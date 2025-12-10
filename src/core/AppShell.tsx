@@ -173,12 +173,14 @@ export default function AppShell() {
           />
         )}
 
-        {/* Logo Stand fijo - only show when a game is selected */}
-        {currentGame?.assets?.standLogo && (
-          <a href="#" className="fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity" aria-label="Stand">
-            <img src={currentGame.assets.standLogo} alt="Stand" className="w-14 h-14 object-contain" />
-          </a>
-        )}
+        {/* Logo Stand fijo - always visible in bottom right corner */}
+        <div className="fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity z-10">
+          <img 
+            src={currentGame?.assets?.standLogo || '/stand-logo.png'} 
+            alt="Stand" 
+            className="w-14 h-14 object-contain" 
+          />
+        </div>
       </div>
     </ThemeProvider>
   )

@@ -6,6 +6,8 @@ const INSTAGRAM_HANDLE = 'stand_official'
 const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
 const API_BASE = "https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod"
 
+type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
+
 type ValidationResponse = {
   valid: boolean
   gameId: string
@@ -21,10 +23,10 @@ type ValidationResponse = {
 }
 
 export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProps) {
+  const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
   const [validationResult, setValidationResult] = useState<ValidationResponse | null>(null)
-  const [isValidating, setIsValidating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleCodeChange = (value: string, setter: (value: string) => void) => {
@@ -44,7 +46,7 @@ export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProp
       return
     }
 
-    setIsValidating(true)
+    setGameState('validating')
     setError(null)
     setValidationResult(null)
 
@@ -65,25 +67,36 @@ export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProp
 
       const result: ValidationResponse = await response.json()
       setValidationResult(result)
+      
+      if (result.valid) {
+        setGameState('valid')
+      } else {
+        setGameState('invalid')
+      }
     } catch (err: any) {
       setError(err.message || 'Error al validar los códigos')
-    } finally {
-      setIsValidating(false)
+      setGameState('invalid')
     }
+  }
+
+  const handleReset = () => {
+    // Reset everything for next validation
+    setGameState('idle')
+    setCode1('')
+    setCode2('')
+    setValidationResult(null)
+    setError(null)
   }
 
   // Auto-reset after 5 seconds when validation is successful
   useEffect(() => {
-    if (validationResult?.valid) {
+    if (gameState === 'valid') {
       const timeout = setTimeout(() => {
-        setCode1('')
-        setCode2('')
-        setValidationResult(null)
-        setError(null)
+        handleReset()
       }, 5000)
       return () => clearTimeout(timeout)
     }
-  }, [validationResult?.valid])
+  }, [gameState])
 
   return (
     <div className="w-full space-y-6">
@@ -131,12 +144,12 @@ export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProp
         </div>
       </div>
 
-      {/* Validator - Only show when not validated or after reset */}
-      {!validationResult?.valid && (
+      {/* Validator - Only show when idle or invalid */}
+      {(gameState === 'idle' || gameState === 'invalid') && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-textMain">Validador de Parejas</h3>
           
-          {error && (
+          {error && gameState === 'invalid' && (
             <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
               {error}
             </div>
@@ -178,32 +191,33 @@ export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProp
           {/* Validation Button */}
           <button
             onClick={validateCodes}
-            disabled={isValidating || code1.length !== 4 || code2.length !== 4}
+            disabled={code1.length !== 4 || code2.length !== 4}
             className="w-full p-3 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             <div className="flex items-center justify-center gap-2">
-              {isValidating ? (
-                <>
-                  <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Validando...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Validar Códigos
-                </>
-              )}
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Validar Códigos
             </div>
           </button>
         </div>
       )}
 
+      {/* Validating State */}
+      {gameState === 'validating' && (
+        <div className="text-center py-8">
+          <div className="flex items-center justify-center gap-3">
+            <svg className="w-6 h-6 animate-spin text-neonMagenta" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <p className="text-xl font-semibold text-neonMagenta">Validando códigos...</p>
+          </div>
+        </div>
+      )}
+
       {/* Winning Animation - Show when validated successfully */}
-      {validationResult?.valid && validationResult.players && validationResult.players.length === 2 && (
+      {gameState === 'valid' && validationResult?.valid && validationResult.players && validationResult.players.length === 2 && (
         <div className="animate-fade-in">
           {/* Player 1 | Success Message | Player 2 - All in one row */}
           <div className="grid grid-cols-3 gap-4 items-center">
@@ -283,8 +297,8 @@ export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProp
         </div>
       )}
 
-      {/* Invalid Result */}
-      {validationResult && !validationResult.valid && (
+      {/* Invalid Result - Show error message only, no button */}
+      {gameState === 'invalid' && validationResult && !validationResult.valid && (
         <div className="p-4 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in">
           <div className="flex items-center justify-center gap-2 mb-2">
             <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -292,8 +306,8 @@ export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProp
             </svg>
             <span className="text-lg font-semibold text-red-400">Pareja Inválida</span>
           </div>
-          {validationResult.message && (
-            <p className="text-sm text-red-300">{validationResult.message}</p>
+          {(validationResult.message || error) && (
+            <p className="text-sm text-red-300">{validationResult.message || error}</p>
           )}
         </div>
       )}

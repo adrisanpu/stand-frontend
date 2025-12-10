@@ -104,30 +104,21 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
   if (!selectedGame) {
     return (
       <div className="w-full space-y-6">
-        {/* Header with Client Logo and Stand Logo */}
-        <div className="flex flex-col items-center mb-6 space-y-4">
-          {/* Client Logo */}
+        {/* Header with Stand Letters Logo */}
+        <div className="flex flex-col items-center mb-6">
+          {/* Stand Letters Logo - no background */}
           <img 
-            src="/client-logo.png" 
-            alt="Client" 
-            className="h-16 w-auto object-contain"
+            src="/logo_stand_letters.png" 
+            alt="Stand" 
+            className="h-20 w-auto object-contain"
+            onError={(e) => {
+              // Fallback to stand-logo.png if logo_stand_letters.png doesn't exist
+              const target = e.target as HTMLImageElement
+              if (target.src !== `${window.location.origin}/stand-logo.png`) {
+                target.src = '/stand-logo.png'
+              }
+            }}
           />
-          
-          {/* Stand Logo with white rounded background */}
-          <div className="bg-white rounded-2xl p-4">
-            <img 
-              src="/logo_stand_letters.png" 
-              alt="Stand" 
-              className="h-16 w-auto object-contain"
-              onError={(e) => {
-                // Fallback to stand-logo.png if logo_stand_letters.png doesn't exist
-                const target = e.target as HTMLImageElement
-                if (target.src !== `${window.location.origin}/stand-logo.png`) {
-                  target.src = '/stand-logo.png'
-                }
-              }}
-            />
-          </div>
         </div>
 
         {/* Games Grid */}
@@ -219,18 +210,18 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
       {/* Action Buttons - Direct actions */}
       <div className="flex gap-3">
         <button
-          onClick={handleJoin}
-          disabled={joining || !gameId.trim()}
-          className="flex-1 p-4 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-        >
-          {joining ? 'Buscando...' : 'Unirse'}
-        </button>
-        <button
           onClick={handleCreate}
           disabled={loading || !gameId.trim()}
           className="flex-1 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
         >
           {loading ? 'Creando...' : 'Crear'}
+        </button>
+        <button
+          onClick={handleJoin}
+          disabled={joining || !gameId.trim()}
+          className="flex-1 p-4 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+        >
+          {joining ? 'Buscando...' : 'Unirse'}
         </button>
       </div>
     </div>
