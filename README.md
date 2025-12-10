@@ -246,6 +246,11 @@ Common endpoints:
 ## 📸 Screenshots
 
 The platform supports multiple games with unique UIs and mechanics, all managed through a unified interface.
+<img width="580" height="506" alt="image" src="https://github.com/user-attachments/assets/c4b21406-3524-4245-8b97-92b22a59a18a" />
+<img width="907" height="646" alt="image" src="https://github.com/user-attachments/assets/13324ab0-5774-44f8-b868-c9521c28d7af" />
+<img width="886" height="658" alt="image" src="https://github.com/user-attachments/assets/027b2ab9-4acf-41c6-acb2-3204987a46af" />
+
+
 
 ## 👤 Author
 
