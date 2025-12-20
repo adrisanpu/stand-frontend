@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Raffle from './Raffle'
 import Quiz from './Quiz'
+import type { GameDefinition } from './types'
 
 type SettingsMenuProps = {
   onClose: () => void
   gameId?: string
   gameType?: string
+  gameDefinition?: GameDefinition
   onLeaveGame?: () => void
   onExitApp?: () => void
 }
 
-export default function SettingsMenu({ onClose, gameId, gameType, onLeaveGame, onExitApp }: SettingsMenuProps) {
+export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition, onLeaveGame, onExitApp }: SettingsMenuProps) {
   const [showRaffle, setShowRaffle] = useState(false)
   const [showQuiz, setShowQuiz] = useState(false)
   const [showRemovePlayer, setShowRemovePlayer] = useState(false)
@@ -26,6 +28,33 @@ export default function SettingsMenu({ onClose, gameId, gameType, onLeaveGame, o
   const [exportQuizData, setExportQuizData] = useState<any>(null)
   const [showExportShareOptions, setShowExportShareOptions] = useState(false)
   const [exportQuizError, setExportQuizError] = useState<string | null>(null)
+  const [showGameConfig, setShowGameConfig] = useState(false)
+  const [gameSettings, setGameSettings] = useState<any>(null)
+
+  // Load game settings from localStorage when gameId changes
+  useEffect(() => {
+    if (gameId && gameDefinition?.id) {
+      const storageKey = `${gameDefinition.id}_settings_${gameId}`
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        try {
+          setGameSettings(JSON.parse(saved))
+        } catch {
+          setGameSettings(null)
+        }
+      } else {
+        setGameSettings(null)
+      }
+    }
+  }, [gameId, gameDefinition?.id])
+
+  const handleGameConfigChange = (newSettings: any) => {
+    if (gameId && gameDefinition?.id) {
+      const storageKey = `${gameDefinition.id}_settings_${gameId}`
+      localStorage.setItem(storageKey, JSON.stringify(newSettings))
+      setGameSettings(newSettings)
+    }
+  }
 
   const API_BASE = "https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod"
 
@@ -195,6 +224,40 @@ export default function SettingsMenu({ onClose, gameId, gameType, onLeaveGame, o
 
   if (showQuiz) {
     return <Quiz onBack={() => setShowQuiz(false)} onClose={onClose} gameId={gameId} />
+  }
+
+  if (showGameConfig && gameDefinition?.GameConfigComponent) {
+    const GameConfigComponent = gameDefinition.GameConfigComponent
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="game-config-title"
+        className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      >
+        <div className="absolute inset-0 bg-black/70" onClick={() => setShowGameConfig(false)} aria-hidden="true" />
+        <div className="relative card w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h2 id="game-config-title" className="text-xl font-semibold">Configurar juego</h2>
+            <button
+              onClick={() => setShowGameConfig(false)}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              aria-label="Cerrar"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <GameConfigComponent
+            gameId={gameId ?? null}
+            gameName={gameDefinition.name}
+            settings={gameSettings}
+            onChange={handleGameConfigChange}
+          />
+        </div>
+      </div>
+    )
   }
 
   if (showExportQuiz) {
@@ -617,6 +680,30 @@ export default function SettingsMenu({ onClose, gameId, gameType, onLeaveGame, o
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
+
+              {/* Game Config - Only show if game has GameConfigComponent */}
+              {gameDefinition?.GameConfigComponent && (
+                <button
+                  onClick={() => setShowGameConfig(true)}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+                >
+                  <div className="p-2 rounded-lg bg-blue-500/20">
+                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">Configurar juego</div>
+                    <div className="text-sm text-gray-400">
+                      Configurar opciones del juego
+                    </div>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
 
               {/* Raffle - For all games */}
               <button

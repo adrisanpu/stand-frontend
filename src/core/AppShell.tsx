@@ -78,6 +78,7 @@ export default function AppShell() {
     // Map common variations
     if (normalized === 't1mer' || normalized === 'timer') return 't1mer'
     if (normalized === 'empareja2' || normalized === 'empareja') return 'empareja2'
+    if (normalized === 'rulet4' || normalized === 'ruleta') return 'rulet4'
     return normalized
   }
 
@@ -168,6 +169,7 @@ export default function AppShell() {
             onClose={() => setShowSettings(false)} 
             gameId={gameId ?? undefined}
             gameType={gameType ?? undefined}
+            gameDefinition={gameDefinition ?? undefined}
             onLeaveGame={handleLeaveGame}
             onExitApp={handleExitApp}
           />

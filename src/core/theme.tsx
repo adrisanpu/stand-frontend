@@ -25,13 +25,13 @@ export function ThemeProvider({
   children: ReactNode 
 }) {
   useEffect(() => {
-    // Always apply theme - if no game, use default orange theme
+    // Always apply theme - if no game, use default gray theme
     const themeToApply = game || {
       id: 'default',
       name: 'Stand',
       colors: {
-        primary: '#fb831b',
-        accent: '#ffa64d',
+        primary: '#9CA3AF',  // gray-400 - nice medium gray
+        accent: '#D1D5DB',   // gray-300 - lighter gray for accent
         background: '#0B0A12',
         surface: 'rgba(255,255,255,0.04)',
         textMain: '#EAEAF2',

@@ -39,6 +39,7 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
       setError('Nombre de partida inválido. Usa letras, números, _ - .')
       return
     }
+
     setLoading(true)
     try {
       const r = await fetch(`${API_BASE}/game`, {
@@ -46,7 +47,7 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           gameName: gameId.toUpperCase(),
-          gameType: selectedGame.id
+          gameType: selectedGame.name
         })
       })
       const data = await r.json()

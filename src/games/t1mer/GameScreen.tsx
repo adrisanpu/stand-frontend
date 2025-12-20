@@ -275,47 +275,80 @@ export default function T1merGameScreen({ gameName, gameId }: GameScreenProps) {
         </div>
       )}
 
+      {/* Validating State */}
+      {gameState === 'idle' && isValidating && (
+        <div className="text-center py-4">
+          <div className="flex items-center justify-center gap-3">
+            <svg className="w-6 h-6 animate-spin text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <p className="text-xl font-semibold text-red-500">Validando código...</p>
+          </div>
+        </div>
+      )}
 
       {/* Preparing Animation */}
       {gameState === 'preparing' && (
-        <div className="text-center py-8">
+        <div className="text-center py-4">
           <p className="text-3xl font-bold text-red-500 animate-pulse">
             {preparingText}
           </p>
         </div>
       )}
 
-      {/* Timer Display - Playing or Hidden */}
-      {(gameState === 'playing' || gameState === 'hidden') && (
-        <div className="space-y-6">
-          <div className="text-center py-8">
-            {gameState === 'playing' ? (
-              <div className="text-6xl font-bold text-red-500 font-mono">
-                {formatTimer(timer)}
-              </div>
-            ) : (
-              <div className="text-6xl font-bold text-gray-600 font-mono">
-                ???
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={handleStop}
-            className="w-full p-6 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
-          >
-            <span className="text-2xl font-bold">DETENER</span>
-          </button>
+      {/* Timer Display - Always visible */}
+      <div className="space-y-6">
+        <div className="text-center py-8 min-h-[120px] flex items-center justify-center">
+          {gameState === 'idle' ? (
+            // Disabled state - show initial timer with reduced opacity
+            <div className="text-6xl font-bold text-gray-600 font-mono opacity-50">
+              00:00.0
+            </div>
+          ) : gameState === 'preparing' ? (
+            // Preparing state - show initial timer
+            <div className="text-6xl font-bold text-gray-600 font-mono opacity-50">
+              00:00.0
+            </div>
+          ) : gameState === 'playing' ? (
+            // Playing state - show active timer
+            <div className="text-6xl font-bold text-red-500 font-mono">
+              {formatTimer(timer)}
+            </div>
+          ) : gameState === 'hidden' ? (
+            // Hidden state - show ???
+            <div className="text-6xl font-bold text-gray-600 font-mono">
+              ???
+            </div>
+          ) : gameState === 'finished' && result ? (
+            // Finished state - show result
+            <div className="text-6xl font-bold text-red-500 font-mono">
+              {formatTimer(result.time)}
+            </div>
+          ) : (
+            // Fallback
+            <div className="text-6xl font-bold text-gray-600 font-mono opacity-50">
+              00:00.0
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Stop Button - Always visible, disabled until validated */}
+        <button
+          onClick={handleStop}
+          disabled={gameState !== 'playing' && gameState !== 'hidden'}
+          className="w-full p-6 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span className="text-2xl font-bold">DETENER</span>
+        </button>
+        {gameState === 'idle' && (
+          <p className="text-sm text-gray-400 text-center">Valida tu código para activar el temporizador</p>
+        )}
+      </div>
 
       {/* Result Display - After stopping */}
       {gameState === 'finished' && result && (
         <div className="space-y-4">
-          <div className="text-center py-6 space-y-4">
-            <div className="text-5xl font-bold text-red-500 font-mono">
-              {formatTimer(result.time)}
-            </div>
+          <div className="text-center space-y-4">
             <div className="text-xl text-gray-300">
               Diferencia: {result.difference.toFixed(3)}s
             </div>
