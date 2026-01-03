@@ -1,5 +1,5 @@
 import { useEffect, createContext, useContext, ReactNode } from 'react'
-import type { GameDefinition } from './types'
+import type { GameDefinition, ThemeColors } from './types'
 
 // Helper function to convert hex to RGB
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -17,6 +17,19 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType>({ game: null })
 
+const STORAGE_KEY_COLORS = 'app_custom_color_palette'
+const STORAGE_KEY_THEME_MODE = 'app_theme_mode'
+
+// Default Stand palette (used when no game is selected)
+const DEFAULT_STAND_PALETTE: ThemeColors = {
+  primary: '#9CA3AF',
+  accent: '#D1D5DB',
+  background: '#0B0A12',
+  surface: 'rgba(255,255,255,0.04)',
+  textMain: '#EAEAF2',
+  textSub: '#9AA0A6',
+}
+
 export function ThemeProvider({ 
   game, 
   children 
@@ -25,23 +38,65 @@ export function ThemeProvider({
   children: ReactNode 
 }) {
   useEffect(() => {
+    // Check for custom color palette in localStorage
+    let customColors: ThemeColors | null = null
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_COLORS)
+      if (saved) {
+        customColors = JSON.parse(saved) as ThemeColors
+      }
+    } catch {
+      // Invalid saved data, ignore
+    }
+
+    // Check for theme mode (dark/light)
+    const savedThemeMode = localStorage.getItem(STORAGE_KEY_THEME_MODE)
+    const isDarkMode = savedThemeMode !== 'light'
+
     // Always apply theme - if no game, use default gray theme
-    const themeToApply = game || {
+    // But prioritize custom colors if they exist
+    const defaultTheme = {
       id: 'default',
       name: 'Stand',
-      colors: {
-        primary: '#9CA3AF',  // gray-400 - nice medium gray
-        accent: '#D1D5DB',   // gray-300 - lighter gray for accent
-        background: '#0B0A12',
-        surface: 'rgba(255,255,255,0.04)',
-        textMain: '#EAEAF2',
-        textSub: '#9AA0A6',
-      },
+      colors: DEFAULT_STAND_PALETTE,
       GameScreen: () => null,
     }
 
+    const themeToApply = game || defaultTheme
+    let colors = customColors || themeToApply.colors
+
+    // If using default palette (not custom), adjust background colors based on theme mode
+    if (!customColors && !isDarkMode) {
+      // Apply light mode colors to default palette
+      colors = {
+        ...colors,
+        background: '#F5F5F7',
+        surface: '#FFFFFF', // Solid white for better card visibility
+        textMain: '#0F172A', // Darker for better readability (slate-900)
+        textSub: '#475569', // Darker gray for better contrast (slate-600)
+      }
+    }
+    
+    // If using custom colors in light mode, ensure surface is visible and text is dark
+    if (customColors && !isDarkMode) {
+      // Check if surface is transparent (dark mode style)
+      if (colors.surface === 'rgba(255,255,255,0.04)' || colors.surface === 'rgba(0,0,0,0.04)') {
+        colors = {
+          ...colors,
+          surface: '#FFFFFF', // Override transparent surface with solid white
+        }
+      }
+      // Ensure text colors are dark enough for light mode
+      if (colors.textMain === '#EAEAF2' || colors.textMain === '#1D1D1F') {
+        colors = {
+          ...colors,
+          textMain: '#0F172A', // Very dark for better readability
+          textSub: '#475569', // Dark gray for good contrast
+        }
+      }
+    }
+
     const root = document.documentElement
-    const { colors } = themeToApply
 
     // Apply CSS variables
     root.style.setProperty('--color-primary', colors.primary)
@@ -50,6 +105,15 @@ export function ThemeProvider({
     root.style.setProperty('--color-surface', colors.surface)
     root.style.setProperty('--color-text-main', colors.textMain)
     root.style.setProperty('--color-text-sub', colors.textSub)
+    
+    // Apply theme mode class to html element
+    if (isDarkMode) {
+      document.documentElement.classList.remove('light-mode')
+      document.documentElement.classList.add('dark-mode')
+    } else {
+      document.documentElement.classList.remove('dark-mode')
+      document.documentElement.classList.add('light-mode')
+    }
     
     // Extract RGB values for gradient backgrounds
     const primaryRgb = hexToRgb(colors.primary) || { r: 176, g: 38, b: 255 }

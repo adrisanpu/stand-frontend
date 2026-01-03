@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { games } from '../games'
 import type { GameDefinition } from './types'
 
@@ -10,12 +10,23 @@ type GameGateProps = {
   onSetGameId: (gameId: string) => void
 }
 
+const STORAGE_KEY_LOGO = 'app_custom_logo'
+
 export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
   const [selectedGame, setSelectedGame] = useState<GameDefinition | null>(null)
   const [gameId, setGameId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [joining, setJoining] = useState(false)
+  const [customLogo, setCustomLogo] = useState<string | null>(null)
+
+  // Load custom logo from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_LOGO)
+    if (saved) {
+      setCustomLogo(saved)
+    }
+  }, [])
 
   const validateGameId = (id: string) => GAME_RE.test(id)
 
@@ -105,21 +116,29 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
   if (!selectedGame) {
     return (
       <div className="w-full space-y-6">
-        {/* Header with Stand Letters Logo */}
+        {/* Header with Logo */}
         <div className="flex flex-col items-center mb-6">
-          {/* Stand Letters Logo - no background */}
-          <img 
-            src="/logo_stand_letters.png" 
-            alt="Stand" 
-            className="h-20 w-auto object-contain"
-            onError={(e) => {
-              // Fallback to stand-logo.png if logo_stand_letters.png doesn't exist
-              const target = e.target as HTMLImageElement
-              if (target.src !== `${window.location.origin}/stand-logo.png`) {
-                target.src = '/stand-logo.png'
-              }
-            }}
-          />
+          {/* Custom logo or Stand Letters Logo */}
+          {customLogo ? (
+            <img 
+              src={customLogo} 
+              alt="Logo personalizado" 
+              className="h-20 w-auto object-contain"
+            />
+          ) : (
+            <img 
+              src="/logo_stand_letters.png" 
+              alt="Stand" 
+              className="h-20 w-auto object-contain"
+              onError={(e) => {
+                // Fallback to stand-logo.png if logo_stand_letters.png doesn't exist
+                const target = e.target as HTMLImageElement
+                if (target.src !== `${window.location.origin}/stand-logo.png`) {
+                  target.src = '/stand-logo.png'
+                }
+              }}
+            />
+          )}
         </div>
 
         {/* Games Grid */}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Raffle from './Raffle'
 import Quiz from './Quiz'
+import AppearanceSettings from './AppearanceSettings'
 import type { GameDefinition } from './types'
 
 type SettingsMenuProps = {
@@ -30,6 +31,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [exportQuizError, setExportQuizError] = useState<string | null>(null)
   const [showGameConfig, setShowGameConfig] = useState(false)
   const [gameSettings, setGameSettings] = useState<any>(null)
+  const [showAppearanceSettings, setShowAppearanceSettings] = useState(false)
 
   // Load game settings from localStorage when gameId changes
   useEffect(() => {
@@ -224,6 +226,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
 
   if (showQuiz) {
     return <Quiz onBack={() => setShowQuiz(false)} onClose={onClose} gameId={gameId} />
+  }
+
+  if (showAppearanceSettings) {
+    return <AppearanceSettings onClose={() => setShowAppearanceSettings(false)} gameDefinition={gameDefinition} />
   }
 
   if (showGameConfig && gameDefinition?.GameConfigComponent) {
@@ -634,27 +640,46 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         </div>
 
         <div className="space-y-3">
-          {/* No game selected - only exit app option */}
+          {/* No game selected - appearance settings and exit app option */}
           {!gameType && (
-            <button
-              onClick={() => {
-                onClose()
-                if (onExitApp) {
-                  onExitApp()
-                }
-              }}
-              className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-            >
-              <div className="p-2 rounded-lg bg-red-500/20">
-                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <>
+              <button
+                onClick={() => setShowAppearanceSettings(true)}
+                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              >
+                <div className="p-2 rounded-lg bg-purple-500/20">
+                  <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <div className="font-medium">Configurar aspecto</div>
+                  <div className="text-sm text-gray-400">Personalizar colores y logo</div>
+                </div>
+                <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-              </div>
-              <div className="text-left">
-                <div className="font-medium">Salir de la aplicación</div>
-                <div className="text-sm text-gray-400">Cerrar la aplicación</div>
-              </div>
-            </button>
+              </button>
+              <button
+                onClick={() => {
+                  onClose()
+                  if (onExitApp) {
+                    onExitApp()
+                  }
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              >
+                <div className="p-2 rounded-lg bg-red-500/20">
+                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <div className="font-medium">Salir de la aplicación</div>
+                  <div className="text-sm text-gray-400">Cerrar la aplicación</div>
+                </div>
+              </button>
+            </>
           )}
 
           {/* Game-specific options */}

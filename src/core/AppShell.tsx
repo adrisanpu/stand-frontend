@@ -6,12 +6,23 @@ import Ranking from './Ranking'
 import { getGameById } from '../games'
 import type { GameDefinition } from './types'
 
+const STORAGE_KEY_LOGO = 'app_custom_logo'
+
 export default function AppShell() {
   const [showSettings, setShowSettings] = useState(false)
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameName, setGameName] = useState<string | null>(null)
   const [gameType, setGameType] = useState<string | null>(null)
   const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
+  const [customLogo, setCustomLogo] = useState<string | null>(null)
+
+  // Load custom logo from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_LOGO)
+    if (saved) {
+      setCustomLogo(saved)
+    }
+  }, [])
 
   // Load gameId, gameName, and gameType from localStorage on mount
   useEffect(() => {
@@ -132,14 +143,23 @@ export default function AppShell() {
             <div className="flex gap-4 w-full max-w-6xl items-start">
               {/* Game Screen */}
               <div className="card flex-1 p-8">
-                {/* Game logo only shown when a game is selected */}
-                {currentGame.assets?.logo && (
-                  <div className="flex flex-col items-center mb-8">
-                    <img 
-                      src={currentGame.assets.logo} 
-                      alt={currentGame.name} 
-                      className="h-[120px] w-auto object-contain"
-                    />
+                {/* Game logo and custom logo shown when a game is selected */}
+                {(currentGame.assets?.logo || customLogo) && (
+                  <div className="flex flex-col items-center mb-8 gap-4">
+                    {customLogo && (
+                      <img 
+                        src={customLogo} 
+                        alt="Logo personalizado" 
+                        className="h-16 w-auto object-contain"
+                      />
+                    )}
+                    {currentGame.assets?.logo && (
+                      <img 
+                        src={currentGame.assets.logo} 
+                        alt={currentGame.name} 
+                        className="h-[120px] w-auto object-contain"
+                      />
+                    )}
                   </div>
                 )}
                 <currentGame.GameScreen gameName={gameName} gameId={gameId} />
@@ -175,11 +195,11 @@ export default function AppShell() {
           />
         )}
 
-        {/* Logo Stand fijo - always visible in bottom right corner */}
+        {/* Logo fijo - always visible in bottom right corner */}
         <div className="fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity z-10">
           <img 
-            src={currentGame?.assets?.standLogo || '/stand-logo.png'} 
-            alt="Stand" 
+            src={customLogo || currentGame?.assets?.standLogo || '/stand-logo.png'} 
+            alt={customLogo ? "Logo personalizado" : "Stand"} 
             className="w-14 h-14 object-contain" 
           />
         </div>

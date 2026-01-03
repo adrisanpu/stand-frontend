@@ -6,6 +6,16 @@
 
 html,body,#root { height: 100%; background: #0B0A12; }
 
+/* Light mode support */
+html.light-mode {
+  color-scheme: light;
+}
+
+html.light-mode body,
+html.light-mode #root {
+  background: #F5F5F7;
+}
+
 .bg-club {
   position: relative;
   min-height: 100vh;
@@ -30,6 +40,13 @@ html,body,#root { height: 100%; background: #0B0A12; }
   box-shadow: 0 10px 30px rgba(0,0,0,0.35);
   position: relative;
 }
+
+/* Light mode card styles */
+html.light-mode .card {
+  background: var(--color-surface, #FFFFFF);
+  border: 2px solid rgba(0,0,0,0.15);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+}
 .card::before{
   content:'';
   position:absolute; inset:-1px;
@@ -40,6 +57,32 @@ html,body,#root { height: 100%; background: #0B0A12; }
      linear-gradient(#000 0 0) content-box, 
      linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
+}
+
+/* Light mode card border - more visible and prominent gradient */
+html.light-mode .card::before {
+  background: linear-gradient(120deg, var(--color-border-gradient-1, rgba(176,38,255,0.6)), var(--color-border-gradient-2, rgba(34,211,238,0.6)));
+  padding: 2px;
+}
+
+/* Light mode text improvements - darker text for better readability */
+html.light-mode .text-gray-300,
+html.light-mode .text-gray-400 {
+  color: #4B5563 !important; /* gray-600 - darker for better readability */
+}
+
+html.light-mode .text-gray-500 {
+  color: #374151 !important; /* gray-700 - even darker */
+}
+
+html.light-mode .text-gray-600 {
+  color: #1F2937 !important; /* gray-800 - very dark */
+}
+
+/* Ensure textMain and textSub are dark in light mode */
+html.light-mode {
+  --color-text-main: #0F172A;
+  --color-text-sub: #475569;
 }
 @keyframes glowPulse { 0%,100%{opacity:.55} 50%{opacity:1} }
 @keyframes shake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
