@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { api } from '../api/api'
 
 type QuizProps = {
   onBack: () => void
@@ -200,16 +201,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
         }))
       }
 
-      const response = await fetch(`https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod/quizz`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(quizData)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al crear el quiz')
-      }
+      await api.post('/quizz', quizData)
 
       setSuccess(true)
       setTimeout(() => {
@@ -315,17 +307,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
     setShowShareOptions(false)
 
     try {
-      const response = await fetch(`https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod/quizz?gameId=${encodeURIComponent(gameId)}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al exportar los datos del quiz')
-      }
-
-      const data: QuizDataResponse = await response.json()
+      const data = await api.get<QuizDataResponse>(`/quizz?gameId=${encodeURIComponent(gameId)}`)
       setExportData(data)
       setShowShareOptions(true)
     } catch (err: any) {

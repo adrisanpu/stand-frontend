@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/QRCode'
 import type { Rulet4Settings, Rulet4PanelConfig } from './GameConfig'
+import { api } from '../../api/api'
 
 const INSTAGRAM_HANDLE = 'stand_official'
 const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
-const API_BASE = "https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod"
 
 type GameState = 
   | 'idle'       // player code input
@@ -68,20 +68,10 @@ export default function Rulet4GameScreen({ gameName, gameId }: GameScreenProps) 
     setError(null)
 
     try {
-      const response = await fetch(`${API_BASE}/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId: gameId,
-          codes: [playerCode.toUpperCase()]
-        })
+      const data = await api.post<{ valid: boolean; playerId?: string; username?: string; message?: string; error?: string }>('/validate', {
+        gameId: gameId,
+        codes: [playerCode.toUpperCase()]
       })
-
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.message || data.error || 'Error al validar el código')
-      }
       
       if (data.valid && data.playerId) {
         setPlayerId(data.playerId)
@@ -153,21 +143,12 @@ export default function Rulet4GameScreen({ gameName, gameId }: GameScreenProps) 
     }
 
     try {
-      const response = await fetch(`${API_BASE}/score`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId: gameId,
-          playerId: playerId,
-          prize: panel.label,
-          index: index,
-        })
+      await api.post('/score', {
+        gameId: gameId,
+        playerId: playerId,
+        prize: panel.label,
+        index: index,
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al enviar el resultado')
-      }
     } catch (err: any) {
       console.error('Error submitting score:', err)
       // Don't show error to user, just log it

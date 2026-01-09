@@ -3,6 +3,7 @@ import Raffle from './Raffle'
 import Quiz from './Quiz'
 import AppearanceSettings from './AppearanceSettings'
 import type { GameDefinition } from './types'
+import { api } from '../api/api'
 
 type SettingsMenuProps = {
   onClose: () => void
@@ -58,8 +59,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     }
   }
 
-  const API_BASE = "https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod"
-
   const handleRemovePlayer = async () => {
     const username = usernameToDelete.trim()
     
@@ -75,16 +74,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     try {
       const cleanUsername = username.startsWith('@') ? username.substring(1) : username
       
-      const response = await fetch(API_BASE, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleanUsername, gameId })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al eliminar el jugador')
-      }
+      await api.delete<{ ok?: boolean }>('', { username: cleanUsername, gameId })
 
       setRemoveSuccess(true)
       setTimeout(() => {
@@ -111,17 +101,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     setShowExportShareOptions(false)
 
     try {
-      const response = await fetch(`${API_BASE}/quizz?gameId=${encodeURIComponent(gameId)}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al exportar los datos del quiz')
-      }
-
-      const data = await response.json()
+      const data = await api.get(`/quizz?gameId=${encodeURIComponent(gameId)}`)
       setExportQuizData(data)
       setShowExportShareOptions(true)
     } catch (err: any) {
@@ -190,16 +170,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     setTerminateError(null)
 
     try {
-      const response = await fetch(`${API_BASE}/game`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameId, isActive: false })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al terminar la partida')
-      }
+      await api.put('/game', { gameId, isActive: false })
 
       // Close the popup and settings menu, then leave the game
       setShowExportQuiz(false)

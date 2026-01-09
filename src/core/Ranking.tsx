@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-
-const API_BASE = "https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod"
+import { api } from '../api/api'
 
 export interface RankingEntry {
   rank?: number
@@ -18,17 +17,7 @@ interface RankingResponse {
 
 async function getRanking(gameId: string, limit: number = 10): Promise<RankingEntry[]> {
   try {
-    const response = await fetch(`${API_BASE}/score?gameId=${encodeURIComponent(gameId)}&limit=${limit}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Error al cargar el ranking')
-    }
-
-    const data: RankingResponse = await response.json()
+    const data = await api.get<RankingResponse>(`/score?gameId=${encodeURIComponent(gameId)}&limit=${limit}`)
     
     // Handle new response structure
     if (data.ok && Array.isArray(data.results)) {

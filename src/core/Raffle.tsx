@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { api } from '../api/api'
 
 type RaffleProps = {
   onBack: () => void
@@ -43,22 +44,11 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
     setWinners(null)
 
     try {
-      const response = await fetch(`https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod/raffle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId,
-          numberOfWinners,
-          applicableOnlyValidated
-        })
+      const result = await api.post<RaffleResponse>('/raffle', {
+        gameId,
+        numberOfWinners,
+        applicableOnlyValidated
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al ejecutar el sorteo')
-      }
-
-      const result: RaffleResponse = await response.json()
       if (result.winners && Array.isArray(result.winners)) {
         setWinners(result.winners)
       } else {

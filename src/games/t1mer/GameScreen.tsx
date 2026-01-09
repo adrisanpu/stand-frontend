@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/QRCode'
+import { api } from '../../api/api'
 
 const INSTAGRAM_HANDLE = 'stand_official'
 const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
-const API_BASE = "https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod"
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
 
@@ -89,21 +89,10 @@ export default function T1merGameScreen({ gameName, gameId }: GameScreenProps) {
     setError(null)
 
     try {
-      const response = await fetch(`${API_BASE}/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId: gameId,
-          codes: [playerCode.toUpperCase()]
-        })
+      const data = await api.post<{ valid: boolean; playerId?: string; username?: string; message?: string; error?: string }>('/validate', {
+        gameId: gameId,
+        codes: [playerCode.toUpperCase()]
       })
-
-      const data = await response.json()
-      
-      if (!response.ok) {
-        // If response is not ok, try to get error message from response
-        throw new Error(data.message || data.error || 'Error al validar el código')
-      }
       
       if (data.valid && data.playerId) {
         setPlayerId(data.playerId)
@@ -149,21 +138,12 @@ export default function T1merGameScreen({ gameName, gameId }: GameScreenProps) {
     try {
       const scoreMs = Math.round(difference * 1000) // Convert to integer milliseconds
 
-      const response = await fetch(`${API_BASE}/score`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId: gameId,
-          playerId: playerId, // string or number
-          timer: time.toFixed(3), // seconds as string
-          score: scoreMs // integer (difference in ms from target time)
-        })
+      await api.post('/score', {
+        gameId: gameId,
+        playerId: playerId, // string or number
+        timer: time.toFixed(3), // seconds as string
+        score: scoreMs // integer (difference in ms from target time)
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error al enviar la puntuación')
-      }
     } catch (err: any) {
       console.error('Error submitting score:', err)
       setError(err.message || 'Error al enviar la puntuación')

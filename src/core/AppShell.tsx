@@ -5,10 +5,12 @@ import SettingsMenu from './SettingsMenu'
 import Ranking from './Ranking'
 import { getGameById } from '../games'
 import type { GameDefinition } from './types'
+import { useCurrentUser } from '../auth/useCurrentUser'
 
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 
 export default function AppShell() {
+  const { user, plan, loading: userLoading } = useCurrentUser()
   const [showSettings, setShowSettings] = useState(false)
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameName, setGameName] = useState<string | null>(null)
@@ -121,6 +123,19 @@ export default function AppShell() {
 
   // Use game definition if available, otherwise use a default theme (no specific game)
   const currentGame = gameDefinition
+
+  // Show loading state while fetching user
+  if (userLoading) {
+    return (
+      <ThemeProvider game={currentGame}>
+        <div className="bg-club text-textMain font-sans min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-textMain">Cargando...</p>
+          </div>
+        </div>
+      </ThemeProvider>
+    )
+  }
 
   return (
     <ThemeProvider game={currentGame}>

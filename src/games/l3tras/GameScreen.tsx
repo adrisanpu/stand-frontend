@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/QRCode'
 import type { L3trasSettings } from './GameConfig'
+import { api } from '../../api/api'
 
 const INSTAGRAM_HANDLE = 'stand_official'
 const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
-const API_BASE = "https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod"
 
 type GameState = 'idle' | 'checking' | 'success' | 'error'
 
@@ -120,21 +120,10 @@ export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) 
     setLetters([])
 
     try {
-      const response = await fetch(`${API_BASE}/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId: gameId,
-          codes: trimmedCodes
-        })
+      const result = await api.post<ValidationResponse>('/validate', {
+        gameId: gameId,
+        codes: trimmedCodes
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || errorData.message || 'Error al validar los códigos')
-      }
-
-      const result: ValidationResponse = await response.json()
       
       // Extract letters from response
       let extractedLetters: string[] = []
@@ -193,21 +182,12 @@ export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) 
     if (!gameId) return
 
     try {
-      const response = await fetch(`${API_BASE}/score`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId: gameId,
-          codesUsed: codesUsed,
-          objectiveWord: objectiveWord,
-          success: success,
-        })
+      await api.post('/score', {
+        gameId: gameId,
+        codesUsed: codesUsed,
+        objectiveWord: objectiveWord,
+        success: success,
       })
-
-      if (!response.ok) {
-        // Don't show error to user, just log it
-        console.error('Error submitting score:', await response.json())
-      }
     } catch (err) {
       // Don't show error to user, just log it
       console.error('Error submitting score:', err)

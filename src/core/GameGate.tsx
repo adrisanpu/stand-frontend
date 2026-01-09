@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { games } from '../games'
 import type { GameDefinition } from './types'
+import { api } from '../api/api'
 
 const GAME_RE = /^[A-Za-z0-9._-]{1,40}$/
-const API_BASE = "https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod"
 
 type GameGateProps = {
   onGameCreated: (gameName: string, gameId: string, gameType?: string) => void
@@ -53,16 +53,10 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
 
     setLoading(true)
     try {
-      const r = await fetch(`${API_BASE}/game`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          gameName: gameId.toUpperCase(),
-          gameType: selectedGame.name
-        })
+      const data = await api.post<{ message?: string; gameName?: string; gameId?: string; table?: unknown; gameType?: string; createdAt?: string; error?: string }>('/game', { 
+        gameName: gameId.toUpperCase(),
+        gameType: selectedGame.name
       })
-      const data = await r.json()
-      if (!r.ok) throw new Error(data.error || 'Error al crear partida')
       // API returns { message, gameName, gameId, table, gameType, createdAt }
       if (data.gameName && data.gameId) {
         onGameCreated(data.gameName, data.gameId, data.gameType || selectedGame.id)
@@ -88,16 +82,7 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
     
     setJoining(true)
     try {
-      const response = await fetch(`${API_BASE}/game?gameName=${encodeURIComponent(gameId.toUpperCase())}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo encontrar la partida')
-      }
+      const data = await api.get<{ message?: string; gameName?: string; gameId?: string; gameType?: string; createdAt?: string; error?: string }>(`/game?gameName=${encodeURIComponent(gameId.toUpperCase())}`)
       
       // API returns { message, gameName, gameId, gameType, createdAt }
       if (data.gameName && data.gameId) {

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/QRCode'
+import { api } from '../../api/api'
 
 const INSTAGRAM_HANDLE = 'stand_official'
 const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
-const API_BASE = "https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod"
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
 
@@ -51,21 +51,10 @@ export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProp
     setValidationResult(null)
 
     try {
-      const response = await fetch(`${API_BASE}/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId: gameId,
-          codes: [code1, code2]
-        })
+      const result = await api.post<ValidationResponse>('/validate', {
+        gameId: gameId,
+        codes: [code1, code2]
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || errorData.message || 'Error al validar los códigos')
-      }
-
-      const result: ValidationResponse = await response.json()
       setValidationResult(result)
       
       if (result.valid) {
