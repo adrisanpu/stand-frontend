@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { ThemeColors, GameDefinition } from './types'
+import { useCurrentUser } from '../auth/useCurrentUser'
+import { getFeaturesByPlan } from '../auth/featureFlags'
 
 type AppearanceSettingsProps = {
   onClose: () => void
@@ -29,6 +31,8 @@ const LIGHT_MODE_COLORS = {
 }
 
 export default function AppearanceSettings({ onClose, gameDefinition }: AppearanceSettingsProps) {
+  const { plan } = useCurrentUser()
+  const features = getFeaturesByPlan(plan)
   const [useDefaultPalette, setUseDefaultPalette] = useState(true)
   const [customPrimary, setCustomPrimary] = useState('#B026FF')
   const [customAccent, setCustomAccent] = useState('#22D3EE')
@@ -135,23 +139,33 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
   }
 
   const handleSave = () => {
-    // Save colors
-    if (useDefaultPalette) {
-      // Remove custom colors to use default
-      localStorage.removeItem(STORAGE_KEY_COLORS)
+    // Save colors (only if advanced customization is available)
+    if (features.advancedCustomization) {
+      if (useDefaultPalette) {
+        // Remove custom colors to use default
+        localStorage.removeItem(STORAGE_KEY_COLORS)
+      } else {
+        // Save custom colors
+        const customColors = generateCustomColors()
+        localStorage.setItem(STORAGE_KEY_COLORS, JSON.stringify(customColors))
+      }
     } else {
-      // Save custom colors
-      const customColors = generateCustomColors()
-      localStorage.setItem(STORAGE_KEY_COLORS, JSON.stringify(customColors))
+      // For free plan, always remove custom colors
+      localStorage.removeItem(STORAGE_KEY_COLORS)
     }
 
-    // Save theme mode
+    // Save theme mode (always available)
     localStorage.setItem(STORAGE_KEY_THEME_MODE, isDarkMode ? 'dark' : 'light')
 
-    // Save logo
-    if (logoPreview) {
-      localStorage.setItem(STORAGE_KEY_LOGO, logoPreview)
+    // Save logo (only if advanced customization is available)
+    if (features.advancedCustomization) {
+      if (logoPreview) {
+        localStorage.setItem(STORAGE_KEY_LOGO, logoPreview)
+      } else {
+        localStorage.removeItem(STORAGE_KEY_LOGO)
+      }
     } else {
+      // For free plan, always remove custom logo
       localStorage.removeItem(STORAGE_KEY_LOGO)
     }
 
@@ -175,7 +189,6 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
   }
 
   const defaultColors = getDefaultColors()
-  const previewColors = useDefaultPalette ? defaultColors : generateCustomColors()
 
   return (
     <div
@@ -257,13 +270,23 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
               </button>
 
               <button
-                onClick={() => setUseDefaultPalette(false)}
-                className={`p-4 rounded-xl border-2 transition-all ${
+                onClick={() => {
+                  if (!features.advancedCustomization) return
+                  setUseDefaultPalette(false)
+                }}
+                disabled={!features.advancedCustomization}
+                className={`p-4 rounded-xl border-2 transition-all relative ${
                   !useDefaultPalette
                     ? 'border-primary bg-primary/10'
                     : 'border-white/10 bg-[rgba(255,255,255,0.05)] hover:border-white/20'
-                }`}
+                } ${!features.advancedCustomization ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={!features.advancedCustomization ? 'Disponible en el plan Event 24h' : undefined}
               >
+                {!features.advancedCustomization && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl">
+                    <span className="text-xs text-gray-400 font-medium">Event 24h</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-3 mb-2">
                   <div
                     className="w-8 h-8 rounded-full border border-white/20"
@@ -276,14 +299,25 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
                 </div>
                 <div className="text-sm font-medium text-left">Personalizado</div>
                 <div className="text-xs text-gray-400 text-left mt-1">
-                  Paleta bicolor personalizada
+                  {features.advancedCustomization 
+                    ? 'Paleta bicolor personalizada' 
+                    : 'Disponible en el plan Event 24h'}
                 </div>
               </button>
             </div>
 
             {/* Custom Color Editor */}
             {!useDefaultPalette && (
-              <div className="p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-4">
+              <div className={`p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-4 relative ${
+                !features.advancedCustomization ? 'opacity-50' : ''
+              }`}>
+                {!features.advancedCustomization && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl z-10">
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-gray-300 mb-1">Disponible en el plan Event 24h</p>
+                    </div>
+                  </div>
+                )}
                 <h4 className="text-sm font-semibold mb-3">Seleccionar Colores</h4>
                 
                 <div className="space-y-3">
@@ -293,13 +327,15 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
                       type="color"
                       value={customPrimary}
                       onChange={(e) => setCustomPrimary(e.target.value)}
-                      className="w-16 h-10 rounded border border-white/10 cursor-pointer"
+                      disabled={!features.advancedCustomization}
+                      className="w-16 h-10 rounded border border-white/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <input
                       type="text"
                       value={customPrimary}
                       onChange={(e) => setCustomPrimary(e.target.value)}
-                      className="flex-1 h-10 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 text-sm font-mono"
+                      disabled={!features.advancedCustomization}
+                      className="flex-1 h-10 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                       placeholder="#000000"
                     />
                   </div>
@@ -310,13 +346,15 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
                       type="color"
                       value={customAccent}
                       onChange={(e) => setCustomAccent(e.target.value)}
-                      className="w-16 h-10 rounded border border-white/10 cursor-pointer"
+                      disabled={!features.advancedCustomization}
+                      className="w-16 h-10 rounded border border-white/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <input
                       type="text"
                       value={customAccent}
                       onChange={(e) => setCustomAccent(e.target.value)}
-                      className="flex-1 h-10 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 text-sm font-mono"
+                      disabled={!features.advancedCustomization}
+                      className="flex-1 h-10 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                       placeholder="#000000"
                     />
                   </div>
@@ -326,8 +364,13 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
           </div>
 
           {/* Logo Section */}
-          <div>
+          <div className={`relative ${!features.advancedCustomization ? 'opacity-50' : ''}`}>
             <h3 className="text-lg font-semibold mb-3">Logo Personalizado</h3>
+            {!features.advancedCustomization && (
+              <div className="absolute top-0 right-0">
+                <span className="text-xs text-gray-400 bg-black/30 px-2 py-1 rounded">Event 24h</span>
+              </div>
+            )}
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 {logoPreview ? (
@@ -337,15 +380,17 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
                       alt="Logo personalizado"
                       className="h-24 w-auto object-contain rounded-lg border border-white/10"
                     />
-                    <button
-                      onClick={handleRemoveLogo}
-                      className="absolute -top-2 -right-2 p-1 rounded-full bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
-                      aria-label="Eliminar logo"
-                    >
-                      <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                    {features.advancedCustomization && (
+                      <button
+                        onClick={handleRemoveLogo}
+                        className="absolute -top-2 -right-2 p-1 rounded-full bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+                        aria-label="Eliminar logo"
+                      >
+                        <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="h-24 w-24 rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center">
@@ -360,12 +405,22 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
                     type="file"
                     accept="image/*"
                     onChange={handleLogoUpload}
+                    disabled={!features.advancedCustomization}
                     className="hidden"
                     id="logo-upload"
                   />
                   <label
-                    htmlFor="logo-upload"
-                    className="inline-block px-4 py-2 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors cursor-pointer"
+                    htmlFor={features.advancedCustomization ? "logo-upload" : undefined}
+                    className={`inline-block px-4 py-2 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors ${
+                      features.advancedCustomization 
+                        ? 'hover:bg-[rgba(255,255,255,0.1)] cursor-pointer' 
+                        : 'cursor-not-allowed opacity-50'
+                    }`}
+                    onClick={(e) => {
+                      if (!features.advancedCustomization) {
+                        e.preventDefault()
+                      }
+                    }}
                   >
                     <div className="flex items-center gap-2">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,16 +430,25 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
                     </div>
                   </label>
                   <p className="text-xs text-gray-400 mt-2">
-                    Se mostrará en la pantalla inicial y junto al logo de cada juego. Máximo 5MB.
+                    {features.advancedCustomization 
+                      ? 'Se mostrará en la pantalla inicial y junto al logo de cada juego. Máximo 5MB.'
+                      : 'Disponible en el plan Event 24h'}
                   </p>
                 </div>
               </div>
-              {logoError && (
+              {logoError && features.advancedCustomization && (
                 <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
                   {logoError}
                 </div>
               )}
             </div>
+            {!features.advancedCustomization && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl pointer-events-none">
+                <div className="text-center">
+                  <p className="text-sm font-medium text-gray-300">Disponible en el plan Event 24h</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}
