@@ -83,6 +83,18 @@ A precision timing game where players:
 - Score calculation and ranking
 - Instagram Direct integration
 
+### L3tras
+A word formation game where players:
+- Form words using available letters
+- Score based on word length and complexity
+- Compete on leaderboard
+
+### Rulet4
+A configurable roulette game with:
+- Customizable panels and options
+- Real-time spinning mechanics
+- Score tracking and ranking
+
 ## ➕ Adding a New Game
 
 To add a new game to StandShell:
@@ -147,16 +159,36 @@ To add a new game to StandShell:
 
 That's it! Your game will automatically appear in the game selection interface.
 
+## 🔐 Authentication & User Management
+
+StandShell uses **AWS Cognito OAuth2** with **PKCE (Proof Key for Code Exchange)** for secure authentication:
+
+- **OAuth2 Authorization Code Flow** with PKCE for enhanced security
+- **Session-based token storage** using `sessionStorage`
+- **Automatic token refresh** and expiration handling
+- **Protected routes** that redirect unauthenticated users to login
+- **User bootstrap** on first login via backend API
+- **Plan-based feature gating** (FREE, EVENT_24H, ENTERPRISE)
+
+### User Plans
+
+- **FREE**: Basic features, limited games and players
+- **EVENT_24H**: Full access to all features for 24 hours
+- **ENTERPRISE**: Unlimited access to all features
+
 ## 🚀 Technologies
 
 - **React 18** — UI framework
 - **TypeScript** — Type safety
 - **Vite** — Build tool and dev server
 - **Tailwind CSS** — Styling with custom theming
-- **AWS Lambda** — Backend API (game logic, validation)
+- **React Router v6** — Client-side routing
+- **AWS Cognito** — User authentication and authorization
+- **AWS Lambda** — Backend API (game logic, validation, user management)
 - **Amazon DynamoDB** — Game data storage
 - **Amazon API Gateway** — REST API
 - **Amazon S3** — Asset storage (character images)
+- **Stripe** — Payment processing for plan upgrades
 - **Meta Graph API** — Instagram Direct messaging
 
 ## 📦 Project Structure
@@ -165,6 +197,17 @@ That's it! Your game will automatically appear in the game selection interface.
 StandShell/
 ├── public/                 # Static assets (logos, images)
 ├── src/
+│   ├── auth/              # Authentication system
+│   │   ├── AuthContext.tsx      # Auth state management
+│   │   ├── AuthStart.tsx        # OAuth initiation
+│   │   ├── AuthCallback.tsx     # OAuth callback handler
+│   │   ├── ProtectedRoute.tsx   # Route protection
+│   │   ├── useCurrentUser.ts    # User data hook
+│   │   ├── authStorage.ts       # Token storage
+│   │   ├── pkce.ts              # PKCE utilities
+│   │   └── featureFlags.ts     # Plan-based features
+│   ├── api/               # API client
+│   │   └── api.ts         # Centralized API client with auth
 │   ├── core/              # Core reusable components
 │   │   ├── AppShell.tsx   # Main app container
 │   │   ├── GameGate.tsx   # Game selection UI
@@ -174,19 +217,28 @@ StandShell/
 │   │   ├── Raffle.tsx
 │   │   ├── QRCode.tsx
 │   │   ├── theme.tsx      # Theming system
+│   │   ├── logoUtils.ts   # Dynamic logo utilities
+│   │   ├── AppearanceSettings.tsx # Appearance customization
 │   │   └── types.ts       # TypeScript definitions
 │   ├── games/             # Game implementations
 │   │   ├── empareja2/
 │   │   ├── t1mer/
+│   │   ├── l3tras/
+│   │   ├── rulet4/
 │   │   └── index.ts       # Game registry
+│   ├── pages/             # Page components
+│   │   ├── Login.tsx      # Login page
+│   │   ├── BillingSuccess.tsx
+│   │   └── BillingCancel.tsx
 │   ├── styles/
 │   │   └── glow.css       # Global styles and animations
-│   ├── App.tsx
+│   ├── App.tsx            # Main app with routing
 │   └── main.tsx
 ├── package.json
 ├── tsconfig.json
 ├── tailwind.config.ts
-└── vite.config.ts
+├── vite.config.ts
+└── .env                    # Environment variables (not in repo)
 ```
 
 ## 🎨 Theming System
@@ -200,7 +252,43 @@ Each game can define its own color scheme:
 
 The theming system uses CSS variables for dynamic color switching based on the active game.
 
+### Appearance Customization
+
+Users can customize the appearance of the platform:
+
+- **Dark/Light Mode**: Toggle between dark and light themes (available for all plans)
+- **Custom Color Palette**: Personalize primary and accent colors (EVENT_24H plan only)
+- **Custom Logo**: Upload a custom logo (EVENT_24H plan only)
+- **Dynamic Logo**: Logo automatically switches between white/black based on theme mode
+
+The platform logo (`logo_stand_letters`) automatically adapts:
+- **Dark mode**: Uses `logo_stand_letters_white.png`
+- **Light mode**: Uses `logo_stand_letters_black.png`
+
 ## 🔧 Development
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- AWS Cognito User Pool configured
+- Backend API deployed (AWS API Gateway + Lambda)
+
+### Environment Variables
+
+Create a `.env` file in the root directory:
+
+```env
+# AWS Cognito Configuration
+VITE_COGNITO_DOMAIN=your-cognito-domain.auth.region.amazoncognito.com
+VITE_COGNITO_CLIENT_ID=your-client-id
+VITE_COGNITO_REDIRECT_URI=http://localhost:5173/auth/callback
+VITE_COGNITO_LOGOUT_URI=http://localhost:5173/logout
+
+# Backend API
+VITE_API_BASE_URL=https://your-api-gateway-url.amazonaws.com/prod
+```
+
+### Setup
 
 ```bash
 # Install dependencies
@@ -219,21 +307,48 @@ npm run preview
 npm run lint
 ```
 
+### Authentication Flow
+
+1. User clicks "Continuar" on login page
+2. Redirects to `/auth/start` which generates PKCE parameters
+3. Redirects to AWS Cognito OAuth2 authorization endpoint
+4. User authenticates with Cognito
+5. Cognito redirects to `/auth/callback` with authorization code
+6. Frontend exchanges code for tokens using PKCE verifier
+7. Tokens stored in `sessionStorage`
+8. User bootstrapped via `POST /users` API
+9. Redirects to `/app` (protected route)
+
 ## 📝 API Integration
 
-Games communicate with the backend API at:
-```
-https://3u0n7y51m9.execute-api.us-east-1.amazonaws.com/prod
-```
+Games and the application communicate with the backend API. The API base URL is configured via environment variable `VITE_API_BASE_URL`.
 
-Common endpoints:
+### Authentication
+
+All API requests automatically include the ID token from AWS Cognito in the `Authorization: Bearer <token>` header. The API client (`src/api/api.ts`) handles:
+- Automatic token injection
+- Error handling (401 redirects to login)
+- Network error handling
+- CORS support
+
+### Common Endpoints
+
+**Game Management:**
 - `/validate` — Validate game codes
 - `/score` — Submit game scores
 - `/game` — Game management
 - `/quizz` — Quiz data
 
+**User Management:**
+- `POST /users` — Bootstrap user on first login
+- `GET /users` — Get current user data (plan, email, etc.)
+
+**Billing:**
+- `POST /billing/checkout` — Create Stripe checkout session for plan upgrade
+
 ## 🎯 Features
 
+### Core Features
 - ✅ **Modular game system** — Add infinite games
 - ✅ **Dynamic theming** — Each game has its own color scheme
 - ✅ **Core components** — Reusable UI components
@@ -242,6 +357,34 @@ Common endpoints:
 - ✅ **QR code generation** — Built-in QR code component
 - ✅ **Instagram integration** — Direct messaging support
 - ✅ **Responsive design** — Works on all screen sizes
+
+### Authentication & User Management
+- ✅ **AWS Cognito OAuth2** — Secure authentication with PKCE
+- ✅ **Protected routes** — Automatic redirect for unauthenticated users
+- ✅ **User profiles** — View user information, plan, and account details
+- ✅ **Session management** — Secure token storage and expiration handling
+
+### Plan-Based Features
+- ✅ **Feature flags** — Plan-based feature gating system
+- ✅ **FREE plan** — Basic features (1 game, 25 players max)
+- ✅ **EVENT_24H plan** — Full access for 24 hours (unlimited games/players)
+- ✅ **ENTERPRISE plan** — Unlimited access to all features
+- ✅ **Plan upgrades** — Stripe integration for plan activation
+
+### Customization
+- ✅ **Dark/Light mode** — Toggle theme (all plans)
+- ✅ **Custom color palettes** — Personalize colors (EVENT_24H+)
+- ✅ **Custom logo upload** — Brand customization (EVENT_24H+)
+- ✅ **Dynamic logo** — Auto-switching logo based on theme
+
+## 🔒 Security Features
+
+- **PKCE (Proof Key for Code Exchange)** — Enhanced OAuth2 security
+- **Session-based tokens** — Tokens stored in `sessionStorage` (cleared on tab close)
+- **Automatic token expiration** — Handles token refresh and expiration
+- **Protected routes** — Unauthenticated users redirected to login
+- **CORS protection** — Backend handles CORS headers
+- **Secure API communication** — All API requests include authentication tokens
 
 ## 📸 Screenshots
 
