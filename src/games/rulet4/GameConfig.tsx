@@ -19,7 +19,7 @@ const DEFAULT_PANELS: Rulet4PanelConfig[] = [
   { id: '4', label: 'Premio 4', color: '#D97706', count: 2 },
 ]
 
-export default function Rulet4GameConfig({ gameId, gameName, settings, onChange }: GameConfigProps) {
+export default function Rulet4GameConfig({ gameName, settings, onChange }: GameConfigProps) {
   const [panels, setPanels] = useState<Rulet4PanelConfig[]>(
     (settings as Rulet4Settings | null)?.panels || DEFAULT_PANELS
   )

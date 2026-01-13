@@ -11,7 +11,7 @@ import { useStandLogo } from './logoUtils'
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 
 export default function AppShell() {
-  const { user, plan, loading: userLoading } = useCurrentUser()
+  const { loading: userLoading } = useCurrentUser()
   const standLogo = useStandLogo()
   const [showSettings, setShowSettings] = useState(false)
   const [gameId, setGameId] = useState<string | null>(null)
