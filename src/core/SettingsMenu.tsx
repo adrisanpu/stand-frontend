@@ -4,6 +4,8 @@ import Quiz from './Quiz'
 import AppearanceSettings from './AppearanceSettings'
 import type { GameDefinition } from './types'
 import { api } from '../api/api'
+import { useCurrentUser } from '../auth/useCurrentUser'
+import { getFeaturesByPlan } from '../auth/featureFlags'
 
 type SettingsMenuProps = {
   onClose: () => void
@@ -33,6 +35,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [showGameConfig, setShowGameConfig] = useState(false)
   const [gameSettings, setGameSettings] = useState<any>(null)
   const [showAppearanceSettings, setShowAppearanceSettings] = useState(false)
+  const [showUserInfo, setShowUserInfo] = useState(false)
+  const [isStartingCheckout, setIsStartingCheckout] = useState(false)
+  const { user, loading: userLoading, plan } = useCurrentUser()
+  const features = getFeaturesByPlan(plan)
 
   // Load game settings from localStorage when gameId changes
   useEffect(() => {
@@ -56,6 +62,22 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       const storageKey = `${gameDefinition.id}_settings_${gameId}`
       localStorage.setItem(storageKey, JSON.stringify(newSettings))
       setGameSettings(newSettings)
+    }
+  }
+
+  const handleStartCheckout = async () => {
+    setIsStartingCheckout(true)
+    try {
+      const data = await api.post<{ url: string }>('/billing/checkout', {})
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error('No se recibió URL de pago')
+      }
+    } catch (error: any) {
+      console.error('Error starting checkout:', error)
+      alert(error.message || 'Error al iniciar el pago. Por favor, intenta de nuevo.')
+      setIsStartingCheckout(false)
     }
   }
 
@@ -203,6 +225,139 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     return <AppearanceSettings onClose={() => setShowAppearanceSettings(false)} gameDefinition={gameDefinition} />
   }
 
+  if (showUserInfo) {
+    const formatDate = (dateString: string | undefined) => {
+      if (!dateString) return 'N/A'
+      try {
+        const date = new Date(dateString)
+        return date.toLocaleDateString('es-ES', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      } catch {
+        return dateString
+      }
+    }
+
+    const planLabels: Record<string, string> = {
+      free: 'Gratis',
+      event: 'Evento 24h',
+      enterprise: 'Enterprise'
+    }
+
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-info-title"
+        className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      >
+        <div className="absolute inset-0 bg-black/70" onClick={() => setShowUserInfo(false)} aria-hidden="true" />
+        <div className="relative card w-full max-w-md p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 id="user-info-title" className="text-xl font-semibold">Información del Usuario</h2>
+            <button
+              onClick={() => setShowUserInfo(false)}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              aria-label="Cerrar"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {userLoading ? (
+            <div className="text-center py-8">
+              <p className="text-textSub">Cargando información...</p>
+            </div>
+          ) : user ? (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">Email</div>
+                    <div className="text-textMain font-medium">{user.email || 'No disponible'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">ID de Usuario</div>
+                    <div className="text-textMain font-mono text-sm break-all">{user.id}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">Plan</div>
+                    <div className="text-textMain font-medium">
+                      {planLabels[user.plan] || user.plan.toUpperCase()}
+                    </div>
+                  </div>
+                  {user.activeUntil && (
+                    <div>
+                      <div className="text-xs text-gray-400 mb-1">Activo hasta</div>
+                      <div className="text-textMain">{formatDate(user.activeUntil)}</div>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">Cuenta creada</div>
+                    <div className="text-textMain text-sm">{formatDate(user.createdAt)}</div>
+                  </div>
+                  {user.updatedAt && user.updatedAt !== user.createdAt && (
+                    <div>
+                      <div className="text-xs text-gray-400 mb-1">Última actualización</div>
+                      <div className="text-textMain text-sm">{formatDate(user.updatedAt)}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-red-300">No se pudo cargar la información del usuario</p>
+            </div>
+          )}
+
+          {/* Upgrade to Event Plan Button */}
+          {plan === 'free' && (
+            <div className="mt-6 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30">
+              <p className="text-sm text-blue-300 mb-3">
+                Actualiza a Event 24h para desbloquear todas las funciones
+              </p>
+              <button
+                onClick={handleStartCheckout}
+                disabled={isStartingCheckout}
+                className="w-full p-3 rounded-xl bg-blue-500/30 border border-blue-500/40 hover:bg-blue-500/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+              >
+                {isStartingCheckout ? (
+                  <>
+                    <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Activar 24h
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowUserInfo(false)}
+            className="w-full mt-6 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (showGameConfig && gameDefinition?.GameConfigComponent) {
     const GameConfigComponent = gameDefinition.GameConfigComponent
     return (
@@ -271,10 +426,18 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 <p className="text-sm text-gray-300">
                   Antes de terminar el juego, puedes exportar los datos del quiz para conservarlos.
                 </p>
+                {!features.exportResults && (
+                  <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+                    <p className="text-yellow-300 text-sm">
+                      Disponible en el plan Event
+                    </p>
+                  </div>
+                )}
                 <button
                   onClick={handleExportQuizBeforeTerminate}
-                  disabled={isExportingQuiz || !gameId}
+                  disabled={isExportingQuiz || !gameId || !features.exportResults}
                   className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!features.exportResults ? 'Disponible en el plan Event' : undefined}
                 >
                   <div className="flex items-center justify-center gap-2">
                     {isExportingQuiz ? (
@@ -611,6 +774,25 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         </div>
 
         <div className="space-y-3">
+          {/* User Info - Available for both catalog and games */}
+          <button
+            onClick={() => setShowUserInfo(true)}
+            className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+          >
+            <div className="p-2 rounded-lg bg-blue-500/20">
+              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <div className="font-medium">Información del Usuario</div>
+              <div className="text-sm text-gray-400">Ver detalles de tu cuenta</div>
+            </div>
+            <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
           {/* No game selected - appearance settings and exit app option */}
           {!gameType && (
             <>
@@ -701,26 +883,28 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </button>
               )}
 
-              {/* Raffle - For all games */}
-              <button
-                onClick={() => setShowRaffle(true)}
-                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-              >
-                <div className="p-2 rounded-lg bg-purple-500/20">
-                  <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <div className="font-medium">Sorteo</div>
-                  <div className="text-sm text-gray-400">
-                    Realizar un sorteo entre jugadores
+              {/* Raffle - Only show if allowed by plan */}
+              {features.raffles && (
+                <button
+                  onClick={() => setShowRaffle(true)}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+                >
+                  <div className="p-2 rounded-lg bg-purple-500/20">
+                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
                   </div>
-                </div>
-                <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+                  <div className="text-left">
+                    <div className="font-medium">Sorteo</div>
+                    <div className="text-sm text-gray-400">
+                      Realizar un sorteo entre jugadores
+                    </div>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
 
               {/* Delete Player - For all games */}
               <button

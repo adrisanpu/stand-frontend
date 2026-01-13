@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { generateCodeVerifier, generateCodeChallenge, generateState } from './pkce'
 import { savePkceState, clearAuth } from './authStorage'
+import { ThemeProvider } from '../core/theme'
 
 const COGNITO_DOMAIN = import.meta.env.VITE_COGNITO_DOMAIN
 const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID
@@ -108,11 +109,13 @@ export default function AuthStart() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <p>Redirigiendo a inicio de sesión...</p>
+    <ThemeProvider game={null}>
+      <div className="min-h-screen flex items-center justify-center bg-club text-textMain px-6">
+        <div className="card w-full max-w-md p-8 text-center">
+          <p className="text-textMain">Redirigiendo a inicio de sesión...</p>
+        </div>
       </div>
-    </div>
+    </ThemeProvider>
   )
 }
 

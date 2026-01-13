@@ -10,6 +10,7 @@ import {
   loadTokens,
 } from './authStorage'
 import { api } from '../api/api'
+import { ThemeProvider } from '../core/theme'
 
 const COGNITO_DOMAIN = import.meta.env.VITE_COGNITO_DOMAIN
 const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID
@@ -195,26 +196,30 @@ export default function AuthCallback() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">{error}</p>
-          <button
-            onClick={() => navigate('/login')}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Volver a inicio de sesión
-          </button>
+      <ThemeProvider game={null}>
+        <div className="min-h-screen flex items-center justify-center bg-club text-textMain px-6">
+          <div className="card w-full max-w-md p-8 text-center">
+            <p className="text-red-500 mb-4">{error}</p>
+            <button
+              onClick={() => navigate('/login')}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Volver a inicio de sesión
+            </button>
+          </div>
         </div>
-      </div>
+      </ThemeProvider>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <p>Completando autenticación...</p>
+    <ThemeProvider game={null}>
+      <div className="min-h-screen flex items-center justify-center bg-club text-textMain px-6">
+        <div className="card w-full max-w-md p-8 text-center">
+          <p className="text-textMain">Completando autenticación...</p>
+        </div>
       </div>
-    </div>
+    </ThemeProvider>
   )
 }
 
