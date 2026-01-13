@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { games } from '../games'
 import type { GameDefinition } from './types'
 import { api } from '../api/api'
+import { useCurrentUser } from '../auth/useCurrentUser'
+import { getFeaturesByPlan } from '../auth/featureFlags'
+import { useStandLogo } from './logoUtils'
 
 const GAME_RE = /^[A-Za-z0-9._-]{1,40}$/
 
@@ -13,12 +16,20 @@ type GameGateProps = {
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 
 export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
+  const { plan } = useCurrentUser()
+  const features = getFeaturesByPlan(plan)
+  const standLogo = useStandLogo()
   const [selectedGame, setSelectedGame] = useState<GameDefinition | null>(null)
   const [gameId, setGameId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [joining, setJoining] = useState(false)
   const [customLogo, setCustomLogo] = useState<string | null>(null)
+  
+  // Count existing games from localStorage (simple approach for MVP)
+  const existingGameId = localStorage.getItem('gameId')
+  const hasExistingGame = !!existingGameId
+  const canCreateGame = features.maxGames === Infinity || !hasExistingGame || (hasExistingGame && features.maxGames > 1)
 
   // Load custom logo from localStorage
   useEffect(() => {
@@ -46,6 +57,13 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
     if (!selectedGame) return
     
     setError(null)
+    
+    // Check maxGames limit
+    if (!canCreateGame) {
+      setError('Disponible en el plan Event')
+      return
+    }
+    
     if (!validateGameId(gameId)) {
       setError('Nombre de partida inválido. Usa letras, números, _ - .')
       return
@@ -112,11 +130,11 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
             />
           ) : (
             <img 
-              src="/logo_stand_letters.png" 
+              src={standLogo} 
               alt="Stand" 
               className="h-20 w-auto object-contain"
               onError={(e) => {
-                // Fallback to stand-logo.png if logo_stand_letters.png doesn't exist
+                // Fallback to stand-logo.png if logo doesn't exist
                 const target = e.target as HTMLImageElement
                 if (target.src !== `${window.location.origin}/stand-logo.png`) {
                   target.src = '/stand-logo.png'
@@ -212,15 +230,30 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
         <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>
       )}
 
+      {/* Player limit info for FREE plan */}
+      {features.maxPlayers !== Infinity && (
+        <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+          <p className="text-yellow-300 text-sm">
+            Plan Gratis: Máximo {features.maxPlayers} jugadores por partida
+          </p>
+        </div>
+      )}
+
       {/* Action Buttons - Direct actions */}
       <div className="flex gap-3">
         <button
           onClick={handleCreate}
-          disabled={loading || !gameId.trim()}
-          className="flex-1 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          disabled={loading || !gameId.trim() || !canCreateGame}
+          className="flex-1 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium relative"
+          title={!canCreateGame ? 'Disponible en el plan Event' : undefined}
         >
           {loading ? 'Creando...' : 'Crear'}
         </button>
+        {!canCreateGame && (
+          <p className="text-xs text-yellow-400 text-center mt-1">
+            Disponible en el plan Event
+          </p>
+        )}
         <button
           onClick={handleJoin}
           disabled={joining || !gameId.trim()}

@@ -6,11 +6,13 @@ import Ranking from './Ranking'
 import { getGameById } from '../games'
 import type { GameDefinition } from './types'
 import { useCurrentUser } from '../auth/useCurrentUser'
+import { useStandLogo } from './logoUtils'
 
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 
 export default function AppShell() {
   const { user, plan, loading: userLoading } = useCurrentUser()
+  const standLogo = useStandLogo()
   const [showSettings, setShowSettings] = useState(false)
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameName, setGameName] = useState<string | null>(null)
@@ -128,8 +130,8 @@ export default function AppShell() {
   if (userLoading) {
     return (
       <ThemeProvider game={currentGame}>
-        <div className="bg-club text-textMain font-sans min-h-screen flex items-center justify-center">
-          <div className="text-center">
+        <div className="bg-club text-textMain font-sans min-h-screen flex items-center justify-center px-6">
+          <div className="card w-full max-w-md p-8 text-center">
             <p className="text-textMain">Cargando...</p>
           </div>
         </div>
@@ -213,7 +215,7 @@ export default function AppShell() {
         {/* Logo fijo - always visible in bottom right corner */}
         <div className="fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity z-10">
           <img 
-            src={customLogo || currentGame?.assets?.standLogo || '/stand-logo.png'} 
+            src={customLogo || currentGame?.assets?.standLogo || standLogo} 
             alt={customLogo ? "Logo personalizado" : "Stand"} 
             className="w-14 h-14 object-contain" 
           />

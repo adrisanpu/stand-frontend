@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { ThemeProvider } from '../core/theme'
+import { useStandLogo } from '../core/logoUtils'
 
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 
 export default function Login() {
   const { login } = useAuth()
   const [customLogo, setCustomLogo] = useState<string | null>(null)
+  const standLogo = useStandLogo()
 
   // Load custom logo from localStorage
   useEffect(() => {
@@ -35,11 +37,11 @@ export default function Login() {
             />
           ) : (
             <img 
-              src="/logo_stand_letters.png" 
+              src={standLogo} 
               alt="Stand" 
               className="h-20 w-auto object-contain"
               onError={(e) => {
-                // Fallback to stand-logo.png if logo_stand_letters.png doesn't exist
+                // Fallback to stand-logo.png if logo doesn't exist
                 const target = e.target as HTMLImageElement
                 if (target.src !== `${window.location.origin}/stand-logo.png`) {
                   target.src = '/stand-logo.png'
