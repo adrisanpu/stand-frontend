@@ -838,26 +838,44 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
           {/* Game-specific options */}
           {gameType && (
             <>
-              {/* Quiz - For all games */}
-              <button
-                onClick={() => setShowQuiz(true)}
-                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-              >
-                <div className="p-2 rounded-lg bg-green-500/20">
-                  <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <div className="font-medium">Quiz</div>
-                  <div className="text-sm text-gray-400">
-                    Crear y configurar un quiz
+              {/* Quiz - For all games, disabled for FREE plan */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    if (plan === 'free') return
+                    setShowQuiz(true)
+                  }}
+                  disabled={plan === 'free'}
+                  className={`w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors relative ${
+                    plan !== 'free'
+                      ? 'hover:bg-[rgba(255,255,255,0.1)]' 
+                      : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  title={plan === 'free' ? 'Disponible en el plan Event 24h' : undefined}
+                >
+                  <div className="p-2 rounded-lg bg-green-500/20">
+                    <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
                   </div>
-                </div>
-                <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+                  <div className="text-left">
+                    <div className="font-medium">Quiz</div>
+                    <div className="text-sm text-gray-400">
+                      {plan !== 'free'
+                        ? 'Crear y configurar un quiz'
+                        : 'Disponible en el plan Event 24h'}
+                    </div>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  {plan === 'free' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl pointer-events-none">
+                      <span className="text-xs text-gray-400 font-medium">Event 24h</span>
+                    </div>
+                  )}
+                </button>
+              </div>
 
               {/* Game Config - Only show if game has GameConfigComponent */}
               {gameDefinition?.GameConfigComponent && (
@@ -883,11 +901,20 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </button>
               )}
 
-              {/* Raffle - Only show if allowed by plan */}
-              {features.raffles && (
+              {/* Raffle - Always shown, disabled for FREE plan */}
+              <div className="relative">
                 <button
-                  onClick={() => setShowRaffle(true)}
-                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+                  onClick={() => {
+                    if (!features.raffles) return
+                    setShowRaffle(true)
+                  }}
+                  disabled={!features.raffles}
+                  className={`w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors relative ${
+                    features.raffles 
+                      ? 'hover:bg-[rgba(255,255,255,0.1)]' 
+                      : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  title={!features.raffles ? 'Disponible en el plan Event 24h' : undefined}
                 >
                   <div className="p-2 rounded-lg bg-purple-500/20">
                     <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -897,14 +924,21 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   <div className="text-left">
                     <div className="font-medium">Sorteo</div>
                     <div className="text-sm text-gray-400">
-                      Realizar un sorteo entre jugadores
+                      {features.raffles 
+                        ? 'Realizar un sorteo entre jugadores'
+                        : 'Disponible en el plan Event 24h'}
                     </div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
+                  {!features.raffles && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl pointer-events-none">
+                      <span className="text-xs text-gray-400 font-medium">Event 24h</span>
+                    </div>
+                  )}
                 </button>
-              )}
+              </div>
 
               {/* Delete Player - For all games */}
               <button
