@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../api/api'
 
 type QuizProps = {
@@ -56,6 +56,40 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
   const [isExporting, setIsExporting] = useState(false)
   const [exportData, setExportData] = useState<QuizDataResponse | null>(null)
   const [showShareOptions, setShowShareOptions] = useState(false)
+
+  // Load quiz configuration when component mounts or gameId changes
+  useEffect(() => {
+    const loadQuizConfiguration = async () => {
+      if (!gameId) return
+
+      setError(null)
+
+      try {
+        const data = await api.get<QuizDataResponse>(`/quizz?gameId=${encodeURIComponent(gameId)}`)
+        
+        // If quiz exists and has questions, load them into the form
+        if (data.ok && data.questions && data.questions.length > 0) {
+          const loadedQuestions: Question[] = data.questions.map((q) => ({
+            id: q.id,
+            text: q.text,
+            options: q.options.map((opt) => ({
+              title: opt.title,
+              payload: opt.payload
+            }))
+          }))
+          setQuestions(loadedQuestions)
+        }
+      } catch (err: any) {
+        // If quiz doesn't exist (404 or similar), that's fine - just start with empty form
+        // Only show error for unexpected errors
+        if (err.message && !err.message.includes('404') && !err.message.includes('Not found')) {
+          console.warn('Error loading quiz configuration:', err.message)
+        }
+      }
+    }
+
+    loadQuizConfiguration()
+  }, [gameId])
 
   const generatePayload = (questionId: string, optionIndex: number): string => {
     if (!gameId) return ''
