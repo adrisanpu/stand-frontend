@@ -3,6 +3,8 @@ import { ThemeProvider } from './theme'
 import GameGate from './GameGate'
 import SettingsMenu from './SettingsMenu'
 import Ranking from './Ranking'
+import Players from './Players'
+import RaffleData from './RaffleData'
 import { getGameById } from '../games'
 import type { GameDefinition } from './types'
 import { useCurrentUser } from '../auth/useCurrentUser'
@@ -156,7 +158,7 @@ export default function AppShell() {
 
         <div className="min-h-screen grid place-items-center px-6">
           {gameId && gameName && currentGame ? (
-            /* Game Screen with optional Ranking */
+            /* Game Screen with sidebar components */
             <div className="flex gap-4 w-full max-w-6xl items-start">
               {/* Game Screen */}
               <div className="card flex-1 p-8">
@@ -182,12 +184,14 @@ export default function AppShell() {
                 <currentGame.GameScreen gameName={gameName} gameId={gameId} />
               </div>
               
-              {/* Ranking - only show if game has it enabled */}
-              {currentGame.showRanking && (
-                <div className="w-64 flex-shrink-0">
+              {/* Sidebar: Players, Ranking (if enabled), RaffleData */}
+              <div className="w-64 flex-shrink-0 space-y-4">
+                <Players gameId={gameId} />
+                {currentGame.showRanking && (
                   <Ranking gameId={gameId} />
-                </div>
-              )}
+                )}
+                <RaffleData gameId={gameId} />
+              </div>
             </div>
           ) : (
             /* GameGate Catalog */
