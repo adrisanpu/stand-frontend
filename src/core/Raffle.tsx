@@ -12,12 +12,75 @@ type RaffleResponse = {
   winners: string[]
 }
 
+interface AutoRaffleConfig {
+  enabled: boolean
+  intervalMinutes: number
+  lastAutoRaffleTime?: number
+  autoNumberOfWinners?: number
+  autoApplicableOnlyValidated?: boolean
+}
+
+const getStorageKey = (gameId: string) => `raffle_auto_${gameId}`
+
+const loadAutoRaffleConfig = (gameId: string | undefined): AutoRaffleConfig | null => {
+  if (!gameId) return null
+  try {
+    const saved = localStorage.getItem(getStorageKey(gameId))
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (error) {
+    console.error('Error loading auto raffle config:', error)
+  }
+  return null
+}
+
+const saveAutoRaffleConfig = (gameId: string | undefined, config: AutoRaffleConfig) => {
+  if (!gameId) return
+  try {
+    localStorage.setItem(getStorageKey(gameId), JSON.stringify(config))
+  } catch (error) {
+    console.error('Error saving auto raffle config:', error)
+  }
+}
+
 export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
   const [numberOfWinners, setNumberOfWinners] = useState<number>(1)
   const [applicableOnlyValidated, setApplicableOnlyValidated] = useState<boolean>(false)
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [winners, setWinners] = useState<string[] | null>(null)
+  
+  // Auto raffle configuration
+  const [autoRaffleEnabled, setAutoRaffleEnabled] = useState<boolean>(false)
+  const [autoRaffleInterval, setAutoRaffleInterval] = useState<number>(30) // minutes
+  const [autoRaffleNumberOfWinners, setAutoRaffleNumberOfWinners] = useState<number>(1)
+  const [autoRaffleApplicableOnlyValidated, setAutoRaffleApplicableOnlyValidated] = useState<boolean>(false)
+
+  // Load auto raffle config on mount
+  useEffect(() => {
+    const config = loadAutoRaffleConfig(gameId)
+    if (config) {
+      setAutoRaffleEnabled(config.enabled)
+      setAutoRaffleInterval(config.intervalMinutes || 30)
+      setAutoRaffleNumberOfWinners(config.autoNumberOfWinners || 1)
+      setAutoRaffleApplicableOnlyValidated(config.autoApplicableOnlyValidated || false)
+    }
+  }, [gameId])
+
+  // Save auto raffle config when it changes
+  useEffect(() => {
+    if (gameId) {
+      const config: AutoRaffleConfig = {
+        enabled: autoRaffleEnabled,
+        intervalMinutes: autoRaffleInterval,
+        autoNumberOfWinners: autoRaffleNumberOfWinners,
+        autoApplicableOnlyValidated: autoRaffleApplicableOnlyValidated,
+        lastAutoRaffleTime: loadAutoRaffleConfig(gameId)?.lastAutoRaffleTime
+      }
+      saveAutoRaffleConfig(gameId, config)
+    }
+  }, [gameId, autoRaffleEnabled, autoRaffleInterval, autoRaffleNumberOfWinners, autoRaffleApplicableOnlyValidated])
 
   const handleNumberChange = (value: string) => {
     const num = parseInt(value, 10)
@@ -25,6 +88,24 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
       setNumberOfWinners(num)
     } else if (value === '') {
       setNumberOfWinners(1)
+    }
+  }
+
+  const handleAutoIntervalChange = (value: string) => {
+    const num = parseInt(value, 10)
+    if (!isNaN(num) && num > 0) {
+      setAutoRaffleInterval(num)
+    } else if (value === '') {
+      setAutoRaffleInterval(1)
+    }
+  }
+
+  const handleAutoNumberChange = (value: string) => {
+    const num = parseInt(value, 10)
+    if (!isNaN(num) && num > 0) {
+      setAutoRaffleNumberOfWinners(num)
+    } else if (value === '') {
+      setAutoRaffleNumberOfWinners(1)
     }
   }
 
@@ -51,6 +132,15 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
       })
       if (result.winners && Array.isArray(result.winners)) {
         setWinners(result.winners)
+        
+        // Update last raffle time if auto raffle is enabled
+        if (gameId && autoRaffleEnabled) {
+          const config = loadAutoRaffleConfig(gameId)
+          if (config) {
+            config.lastAutoRaffleTime = Date.now()
+            saveAutoRaffleConfig(gameId, config)
+          }
+        }
       } else {
         throw new Error('Formato de respuesta inválido')
       }
@@ -217,7 +307,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
             </div>
 
             {/* Run Raffle Button */}
-            <div className="mb-4">
+            <div className="mb-6">
               <button
                 onClick={runRaffle}
                 disabled={isRunning || numberOfWinners < 1}
@@ -236,6 +326,102 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                   {isRunning ? 'Ejecutando sorteo...' : 'Ejecutar Sorteo'}
                 </div>
               </button>
+            </div>
+
+            {/* Automatic Raffles Configuration */}
+            <div className="mb-4 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-300 mb-1">Sorteos Automáticos</h3>
+                  <p className="text-xs text-gray-400">Ejecutar sorteos automáticamente cada cierto tiempo</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoRaffleEnabled}
+                    onChange={(e) => {
+                      setAutoRaffleEnabled(e.target.checked)
+                      if (e.target.checked && gameId) {
+                        // Set initial last raffle time when enabling
+                        const config = loadAutoRaffleConfig(gameId)
+                        if (config) {
+                          config.lastAutoRaffleTime = Date.now()
+                          saveAutoRaffleConfig(gameId, config)
+                        }
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                </label>
+              </div>
+
+              {autoRaffleEnabled && (
+                <div className="space-y-4 mt-4">
+                  {/* Interval Input */}
+                  <div>
+                    <label htmlFor="auto-interval" className="block text-xs font-medium text-gray-300 mb-2">
+                      Intervalo (minutos)
+                    </label>
+                    <input
+                      id="auto-interval"
+                      type="number"
+                      min="1"
+                      value={autoRaffleInterval}
+                      onChange={(e) => handleAutoIntervalChange(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-white/20 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Auto Number of Winners */}
+                  <div>
+                    <label htmlFor="auto-number-of-winners" className="block text-xs font-medium text-gray-300 mb-2">
+                      Número de ganadores (automático)
+                    </label>
+                    <input
+                      id="auto-number-of-winners"
+                      type="number"
+                      min="1"
+                      value={autoRaffleNumberOfWinners}
+                      onChange={(e) => handleAutoNumberChange(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-white/20 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Auto Applicable To Selection */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-300 mb-2">
+                      Aplicable a (automático)
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 p-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors">
+                        <input
+                          type="radio"
+                          name="autoApplicableOnlyValidated"
+                          checked={!autoRaffleApplicableOnlyValidated}
+                          onChange={() => setAutoRaffleApplicableOnlyValidated(false)}
+                          className="w-3 h-3 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-xs">Todos los jugadores</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-2 p-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors">
+                        <input
+                          type="radio"
+                          name="autoApplicableOnlyValidated"
+                          checked={autoRaffleApplicableOnlyValidated}
+                          onChange={() => setAutoRaffleApplicableOnlyValidated(true)}
+                          className="w-3 h-3 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-xs">Parejas validadas</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : (
