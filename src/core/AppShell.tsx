@@ -8,13 +8,11 @@ import RaffleData from './RaffleData'
 import { getGameById } from '../games'
 import type { GameDefinition } from './types'
 import { useCurrentUser } from '../auth/useCurrentUser'
-import { useStandLogo } from './logoUtils'
 
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 
 export default function AppShell() {
   const { loading: userLoading } = useCurrentUser()
-  const standLogo = useStandLogo()
   const [showSettings, setShowSettings] = useState(false)
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameName, setGameName] = useState<string | null>(null)
@@ -219,7 +217,7 @@ export default function AppShell() {
         {/* Logo fijo - always visible in bottom right corner */}
         <div className="fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity z-10">
           <img 
-            src={customLogo || currentGame?.assets?.standLogo || standLogo} 
+            src={customLogo || '/stand-logo.png'} 
             alt={customLogo ? "Logo personalizado" : "Stand"} 
             className="w-14 h-14 object-contain" 
           />
