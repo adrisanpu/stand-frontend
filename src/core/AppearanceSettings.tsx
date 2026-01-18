@@ -282,11 +282,6 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
                 } ${!features.advancedCustomization ? 'opacity-50 cursor-not-allowed' : ''}`}
                 title={!features.advancedCustomization ? 'Disponible en el plan Event 24h' : undefined}
               >
-                {!features.advancedCustomization && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl">
-                    <span className="text-xs text-gray-400 font-medium">Event 24h</span>
-                  </div>
-                )}
                 <div className="flex items-center gap-3 mb-2">
                   <div
                     className="w-8 h-8 rounded-full border border-white/20"
@@ -311,13 +306,6 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
               <div className={`p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-4 relative ${
                 !features.advancedCustomization ? 'opacity-50' : ''
               }`}>
-                {!features.advancedCustomization && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl z-10">
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-gray-300 mb-1">Disponible en el plan Event 24h</p>
-                    </div>
-                  </div>
-                )}
                 <h4 className="text-sm font-semibold mb-3">Seleccionar Colores</h4>
                 
                 <div className="space-y-3">
@@ -366,11 +354,6 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
           {/* Logo Section */}
           <div className={`relative ${!features.advancedCustomization ? 'opacity-50' : ''}`}>
             <h3 className="text-lg font-semibold mb-3">Logo Personalizado</h3>
-            {!features.advancedCustomization && (
-              <div className="absolute top-0 right-0">
-                <span className="text-xs text-gray-400 bg-black/30 px-2 py-1 rounded">Event 24h</span>
-              </div>
-            )}
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 {logoPreview ? (
@@ -442,13 +425,6 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
                 </div>
               )}
             </div>
-            {!features.advancedCustomization && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl pointer-events-none">
-                <div className="text-center">
-                  <p className="text-sm font-medium text-gray-300">Disponible en el plan Event 24h</p>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Action Buttons */}
