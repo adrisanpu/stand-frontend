@@ -73,7 +73,7 @@ export default function BillingSuccess() {
             <h1 className="text-2xl font-bold mb-2 text-red-400">Error</h1>
             <p className="text-textSub mb-6">{error.message}</p>
             <button
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/home')}
               className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
             >
               Volver a la aplicación
@@ -91,7 +91,7 @@ export default function BillingSuccess() {
               Tu plan ha sido actualizado a: <span className="font-semibold text-textMain">{planLabels[plan || 'free'] || plan?.toUpperCase()}</span>
             </p>
             <button
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/home')}
               className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors font-medium"
             >
               Continuar

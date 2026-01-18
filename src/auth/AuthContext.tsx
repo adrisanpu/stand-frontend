@@ -48,7 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [])
 
-  const login = useCallback((nextPath: string = '/app') => {
+  const login = useCallback((nextPath: string = '/home') => {
     navigate(`/auth/start?next=${encodeURIComponent(nextPath)}`)
   }, [navigate])
 

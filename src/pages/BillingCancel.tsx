@@ -18,7 +18,7 @@ export default function BillingCancel() {
           No se ha realizado ningún cargo. Puedes intentar de nuevo cuando estés listo.
         </p>
         <button
-          onClick={() => navigate('/app')}
+          onClick={() => navigate('/home')}
           className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors font-medium"
         >
           Volver a la aplicación

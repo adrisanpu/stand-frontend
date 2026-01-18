@@ -71,7 +71,7 @@ export default function AuthCallback() {
       }
 
       // Get next path
-      const next = loadNextPath() || '/app'
+      const next = loadNextPath() || '/home'
 
       try {
         // Exchange code for tokens with PKCE

@@ -16,7 +16,7 @@ function RootRedirect() {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
-  return <Navigate to="/app" replace />
+  return <Navigate to="/home" replace />
 }
 
 function AppRoutes() {
@@ -43,7 +43,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/app/*"
+        path="/home/*"
         element={
           <ProtectedRoute>
             <AppShell />

@@ -12,7 +12,7 @@ export default function AuthStart() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
-  const next = searchParams.get('next') || '/app'
+  const next = searchParams.get('next') || '/home'
 
   useEffect(() => {
     async function startAuth() {
