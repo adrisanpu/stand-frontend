@@ -248,6 +248,50 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       enterprise: 'Enterprise'
     }
 
+    // Countdown component for activeUntil
+    const Countdown = ({ targetDate }: { targetDate: string }) => {
+      const [timeLeft, setTimeLeft] = useState<string>('')
+
+      useEffect(() => {
+        const updateCountdown = () => {
+          try {
+            const target = new Date(targetDate).getTime()
+            const now = Date.now()
+            const difference = target - now
+
+            if (difference <= 0) {
+              setTimeLeft('Expirado')
+              return
+            }
+
+            const days = Math.floor(difference / (1000 * 60 * 60 * 24))
+            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+            const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
+            const seconds = Math.floor((difference % (1000 * 60)) / 1000)
+
+            if (days > 0) {
+              setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`)
+            } else if (hours > 0) {
+              setTimeLeft(`${hours}h ${minutes}m ${seconds}s`)
+            } else if (minutes > 0) {
+              setTimeLeft(`${minutes}m ${seconds}s`)
+            } else {
+              setTimeLeft(`${seconds}s`)
+            }
+          } catch {
+            setTimeLeft('Error')
+          }
+        }
+
+        updateCountdown()
+        const interval = setInterval(updateCountdown, 1000)
+
+        return () => clearInterval(interval)
+      }, [targetDate])
+
+      return <span>{timeLeft}</span>
+    }
+
     return (
       <div
         role="dialog"
@@ -283,10 +327,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     <div className="text-textMain font-medium">{user.email || 'No disponible'}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">ID de Usuario</div>
-                    <div className="text-textMain font-mono text-sm break-all">{user.id}</div>
-                  </div>
-                  <div>
                     <div className="text-xs text-gray-400 mb-1">Plan</div>
                     <div className="text-textMain font-medium">
                       {planLabels[user.plan] || user.plan.toUpperCase()}
@@ -295,7 +335,9 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   {user.activeUntil && (
                     <div>
                       <div className="text-xs text-gray-400 mb-1">Activo hasta</div>
-                      <div className="text-textMain">{formatDate(user.activeUntil)}</div>
+                      <div className="text-textMain">
+                        <Countdown targetDate={user.activeUntil} />
+                      </div>
                     </div>
                   )}
                   <div>
@@ -774,24 +816,26 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         </div>
 
         <div className="space-y-3">
-          {/* User Info - Available for both catalog and games */}
-          <button
-            onClick={() => setShowUserInfo(true)}
-            className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-          >
-            <div className="p-2 rounded-lg bg-blue-500/20">
-              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          {/* User Info - Only available when no game is active */}
+          {!gameType && (
+            <button
+              onClick={() => setShowUserInfo(true)}
+              className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+            >
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <div className="font-medium">Información del Usuario</div>
+                <div className="text-sm text-gray-400">Ver detalles de tu cuenta</div>
+              </div>
+              <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-            </div>
-            <div className="text-left">
-              <div className="font-medium">Información del Usuario</div>
-              <div className="text-sm text-gray-400">Ver detalles de tu cuenta</div>
-            </div>
-            <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+            </button>
+          )}
 
           {/* No game selected - appearance settings and exit app option */}
           {!gameType && (
@@ -869,11 +913,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  {plan === 'free' && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl pointer-events-none">
-                      <span className="text-xs text-gray-400 font-medium">Event 24h</span>
-                    </div>
-                  )}
                 </button>
               </div>
 
@@ -932,11 +971,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  {!features.raffles && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl pointer-events-none">
-                      <span className="text-xs text-gray-400 font-medium">Event 24h</span>
-                    </div>
-                  )}
                 </button>
               </div>
 
