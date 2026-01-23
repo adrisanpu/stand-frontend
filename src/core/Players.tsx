@@ -28,7 +28,7 @@ interface QuizDataResponse {
 async function getPlayerCount(gameId: string): Promise<number> {
   try {
     // Get player count from quiz endpoint
-    const data = await api.get<QuizDataResponse>(`/quizz?gameId=${encodeURIComponent(gameId)}`)
+    const data = await api.get<QuizDataResponse>(`/v1/game/quiz?gameId=${encodeURIComponent(gameId)}`)
     
     if (data.ok && Array.isArray(data.players)) {
       // Count unique players by instagramPSID (in case there are duplicates)

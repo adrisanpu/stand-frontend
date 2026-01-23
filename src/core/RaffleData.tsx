@@ -110,7 +110,7 @@ export default function RaffleData({ gameId, refreshInterval = 10000 }: RaffleDa
 
       // Fetch raffle winners from quiz endpoint
       try {
-        const quizData = await api.get<QuizDataResponse>(`/quizz?gameId=${encodeURIComponent(gameId)}`)
+        const quizData = await api.get<QuizDataResponse>(`/v1/game/quiz?gameId=${encodeURIComponent(gameId)}`)
         
         if (quizData.ok && Array.isArray(quizData.raffleWinners)) {
           // Map raffleWinners to RaffleWinner format

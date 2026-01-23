@@ -65,7 +65,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
       setError(null)
 
       try {
-        const data = await api.get<QuizDataResponse>(`/quizz?gameId=${encodeURIComponent(gameId)}`)
+        const data = await api.get<QuizDataResponse>(`/v1/game/quiz?gameId=${encodeURIComponent(gameId)}`)
         
         // If quiz exists and has questions, load them into the form
         if (data.ok && data.questions && data.questions.length > 0) {
@@ -235,7 +235,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
         }))
       }
 
-      await api.post('/quizz', quizData)
+      await api.post('/v1/game/quiz', quizData)
 
       setSuccess(true)
       setTimeout(() => {
@@ -341,7 +341,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
     setShowShareOptions(false)
 
     try {
-      const data = await api.get<QuizDataResponse>(`/quizz?gameId=${encodeURIComponent(gameId)}`)
+      const data = await api.get<QuizDataResponse>(`/quiz?gameId=${encodeURIComponent(gameId)}`)
       setExportData(data)
       setShowShareOptions(true)
     } catch (err: any) {
