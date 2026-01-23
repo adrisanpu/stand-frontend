@@ -71,16 +71,28 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
 
     setLoading(true)
     try {
-      const data = await api.post<{ message?: string; gameName?: string; gameId?: string; table?: unknown; gameType?: string; createdAt?: string; error?: string }>('/game', { 
+      const response = await api.post<{ 
+        message: string
+        game: {
+          gameId: string
+          ownerUserId: string
+          gameType: string
+          gameName: string
+          isActive: boolean
+          maxPlayers: number
+          createdAt: string
+          updatedAt: string
+        }
+      }>('/v1/game', { 
         gameName: gameId.toUpperCase(),
         gameType: selectedGame.name
       })
-      // API returns { message, gameName, gameId, table, gameType, createdAt }
-      if (data.gameName && data.gameId) {
-        onGameCreated(data.gameName, data.gameId, data.gameType || selectedGame.id)
+      
+      // API returns { message, game: { gameId, gameName, gameType, ... } }
+      if (response.game && response.game.gameId && response.game.gameName) {
+        onGameCreated(response.game.gameName, response.game.gameId, response.game.gameType || selectedGame.id)
       } else {
-        // Fallback for old API format
-        onSetGameId(gameId.toUpperCase())
+        throw new Error('Respuesta inválida del servidor')
       }
     } catch (e: any) {
       setError(e.message || 'No se ha podido crear la partida. Prueba con otro nombre.')
@@ -100,11 +112,20 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
     
     setJoining(true)
     try {
-      const data = await api.get<{ message?: string; gameName?: string; gameId?: string; gameType?: string; createdAt?: string; error?: string }>(`/game?gameName=${encodeURIComponent(gameId.toUpperCase())}`)
+      const response = await api.get<{ 
+        message: string
+        game: {
+          gameId: string
+          gameName: string
+          gameType: string
+          createdAt: string
+          maxPlayers: number
+        }
+      }>(`/v1/game?gameName=${encodeURIComponent(gameId.toUpperCase())}`)
       
-      // API returns { message, gameName, gameId, gameType, createdAt }
-      if (data.gameName && data.gameId) {
-        onGameCreated(data.gameName, data.gameId, data.gameType || selectedGame.id)
+      // API returns { message, game: { gameId, gameName, gameType, createdAt, maxPlayers } }
+      if (response.game && response.game.gameId && response.game.gameName) {
+        onGameCreated(response.game.gameName, response.game.gameId, response.game.gameType || selectedGame.id)
       } else {
         throw new Error('Respuesta inválida del servidor')
       }

@@ -68,9 +68,9 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const handleStartCheckout = async () => {
     setIsStartingCheckout(true)
     try {
-      const data = await api.post<{ url: string }>('/billing/checkout', {})
-      if (data.url) {
-        window.location.href = data.url
+      const data = await api.post<{ ok: boolean; checkoutUrl: string; sessionId: string }>('/v1/billing/checkout', {})
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl
       } else {
         throw new Error('No se recibió URL de pago')
       }
@@ -123,7 +123,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     setShowExportShareOptions(false)
 
     try {
-      const data = await api.get(`/quizz?gameId=${encodeURIComponent(gameId)}`)
+      const data = await api.get(`/quiz?gameId=${encodeURIComponent(gameId)}`)
       setExportQuizData(data)
       setShowExportShareOptions(true)
     } catch (err: any) {
@@ -192,7 +192,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     setTerminateError(null)
 
     try {
-      await api.put('/game', { gameId, isActive: false })
+      await api.put('/v1/game', { gameId, isActive: false })
 
       // Close the popup and settings menu, then leave the game
       setShowExportQuiz(false)
