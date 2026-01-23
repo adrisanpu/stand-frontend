@@ -51,7 +51,7 @@ export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProp
     setValidationResult(null)
 
     try {
-      const result = await api.post<ValidationResponse>('/validate', {
+      const result = await api.post<ValidationResponse>('/v1/game/validate', {
         gameId: gameId,
         codes: [code1, code2]
       })

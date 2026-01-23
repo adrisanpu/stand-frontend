@@ -89,7 +89,7 @@ export default function T1merGameScreen({ gameName, gameId }: GameScreenProps) {
     setError(null)
 
     try {
-      const data = await api.post<{ valid: boolean; playerId?: string; username?: string; message?: string; error?: string }>('/validate', {
+      const data = await api.post<{ valid: boolean; playerId?: string; username?: string; message?: string; error?: string }>('/v1/game/validate', {
         gameId: gameId,
         codes: [playerCode.toUpperCase()]
       })
@@ -138,7 +138,7 @@ export default function T1merGameScreen({ gameName, gameId }: GameScreenProps) {
     try {
       const scoreMs = Math.round(difference * 1000) // Convert to integer milliseconds
 
-      await api.post('/score', {
+      await api.post('/v1/game/score', {
         gameId: gameId,
         playerId: playerId, // string or number
         timer: time.toFixed(3), // seconds as string

@@ -17,7 +17,7 @@ interface RankingResponse {
 
 async function getRanking(gameId: string, limit: number = 10): Promise<RankingEntry[]> {
   try {
-    const data = await api.get<RankingResponse>(`/score?gameId=${encodeURIComponent(gameId)}&limit=${limit}`)
+    const data = await api.get<RankingResponse>(`/v1/game/score?gameId=${encodeURIComponent(gameId)}&limit=${limit}`)
     
     // Handle new response structure
     if (data.ok && Array.isArray(data.results)) {

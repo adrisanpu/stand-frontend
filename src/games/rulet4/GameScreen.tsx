@@ -68,7 +68,7 @@ export default function Rulet4GameScreen({ gameName, gameId }: GameScreenProps) 
     setError(null)
 
     try {
-      const data = await api.post<{ valid: boolean; playerId?: string; username?: string; message?: string; error?: string }>('/validate', {
+      const data = await api.post<{ valid: boolean; playerId?: string; username?: string; message?: string; error?: string }>('/v1/game/validate', {
         gameId: gameId,
         codes: [playerCode.toUpperCase()]
       })
@@ -143,7 +143,7 @@ export default function Rulet4GameScreen({ gameName, gameId }: GameScreenProps) 
     }
 
     try {
-      await api.post('/score', {
+      await api.post('/v1/game/score', {
         gameId: gameId,
         playerId: playerId,
         prize: panel.label,

@@ -120,7 +120,7 @@ export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) 
     setLetters([])
 
     try {
-      const result = await api.post<ValidationResponse>('/validate', {
+      const result = await api.post<ValidationResponse>('/v1/game/validate', {
         gameId: gameId,
         codes: trimmedCodes
       })
@@ -182,7 +182,7 @@ export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) 
     if (!gameId) return
 
     try {
-      await api.post('/score', {
+      await api.post('/v1/game/score', {
         gameId: gameId,
         codesUsed: codesUsed,
         objectiveWord: objectiveWord,
