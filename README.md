@@ -337,7 +337,7 @@ All API requests automatically include the ID token from AWS Cognito in the `Aut
 - `/validate` — Validate game codes
 - `/score` — Submit game scores
 - `/game` — Game management
-- `/quizz` — Quiz data
+- `/quiz` — Quiz data
 
 **User Management:**
 - `POST /users` — Bootstrap user on first login
