@@ -17,7 +17,7 @@ export default function BillingSuccess() {
     const refreshUser = async () => {
       try {
         setRefreshing(true)
-        const data = await api.get<{ user: BackendUser }>('/users')
+        const data = await api.get<{ user: BackendUser }>('/v1/user/me')
         if (data.user) {
           // Normalize plan
           const normalizedPlan = 

@@ -53,16 +53,33 @@ export function useCurrentUser(): UseCurrentUserReturn {
         setError(null)
 
         // API client automatically uses ID token (backend needs 'sub' claim)
-        // Backend always returns { user: {...} }
-        const data = await api.get<{ user: BackendUser }>('/users')
-
-        if (!data.user) {
+        // Backend returns: { user: { plan, createdAt, email, userId, updatedAt, activeUntil } }
+        const response = await api.get<any>('/v1/user/me')
+        
+        // Handle response - it should be an object with a 'user' property
+        // Response format: {"user": {"plan": "FREE", "createdAt": "...", "email": "...", "userId": "...", "updatedAt": "...", "activeUntil": null}}
+        let data: { user: BackendUser }
+        
+        if (typeof response === 'string') {
+          // If response is a string, parse it
+          try {
+            data = JSON.parse(response)
+          } catch (e) {
+            throw new Error('Invalid JSON response')
+          }
+        } else if (response && typeof response === 'object') {
+          data = response as { user: BackendUser }
+        } else {
+          throw new Error('Unexpected response format')
+        }
+        
+        // Extract user from response
+        const backendUser = data.user
+        
+        if (!backendUser || !backendUser.userId) {
           throw new Error('Invalid user data received')
         }
 
-        // Normalize backend user to frontend format
-        const backendUser = data.user
-        
         // Normalize plan: "FREE" -> "free", "EVENT_24H" -> "event", "ENTERPRISE" -> "enterprise"
         const normalizedPlan: FrontendPlan = 
           backendUser.plan === 'FREE' ? 'free' :
@@ -70,6 +87,7 @@ export function useCurrentUser(): UseCurrentUserReturn {
           backendUser.plan === 'ENTERPRISE' ? 'enterprise' :
           'free' // default fallback
 
+        // Convert backend user format to frontend format
         const frontendUser: User = {
           id: backendUser.userId,
           email: backendUser.email,
@@ -81,6 +99,14 @@ export function useCurrentUser(): UseCurrentUserReturn {
 
         setUser(frontendUser)
       } catch (err: any) {
+        console.error('Error fetching user:', {
+          error: err,
+          message: err instanceof Error ? err.message : String(err),
+          status: (err as any)?.status,
+          isNetworkError: (err as any)?.isNetworkError,
+          stack: err instanceof Error ? err.stack : undefined,
+        })
+
         // Handle 401 - unauthorized
         if (err.status === 401 || err.message?.includes('401') || err.message?.includes('Unauthorized')) {
           clearAuth()

@@ -169,17 +169,46 @@ export default function AuthCallback() {
           if (savedTokens?.idToken) {
             console.log('Calling bootstrap endpoint with ID token:', {
               apiBaseUrl: API_BASE_URL,
+              endpoint: '/v1/user',
+              fullUrl: `${API_BASE_URL}/v1/user`,
               tokenPreview: savedTokens.idToken.substring(0, 30) + '...',
             })
             // Don't await - let it run in background
             // API client automatically uses ID token
-            api.post('/users', {}).catch((err) => {
-              // Log only, don't block navigation
-              console.error('Bootstrap call failed (non-blocking):', err)
+            // Try with empty body first, some APIs might require it
+            api.post('/v1/user', {}).then(() => {
+              console.log('Bootstrap call succeeded')
+            }).catch((err) => {
+              // Log detailed error information
+              const errorStatus = (err as any)?.status
+              const errorMessage = err instanceof Error ? err.message : String(err)
+              const isNetworkError = (err as any)?.isNetworkError
+              
+              console.error('Bootstrap call failed (non-blocking):', {
+                error: err,
+                message: errorMessage,
+                status: errorStatus,
+                isNetworkError: isNetworkError,
+                url: `${API_BASE_URL}/v1/user`,
+                method: 'POST',
+              })
+              
+              // If it's a 404, the endpoint might not exist - log as warning
+              if (errorStatus === 404) {
+                console.warn('Bootstrap endpoint returned 404 - endpoint might not exist or user already exists')
+              } else if (errorStatus === 409) {
+                // 409 Conflict usually means user already exists - this is OK
+                console.log('User already exists (409) - this is expected for existing users')
+              } else if (!isNetworkError && errorStatus !== 401) {
+                // For other non-network errors (except 401), log as error but don't block
+                console.error('Bootstrap failed with status:', errorStatus, errorMessage)
+              }
             })
           } else {
             console.warn('Bootstrap skipped: ID token not found in storage')
           }
+        } else {
+          console.warn('Bootstrap skipped: API_BASE_URL not configured')
         }
 
         // Redirect to next path immediately
