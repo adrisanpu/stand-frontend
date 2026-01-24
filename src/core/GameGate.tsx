@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { games } from '../games'
 import type { GameDefinition } from './types'
 import { api } from '../api/api'
@@ -15,8 +15,16 @@ type GameGateProps = {
 
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 
+interface UserGame {
+  gameId: string
+  gameName: string
+  gameType: string
+  createdAt: string
+  maxPlayers: number
+}
+
 export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
-  const { plan } = useCurrentUser()
+  const { plan, user } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const standLogo = useStandLogo()
   const [selectedGame, setSelectedGame] = useState<GameDefinition | null>(null)
@@ -25,6 +33,11 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
   const [loading, setLoading] = useState(false)
   const [joining, setJoining] = useState(false)
   const [customLogo, setCustomLogo] = useState<string | null>(null)
+  const [userGames, setUserGames] = useState<UserGame[]>([])
+  const [loadingGames, setLoadingGames] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   
   // Count existing games from localStorage (simple approach for MVP)
   const existingGameId = localStorage.getItem('gameId')
@@ -39,11 +52,72 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
     }
   }, [])
 
+  // Fetch user games when a game is selected
+  useEffect(() => {
+    if (selectedGame && user) {
+      fetchUserGames(selectedGame.name)
+    } else {
+      setUserGames([])
+    }
+  }, [selectedGame, user])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
+          inputRef.current && !inputRef.current.contains(event.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  const fetchUserGames = async (gameType: string) => {
+    if (!user) return
+    
+    setLoadingGames(true)
+    try {
+      // Fetch user games from API: GET /v1/game?gameType=TYPE
+      // Response format: { ok: true, games: [...], count: number, gameType: string, ownerUserId: string }
+      const response = await api.get<{
+        ok: boolean
+        games: UserGame[]
+        count: number
+        gameType: string
+        ownerUserId: string
+      }>(`/v1/game?gameType=${encodeURIComponent(gameType)}`)
+      
+      // Handle response format
+      if (response && response.ok && Array.isArray(response.games)) {
+        setUserGames(response.games)
+      } else {
+        setUserGames([])
+      }
+    } catch (e: any) {
+      // If endpoint fails, just show empty list
+      console.warn('Could not fetch user games:', e.message)
+      setUserGames([])
+    } finally {
+      setLoadingGames(false)
+    }
+  }
+
   const validateGameId = (id: string) => GAME_RE.test(id)
 
   const handleGameSelect = (game: GameDefinition) => {
     setSelectedGame(game)
     setGameId('')
+    setError(null)
+    setShowDropdown(false)
+  }
+
+  const handleGameSelectFromDropdown = (game: UserGame) => {
+    setGameId(game.gameName)
+    setShowDropdown(false)
     setError(null)
   }
 
@@ -234,17 +308,76 @@ export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
         </div>
       </div>
 
-      {/* Game ID Input */}
-      <div className="space-y-2">
+      {/* Game ID Input with Dropdown */}
+      <div className="space-y-2 relative">
         <label htmlFor="game-id" className="text-sm text-gray-300">Nombre de la partida</label>
-        <input
-          id="game-id"
-          value={gameId}
-          onChange={(e)=>setGameId(e.target.value.toUpperCase())}
-          placeholder="ej. TORNEO_1"
-          className="w-full h-11 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 outline-none focus:border-white/20 uppercase"
-        />
-        <p className="text-xs text-gray-400">Caracteres permitidos: letras, números, _ - .</p>
+        <div className="relative">
+          <input
+            ref={inputRef}
+            id="game-id"
+            name="game-name-input"
+            value={gameId}
+            onChange={(e) => {
+              setGameId(e.target.value.toUpperCase())
+              setShowDropdown(true)
+            }}
+            onFocus={() => {
+              if (userGames.length > 0) {
+                setShowDropdown(true)
+              }
+            }}
+            placeholder="ej. TORNEO_1"
+            autoComplete="off"
+            data-form-type="other"
+            className="w-full h-11 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 pr-10 outline-none focus:border-white/20 uppercase"
+          />
+          {userGames.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowDropdown(!showDropdown)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-textMain transition-colors"
+            >
+              <svg 
+                className={`w-5 h-5 transition-transform ${showDropdown ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
+          
+          {/* Dropdown with user games */}
+          {showDropdown && userGames.length > 0 && (
+            <div
+              ref={dropdownRef}
+              className="absolute z-50 w-full mt-1 max-h-60 overflow-auto rounded-xl bg-[rgba(20,20,30,0.95)] border border-white/20 shadow-xl backdrop-blur-sm"
+            >
+              {loadingGames ? (
+                <div className="p-3 text-center text-sm text-gray-400">Cargando partidas...</div>
+              ) : (
+                <div className="py-1">
+                  {userGames.map((game) => (
+                    <button
+                      key={game.gameId}
+                      type="button"
+                      onClick={() => handleGameSelectFromDropdown(game)}
+                      className="w-full px-4 py-2 text-left text-sm text-textMain hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+                    >
+                      <span className="font-medium">{game.gameName}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-gray-400">
+          {userGames.length > 0 
+            ? `Tienes ${userGames.length} partida${userGames.length > 1 ? 's' : ''} creada${userGames.length > 1 ? 's' : ''}. Selecciona una o escribe un nombre nuevo.`
+            : 'Caracteres permitidos: letras, números, _ - .'}
+        </p>
       </div>
 
       {error && (
