@@ -7,46 +7,32 @@ interface RaffleWinner {
   raffleId?: string
 }
 
-interface QuizDataResponse {
+interface GameDataRaffleWinner {
+  wonAt: string
+  validationCode: number
+  instagramUsername: string
+  playerId: number
+  instagramPSID: string
+}
+
+interface GameDataResponse {
   ok: boolean
-  gameId: string
-  questions?: Array<{
-    id: string
-    text: string
-    options: Array<{
-      title: string
-      payload: string
-      answerId: string
-    }>
-  }>
-  players?: Array<{
-    playerId: number
-    instagramPSID: string
-    instagramUsername: string
-    quizCompleted: boolean
-    quizCurrentQuestion: string | null
-    quizAnswers: Record<string, string>
-  }>
-  raffleWinners?: Array<{
-    playerId: number
-    instagramPSID: string
-    instagramUsername: string
-    raffleWin: boolean
-    raffleWinAt: string
-    validationCode: number
-  }>
+  game?: { gameId: string; gameName: string; gameType: string; createdAt: string; maxPlayers: number }
+  playerCount?: number
+  validatedCount?: number
+  raffleWinners?: GameDataRaffleWinner[]
+  quiz?: { enabled: boolean; questionsCount: number }
 }
 
 interface AutoRaffleConfig {
   enabled: boolean
   intervalMinutes: number
   lastAutoRaffleTime?: number
-  autoNumberOfWinners?: number
-  autoApplicableOnlyValidated?: boolean
 }
 
 interface RaffleDataProps {
   gameId: string
+  gameName: string
   refreshInterval?: number // in milliseconds, 0 to disable
 }
 
@@ -64,7 +50,7 @@ const loadAutoRaffleConfig = (gameId: string): AutoRaffleConfig | null => {
   return null
 }
 
-export default function RaffleData({ gameId, refreshInterval = 10000 }: RaffleDataProps) {
+export default function RaffleData({ gameId, gameName, refreshInterval = 10000 }: RaffleDataProps) {
   const [winners, setWinners] = useState<RaffleWinner[]>([])
   const [nextRaffleTime, setNextRaffleTime] = useState<Date | null>(null)
   const [timeUntilNext, setTimeUntilNext] = useState<number | null>(null)
@@ -92,7 +78,7 @@ export default function RaffleData({ gameId, refreshInterval = 10000 }: RaffleDa
   }
 
   const loadRaffleData = async () => {
-    if (!gameId) return
+    if (!gameId || !gameName) return
 
     try {
       // Load auto raffle config from localStorage
@@ -108,31 +94,27 @@ export default function RaffleData({ gameId, refreshInterval = 10000 }: RaffleDa
         setTimeUntilNext(null)
       }
 
-      // Fetch raffle winners from quiz endpoint
+      // Fetch raffle winners from game endpoint
       try {
-        const quizData = await api.get<QuizDataResponse>(`/v1/game/quiz?gameId=${encodeURIComponent(gameId)}`)
-        
-        if (quizData.ok && Array.isArray(quizData.raffleWinners)) {
-          // Map raffleWinners to RaffleWinner format
-          const mappedWinners: RaffleWinner[] = quizData.raffleWinners
-            .filter(winner => winner.raffleWin) // Only include actual winners
-            .map(winner => ({
-              username: winner.instagramUsername,
-              timestamp: winner.raffleWinAt,
-              raffleId: winner.playerId.toString()
+        const data = await api.get<GameDataResponse>(`/v1/game?gameName=${encodeURIComponent(gameName)}`)
+
+        if (data.ok && Array.isArray(data.raffleWinners)) {
+          const mappedWinners: RaffleWinner[] = data.raffleWinners
+            .map(w => ({
+              username: w.instagramUsername,
+              timestamp: w.wonAt,
+              raffleId: w.playerId.toString()
             }))
-            // Sort by timestamp (most recent first)
             .sort((a, b) => {
               if (!a.timestamp || !b.timestamp) return 0
               return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
             })
-          
           setWinners(mappedWinners)
         } else {
           setWinners([])
         }
-      } catch (historyError) {
-        console.warn('Error fetching raffle winners:', historyError)
+      } catch (err) {
+        console.warn('Error fetching raffle winners:', err)
         setWinners([])
       }
 
@@ -170,17 +152,16 @@ export default function RaffleData({ gameId, refreshInterval = 10000 }: RaffleDa
   }, [nextRaffleTime, autoRaffleConfig])
 
   useEffect(() => {
-    if (gameId) {
+    if (gameId && gameName) {
       loadRaffleData()
-      
-      // Refresh raffle data at specified interval
+
       if (refreshInterval > 0) {
         const interval = setInterval(loadRaffleData, refreshInterval)
         return () => clearInterval(interval)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, refreshInterval])
+  }, [gameId, gameName, refreshInterval])
 
   // Also listen for storage changes to update when config changes in another tab/window
   useEffect(() => {

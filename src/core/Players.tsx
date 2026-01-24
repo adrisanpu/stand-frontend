@@ -3,39 +3,21 @@ import { api } from '../api/api'
 import { useCurrentUser } from '../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../auth/featureFlags'
 
-interface QuizDataResponse {
+interface GameDataResponse {
   ok: boolean
-  gameId: string
-  questions?: Array<{
-    id: string
-    text: string
-    options: Array<{
-      title: string
-      payload: string
-      answerId: string
-    }>
-  }>
-  players: Array<{
-    playerId: number
-    instagramPSID: string
-    instagramUsername: string
-    quizCompleted: boolean
-    quizCurrentQuestion: string | null
-    quizAnswers: Record<string, string>
-  }>
+  game?: { gameId: string; gameName: string; gameType: string; createdAt: string; maxPlayers: number }
+  playerCount?: number
+  validatedCount?: number
+  raffleWinners?: unknown[]
+  quiz?: { enabled: boolean; questionsCount: number }
 }
 
-async function getPlayerCount(gameId: string): Promise<number> {
+async function getPlayerCount(gameName: string): Promise<number> {
   try {
-    // Get player count from quiz endpoint
-    const data = await api.get<QuizDataResponse>(`/v1/game/quiz?gameId=${encodeURIComponent(gameId)}`)
-    
-    if (data.ok && Array.isArray(data.players)) {
-      // Count unique players by instagramPSID (in case there are duplicates)
-      const uniquePlayers = new Set(data.players.map(p => p.instagramPSID).filter(Boolean))
-      return uniquePlayers.size
+    const data = await api.get<GameDataResponse>(`/v1/game?gameName=${encodeURIComponent(gameName)}`)
+    if (data.ok && typeof data.playerCount === 'number') {
+      return data.playerCount
     }
-    
     return 0
   } catch (error) {
     console.error('Error fetching player count:', error)
@@ -44,11 +26,11 @@ async function getPlayerCount(gameId: string): Promise<number> {
 }
 
 interface PlayersProps {
-  gameId: string
+  gameName: string
   refreshInterval?: number // in milliseconds, 0 to disable
 }
 
-export default function Players({ gameId, refreshInterval = 10000 }: PlayersProps) {
+export default function Players({ gameName, refreshInterval = 10000 }: PlayersProps) {
   const { plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const [playerCount, setPlayerCount] = useState<number>(0)
@@ -57,10 +39,10 @@ export default function Players({ gameId, refreshInterval = 10000 }: PlayersProp
   const maxPlayers = features.maxPlayers === Infinity ? null : features.maxPlayers
 
   const loadPlayerCount = async () => {
-    if (!gameId) return
+    if (!gameName) return
 
     try {
-      const count = await getPlayerCount(gameId)
+      const count = await getPlayerCount(gameName)
       setPlayerCount(count)
       setLoading(false)
     } catch (error) {
@@ -71,17 +53,16 @@ export default function Players({ gameId, refreshInterval = 10000 }: PlayersProp
   }
 
   useEffect(() => {
-    if (gameId) {
+    if (gameName) {
       loadPlayerCount()
-      
-      // Refresh player count at specified interval
+
       if (refreshInterval > 0) {
         const interval = setInterval(loadPlayerCount, refreshInterval)
         return () => clearInterval(interval)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, refreshInterval])
+  }, [gameName, refreshInterval])
 
   if (loading) {
     return (

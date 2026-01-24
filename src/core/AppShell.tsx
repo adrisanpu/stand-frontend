@@ -184,11 +184,11 @@ export default function AppShell() {
               
               {/* Sidebar: Players, Ranking (if enabled), RaffleData */}
               <div className="w-64 flex-shrink-0 space-y-4">
-                <Players gameId={gameId} />
+                <Players gameName={gameName} />
                 {currentGame.showRanking && (
                   <Ranking gameId={gameId} />
                 )}
-                <RaffleData gameId={gameId} />
+                <RaffleData gameId={gameId} gameName={gameName} />
               </div>
             </div>
           ) : (
