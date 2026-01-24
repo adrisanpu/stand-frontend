@@ -16,8 +16,6 @@ interface AutoRaffleConfig {
   enabled: boolean
   intervalMinutes: number
   lastAutoRaffleTime?: number
-  autoNumberOfWinners?: number
-  autoApplicableOnlyValidated?: boolean
 }
 
 const getStorageKey = (gameId: string) => `raffle_auto_${gameId}`
@@ -51,11 +49,9 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
   const [error, setError] = useState<string | null>(null)
   const [winners, setWinners] = useState<string[] | null>(null)
   
-  // Auto raffle configuration
+  // Auto raffle: solo activar/desactivar e intervalo. El resto (número de ganadores, aplicable a) se toma de los inputs del sorteo manual.
   const [autoRaffleEnabled, setAutoRaffleEnabled] = useState<boolean>(false)
   const [autoRaffleInterval, setAutoRaffleInterval] = useState<number>(30) // minutes
-  const [autoRaffleNumberOfWinners, setAutoRaffleNumberOfWinners] = useState<number>(1)
-  const [autoRaffleApplicableOnlyValidated, setAutoRaffleApplicableOnlyValidated] = useState<boolean>(false)
 
   // Load auto raffle config on mount
   useEffect(() => {
@@ -63,8 +59,6 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
     if (config) {
       setAutoRaffleEnabled(config.enabled)
       setAutoRaffleInterval(config.intervalMinutes || 30)
-      setAutoRaffleNumberOfWinners(config.autoNumberOfWinners || 1)
-      setAutoRaffleApplicableOnlyValidated(config.autoApplicableOnlyValidated || false)
     }
   }, [gameId])
 
@@ -74,13 +68,11 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
       const config: AutoRaffleConfig = {
         enabled: autoRaffleEnabled,
         intervalMinutes: autoRaffleInterval,
-        autoNumberOfWinners: autoRaffleNumberOfWinners,
-        autoApplicableOnlyValidated: autoRaffleApplicableOnlyValidated,
         lastAutoRaffleTime: loadAutoRaffleConfig(gameId)?.lastAutoRaffleTime
       }
       saveAutoRaffleConfig(gameId, config)
     }
-  }, [gameId, autoRaffleEnabled, autoRaffleInterval, autoRaffleNumberOfWinners, autoRaffleApplicableOnlyValidated])
+  }, [gameId, autoRaffleEnabled, autoRaffleInterval])
 
   const handleNumberChange = (value: string) => {
     const num = parseInt(value, 10)
@@ -97,15 +89,6 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
       setAutoRaffleInterval(num)
     } else if (value === '') {
       setAutoRaffleInterval(1)
-    }
-  }
-
-  const handleAutoNumberChange = (value: string) => {
-    const num = parseInt(value, 10)
-    if (!isNaN(num) && num > 0) {
-      setAutoRaffleNumberOfWinners(num)
-    } else if (value === '') {
-      setAutoRaffleNumberOfWinners(1)
     }
   }
 
@@ -132,7 +115,14 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
       })
       if (result.winners && Array.isArray(result.winners)) {
         setWinners(result.winners)
-        
+
+        // Guardar parámetros usados para que los sorteos automáticos los reutilicen
+        if (gameId) {
+          try {
+            localStorage.setItem(`raffle_last_manual_${gameId}`, JSON.stringify({ numberOfWinners, applicableOnlyValidated }))
+          } catch (_) {}
+        }
+
         // Update last raffle time if auto raffle is enabled
         if (gameId && autoRaffleEnabled) {
           const config = loadAutoRaffleConfig(gameId)
@@ -357,69 +347,21 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
               </div>
 
               {autoRaffleEnabled && (
-                <div className="space-y-4 mt-4">
-                  {/* Interval Input */}
-                  <div>
-                    <label htmlFor="auto-interval" className="block text-xs font-medium text-gray-300 mb-2">
-                      Intervalo (minutos)
-                    </label>
-                    <input
-                      id="auto-interval"
-                      type="number"
-                      min="1"
-                      value={autoRaffleInterval}
-                      onChange={(e) => handleAutoIntervalChange(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-white/20 focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Auto Number of Winners */}
-                  <div>
-                    <label htmlFor="auto-number-of-winners" className="block text-xs font-medium text-gray-300 mb-2">
-                      Número de ganadores (automático)
-                    </label>
-                    <input
-                      id="auto-number-of-winners"
-                      type="number"
-                      min="1"
-                      value={autoRaffleNumberOfWinners}
-                      onChange={(e) => handleAutoNumberChange(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-white/20 focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Auto Applicable To Selection */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-300 mb-2">
-                      Aplicable a (automático)
-                    </label>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 p-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors">
-                        <input
-                          type="radio"
-                          name="autoApplicableOnlyValidated"
-                          checked={!autoRaffleApplicableOnlyValidated}
-                          onChange={() => setAutoRaffleApplicableOnlyValidated(false)}
-                          className="w-3 h-3 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium text-xs">Todos los jugadores</div>
-                        </div>
-                      </label>
-                      <label className="flex items-center gap-2 p-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors">
-                        <input
-                          type="radio"
-                          name="autoApplicableOnlyValidated"
-                          checked={autoRaffleApplicableOnlyValidated}
-                          onChange={() => setAutoRaffleApplicableOnlyValidated(true)}
-                          className="w-3 h-3 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium text-xs">Parejas validadas</div>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
+                <div className="mt-4">
+                  <label htmlFor="auto-interval" className="block text-xs font-medium text-gray-300 mb-2">
+                    Intervalo (minutos)
+                  </label>
+                  <input
+                    id="auto-interval"
+                    type="number"
+                    min="1"
+                    value={autoRaffleInterval}
+                    onChange={(e) => handleAutoIntervalChange(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-white/20 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Número de ganadores y «aplicable a» = los del sorteo manual arriba.
+                  </p>
                 </div>
               )}
             </div>
