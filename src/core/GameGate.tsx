@@ -10,7 +10,6 @@ const GAME_RE = /^[A-Za-z0-9._-]{1,40}$/
 
 type GameGateProps = {
   onGameCreated: (gameName: string, gameId: string, gameType?: string) => void
-  onSetGameId: (gameId: string) => void
 }
 
 const STORAGE_KEY_LOGO = 'app_custom_logo'
@@ -23,7 +22,7 @@ interface UserGame {
   maxPlayers: number
 }
 
-export default function GameGate({ onGameCreated, onSetGameId }: GameGateProps){
+export default function GameGate({ onGameCreated }: GameGateProps){
   const { plan, user } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const standLogo = useStandLogo()

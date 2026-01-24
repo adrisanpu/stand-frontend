@@ -105,10 +105,6 @@ export default function AppShell() {
     setGameType(gameIdToUse)
   }
 
-  const handleSetGameId = (id: string) => {
-    setGameId(id)
-  }
-
   const handleLeaveGame = () => {
     setGameId(null)
     setGameName(null)
@@ -195,10 +191,7 @@ export default function AppShell() {
           ) : (
             /* GameGate Catalog */
             <div className="card w-full max-w-md p-8">
-              <GameGate 
-                onGameCreated={handleGameCreated} 
-                onSetGameId={handleSetGameId}
-              />
+              <GameGate onGameCreated={handleGameCreated} />
             </div>
           )}
         </div>
