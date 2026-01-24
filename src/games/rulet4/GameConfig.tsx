@@ -56,8 +56,6 @@ export default function Rulet4GameConfig({ gameName, settings, onChange }: GameC
   const handleSave = () => {
     const newSettings: Rulet4Settings = { panels }
     onChange(newSettings)
-    // Refresh the page to see changes instantly
-    window.location.reload()
   }
 
   return (

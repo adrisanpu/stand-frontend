@@ -14,9 +14,10 @@ type SettingsMenuProps = {
   gameDefinition?: GameDefinition
   onLeaveGame?: () => void
   onExitApp?: () => void
+  onConfigSaved?: () => void
 }
 
-export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition, onLeaveGame, onExitApp }: SettingsMenuProps) {
+export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition, onLeaveGame, onExitApp, onConfigSaved }: SettingsMenuProps) {
   const [showRaffle, setShowRaffle] = useState(false)
   const [showQuiz, setShowQuiz] = useState(false)
   const [showRemovePlayer, setShowRemovePlayer] = useState(false)
@@ -62,6 +63,9 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       const storageKey = `${gameDefinition.id}_settings_${gameId}`
       localStorage.setItem(storageKey, JSON.stringify(newSettings))
       setGameSettings(newSettings)
+      setShowGameConfig(false)
+      onConfigSaved?.()
+      onClose()
     }
   }
 
@@ -410,8 +414,8 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
         <div className="absolute inset-0 bg-black/70" onClick={() => setShowGameConfig(false)} aria-hidden="true" />
-        <div className="relative card w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-6">
+        <div className="relative card w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
             <h2 id="game-config-title" className="text-xl font-semibold">Configurar juego</h2>
             <button
               onClick={() => setShowGameConfig(false)}
@@ -423,12 +427,14 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               </svg>
             </button>
           </div>
-          <GameConfigComponent
-            gameId={gameId ?? null}
-            gameName={gameDefinition.name}
-            settings={gameSettings}
-            onChange={handleGameConfigChange}
-          />
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6">
+            <GameConfigComponent
+              gameId={gameId ?? null}
+              gameName={gameDefinition.name}
+              settings={gameSettings}
+              onChange={handleGameConfigChange}
+            />
+          </div>
         </div>
       </div>
     )

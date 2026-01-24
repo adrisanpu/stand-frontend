@@ -19,6 +19,7 @@ export default function AppShell() {
   const [gameType, setGameType] = useState<string | null>(null)
   const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
   const [customLogo, setCustomLogo] = useState<string | null>(null)
+  const [gameConfigVersion, setGameConfigVersion] = useState(0)
 
   // Load custom logo from localStorage
   useEffect(() => {
@@ -179,7 +180,7 @@ export default function AppShell() {
                     )}
                   </div>
                 )}
-                <currentGame.GameScreen gameName={gameName} gameId={gameId} />
+                <currentGame.GameScreen key={`game-${gameId}-${gameConfigVersion}`} gameName={gameName} gameId={gameId} />
               </div>
               
               {/* Sidebar: Players, Ranking (if enabled), RaffleData */}
@@ -211,6 +212,7 @@ export default function AppShell() {
             gameDefinition={gameDefinition ?? undefined}
             onLeaveGame={handleLeaveGame}
             onExitApp={handleExitApp}
+            onConfigSaved={() => setGameConfigVersion(v => v + 1)}
           />
         )}
 
