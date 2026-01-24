@@ -17,6 +17,7 @@ type ValidationResponse = {
     instagramUsername: string
     characterId: number
     characterName: string
+    characterImageUrl?: string | null
   }>
   message: string
   notified?: boolean
@@ -214,9 +215,7 @@ export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProp
             <div className="flex flex-col items-center space-y-3 animate-scale-in">
               {(() => {
                 const player = validationResult.players[0]
-                const imgUrl = player.characterName 
-                  ? `https://empareja2-characters.s3.us-east-1.amazonaws.com/${player.characterName}.png`
-                  : null
+                const imgUrl = player.characterImageUrl || null
                 return (
                   <>
                     <div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg">
@@ -257,9 +256,7 @@ export default function Empareja2GameScreen({ gameName, gameId }: GameScreenProp
             <div className="flex flex-col items-center space-y-3 animate-scale-in" style={{ animationDelay: '0.2s' }}>
               {(() => {
                 const player = validationResult.players[1]
-                const imgUrl = player.characterName 
-                  ? `https://empareja2-characters.s3.us-east-1.amazonaws.com/${player.characterName}.png`
-                  : null
+                const imgUrl = player.characterImageUrl || null
                 return (
                   <>
                     <div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg">
