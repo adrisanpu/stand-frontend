@@ -8,7 +8,6 @@ import AuthCallback from './auth/AuthCallback'
 import Logout from './auth/Logout'
 import BillingSuccess from './pages/BillingSuccess'
 import BillingCancel from './pages/BillingCancel'
-import Privacy from './pages/Privacy'
 
 function RootRedirect() {
   const { isAuthenticated } = useAuth()
@@ -24,7 +23,6 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/privacy" element={<Privacy />} />
       <Route path="/auth/start" element={<AuthStart />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/logout" element={<Logout />} />
