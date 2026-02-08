@@ -1,0 +1,481 @@
+import { useState, useEffect } from 'react'
+import type { GameScreenProps } from '../../core/types'
+import QRCode from '../../core/QRCode'
+import { api } from '../../api/api'
+
+const INSTAGRAM_HANDLE = 'stand_official'
+const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
+
+type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
+
+type CupidoStats = {
+  maleCount?: number
+  femaleCount?: number
+  matchedCouples?: number
+}
+
+type ValidationResponse = {
+  valid: boolean
+  gameId: string
+  pairId: string | null
+  players: Array<{
+    playerId: number
+    instagramUsername: string
+    characterId?: number
+    characterName?: string
+    characterImageUrl?: string | null
+  }>
+  message: string
+  notified?: boolean
+}
+
+const CUPIDO_PRIMARY = '#E11D48'
+const CUPIDO_PRIMARY_RGB = '225, 29, 72'
+
+export default function CupidoGameScreen({ gameName, gameId }: GameScreenProps) {
+  // ----- CUPIDO TEST MODE (remove when backend ready): enable if game name/id contains _TEST -----
+  const CUPIDO_TEST_MODE = gameId.includes('_TEST') || gameName.includes('_TEST')
+  // ----- END CUPIDO TEST MODE -----
+
+  const [gameState, setGameState] = useState<GameState>('idle')
+  const [code1, setCode1] = useState('')
+  const [code2, setCode2] = useState('')
+  const [validationResult, setValidationResult] = useState<ValidationResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState<CupidoStats>({ maleCount: 0, femaleCount: 0, matchedCouples: 0 })
+  const [statsLoading, setStatsLoading] = useState(false)
+
+  // ----- CUPIDO TEST MODE state (remove with test block) -----
+  const [testSimulateInvalid, setTestSimulateInvalid] = useState(false)
+  useEffect(() => {
+    if (CUPIDO_TEST_MODE) {
+      setStats({ maleCount: 3, femaleCount: 3, matchedCouples: 2 })
+    }
+  }, [CUPIDO_TEST_MODE])
+  // ----- END CUPIDO TEST MODE -----
+
+  // Stats will come from GET /v1/game (gameName) when backend returns them in the game payload
+  const handleCodeChange = (value: string, setter: (value: string) => void) => {
+    const numericValue = value.replace(/\D/g, '').slice(0, 4)
+    setter(numericValue)
+  }
+
+  const validateCodes = async () => {
+    if (!code1 || !code2 || code1.length !== 4 || code2.length !== 4) {
+      setError('Ambos códigos deben tener 4 dígitos')
+      return
+    }
+    if (!gameId) {
+      setError('No hay gameId disponible')
+      return
+    }
+    setGameState('validating')
+    setError(null)
+    setValidationResult(null)
+
+    // ----- CUPIDO TEST MODE: mock validate (remove when backend ready) -----
+    if (CUPIDO_TEST_MODE) {
+      await new Promise((r) => setTimeout(r, 800))
+      const invalid = testSimulateInvalid
+      setValidationResult({
+        valid: !invalid,
+        gameId,
+        pairId: invalid ? null : 'test-pair',
+        players: invalid
+          ? []
+          : [
+              { playerId: 1, instagramUsername: `@jugador_${code1}` },
+              { playerId: 2, instagramUsername: `@jugador_${code2}` },
+            ],
+        message: invalid ? 'Pareja no válida (test)' : '¡Pareja validada! (test)',
+      })
+      setGameState(invalid ? 'invalid' : 'valid')
+      if (!invalid) {
+        setStats((prev) => ({ ...prev, matchedCouples: (prev.matchedCouples ?? 0) + 1 }))
+      }
+      return
+    }
+    // ----- END CUPIDO TEST MODE -----
+
+    try {
+      const result = await api.post<ValidationResponse>('/v1/game/validate', {
+        gameId: gameId,
+        codes: [code1, code2],
+      })
+      setValidationResult(result)
+      setGameState(result.valid ? 'valid' : 'invalid')
+    } catch (err: any) {
+      setError(err.message || 'Error al validar los códigos')
+      setGameState('invalid')
+    }
+  }
+
+  const handleReset = () => {
+    setGameState('idle')
+    setCode1('')
+    setCode2('')
+    setValidationResult(null)
+    setError(null)
+  }
+
+  useEffect(() => {
+    if (gameState === 'valid') {
+      const t = setTimeout(handleReset, 5000)
+      return () => clearTimeout(t)
+    }
+  }, [gameState])
+
+  const matchedCouples = stats.matchedCouples ?? 0
+  const maleCount = stats.maleCount ?? 0
+  const femaleCount = stats.femaleCount ?? 0
+
+  return (
+    <div className="w-full space-y-6">
+      {/* Game Code */}
+      <div className="text-center">
+        <div
+          className="p-4 rounded-xl border"
+          style={{
+            backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.15)`,
+            borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)`,
+          }}
+        >
+          <p className="text-sm text-gray-300 mb-2">Código de partida {gameName}:</p>
+          <p className="text-3xl font-bold tracking-wider" style={{ color: CUPIDO_PRIMARY }}>
+            {gameId}
+          </p>
+        </div>
+      </div>
+
+      {/* QR + Instructions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex justify-center items-start">
+          <QRCode
+            data={INSTAGRAM_DM_URL}
+            size={200}
+            margin={8}
+            alt="QR Code para Instagram DM"
+          />
+        </div>
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-textMain mb-3">Instrucciones</h3>
+          <ol className="space-y-3 text-sm text-gray-300">
+            <li className="flex gap-3">
+              <span
+                className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-semibold text-xs text-white"
+                style={{
+                  backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`,
+                  border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)`,
+                }}
+              >
+                1
+              </span>
+              <span className="pt-0.5">Escanea el QR y responde al quiz (gustos, aficiones…).</span>
+            </li>
+            <li className="flex gap-3">
+              <span
+                className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-semibold text-xs text-white"
+                style={{
+                  backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`,
+                  border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)`,
+                }}
+              >
+                2
+              </span>
+              <span className="pt-0.5">Cupido te empareja con alguien de gustos afines (pareja o amigos).</span>
+            </li>
+            <li className="flex gap-3">
+              <span
+                className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center font-semibold text-xs text-white"
+                style={{
+                  backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`,
+                  border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)`,
+                }}
+              >
+                3
+              </span>
+              <span className="pt-0.5">Encuentra a tu pareja y validad juntos vuestros códigos aquí.</span>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      {/* Bottom: chicos, chicas, parejas emparejadas */}
+      <div
+        className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border"
+        style={{
+          backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.08)`,
+          borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`,
+        }}
+      >
+        <div className="flex flex-wrap items-center gap-4">
+          {statsLoading ? (
+            <span className="text-sm text-gray-500">Cargando…</span>
+          ) : (
+            <>
+              <div className="flex items-center gap-2" title="Chicos">
+                <span className="text-xl" aria-hidden>👨</span>
+                <span className="text-sm text-gray-400">Chicos</span>
+                <span className="text-lg font-semibold text-textMain">{maleCount}</span>
+              </div>
+              <div className="flex items-center gap-2" title="Chicas">
+                <span className="text-xl" aria-hidden>👩</span>
+                <span className="text-sm text-gray-400">Chicas</span>
+                <span className="text-lg font-semibold text-textMain">{femaleCount}</span>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-400">Parejas emparejadas</span>
+          <span className="text-lg font-semibold" style={{ color: CUPIDO_PRIMARY }}>
+            {statsLoading ? '—' : matchedCouples} ❤️
+          </span>
+        </div>
+      </div>
+
+      {/* ----- CUPIDO TEST MODE: test controls (remove this block when backend ready) ----- */}
+      {CUPIDO_TEST_MODE && (
+        <div
+          className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 space-y-3"
+          aria-label="Controles de test Cupido"
+        >
+          <p className="text-sm font-medium text-amber-200">Modo test (_TEST en nombre de partida)</p>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm" aria-hidden>👨</span>
+              <span className="text-xs text-amber-200/80">Chicos:</span>
+              <button
+                type="button"
+                onClick={() => setStats((prev) => ({ ...prev, maleCount: Math.max(0, (prev.maleCount ?? 0) - 1) }))}
+                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
+              >
+                −
+              </button>
+              <span className="text-sm w-8 text-center">{stats.maleCount ?? 0}</span>
+              <button
+                type="button"
+                onClick={() => setStats((prev) => ({ ...prev, maleCount: (prev.maleCount ?? 0) + 1 }))}
+                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
+              >
+                +
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm" aria-hidden>👩</span>
+              <span className="text-xs text-amber-200/80">Chicas:</span>
+              <button
+                type="button"
+                onClick={() => setStats((prev) => ({ ...prev, femaleCount: Math.max(0, (prev.femaleCount ?? 0) - 1) }))}
+                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
+              >
+                −
+              </button>
+              <span className="text-sm w-8 text-center">{stats.femaleCount ?? 0}</span>
+              <button
+                type="button"
+                onClick={() => setStats((prev) => ({ ...prev, femaleCount: (prev.femaleCount ?? 0) + 1 }))}
+                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
+              >
+                +
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-amber-200/80">Parejas:</span>
+              <button
+                type="button"
+                onClick={() => setStats((prev) => ({ ...prev, matchedCouples: Math.max(0, (prev.matchedCouples ?? 0) - 1) }))}
+                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
+              >
+                −
+              </button>
+              <span className="text-sm w-8 text-center">{stats.matchedCouples ?? 0}</span>
+              <button
+                type="button"
+                onClick={() => setStats((prev) => ({ ...prev, matchedCouples: (prev.matchedCouples ?? 0) + 1 }))}
+                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
+              >
+                +
+              </button>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={testSimulateInvalid}
+                onChange={(e) => setTestSimulateInvalid(e.target.checked)}
+                className="rounded border-white/30"
+              />
+              <span className="text-xs text-amber-200/80">Siguiente validación inválida</span>
+            </label>
+          </div>
+        </div>
+      )}
+      {/* ----- END CUPIDO TEST MODE ----- */}
+
+      {/* Validator: double code (like empareja2) */}
+      {(gameState === 'idle' || gameState === 'invalid') && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-textMain">Validador de Parejas</h3>
+          {error && gameState === 'invalid' && (
+            <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+              {error}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="cupido-code1" className="block text-sm font-medium text-gray-300 mb-1">
+                Código Jugador 1
+              </label>
+              <input
+                id="cupido-code1"
+                type="text"
+                value={code1}
+                onChange={(e) => handleCodeChange(e.target.value, setCode1)}
+                placeholder="1234"
+                maxLength={4}
+                className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-white/20 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label htmlFor="cupido-code2" className="block text-sm font-medium text-gray-300 mb-1">
+                Código Jugador 2
+              </label>
+              <input
+                id="cupido-code2"
+                type="text"
+                value={code2}
+                onChange={(e) => handleCodeChange(e.target.value, setCode2)}
+                placeholder="5678"
+                maxLength={4}
+                className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-white/20 focus:outline-none"
+              />
+            </div>
+          </div>
+          <button
+            onClick={validateCodes}
+            disabled={code1.length !== 4 || code2.length !== 4}
+            className="w-full p-3 rounded-xl border font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`,
+              borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)`,
+            }}
+            onMouseOver={(e) => {
+              if (code1.length === 4 && code2.length === 4) {
+                e.currentTarget.style.backgroundColor = `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)`
+              }
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`
+            }}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Validar Códigos
+            </div>
+          </button>
+        </div>
+      )}
+
+      {gameState === 'validating' && (
+        <div className="text-center py-8">
+          <div className="flex items-center justify-center gap-3">
+            <svg
+              className="w-6 h-6 animate-spin"
+              style={{ color: CUPIDO_PRIMARY }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <p className="text-xl font-semibold" style={{ color: CUPIDO_PRIMARY }}>
+              Validando códigos...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {gameState === 'valid' && validationResult?.valid && validationResult.players?.length === 2 && (
+        <div className="animate-fade-in">
+          <div className="grid grid-cols-3 gap-4 items-center">
+            <div className="flex flex-col items-center space-y-3 animate-scale-in">
+              {(() => {
+                const player = validationResult.players[0]
+                const imgUrl = player.characterImageUrl ?? null
+                return (
+                  <>
+                    <div
+                      className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 flex items-center justify-center shadow-lg"
+                      style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}
+                    >
+                      {imgUrl ? (
+                        <img src={imgUrl} alt={player.characterName || 'Jugador 1'} className="max-w-full max-h-full w-auto h-auto object-contain" />
+                      ) : (
+                        <div className="text-xs text-gray-500">Jugador 1</div>
+                      )}
+                    </div>
+                    {player.instagramUsername && (
+                      <p className="text-base font-semibold" style={{ color: CUPIDO_PRIMARY }}>
+                        {player.instagramUsername}
+                      </p>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+            <div className="flex flex-col items-center justify-center space-y-2 text-center">
+              <div className="flex items-center justify-center gap-1 text-4xl animate-scale-in" aria-hidden>
+                <span>❤️</span>
+                <span>🏹</span>
+                <span>❤️</span>
+              </div>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-xl font-semibold text-green-400">¡Pareja válida!</span>
+              </div>
+              {validationResult.message && <p className="text-sm text-green-300">{validationResult.message}</p>}
+            </div>
+            <div className="flex flex-col items-center space-y-3 animate-scale-in" style={{ animationDelay: '0.2s' }}>
+              {(() => {
+                const player = validationResult.players[1]
+                const imgUrl = player.characterImageUrl ?? null
+                return (
+                  <>
+                    <div
+                      className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 flex items-center justify-center shadow-lg"
+                      style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}
+                    >
+                      {imgUrl ? (
+                        <img src={imgUrl} alt={player.characterName || 'Jugador 2'} className="max-w-full max-h-full w-auto h-auto object-contain" />
+                      ) : (
+                        <div className="text-xs text-gray-500">Jugador 2</div>
+                      )}
+                    </div>
+                    {player.instagramUsername && (
+                      <p className="text-base font-semibold" style={{ color: CUPIDO_PRIMARY }}>
+                        {player.instagramUsername}
+                      </p>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {gameState === 'invalid' && validationResult && !validationResult.valid && (
+        <div className="p-4 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-4xl" aria-hidden>💔</span>
+            <span className="text-lg font-semibold text-red-400">Pareja inválida</span>
+          </div>
+          {(validationResult.message || error) && (
+            <p className="text-sm text-red-300">{validationResult.message || error}</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
