@@ -29,10 +29,25 @@ export type GameConfigProps = {
   onChange: (newSettings: any) => void
 }
 
+/** Game display tags for catalog / create-join view */
+export type GamePlayerMode = 'solo' | 'multi'
+export interface GameTags {
+  /** solo = individual, multi = multijugador */
+  playerMode?: GamePlayerMode
+  /** Implica socializar / conocer gente */
+  social?: boolean
+  /** Competitivo (ranking, puntuación) vs casual */
+  competitive?: boolean
+}
+
 export interface GameDefinition {
   id: string
   name: string
   description?: string
+  /** Extended description for create/join view */
+  descriptionLong?: string
+  /** Tags shown as icons in create/join view */
+  tags?: GameTags
   colors: ThemeColors
   assets?: GameAssets
   GameScreen: React.ComponentType<GameScreenProps>
