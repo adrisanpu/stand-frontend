@@ -40,19 +40,17 @@ export default function Rulet4GameScreen({ gameName, gameId }: GameScreenProps) 
         } catch {
           // Use default settings
           setSettings({ panels: [
-            { id: '1', label: 'Premio 1', color: '#FACC15', count: 2 },
-            { id: '2', label: 'Premio 2', color: '#FBBF24', count: 2 },
-            { id: '3', label: 'Premio 3', color: '#F59E0B', count: 2 },
-            { id: '4', label: 'Premio 4', color: '#D97706', count: 2 },
+            { id: '1', label: 'Rojo', color: '#DC2626', count: 4 },
+            { id: '2', label: 'Negro', color: '#000000', count: 4 },
+            { id: '3', label: 'Verde', color: '#22C55E', count: 1 },
           ]})
         }
       } else {
         // Use default settings
         setSettings({ panels: [
-          { id: '1', label: 'Premio 1', color: '#FACC15', count: 2 },
-          { id: '2', label: 'Premio 2', color: '#FBBF24', count: 2 },
-          { id: '3', label: 'Premio 3', color: '#F59E0B', count: 2 },
-          { id: '4', label: 'Premio 4', color: '#D97706', count: 2 },
+          { id: '1', label: 'Rojo', color: '#DC2626', count: 4 },
+          { id: '2', label: 'Negro', color: '#000000', count: 4 },
+          { id: '3', label: 'Verde', color: '#22C55E', count: 1 },
         ]})
       }
     }
@@ -183,17 +181,32 @@ export default function Rulet4GameScreen({ gameName, gameId }: GameScreenProps) 
   
   useEffect(() => {
     if (settings) {
-      // First, create all segments
+      const panels = settings.panels
       const allSegments: Rulet4PanelConfig[] = []
-      settings.panels.forEach(panel => {
-        for (let i = 0; i < panel.count; i++) {
-          allSegments.push(panel)
+      // If we have exactly two panel types with the same count, interleave them then append the rest
+      const maxCount = Math.max(...panels.map(p => p.count), 0)
+      const withMaxCount = panels.filter(p => p.count === maxCount)
+      if (withMaxCount.length === 2 && maxCount >= 2) {
+        const [a, b] = withMaxCount
+        const rest = panels.filter(p => p !== a && p !== b)
+        for (let i = 0; i < maxCount; i++) {
+          allSegments.push(a)
+          allSegments.push(b)
         }
-      })
-      // Shuffle the segments randomly (Fisher-Yates shuffle)
-      for (let i = allSegments.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [allSegments[i], allSegments[j]] = [allSegments[j], allSegments[i]]
+        rest.forEach(panel => {
+          for (let i = 0; i < panel.count; i++) allSegments.push(panel)
+        })
+      } else {
+        panels.forEach(panel => {
+          for (let i = 0; i < panel.count; i++) allSegments.push(panel)
+        })
+        // Shuffle the segments randomly (Fisher-Yates shuffle)
+        for (let i = allSegments.length - 1; i > 0; i--) {
+          const j: number = Math.floor(Math.random() * (i + 1))
+          const tmp = allSegments[j]
+          allSegments[j] = allSegments[i]
+          allSegments[i] = tmp
+        }
       }
       setSegments(allSegments)
     }
@@ -393,7 +406,7 @@ export default function Rulet4GameScreen({ gameName, gameId }: GameScreenProps) 
                     <g key={`${segment.id}-${index}`}>
                       <path
                         d={pathData}
-                        fill={segment.color || '#FACC15'}
+                        fill={segment.color || '#DC2626'}
                         stroke={isWinning ? '#FACC15' : 'rgba(255,255,255,0.2)'}
                         strokeWidth={isWinning ? 4 : 1}
                         style={{

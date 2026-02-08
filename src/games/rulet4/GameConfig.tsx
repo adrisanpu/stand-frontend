@@ -13,10 +13,9 @@ export type Rulet4Settings = {
 }
 
 const DEFAULT_PANELS: Rulet4PanelConfig[] = [
-  { id: '1', label: 'Premio 1', color: '#FACC15', count: 2 },
-  { id: '2', label: 'Premio 2', color: '#FBBF24', count: 2 },
-  { id: '3', label: 'Premio 3', color: '#F59E0B', count: 2 },
-  { id: '4', label: 'Premio 4', color: '#D97706', count: 2 },
+  { id: '1', label: 'Rojo', color: '#DC2626', count: 4 },
+  { id: '2', label: 'Negro', color: '#000000', count: 4 },
+  { id: '3', label: 'Verde', color: '#22C55E', count: 1 },
 ]
 
 export default function Rulet4GameConfig({ gameName, settings, onChange }: GameConfigProps) {
@@ -35,7 +34,7 @@ export default function Rulet4GameConfig({ gameName, settings, onChange }: GameC
     const newPanel: Rulet4PanelConfig = {
       id: newId,
       label: `Premio ${panels.length + 1}`,
-      color: '#FACC15',
+      color: '#DC2626',
       count: 1,
     }
     setPanels([...panels, newPanel])
@@ -117,16 +116,16 @@ export default function Rulet4GameConfig({ gameName, settings, onChange }: GameC
               <div className="flex gap-2 items-center">
                 <input
                   type="color"
-                  value={panel.color || '#FACC15'}
+                  value={panel.color || '#DC2626'}
                   onChange={(e) => handlePanelChange(panel.id, 'color', e.target.value)}
                   className="w-12 h-9 rounded-lg border border-white/10 cursor-pointer"
                 />
                 <input
                   type="text"
-                  value={panel.color || '#FACC15'}
+                  value={panel.color || '#DC2626'}
                   onChange={(e) => handlePanelChange(panel.id, 'color', e.target.value)}
                   className="flex-1 h-9 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm font-mono focus:border-white/20 focus:outline-none"
-                  placeholder="#FACC15"
+                  placeholder="#DC2626"
                 />
               </div>
             </div>
