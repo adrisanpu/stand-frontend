@@ -14,9 +14,9 @@ export const empareja2Definition: GameDefinition = {
     textSub: '#9AA0A6',
   },
   assets: {
-    logo: '/empareja2-logo.png',
+    logo: '/images/empareja2-logo.png',
     clientLogo: '/client-logo.png',
-    standLogo: '/stand-logo.png',
+    standLogo: '/images/stand-logo.png',
   },
   GameScreen: Empareja2GameScreen,
   showRanking: false,

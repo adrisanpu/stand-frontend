@@ -37,7 +37,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  
+
   // Count existing games from localStorage (simple approach for MVP)
   const existingGameId = localStorage.getItem('gameId')
   const hasExistingGame = !!existingGameId
@@ -51,10 +51,10 @@ export default function GameGate({ onGameCreated }: GameGateProps){
     }
   }, [])
 
-  // Fetch user games when a game is selected
+  // Fetch user games when a game is selected (API expects gameType = game id, e.g. SEMAFORO)
   useEffect(() => {
     if (selectedGame && user) {
-      fetchUserGames(selectedGame.name)
+      fetchUserGames(selectedGame.id)
     } else {
       setUserGames([])
     }
@@ -88,7 +88,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         count: number
         gameType: string
         ownerUserId: string
-      }>(`/v1/game?gameType=${encodeURIComponent(gameType)}`)
+      }>(`/v1/game?gameType=${encodeURIComponent(gameType.toUpperCase())}`)
       
       // Handle response format
       if (response && response.ok && Array.isArray(response.games)) {
@@ -158,7 +158,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         }
       }>('/v1/game', { 
         gameName: gameId.toUpperCase(),
-        gameType: selectedGame.name
+        gameType: selectedGame.id.toUpperCase()
       })
       
       // API returns { message, game: { gameId, gameName, gameType, ... } }
@@ -176,16 +176,22 @@ export default function GameGate({ onGameCreated }: GameGateProps){
 
   const handleJoin = async () => {
     if (!selectedGame) return
-    
+
     setError(null)
     if (!validateGameId(gameId)) {
       setError('Nombre de partida inválido. Usa letras, números, _ - .')
       return
     }
-    
+
+    const name = gameId.trim()
+    if (name.toUpperCase().includes('_TEST')) {
+      onGameCreated(name.toUpperCase(), name.toLowerCase().replace(/\s+/g, '_'), selectedGame.id)
+      return
+    }
+
     setJoining(true)
     try {
-      const response = await api.get<{ 
+      const response = await api.get<{
         message: string
         game: {
           gameId: string
@@ -195,8 +201,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
           maxPlayers: number
         }
       }>(`/v1/game?gameName=${encodeURIComponent(gameId.toUpperCase())}`)
-      
-      // API returns { message, game: { gameId, gameName, gameType, createdAt, maxPlayers } }
+
       if (response.game && response.game.gameId && response.game.gameName) {
         onGameCreated(response.game.gameName, response.game.gameId, response.game.gameType || selectedGame.id)
       } else {
@@ -230,8 +235,8 @@ export default function GameGate({ onGameCreated }: GameGateProps){
               onError={(e) => {
                 // Fallback to stand-logo.png if logo doesn't exist
                 const target = e.target as HTMLImageElement
-                if (target.src !== `${window.location.origin}/stand-logo.png`) {
-                  target.src = '/stand-logo.png'
+                if (target.src !== `${window.location.origin}/images/stand-logo.png`) {
+                  target.src = '/images/stand-logo.png'
                 }
               }}
             />

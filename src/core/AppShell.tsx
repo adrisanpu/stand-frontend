@@ -95,6 +95,8 @@ export default function AppShell() {
     if (normalized === 't1mer' || normalized === 'timer') return 't1mer'
     if (normalized === 'empareja2' || normalized === 'empareja') return 'empareja2'
     if (normalized === 'rulet4' || normalized === 'ruleta') return 'rulet4'
+    if (normalized === 'cupido') return 'cupido'
+    if (normalized === 'semaforo' || normalized === 'semáforo') return 'semaforo'
     return normalized
   }
 
@@ -212,7 +214,7 @@ export default function AppShell() {
         {/* Logo fijo - always visible in bottom right corner */}
         <div className="fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity z-10">
           <img 
-            src={customLogo || '/stand-logo.png'} 
+            src={customLogo || '/images/stand-logo.png'} 
             alt={customLogo ? "Logo personalizado" : "Stand"} 
             className="w-14 h-14 object-contain" 
           />

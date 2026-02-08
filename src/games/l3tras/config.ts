@@ -15,9 +15,9 @@ export const l3trasDefinition: GameDefinition = {
     textSub: '#9AA0A6',
   },
   assets: {
-    logo: '/l3tras-logo.png',
+    logo: '/images/l3tras-logo.png',
     clientLogo: '/client-logo.png',
-    standLogo: '/stand-logo.png',
+    standLogo: '/images/stand-logo.png',
   },
   GameScreen: L3trasGameScreen,
   showRanking: false,

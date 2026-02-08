@@ -16,9 +16,9 @@ export const rulet4Definition: GameDefinition = {
     textSub: '#9AA0A6',
   },
   assets: {
-    logo: '/rulet4-logo.png',       // create or point to a placeholder logo
+    logo: '/images/ruleta-logo.png',
     clientLogo: '/client-logo.png', // can reuse an existing one if needed
-    standLogo: '/stand-logo.png',
+    standLogo: '/images/stand-logo.png',
   },
   GameScreen: Rulet4GameScreen,
   showRanking: false,

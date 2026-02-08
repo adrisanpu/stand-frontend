@@ -14,9 +14,9 @@ export const t1merDefinition: GameDefinition = {
     textSub: '#9AA0A6',
   },
   assets: {
-    logo: '/t1mer-logo.png', // You'll need to add this asset
+    logo: '/images/t1mer-logo.png',
     clientLogo: '/client-logo.png',
-    standLogo: '/stand-logo.png',
+    standLogo: '/images/stand-logo.png',
   },
   GameScreen: T1merGameScreen,
   showRanking: true,

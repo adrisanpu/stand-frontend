@@ -42,8 +42,8 @@ export default function Login() {
                 onError={(e) => {
                   // Fallback to stand-logo.png if logo doesn't exist
                   const target = e.target as HTMLImageElement
-                  if (target.src !== `${window.location.origin}/stand-logo.png`) {
-                    target.src = '/stand-logo.png'
+                  if (target.src !== `${window.location.origin}/images/stand-logo.png`) {
+                    target.src = '/images/stand-logo.png'
                   }
                 }}
               />
