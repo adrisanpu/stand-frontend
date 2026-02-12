@@ -594,7 +594,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         <div className="relative card w-full max-w-sm p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 id="exit-confirm-title" className="text-xl font-semibold">
-              {gameType?.toLowerCase() === 'empareja2' ? 'Salir de la partida' : 'Terminar el juego'}
+              {(gameType?.toLowerCase() === 'empareja2' || gameType?.toLowerCase() === 'cupido' || gameType?.toLowerCase() === 'semaforo') ? 'Salir de la partida' : 'Terminar el juego'}
             </h2>
             <button
               onClick={() => setShowExitConfirm(false)}
@@ -1013,10 +1013,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </div>
                 <div className="text-left">
                   <div className="font-medium">
-                    {gameType.toLowerCase() === 'empareja2' ? 'Salir de la partida' : 'Terminar el juego'}
+                    {(gameType.toLowerCase() === 'empareja2' || gameType.toLowerCase() === 'cupido' || gameType.toLowerCase() === 'semaforo') ? 'Salir de la partida' : 'Terminar el juego'}
                   </div>
                   <div className="text-sm text-gray-400">
-                    {gameType.toLowerCase() === 'empareja2' ? 'Volver a la selección de partida' : 'Finalizar y salir del juego'}
+                    {(gameType.toLowerCase() === 'empareja2' || gameType.toLowerCase() === 'cupido' || gameType.toLowerCase() === 'semaforo') ? 'Volver a la selección de partida' : 'Finalizar y salir del juego'}
                   </div>
                 </div>
                 <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
