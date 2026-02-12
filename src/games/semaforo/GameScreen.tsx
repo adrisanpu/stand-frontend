@@ -84,8 +84,8 @@ function buildCrossQuizRounds(res: ValidationResponse): CrossQuizRound[] {
 }
 
 export default function SemaforoGameScreen({ gameName, gameId }: GameScreenProps) {
-  const [stats, setStats] = useState<SemaforoStats>({ redCount: 0, yellowCount: 0, greenCount: 0 })
-  const [statsLoading, setStatsLoading] = useState(false)
+  const [stats] = useState<SemaforoStats>({ redCount: 0, yellowCount: 0, greenCount: 0 })
+  const [statsLoading] = useState(false)
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')

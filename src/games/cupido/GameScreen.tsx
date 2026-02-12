@@ -38,8 +38,8 @@ export default function CupidoGameScreen({ gameName, gameId }: GameScreenProps) 
   const [code2, setCode2] = useState('')
   const [validationResult, setValidationResult] = useState<ValidationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [stats, setStats] = useState<CupidoStats>({ maleCount: 0, femaleCount: 0, matchedCouples: 0 })
-  const [statsLoading, setStatsLoading] = useState(false)
+  const [stats] = useState<CupidoStats>({ maleCount: 0, femaleCount: 0, matchedCouples: 0 })
+  const [statsLoading] = useState(false)
 
   // Stats will come from GET /v1/game (gameName) when backend returns them in the game payload
   const handleCodeChange = (value: string, setter: (value: string) => void) => {
