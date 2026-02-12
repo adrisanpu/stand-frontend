@@ -26,6 +26,12 @@ StandShell
     ├── t1mer/             # Timer precision game
     │   ├── config.ts
     │   └── GameScreen.tsx
+    ├── cupido/            # Matching game (gustos afines, parejas/amigos, validación)
+    │   ├── config.ts
+    │   └── GameScreen.tsx
+    ├── semaforo/          # Groups by social interest (casado / puede ser / soltero)
+    │   ├── config.ts
+    │   └── GameScreen.tsx
     └── [your-game]/        # Add your own game here!
         ├── config.ts
         └── GameScreen.tsx
@@ -94,6 +100,18 @@ A configurable roulette game with:
 - Customizable panels and options
 - Real-time spinning mechanics
 - Score tracking and ranking
+
+### Cupido
+A matching game where players answer a quiz on join (via backend; traffic light, availability, likes, etc.) and the backend pairs compatible people. On the stand screen:
+- **Traffic light** (below QR + instructions): indicates current players’ state (red / yellow / green) from backend.
+- **Matched couples count**: how many couples Cupido has matched.
+- **Double validation**: both players enter their codes on screen (same flow as Empareja2) to confirm the couple; backend validates and can increment matched count.
+
+**Frontend expects (backend):**
+- Cupido: `GET /v1/game/{gameId}/stats` → `{ maleCount?, femaleCount?, matchedCouples? }`; `POST /v1/game/validate` with `{ gameId, codes: [code1, code2] }`.
+- Semáforo: `GET /v1/game/{gameId}/stats` → `{ redCount?, yellowCount?, greenCount? }`.
+
+**Test mode (UX only, remove when backend is ready):** Use a game name containing `_TEST` (e.g. `CUPIDO_TEST`). In the catalog, select Cupido, type the name, and click **Unirse** — no API call. Once in the game, a test panel appears: set traffic light (red/yellow/green), player/couple counts, and “Siguiente validación inválida”; validation is mocked. To remove test mode, search for `CUPIDO TEST MODE` in `src/games/cupido/GameScreen.tsx` and for `_TEST` in `src/core/GameGate.tsx` (handleJoin) and delete those blocks.
 
 ## ➕ Adding a New Game
 

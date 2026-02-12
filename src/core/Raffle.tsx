@@ -108,7 +108,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
     setWinners(null)
 
     try {
-      const result = await api.post<RaffleResponse>('/raffle', {
+      const result = await api.post<RaffleResponse>('/v1/game/raffle', {
         gameId,
         numberOfWinners,
         applicableOnlyValidated

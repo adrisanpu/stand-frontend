@@ -8,8 +8,8 @@ export function getStandLogo(): string {
   const isDarkMode = themeMode !== 'light'
   
   return isDarkMode 
-    ? '/logo_stand_letters_white.png'
-    : '/logo_stand_letters_black.png'
+    ? '/images/logo_stand_letters_white.png'
+    : '/images/logo_stand_letters_black.png'
 }
 
 /**

@@ -37,7 +37,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  
+
   // Count existing games from localStorage (simple approach for MVP)
   const existingGameId = localStorage.getItem('gameId')
   const hasExistingGame = !!existingGameId
@@ -51,10 +51,10 @@ export default function GameGate({ onGameCreated }: GameGateProps){
     }
   }, [])
 
-  // Fetch user games when a game is selected
+  // Fetch user games when a game is selected (API expects gameType = game id, e.g. SEMAFORO)
   useEffect(() => {
     if (selectedGame && user) {
-      fetchUserGames(selectedGame.name)
+      fetchUserGames(selectedGame.id)
     } else {
       setUserGames([])
     }
@@ -88,7 +88,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         count: number
         gameType: string
         ownerUserId: string
-      }>(`/v1/game?gameType=${encodeURIComponent(gameType)}`)
+      }>(`/v1/game?gameType=${encodeURIComponent(gameType.toUpperCase())}`)
       
       // Handle response format
       if (response && response.ok && Array.isArray(response.games)) {
@@ -158,7 +158,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         }
       }>('/v1/game', { 
         gameName: gameId.toUpperCase(),
-        gameType: selectedGame.name
+        gameType: selectedGame.id.toUpperCase()
       })
       
       // API returns { message, game: { gameId, gameName, gameType, ... } }
@@ -176,16 +176,16 @@ export default function GameGate({ onGameCreated }: GameGateProps){
 
   const handleJoin = async () => {
     if (!selectedGame) return
-    
+
     setError(null)
     if (!validateGameId(gameId)) {
       setError('Nombre de partida inválido. Usa letras, números, _ - .')
       return
     }
-    
+
     setJoining(true)
     try {
-      const response = await api.get<{ 
+      const response = await api.get<{
         message: string
         game: {
           gameId: string
@@ -195,8 +195,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
           maxPlayers: number
         }
       }>(`/v1/game?gameName=${encodeURIComponent(gameId.toUpperCase())}`)
-      
-      // API returns { message, game: { gameId, gameName, gameType, createdAt, maxPlayers } }
+
       if (response.game && response.game.gameId && response.game.gameName) {
         onGameCreated(response.game.gameName, response.game.gameId, response.game.gameType || selectedGame.id)
       } else {
@@ -230,8 +229,8 @@ export default function GameGate({ onGameCreated }: GameGateProps){
               onError={(e) => {
                 // Fallback to stand-logo.png if logo doesn't exist
                 const target = e.target as HTMLImageElement
-                if (target.src !== `${window.location.origin}/stand-logo.png`) {
-                  target.src = '/stand-logo.png'
+                if (target.src !== `${window.location.origin}/images/stand-logo.png`) {
+                  target.src = '/images/stand-logo.png'
                 }
               }}
             />
@@ -290,21 +289,47 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         Volver al catálogo
       </button>
 
-      {/* Selected Game Info */}
-      <div className="flex items-center gap-4 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
-        {selectedGame.assets?.logo && (
-          <img 
-            src={selectedGame.assets.logo} 
-            alt={selectedGame.name} 
-            className="h-12 w-12 object-contain"
-          />
-        )}
-        <div>
-          <h3 className="text-lg font-semibold text-textMain">{selectedGame.name}</h3>
-          {selectedGame.description && (
-            <p className="text-sm text-textSub">{selectedGame.description}</p>
+      {/* Selected Game Info: big logo + extended description + tags */}
+      <div className="p-5 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-4">
+        <div className="flex flex-col items-center text-center">
+          {selectedGame.assets?.logo && (
+            <img 
+              src={selectedGame.assets.logo} 
+              alt={selectedGame.name} 
+              className="h-36 w-auto max-w-[280px] object-contain mb-3"
+            />
           )}
+          <p className="text-sm text-textSub max-w-md">
+            {selectedGame.descriptionLong ?? selectedGame.description ?? ''}
+          </p>
         </div>
+        {/* Game tags: player mode, social, competitive */}
+        {selectedGame.tags && (selectedGame.tags.playerMode ?? selectedGame.tags.social ?? selectedGame.tags.competitive !== undefined) && (
+          <div className="flex flex-wrap justify-center gap-4 pt-2 border-t border-white/10">
+            {selectedGame.tags.playerMode && (
+              <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.playerMode === 'multi' ? 'Multijugador' : 'Individual'}>
+                {selectedGame.tags.playerMode === 'multi' ? (
+                  <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                ) : (
+                  <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                )}
+                {selectedGame.tags.playerMode === 'multi' ? 'Multijugador' : 'Individual'}
+              </span>
+            )}
+            {selectedGame.tags.social !== undefined && (
+              <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.social ? 'Implica socializar' : 'No implica socializar'}>
+                <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                {selectedGame.tags.social ? 'Social' : 'No social'}
+              </span>
+            )}
+            {selectedGame.tags.competitive !== undefined && (
+              <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.competitive ? 'Competitivo' : 'Casual'}>
+                <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                {selectedGame.tags.competitive ? 'Competitivo' : 'Casual'}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Game ID Input with Dropdown */}
@@ -393,27 +418,30 @@ export default function GameGate({ onGameCreated }: GameGateProps){
       )}
 
       {/* Action Buttons - Direct actions */}
-      <div className="flex gap-3">
-        <button
-          onClick={handleCreate}
-          disabled={loading || !gameId.trim() || !canCreateGame}
-          className="flex-1 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium relative"
-          title={!canCreateGame ? 'Disponible en el plan Event' : undefined}
-        >
-          {loading ? 'Creando...' : 'Crear'}
-        </button>
-        {!canCreateGame && (
-          <p className="text-xs text-yellow-400 text-center mt-1">
-            Disponible en el plan Event
-          </p>
+      <div className="space-y-2">
+        <div className="flex gap-3">
+          <button
+            onClick={handleCreate}
+            disabled={loading || !gameId.trim() || !canCreateGame || selectedGame.underDevelopment}
+            className="flex-1 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium relative"
+            title={selectedGame.underDevelopment ? 'Juego en desarrollo' : !canCreateGame ? 'Disponible en el plan Event' : undefined}
+          >
+            {loading ? 'Creando...' : 'Crear'}
+          </button>
+          <button
+            onClick={handleJoin}
+            disabled={joining || !gameId.trim()}
+            className="flex-1 p-4 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          >
+            {joining ? 'Buscando...' : 'Unirse'}
+          </button>
+        </div>
+        {selectedGame.underDevelopment && (
+          <p className="text-xs text-amber-400 text-center">En desarrollo (solo unirse)</p>
         )}
-        <button
-          onClick={handleJoin}
-          disabled={joining || !gameId.trim()}
-          className="flex-1 p-4 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-        >
-          {joining ? 'Buscando...' : 'Unirse'}
-        </button>
+        {!canCreateGame && !selectedGame.underDevelopment && (
+          <p className="text-xs text-yellow-400 text-center">Disponible en el plan Event</p>
+        )}
       </div>
     </div>
   )
