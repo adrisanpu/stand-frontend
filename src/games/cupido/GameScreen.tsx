@@ -33,10 +33,6 @@ const CUPIDO_PRIMARY = '#E11D48'
 const CUPIDO_PRIMARY_RGB = '225, 29, 72'
 
 export default function CupidoGameScreen({ gameName, gameId }: GameScreenProps) {
-  // ----- CUPIDO TEST MODE (remove when backend ready): enable if game name/id contains _TEST -----
-  const CUPIDO_TEST_MODE = gameId.includes('_TEST') || gameName.includes('_TEST')
-  // ----- END CUPIDO TEST MODE -----
-
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
@@ -44,15 +40,6 @@ export default function CupidoGameScreen({ gameName, gameId }: GameScreenProps) 
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<CupidoStats>({ maleCount: 0, femaleCount: 0, matchedCouples: 0 })
   const [statsLoading, setStatsLoading] = useState(false)
-
-  // ----- CUPIDO TEST MODE state (remove with test block) -----
-  const [testSimulateInvalid, setTestSimulateInvalid] = useState(false)
-  useEffect(() => {
-    if (CUPIDO_TEST_MODE) {
-      setStats({ maleCount: 3, femaleCount: 3, matchedCouples: 2 })
-    }
-  }, [CUPIDO_TEST_MODE])
-  // ----- END CUPIDO TEST MODE -----
 
   // Stats will come from GET /v1/game (gameName) when backend returns them in the game payload
   const handleCodeChange = (value: string, setter: (value: string) => void) => {
@@ -72,30 +59,6 @@ export default function CupidoGameScreen({ gameName, gameId }: GameScreenProps) 
     setGameState('validating')
     setError(null)
     setValidationResult(null)
-
-    // ----- CUPIDO TEST MODE: mock validate (remove when backend ready) -----
-    if (CUPIDO_TEST_MODE) {
-      await new Promise((r) => setTimeout(r, 800))
-      const invalid = testSimulateInvalid
-      setValidationResult({
-        valid: !invalid,
-        gameId,
-        pairId: invalid ? null : 'test-pair',
-        players: invalid
-          ? []
-          : [
-              { playerId: 1, instagramUsername: `@jugador_${code1}` },
-              { playerId: 2, instagramUsername: `@jugador_${code2}` },
-            ],
-        message: invalid ? 'Pareja no válida (test)' : '¡Pareja validada! (test)',
-      })
-      setGameState(invalid ? 'invalid' : 'valid')
-      if (!invalid) {
-        setStats((prev) => ({ ...prev, matchedCouples: (prev.matchedCouples ?? 0) + 1 }))
-      }
-      return
-    }
-    // ----- END CUPIDO TEST MODE -----
 
     try {
       const result = await api.post<ValidationResponse>('/v1/game/validate', {
@@ -233,84 +196,6 @@ export default function CupidoGameScreen({ gameName, gameId }: GameScreenProps) 
           </span>
         </div>
       </div>
-
-      {/* ----- CUPIDO TEST MODE: test controls (remove this block when backend ready) ----- */}
-      {CUPIDO_TEST_MODE && (
-        <div
-          className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 space-y-3"
-          aria-label="Controles de test Cupido"
-        >
-          <p className="text-sm font-medium text-amber-200">Modo test (_TEST en nombre de partida)</p>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm" aria-hidden>👨</span>
-              <span className="text-xs text-amber-200/80">Chicos:</span>
-              <button
-                type="button"
-                onClick={() => setStats((prev) => ({ ...prev, maleCount: Math.max(0, (prev.maleCount ?? 0) - 1) }))}
-                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
-              >
-                −
-              </button>
-              <span className="text-sm w-8 text-center">{stats.maleCount ?? 0}</span>
-              <button
-                type="button"
-                onClick={() => setStats((prev) => ({ ...prev, maleCount: (prev.maleCount ?? 0) + 1 }))}
-                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
-              >
-                +
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm" aria-hidden>👩</span>
-              <span className="text-xs text-amber-200/80">Chicas:</span>
-              <button
-                type="button"
-                onClick={() => setStats((prev) => ({ ...prev, femaleCount: Math.max(0, (prev.femaleCount ?? 0) - 1) }))}
-                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
-              >
-                −
-              </button>
-              <span className="text-sm w-8 text-center">{stats.femaleCount ?? 0}</span>
-              <button
-                type="button"
-                onClick={() => setStats((prev) => ({ ...prev, femaleCount: (prev.femaleCount ?? 0) + 1 }))}
-                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
-              >
-                +
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-amber-200/80">Parejas:</span>
-              <button
-                type="button"
-                onClick={() => setStats((prev) => ({ ...prev, matchedCouples: Math.max(0, (prev.matchedCouples ?? 0) - 1) }))}
-                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
-              >
-                −
-              </button>
-              <span className="text-sm w-8 text-center">{stats.matchedCouples ?? 0}</span>
-              <button
-                type="button"
-                onClick={() => setStats((prev) => ({ ...prev, matchedCouples: (prev.matchedCouples ?? 0) + 1 }))}
-                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 font-bold"
-              >
-                +
-              </button>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={testSimulateInvalid}
-                onChange={(e) => setTestSimulateInvalid(e.target.checked)}
-                className="rounded border-white/30"
-              />
-              <span className="text-xs text-amber-200/80">Siguiente validación inválida</span>
-            </label>
-          </div>
-        </div>
-      )}
-      {/* ----- END CUPIDO TEST MODE ----- */}
 
       {/* Validator: double code (like empareja2) */}
       {(gameState === 'idle' || gameState === 'invalid') && (

@@ -183,12 +183,6 @@ export default function GameGate({ onGameCreated }: GameGateProps){
       return
     }
 
-    const name = gameId.trim()
-    if (name.toUpperCase().includes('_TEST')) {
-      onGameCreated(name.toUpperCase(), name.toLowerCase().replace(/\s+/g, '_'), selectedGame.id)
-      return
-    }
-
     setJoining(true)
     try {
       const response = await api.get<{
@@ -424,27 +418,30 @@ export default function GameGate({ onGameCreated }: GameGateProps){
       )}
 
       {/* Action Buttons - Direct actions */}
-      <div className="flex gap-3">
-        <button
-          onClick={handleCreate}
-          disabled={loading || !gameId.trim() || !canCreateGame}
-          className="flex-1 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium relative"
-          title={!canCreateGame ? 'Disponible en el plan Event' : undefined}
-        >
-          {loading ? 'Creando...' : 'Crear'}
-        </button>
-        {!canCreateGame && (
-          <p className="text-xs text-yellow-400 text-center mt-1">
-            Disponible en el plan Event
-          </p>
+      <div className="space-y-2">
+        <div className="flex gap-3">
+          <button
+            onClick={handleCreate}
+            disabled={loading || !gameId.trim() || !canCreateGame || selectedGame.underDevelopment}
+            className="flex-1 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium relative"
+            title={selectedGame.underDevelopment ? 'Juego en desarrollo' : !canCreateGame ? 'Disponible en el plan Event' : undefined}
+          >
+            {loading ? 'Creando...' : 'Crear'}
+          </button>
+          <button
+            onClick={handleJoin}
+            disabled={joining || !gameId.trim()}
+            className="flex-1 p-4 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          >
+            {joining ? 'Buscando...' : 'Unirse'}
+          </button>
+        </div>
+        {selectedGame.underDevelopment && (
+          <p className="text-xs text-amber-400 text-center">En desarrollo (solo unirse)</p>
         )}
-        <button
-          onClick={handleJoin}
-          disabled={joining || !gameId.trim()}
-          className="flex-1 p-4 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-        >
-          {joining ? 'Buscando...' : 'Unirse'}
-        </button>
+        {!canCreateGame && !selectedGame.underDevelopment && (
+          <p className="text-xs text-yellow-400 text-center">Disponible en el plan Event</p>
+        )}
       </div>
     </div>
   )

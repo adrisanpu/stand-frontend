@@ -48,6 +48,8 @@ export interface GameDefinition {
   descriptionLong?: string
   /** Tags shown as icons in create/join view */
   tags?: GameTags
+  /** If true, user cannot create a game (under development) */
+  underDevelopment?: boolean
   colors: ThemeColors
   assets?: GameAssets
   GameScreen: React.ComponentType<GameScreenProps>

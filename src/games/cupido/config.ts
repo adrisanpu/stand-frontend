@@ -7,6 +7,7 @@ export const cupidoDefinition: GameDefinition = {
   description: 'Encuentra personas con gustos afines.',
   descriptionLong: 'Empareja a participantes según sus respuestas a un cuestionario. Cada uno ve un semáforo (rojo/amarillo/verde) que indica compatibilidad. El objetivo es encontrar a tu pareja asignada y validar el código entre los dos. Muy social y pensado para eventos.',
   tags: { playerMode: 'multi', social: true, competitive: false },
+  underDevelopment: true,
   colors: {
     primary: '#E11D48',
     accent: '#F472B6',
