@@ -7,7 +7,7 @@ export const rulet4Definition: GameDefinition = {
   name: 'Rulet4',
   description: 'Ruleta personalizable.',
   descriptionLong: 'Ruleta de premios o acciones personalizable para el evento. El organizador configura opciones y la ruleta decide quién gana o qué reto toca. Puede usarse para sorteos, dinámicas o simplemente animar el público. Multijugador en formato sala.',
-  tags: { playerMode: 'multi', social: false, competitive: false },
+  tags: { playerMode: 'multi', social: false, competitive: false, idealFor: ['fiesta', 'stand_feria', 'evento_corporativo'] },
   colors: {
     primary: '#FACC15',   // yellow
     accent: '#FBBF24',    // yellow 2

@@ -31,6 +31,17 @@ export type GameConfigProps = {
 
 /** Game display tags for catalog / create-join view */
 export type GamePlayerMode = 'solo' | 'multi'
+
+/** Context/venue the game is ideal for */
+export type GameIdealFor = 'fiesta' | 'stand_feria' | 'evento_corporativo' | 'presentacion'
+
+export const IDEAL_FOR_LABELS: Record<GameIdealFor, string> = {
+  fiesta: 'Fiesta',
+  stand_feria: 'Stand de feria',
+  evento_corporativo: 'Evento corporativo',
+  presentacion: 'Presentación / demo',
+}
+
 export interface GameTags {
   /** solo = individual, multi = multijugador */
   playerMode?: GamePlayerMode
@@ -38,6 +49,8 @@ export interface GameTags {
   social?: boolean
   /** Competitivo (ranking, puntuación) vs casual */
   competitive?: boolean
+  /** Contexts/venues this game is ideal for */
+  idealFor?: GameIdealFor[]
 }
 
 export interface GameDefinition {

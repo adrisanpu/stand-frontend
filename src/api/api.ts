@@ -31,12 +31,6 @@ async function request<T>(
   // The browser sends OPTIONS automatically, and we shouldn't add auth to them
   if (authToken && fetchOptions.method !== 'OPTIONS') {
     headers['Authorization'] = `Bearer ${authToken}`
-    console.log('API request with token:', {
-      url,
-      method: fetchOptions.method || 'GET',
-      tokenPreview: authToken.substring(0, 20) + '...',
-      tokenLength: authToken.length,
-    })
   } else if (!authToken) {
     console.warn('API request without token:', { url, method: fetchOptions.method || 'GET' })
   }
@@ -71,7 +65,6 @@ async function request<T>(
       statusText: response.statusText,
       error: errorText,
       hasToken: !!authToken,
-      tokenPreview: authToken ? authToken.substring(0, 30) + '...' : null,
       requestHeaders: Object.keys(headers),
       responseHeaders: Object.fromEntries(response.headers.entries()),
     })
