@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../api/api'
+import { usePolling } from '../hooks/usePolling'
 
 export interface RankingEntry {
   rank?: number
@@ -15,64 +16,24 @@ interface RankingResponse {
   results: RankingEntry[]
 }
 
-async function getRanking(gameId: string, limit: number = 10): Promise<RankingEntry[]> {
-  try {
-    const data = await api.get<RankingResponse>(`/v1/game/score?gameId=${encodeURIComponent(gameId)}&limit=${limit}`)
-    
-    // Handle new response structure
-    if (data.ok && Array.isArray(data.results)) {
-      return data.results
-    }
-    
-    // Fallback for old structure (if API still returns array directly)
-    if (Array.isArray(data)) {
-      return data
-    }
-    
-    return []
-  } catch (error) {
-    console.error('Error fetching ranking:', error)
-    return []
-  }
-}
-
 interface RankingProps {
   gameId: string
   refreshInterval?: number // in milliseconds, 0 to disable
 }
 
 export default function Ranking({ gameId, refreshInterval = 10000 }: RankingProps) {
-  const [ranking, setRanking] = useState<RankingEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const [ranking, setRanking] = useState<RankingEntry[] | null>(null)
 
-  const loadRanking = async () => {
+  const fetchRanking = async () => {
     if (!gameId) return
-
-    try {
-      const data = await getRanking(gameId, 10)
-      setRanking(Array.isArray(data) ? data : [])
-      setLoading(false)
-    } catch (error) {
-      console.error('Error loading ranking:', error)
-      setRanking([])
-      setLoading(false)
-    }
+    const data = await api.get<RankingResponse>(`/v1/game/score?gameId=${encodeURIComponent(gameId)}&limit=10`)
+    if (!data.ok) throw new Error('API response not ok')
+    setRanking(Array.isArray(data.results) ? data.results : [])
   }
 
-  useEffect(() => {
-    if (gameId) {
-      loadRanking()
-      
-      // Refresh ranking at specified interval
-      if (refreshInterval > 0) {
-        const interval = setInterval(loadRanking, refreshInterval)
-        return () => clearInterval(interval)
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, refreshInterval])
+  const { isStale } = usePolling(fetchRanking, [gameId], { interval: refreshInterval })
 
-  if (loading) {
+  if (ranking === null) {
     return (
       <div className="card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-neon">
         <h2 className="text-lg sm:text-xl font-bold text-textMain mb-2 sm:mb-4">Ranking</h2>
@@ -83,7 +44,10 @@ export default function Ranking({ gameId, refreshInterval = 10000 }: RankingProp
 
   return (
     <div className="card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-neon h-full flex flex-col">
-      <h2 className="text-lg sm:text-xl font-bold text-textMain mb-2 sm:mb-4">Ranking</h2>
+      <h2 className="text-lg sm:text-xl font-bold text-textMain mb-2 sm:mb-4 flex items-center gap-2">
+        Ranking
+        {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
+      </h2>
       <div className="flex-1 overflow-y-auto space-y-1 sm:space-y-2">
         {ranking.length === 0 ? (
           <p className="text-textSub text-xs sm:text-sm">No hay puntuaciones aún</p>
@@ -120,4 +84,3 @@ export default function Ranking({ gameId, refreshInterval = 10000 }: RankingProp
     </div>
   )
 }
-

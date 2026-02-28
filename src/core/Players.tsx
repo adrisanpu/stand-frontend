@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../api/api'
 import { useCurrentUser } from '../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../auth/featureFlags'
+import { usePolling } from '../hooks/usePolling'
 
 interface GameDataResponse {
   ok: boolean
@@ -12,19 +13,6 @@ interface GameDataResponse {
   quiz?: { enabled: boolean; questionsCount: number }
 }
 
-async function getPlayerCount(gameName: string): Promise<number> {
-  try {
-    const data = await api.get<GameDataResponse>(`/v1/game?gameName=${encodeURIComponent(gameName)}`)
-    if (data.ok && typeof data.playerCount === 'number') {
-      return data.playerCount
-    }
-    return 0
-  } catch (error) {
-    console.error('Error fetching player count:', error)
-    return 0
-  }
-}
-
 interface PlayersProps {
   gameName: string
   refreshInterval?: number // in milliseconds, 0 to disable
@@ -33,38 +21,20 @@ interface PlayersProps {
 export default function Players({ gameName, refreshInterval = 10000 }: PlayersProps) {
   const { plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
-  const [playerCount, setPlayerCount] = useState<number>(0)
-  const [loading, setLoading] = useState(true)
+  const [playerCount, setPlayerCount] = useState<number | null>(null)
 
   const maxPlayers = features.maxPlayers === Infinity ? null : features.maxPlayers
 
-  const loadPlayerCount = async () => {
+  const fetchCount = async () => {
     if (!gameName) return
-
-    try {
-      const count = await getPlayerCount(gameName)
-      setPlayerCount(count)
-      setLoading(false)
-    } catch (error) {
-      console.error('Error loading player count:', error)
-      setPlayerCount(0)
-      setLoading(false)
-    }
+    const data = await api.get<GameDataResponse>(`/v1/game?gameName=${encodeURIComponent(gameName)}`)
+    if (!data.ok) throw new Error('API response not ok')
+    setPlayerCount(data.playerCount ?? 0)
   }
 
-  useEffect(() => {
-    if (gameName) {
-      loadPlayerCount()
+  const { isStale } = usePolling(fetchCount, [gameName], { interval: refreshInterval })
 
-      if (refreshInterval > 0) {
-        const interval = setInterval(loadPlayerCount, refreshInterval)
-        return () => clearInterval(interval)
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameName, refreshInterval])
-
-  if (loading) {
+  if (playerCount === null) {
     return (
       <div className="card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-neon">
         <h2 className="text-lg sm:text-xl font-bold text-textMain mb-2 sm:mb-4">Jugadores</h2>
@@ -75,7 +45,10 @@ export default function Players({ gameName, refreshInterval = 10000 }: PlayersPr
 
   return (
     <div className="card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-neon">
-      <h2 className="text-lg sm:text-xl font-bold text-textMain mb-2 sm:mb-4">Jugadores</h2>
+      <h2 className="text-lg sm:text-xl font-bold text-textMain mb-2 sm:mb-4 flex items-center gap-2">
+        Jugadores
+        {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
+      </h2>
       <div className="flex items-center gap-2">
         <div className="text-2xl sm:text-3xl font-bold text-[var(--color-primary)]">
           {playerCount}
