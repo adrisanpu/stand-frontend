@@ -97,6 +97,7 @@ export default function AppShell() {
     if (normalized === 'rulet4' || normalized === 'ruleta') return 'rulet4'
     if (normalized === 'cupido') return 'cupido'
     if (normalized === 'semaforo' || normalized === 'semáforo') return 'semaforo'
+    if (normalized === 'infocards') return 'infocards'
     return normalized
   }
 
@@ -159,23 +160,14 @@ export default function AppShell() {
             <div className="flex gap-4 w-full max-w-6xl items-start">
               {/* Game Screen */}
               <div className="card flex-1 p-8">
-                {/* Game logo and custom logo shown when a game is selected */}
-                {(currentGame.assets?.logo || customLogo) && (
-                  <div className="flex flex-col items-center mb-8 gap-4">
-                    {customLogo && (
-                      <img 
-                        src={customLogo} 
-                        alt="Logo personalizado" 
-                        className="h-16 w-auto object-contain"
-                      />
-                    )}
-                    {currentGame.assets?.logo && (
-                      <img 
-                        src={currentGame.assets.logo} 
-                        alt={currentGame.name} 
-                        className="h-[120px] w-auto object-contain"
-                      />
-                    )}
+                {/* Game logo: if client logo is configured, use it; otherwise use game logo */}
+                {(customLogo || currentGame.assets?.logo) && (
+                  <div className="flex flex-col items-center mb-8">
+                    <img
+                      src={customLogo ?? currentGame.assets!.logo}
+                      alt={customLogo ? 'Logo del cliente' : currentGame.name}
+                      className="h-[120px] w-auto object-contain"
+                    />
                   </div>
                 )}
                 <currentGame.GameScreen key={`game-${gameId}-${gameConfigVersion}`} gameName={gameName} gameId={gameId} />
@@ -211,11 +203,11 @@ export default function AppShell() {
           />
         )}
 
-        {/* Logo fijo - always visible in bottom right corner */}
+        {/* Logo fijo - always stand logo in bottom right corner */}
         <div className="fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity z-10">
           <img 
-            src={customLogo || '/images/stand-logo.png'} 
-            alt={customLogo ? "Logo personalizado" : "Stand"} 
+            src="/images/stand-logo.png" 
+            alt="Stand" 
             className="w-14 h-14 object-contain" 
           />
         </div>
