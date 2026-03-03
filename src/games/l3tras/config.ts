@@ -7,7 +7,7 @@ export const l3trasDefinition: GameDefinition = {
   name: 'L3tras',
   description: 'Forma la palabra objetivo con las letras de los códigos.',
   descriptionLong: 'Se muestra una palabra objetivo y los jugadores usan las letras de sus códigos (o de la partida) para formar esa palabra. Quien lo consiga antes o con más aciertos gana. Juego de ingenio y velocidad, con ranking opcional.',
-  tags: { playerMode: 'multi', social: false, competitive: true },
+  tags: { playerMode: 'multi', social: false, competitive: true, idealFor: ['fiesta', 'stand_feria'] },
   underDevelopment: true,
   colors: {
     primary: '#10B981',   // emerald green

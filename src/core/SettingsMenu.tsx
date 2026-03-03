@@ -61,11 +61,18 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const handleGameConfigChange = (newSettings: any) => {
     if (gameId && gameDefinition?.id) {
       const storageKey = `${gameDefinition.id}_settings_${gameId}`
-      localStorage.setItem(storageKey, JSON.stringify(newSettings))
-      setGameSettings(newSettings)
-      setShowGameConfig(false)
-      onConfigSaved?.()
-      onClose()
+      const merged = { ...(gameSettings || {}), ...newSettings }
+      const { close: shouldClose, refreshGameScreen, ...toPersist } = merged
+      localStorage.setItem(storageKey, JSON.stringify(toPersist))
+      setGameSettings(toPersist)
+      if (refreshGameScreen === true) {
+        onConfigSaved?.()
+      }
+      if (shouldClose === true) {
+        setShowGameConfig(false)
+        onConfigSaved?.()
+        onClose()
+      }
     }
   }
 

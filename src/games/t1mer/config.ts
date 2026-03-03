@@ -6,7 +6,7 @@ export const t1merDefinition: GameDefinition = {
   name: 'T1mer',
   description: 'Juego de precisión temporal.',
   descriptionLong: 'Los jugadores deben pulsar o actuar en el momento exacto que indica el temporizador. Prueba de reflejos y precisión. Puede ser individual o en sala compitiendo por el mejor tiempo. Competitivo y con ranking.',
-  tags: { playerMode: 'multi', social: false, competitive: true },
+  tags: { playerMode: 'multi', social: false, competitive: true, idealFor: ['fiesta', 'stand_feria'] },
   colors: {
     primary: '#EF4444', // red
     accent: '#3B82F6', // blue

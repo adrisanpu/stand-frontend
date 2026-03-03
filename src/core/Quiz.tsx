@@ -51,8 +51,13 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const [showImport, setShowImport] = useState(false)
-  const [jsonInput, setJsonInput] = useState('')
+  const [showGenerate, setShowGenerate] = useState(false)
+  const [generateText, setGenerateText] = useState('')
+  const [numQuestions, setNumQuestions] = useState(3)
+  const [numOptions, setNumOptions] = useState(3)
+  const [useEmojis, setUseEmojis] = useState(false)
+  const [generateStatus, setGenerateStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [generateMessage, setGenerateMessage] = useState('')
   const [isExporting, setIsExporting] = useState(false)
   const [exportData, setExportData] = useState<QuizDataResponse | null>(null)
   const [showShareOptions, setShowShareOptions] = useState(false)
@@ -78,6 +83,8 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
             }))
           }))
           setQuestions(loadedQuestions)
+        } else {
+          setShowGenerate(true)
         }
       } catch (err: any) {
         // If quiz doesn't exist (404 or similar), that's fine - just start with empty form
@@ -85,6 +92,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
         if (err.message && !err.message.includes('404') && !err.message.includes('Not found')) {
           console.warn('Error loading quiz configuration:', err.message)
         }
+        setShowGenerate(true)
       }
     }
 
@@ -258,74 +266,52 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
     ])
     setError(null)
     setSuccess(false)
-    setJsonInput('')
-    setShowImport(false)
   }
 
-  const importFromJson = () => {
-    if (!jsonInput.trim()) {
-      setError('Por favor, pega el JSON en el campo de texto')
+  const handleGenerate = async () => {
+    if (!gameId) return
+    if (!generateText.trim()) {
+      setGenerateStatus('error')
+      setGenerateMessage('Describe el tema del quiz antes de generar.')
       return
     }
 
+    setGenerateStatus('loading')
+    setGenerateMessage('Generando quiz con IA...')
+
     try {
-      const parsed = JSON.parse(jsonInput.trim())
-
-      // Validate structure
-      if (!parsed.questions || !Array.isArray(parsed.questions)) {
-        throw new Error('El JSON debe contener un array "questions"')
-      }
-
-      if (parsed.questions.length === 0) {
-        throw new Error('El array "questions" no puede estar vacío')
-      }
-
-      if (parsed.questions.length > 5) {
-        throw new Error('Máximo 5 preguntas permitidas')
-      }
-
-      // Validate and transform questions
-      const importedQuestions: Question[] = parsed.questions.map((q: any, index: number) => {
-        if (!q.id || !q.text) {
-          throw new Error(`La pregunta ${index + 1} debe tener "id" y "text"`)
-        }
-
-        if (!q.options || !Array.isArray(q.options)) {
-          throw new Error(`La pregunta ${index + 1} debe tener un array "options"`)
-        }
-
-        if (q.options.length === 0) {
-          throw new Error(`La pregunta ${index + 1} debe tener al menos una opción`)
-        }
-
-        if (q.options.length > 3) {
-          throw new Error(`La pregunta ${index + 1} no puede tener más de 3 opciones`)
-        }
-
-        return {
-          id: q.id,
-          text: q.text,
-          options: q.options.map((opt: any, optIndex: number) => ({
-            title: opt.title || '',
-            payload: opt.payload || generatePayload(q.id, optIndex)
-          }))
-        }
+      const res = await api.post<{
+        ok: boolean
+        gameId: string
+        questions: Array<{
+          id: string
+          text: string
+          options: Array<{ title: string; payload: string; answerId: string }>
+        }>
+      }>('/v1/game/quiz/generate', {
+        gameId,
+        text: generateText.trim(),
+        numQuestions,
+        numOptions,
+        useEmojis,
       })
 
-      setQuestions(importedQuestions)
-      setJsonInput('')
-      setShowImport(false)
-      setError(null)
-      setSuccess(true)
-      setTimeout(() => {
-        setSuccess(false)
-      }, 2000)
-    } catch (err: any) {
-      if (err instanceof SyntaxError) {
-        setError('JSON inválido. Por favor, verifica la sintaxis.')
-      } else {
-        setError(err.message || 'Error al importar el JSON')
+      if (!res.ok || !res.questions || res.questions.length === 0) {
+        throw new Error('No se generaron preguntas.')
       }
+
+      const loaded: Question[] = res.questions.map((q) => ({
+        id: q.id,
+        text: q.text,
+        options: q.options.map((opt) => ({ title: opt.title, payload: opt.payload }))
+      }))
+      setQuestions(loaded)
+      setGenerateStatus('done')
+      setGenerateMessage(`Listo. Se generaron ${loaded.length} preguntas.`)
+      setShowGenerate(false)
+    } catch (err: any) {
+      setGenerateStatus('error')
+      setGenerateMessage(err.message || 'Error al generar el quiz.')
     }
   }
 
@@ -443,50 +429,99 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
             </div>
           )}
 
-          {/* Import JSON Section */}
+          {/* AI Generation Section */}
           <div className="mb-4">
-            {!showImport ? (
-              <button
-                onClick={() => setShowImport(true)}
-                className="w-full p-3 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+            <button
+              onClick={() => setShowGenerate(v => !v)}
+              className="flex items-center justify-between w-full text-left mb-1 p-2 rounded-lg hover:bg-white/5 transition-colors"
+              aria-expanded={showGenerate}
+            >
+              <span className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                <svg className="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                </svg>
+                IA
+              </span>
+              <svg
+                className={`w-4 h-4 text-gray-400 transition-transform ${showGenerate ? 'rotate-180' : ''}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
               >
-                <div className="flex items-center justify-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  Importar desde JSON
-                </div>
-              </button>
-            ) : (
-              <div className="p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="block text-sm font-medium text-gray-300">
-                    Pegar JSON del quiz
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showGenerate && (
+              <div className="mt-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-3">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="min-w-[100px]">
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Nº de preguntas</label>
+                    <select
+                      value={numQuestions}
+                      onChange={(e) => setNumQuestions(Number(e.target.value))}
+                      disabled={generateStatus === 'loading'}
+                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none disabled:opacity-50"
+                    >
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="min-w-[100px]">
+                    <label className="block text-xs font-medium text-gray-400 mb-1">Nº de respuestas</label>
+                    <select
+                      value={numOptions}
+                      onChange={(e) => setNumOptions(Number(e.target.value))}
+                      disabled={generateStatus === 'loading'}
+                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none disabled:opacity-50"
+                    >
+                      {[2, 3, 4].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none h-10 items-center pb-0.5">
+                    <input
+                      type="checkbox"
+                      checked={useEmojis}
+                      onChange={(e) => setUseEmojis(e.target.checked)}
+                      disabled={generateStatus === 'loading'}
+                      className="rounded border-white/20 bg-[rgba(255,255,255,0.05)] text-indigo-500 focus:ring-white/20 disabled:opacity-50"
+                    />
+                    <span className="text-sm text-gray-300 whitespace-nowrap">Usar emoticonos</span>
                   </label>
-                  <button
-                    onClick={() => {
-                      setShowImport(false)
-                      setJsonInput('')
-                    }}
-                    className="p-1 rounded-lg hover:bg-white/10 transition-colors"
-                    aria-label="Cerrar importación"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
+
                 <textarea
-                  value={jsonInput}
-                  onChange={(e) => setJsonInput(e.target.value)}
-                  placeholder='Pega aquí el JSON, por ejemplo:&#10;{&#10;  "gameId": "E0001",&#10;  "questions": [...]&#10;}'
-                  className="w-full h-32 px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm font-mono focus:border-white/20 focus:outline-none resize-none"
+                  value={generateText}
+                  onChange={(e) => setGenerateText(e.target.value)}
+                  placeholder="Describe el tema del quiz..."
+                  rows={3}
+                  disabled={generateStatus === 'loading'}
+                  className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none resize-none disabled:opacity-50"
                 />
+
+                {generateStatus !== 'idle' && (
+                  <div className={`rounded-xl px-3 py-2.5 text-sm ${
+                    generateStatus === 'error'
+                      ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                      : generateStatus === 'done'
+                      ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                      : 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20'
+                  }`}>
+                    {generateStatus === 'loading' && (
+                      <span className="inline-block w-3 h-3 rounded-full bg-current animate-pulse mr-2 align-middle" />
+                    )}
+                    {generateMessage}
+                  </div>
+                )}
+
                 <button
-                  onClick={importFromJson}
-                  className="w-full mt-3 p-2 rounded-lg bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors text-sm"
+                  onClick={handleGenerate}
+                  disabled={generateStatus === 'loading' || !generateText.trim()}
+                  className="w-full py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: '#6366F1', color: '#fff' }}
                 >
-                  Importar y cargar formulario
+                  {generateStatus === 'loading' ? 'Generando...' : 'Generar quiz'}
                 </button>
               </div>
             )}

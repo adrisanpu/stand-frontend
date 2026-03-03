@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { games } from '../games'
-import type { GameDefinition } from './types'
+import type { GameDefinition, GameIdealFor, GamePlayerMode } from './types'
+import { IDEAL_FOR_LABELS } from './types'
 import { api } from '../api/api'
 import { useCurrentUser } from '../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../auth/featureFlags'
@@ -35,6 +36,10 @@ export default function GameGate({ onGameCreated }: GameGateProps){
   const [userGames, setUserGames] = useState<UserGame[]>([])
   const [loadingGames, setLoadingGames] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
+  const [idealForFilter, setIdealForFilter] = useState<GameIdealFor | null>(null)
+  const [playerModeFilter, setPlayerModeFilter] = useState<GamePlayerMode | null>(null)
+  const [socialFilter, setSocialFilter] = useState<boolean | null>(null)
+  const [competitiveFilter, setCompetitiveFilter] = useState<boolean | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -210,6 +215,15 @@ export default function GameGate({ onGameCreated }: GameGateProps){
 
   // Game Catalog View
   if (!selectedGame) {
+    const filteredGames = games.filter((g) => {
+      if (idealForFilter != null && !g.tags?.idealFor?.includes(idealForFilter)) return false
+      if (playerModeFilter != null && g.tags?.playerMode !== playerModeFilter) return false
+      if (socialFilter !== null && g.tags?.social !== socialFilter) return false
+      if (competitiveFilter !== null && g.tags?.competitive !== competitiveFilter) return false
+      return true
+    })
+    const hasNoGames = filteredGames.length === 0
+
     return (
       <div className="w-full space-y-6">
         {/* Header with Logo */}
@@ -240,36 +254,99 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         {/* Games Grid */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-textMain text-center mb-4">Selecciona un juego</h2>
-          {games.map((game) => (
-            <button
-              key={game.id}
-              onClick={() => handleGameSelect(game)}
-              className="w-full p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/20 text-left"
-            >
-              <div className="flex items-center gap-4">
-                {game.assets?.logo && (
-                  <div className="flex-shrink-0">
-                    <img 
-                      src={game.assets.logo} 
-                      alt={game.name} 
-                      className="h-16 w-16 object-contain"
-                    />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-textMain mb-1">{game.name}</h3>
-                  {game.description && (
-                    <p className="text-sm text-textSub line-clamp-2">{game.description}</p>
-                  )}
-                </div>
-                <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
+          {/* Filter dropdowns: each defaults to "Todos", filters accumulate (AND) */}
+          <div className="flex flex-wrap gap-3 mb-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-textSub">Ideal para</span>
+              <select
+                value={idealForFilter ?? ''}
+                onChange={(e) => setIdealForFilter((e.target.value || null) as GameIdealFor | null)}
+                className="rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 py-2 text-sm text-textMain focus:border-white/20 outline-none min-w-[140px]"
+              >
+                <option value="">Todos</option>
+                {(Object.keys(IDEAL_FOR_LABELS) as GameIdealFor[]).map((key) => (
+                  <option key={key} value={key}>{IDEAL_FOR_LABELS[key]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-textSub">Jugadores</span>
+              <select
+                value={playerModeFilter ?? ''}
+                onChange={(e) => setPlayerModeFilter((e.target.value || null) as GamePlayerMode | null)}
+                className="rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 py-2 text-sm text-textMain focus:border-white/20 outline-none min-w-[140px]"
+              >
+                <option value="">Todos</option>
+                <option value="solo">Individual</option>
+                <option value="multi">Multijugador</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-textSub">Social</span>
+              <select
+                value={socialFilter === null ? '' : String(socialFilter)}
+                onChange={(e) => setSocialFilter(e.target.value === '' ? null : e.target.value === 'true')}
+                className="rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 py-2 text-sm text-textMain focus:border-white/20 outline-none min-w-[120px]"
+              >
+                <option value="">Todos</option>
+                <option value="true">Social</option>
+                <option value="false">No social</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-textSub">Tipo</span>
+              <select
+                value={competitiveFilter === null ? '' : String(competitiveFilter)}
+                onChange={(e) => setCompetitiveFilter(e.target.value === '' ? null : e.target.value === 'true')}
+                className="rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 py-2 text-sm text-textMain focus:border-white/20 outline-none min-w-[120px]"
+              >
+                <option value="">Todos</option>
+                <option value="true">Competitivo</option>
+                <option value="false">Casual</option>
+              </select>
+            </label>
+          </div>
+          {/* List with fixed min-height so layout does not jump when filtering */}
+          <div className="min-h-[420px] overflow-y-auto rounded-xl">
+            {hasNoGames ? (
+              <p className="text-center text-textSub text-sm py-6">
+                Ningún juego con los filtros seleccionados.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {filteredGames.map((game) => (
+                  <button
+                    key={game.id}
+                    onClick={() => handleGameSelect(game)}
+                    className="w-full p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/20 text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      {game.assets?.logo && (
+                        <div className="flex-shrink-0">
+                          <img 
+                            src={game.assets.logo} 
+                            alt={game.name} 
+                            className="h-16 w-16 object-contain"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-semibold text-textMain mb-1">{game.name}</h3>
+                        {game.description && (
+                          <p className="text-sm text-textSub line-clamp-2">{game.description}</p>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0">
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </button>
+                ))}
               </div>
-            </button>
-          ))}
+            )}
+          </div>
         </div>
       </div>
     )
@@ -303,8 +380,8 @@ export default function GameGate({ onGameCreated }: GameGateProps){
             {selectedGame.descriptionLong ?? selectedGame.description ?? ''}
           </p>
         </div>
-        {/* Game tags: player mode, social, competitive */}
-        {selectedGame.tags && (selectedGame.tags.playerMode ?? selectedGame.tags.social ?? selectedGame.tags.competitive !== undefined) && (
+        {/* Game tags: player mode, social, competitive, idealFor */}
+        {selectedGame.tags && ((selectedGame.tags.playerMode ?? selectedGame.tags.social ?? selectedGame.tags.competitive !== undefined) || ((selectedGame.tags.idealFor?.length ?? 0) > 0)) && (
           <div className="flex flex-wrap justify-center gap-4 pt-2 border-t border-white/10">
             {selectedGame.tags.playerMode && (
               <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.playerMode === 'multi' ? 'Multijugador' : 'Individual'}>
@@ -326,6 +403,19 @@ export default function GameGate({ onGameCreated }: GameGateProps){
               <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.competitive ? 'Competitivo' : 'Casual'}>
                 <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                 {selectedGame.tags.competitive ? 'Competitivo' : 'Casual'}
+              </span>
+            )}
+            {selectedGame.tags.idealFor && selectedGame.tags.idealFor.length > 0 && (
+              <span className="flex flex-wrap items-center gap-1.5 text-xs text-textSub">
+                {selectedGame.tags.idealFor.map((key) => (
+                  <span
+                    key={key}
+                    className="px-2 py-0.5 rounded bg-white/10 text-textSub"
+                    title="Ideal para"
+                  >
+                    {IDEAL_FOR_LABELS[key]}
+                  </span>
+                ))}
               </span>
             )}
           </div>
