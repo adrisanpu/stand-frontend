@@ -49,7 +49,7 @@ function renderCallback(search: string) {
 }
 
 function mockFetch(ok: boolean, body: object) {
-  global.fetch = vi.fn().mockResolvedValue({
+  globalThis.fetch = vi.fn().mockResolvedValue({
     ok,
     status: ok ? 200 : 400,
     statusText: ok ? 'OK' : 'Bad Request',
