@@ -11,6 +11,8 @@ type InfoCard = {
   imageUrl?: string | null   // presigned GET URL from backend, not persisted
   videoUrl?: string | null   // presigned GET URL from backend, not persisted
   order?: number
+  imagePositionX?: number   // 0-100, focal point for object-position
+  imagePositionY?: number
   _localImagePreview?: string  // blob URL for immediate preview before save
   _localVideoPreview?: string
 }
@@ -25,6 +27,8 @@ type GetResponse = {
   ok: boolean
   gameId: string
   cards: InfoCard[]
+  requiresValidation?: boolean
+  quizCompletedMessage?: string
 }
 
 type ProcessResponse = {
@@ -72,9 +76,15 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
   const [aiStatus, setAiStatus] = useState<Status>('idle')
   const [aiMessage, setAiMessage] = useState('')
 
+  // Participation / sorteo (no validación, mensaje al completar quiz)
+  const [requiresValidation, setRequiresValidation] = useState(false)
+  const [quizCompletedMessage, setQuizCompletedMessage] = useState('')
+
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
   const mediaInputCardIdRef = useRef<string | null>(null)
+  const focalContainerRef = useRef<Record<string, HTMLDivElement | null>>({})
+  const draggingFocalCardIdRef = useRef<string | null>(null)
 
   const fetchCards = useCallback(async () => {
     if (!gameId) return
@@ -85,6 +95,8 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
       setCards(sorted)
       setCardsDirty(false)
       setAiExpanded(sorted.length === 0)
+      setRequiresValidation(data.requiresValidation ?? false)
+      setQuizCompletedMessage(data.quizCompletedMessage ?? '')
     } catch {
       setCards([])
       setAiExpanded(true)
@@ -170,7 +182,12 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
     try {
       // Strip ephemeral/computed fields before sending
       const cardsToSave = cards.map(({ _localImagePreview, _localVideoPreview, imageUrl, videoUrl, ...rest }) => rest)
-      const res = await api.put<PutResponse>('/v1/game/infocards', { gameId, cards: cardsToSave })
+      const res = await api.put<PutResponse>('/v1/game/infocards', {
+        gameId,
+        cards: cardsToSave,
+        requiresValidation,
+        quizCompletedMessage: quizCompletedMessage.trim(),
+      })
       if (!res.ok) throw new Error('No se pudieron guardar las tarjetas.')
       setSaveStatus('done')
       setSaveMessage('Guardado correctamente.')
@@ -269,15 +286,61 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
   }
 
   const renderImageSlot = (card: InfoCard, className: string) => {
-    const previewSrc = card._localImagePreview || card.imageUrl
+    const previewVideoSrc = card._localVideoPreview || card.videoUrl
+    const previewImageSrc = card._localImagePreview || card.imageUrl
     const isUploadingThisCard = mediaUploadingCardId === card.id
-    if (previewSrc) {
+
+    if (previewVideoSrc) {
       return (
         <div className={`relative flex-shrink-0 ${className}`}>
+          <video
+            src={previewVideoSrc}
+            controls
+            playsInline
+            className="w-full h-full object-cover rounded-lg"
+            aria-label={card.title}
+          />
+          <button
+            onClick={() => handleRemoveMedia(card.id, 'video')}
+            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-600 transition-colors"
+            aria-label="Eliminar vídeo"
+          >
+            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )
+    }
+
+    if (previewImageSrc) {
+      const posX = card.imagePositionX ?? 50
+      const posY = card.imagePositionY ?? 50
+      const handleFocalPointerDown = (e: React.PointerEvent) => {
+        e.preventDefault()
+        draggingFocalCardIdRef.current = card.id
+        document.addEventListener('pointermove', focalMoveHandlerRef.current)
+        document.addEventListener('pointerup', focalUpHandlerRef.current)
+      }
+      return (
+        <div
+          ref={el => { if (el) focalContainerRef.current[card.id] = el }}
+          className={`relative flex-shrink-0 overflow-hidden rounded-lg ${className}`}
+        >
           <img
-            src={previewSrc}
+            src={previewImageSrc}
             alt={card.title}
             className="w-full h-full object-cover rounded-lg"
+            style={{ objectPosition: `${posX}% ${posY}%` }}
+            draggable={false}
+          />
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Ajustar encuadre de la imagen"
+            className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-white/20 shadow cursor-grab active:cursor-grabbing touch-none"
+            style={{ left: `${posX}%`, top: `${posY}%` }}
+            onPointerDown={handleFocalPointerDown}
           />
           <button
             onClick={() => handleRemoveMedia(card.id, 'image')}
@@ -291,6 +354,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
         </div>
       )
     }
+
     return (
       <button
         onClick={() => handleMediaClick(card.id)}
@@ -304,7 +368,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <span className="text-[10px] text-gray-600">Imagen</span>
+            <span className="text-[10px] text-gray-600">Imagen / Vídeo</span>
           </>
         )}
       </button>
@@ -319,6 +383,30 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
     setCards(prev => prev.map(c => (c.id === cardId ? { ...c, body } : c)))
     setCardsDirty(true)
   }
+  const updateCardImagePosition = (cardId: string, x: number, y: number) => {
+    const cx = Math.max(0, Math.min(100, x))
+    const cy = Math.max(0, Math.min(100, y))
+    setCards(prev => prev.map(c => (c.id === cardId ? { ...c, imagePositionX: cx, imagePositionY: cy } : c)))
+    setCardsDirty(true)
+  }
+  const updateCardImagePositionRef = useRef(updateCardImagePosition)
+  updateCardImagePositionRef.current = updateCardImagePosition
+
+  const focalMoveHandlerRef = useRef((e: PointerEvent) => {
+    const cardId = draggingFocalCardIdRef.current
+    if (!cardId) return
+    const el = focalContainerRef.current[cardId]
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 100
+    const y = ((e.clientY - rect.top) / rect.height) * 100
+    updateCardImagePositionRef.current(cardId, Math.max(0, Math.min(100, x)), Math.max(0, Math.min(100, y)))
+  })
+  const focalUpHandlerRef = useRef(() => {
+    document.removeEventListener('pointermove', focalMoveHandlerRef.current)
+    document.removeEventListener('pointerup', focalUpHandlerRef.current)
+    draggingFocalCardIdRef.current = null
+  })
 
   return (
     <div className="space-y-6">
@@ -517,6 +605,44 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
             </button>
           </div>
         )}
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-white/10" />
+
+      {/* ===== SECTION: Participación y sorteo ===== */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Participación y sorteo</h3>
+        <div className="space-y-3 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={!requiresValidation}
+              onChange={e => {
+                setRequiresValidation(!e.target.checked)
+                setCardsDirty(true)
+              }}
+              className="rounded border-white/20 bg-[rgba(255,255,255,0.05)] text-indigo-500 focus:ring-white/20"
+            />
+            <span className="text-sm text-gray-300">No requiere validación (solo quiz para participar)</span>
+          </label>
+          <p className="text-xs text-gray-500">
+            Si está activado, los jugadores no reciben código de validación; al completar el quiz se les envía el mensaje de abajo.
+          </p>
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1">Mensaje al completar el quiz</label>
+            <textarea
+              value={quizCompletedMessage}
+              onChange={e => {
+                setQuizCompletedMessage(e.target.value)
+                setCardsDirty(true)
+              }}
+              placeholder="¡Gracias! Ya estás participando en el sorteo."
+              rows={2}
+              className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none resize-none placeholder-gray-500"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Divider */}

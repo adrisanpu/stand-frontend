@@ -17,6 +17,8 @@ type InfoCard = {
   imageUrl?: string | null
   videoUrl?: string | null
   order?: number
+  imagePositionX?: number
+  imagePositionY?: number
 }
 
 type ApiResponse = {
@@ -134,20 +136,50 @@ export default function InfocardsGameScreen({ gameId }: GameScreenProps) {
     </>
   )
 
-  const imageBlock = card.imageUrl ? (
-    <img
-      src={card.imageUrl}
-      alt={card.title}
-      className="w-full h-full object-cover rounded-xl"
-    />
+  const hasMedia = !!(card.videoUrl || card.imageUrl)
+
+  const mediaBlock = hasMedia ? (
+    card.videoUrl ? (
+      <video
+        src={card.videoUrl}
+        autoPlay
+        loop
+        muted
+        playsInline
+        controls
+        className="w-full h-full object-cover rounded-xl"
+        aria-label={card.title}
+      />
+    ) : (
+      <img
+        src={card.imageUrl!}
+        alt={card.title}
+        className="w-full h-full object-cover rounded-xl"
+        style={{ objectPosition: `${card.imagePositionX ?? 50}% ${card.imagePositionY ?? 50}%` }}
+      />
+    )
   ) : null
 
-  const imageBlockFullWidth = card.imageUrl ? (
-    <img
-      src={card.imageUrl}
-      alt={card.title}
-      className="w-full max-h-48 object-cover rounded-xl"
-    />
+  const mediaBlockFullWidth = hasMedia ? (
+    card.videoUrl ? (
+      <video
+        src={card.videoUrl}
+        autoPlay
+        loop
+        muted
+        playsInline
+        controls
+        className="w-full max-h-48 object-cover rounded-xl"
+        aria-label={card.title}
+      />
+    ) : (
+      <img
+        src={card.imageUrl!}
+        alt={card.title}
+        className="w-full max-h-48 object-cover rounded-xl"
+        style={{ objectPosition: `${card.imagePositionX ?? 50}% ${card.imagePositionY ?? 50}%` }}
+      />
+    )
   ) : null
 
   const baseClass = 'w-full h-full min-h-0 rounded-2xl p-8 flex flex-col gap-4'
@@ -197,8 +229,8 @@ export default function InfocardsGameScreen({ gameId }: GameScreenProps) {
     if (layout === 'top') {
       return (
         <div key={card.id} className={baseClass} style={cardStyle}>
-          {imageBlockFullWidth && (
-            <div className="w-full rounded-xl overflow-hidden flex-shrink-0">{imageBlockFullWidth}</div>
+          {mediaBlockFullWidth && (
+            <div className="w-full rounded-xl overflow-hidden flex-shrink-0">{mediaBlockFullWidth}</div>
           )}
           <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto">{cardContent}</div>
         </div>
@@ -208,8 +240,8 @@ export default function InfocardsGameScreen({ gameId }: GameScreenProps) {
       return (
         <div key={card.id} className={baseClass} style={cardStyle}>
           <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto">{cardContent}</div>
-          {imageBlockFullWidth && (
-            <div className="w-full rounded-xl overflow-hidden flex-shrink-0">{imageBlockFullWidth}</div>
+          {mediaBlockFullWidth && (
+            <div className="w-full rounded-xl overflow-hidden flex-shrink-0">{mediaBlockFullWidth}</div>
           )}
         </div>
       )
@@ -217,8 +249,8 @@ export default function InfocardsGameScreen({ gameId }: GameScreenProps) {
     if (layout === 'left') {
       return (
         <div key={card.id} className={rowClassGrid} style={cardStyle}>
-          {imageBlock && (
-            <div className="min-w-0 h-full rounded-xl overflow-hidden">{imageBlock}</div>
+          {mediaBlock && (
+            <div className="min-w-0 h-full rounded-xl overflow-hidden">{mediaBlock}</div>
           )}
           <div className="flex flex-col gap-3 min-w-0 min-h-0 overflow-y-auto">{cardContent}</div>
         </div>
@@ -228,8 +260,8 @@ export default function InfocardsGameScreen({ gameId }: GameScreenProps) {
     return (
       <div key={card.id} className={rowClassGrid} style={cardStyle}>
         <div className="flex flex-col gap-3 min-w-0 min-h-0 overflow-y-auto">{cardContent}</div>
-        {imageBlock && (
-          <div className="min-w-0 h-full rounded-xl overflow-hidden">{imageBlock}</div>
+        {mediaBlock && (
+          <div className="min-w-0 h-full rounded-xl overflow-hidden">{mediaBlock}</div>
         )}
       </div>
     )
