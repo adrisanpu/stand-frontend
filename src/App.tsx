@@ -8,6 +8,7 @@ import AuthCallback from './auth/AuthCallback'
 import Logout from './auth/Logout'
 import BillingSuccess from './pages/BillingSuccess'
 import BillingCancel from './pages/BillingCancel'
+import BillingCheckout from './pages/BillingCheckout'
 
 function RootRedirect() {
   const { isAuthenticated } = useAuth()
@@ -26,6 +27,7 @@ function AppRoutes() {
       <Route path="/auth/start" element={<AuthStart />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/logout" element={<Logout />} />
+      <Route path="/billing/checkout" element={<BillingCheckout />} />
       <Route
         path="/billing/success"
         element={

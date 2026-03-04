@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { ThemeProvider } from '../core/theme'
 import { useStandLogo } from '../core/logoUtils'
@@ -6,6 +7,8 @@ import { useStandLogo } from '../core/logoUtils'
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 
 export default function Login() {
+  const [searchParams] = useSearchParams()
+  const returnUrl = searchParams.get('returnUrl')
   const { login } = useAuth()
   const [customLogo, setCustomLogo] = useState<string | null>(null)
   const standLogo = useStandLogo()
@@ -19,7 +22,7 @@ export default function Login() {
   }, [])
 
   const handleLogin = () => {
-    login('/home')
+    login(returnUrl || '/home')
   }
 
   return (
