@@ -30,7 +30,8 @@ export default function AppShell() {
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
   const portraitContentRef = useRef<HTMLDivElement>(null)
   const landscapeContentRef = useRef<HTMLDivElement>(null)
-  const [portraitPaddingDvh, setPortraitPaddingDvh] = useState(10)
+  const [portraitPaddingTopDvh, setPortraitPaddingTopDvh] = useState(5)
+  const [portraitPaddingBottomDvh, setPortraitPaddingBottomDvh] = useState(10)
   const [landscapeScale, setLandscapeScale] = useState(1)
   const [landscapeContentSize, setLandscapeContentSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -140,10 +141,11 @@ export default function AppShell() {
   const currentGame = gameDefinition
   const isPortrait = useOrientation()
 
-  // Portrait: reduce top/bottom padding when content overflows (e.g. Sorteo with countdown) so nothing is hidden
+  // Portrait: 5% air at top (logo), 10% at bottom; reduce bottom when content overflows so nothing is hidden
   useEffect(() => {
     if (!isPortrait) {
-      setPortraitPaddingDvh(10)
+      setPortraitPaddingTopDvh(5)
+      setPortraitPaddingBottomDvh(10)
       return
     }
     const el = portraitContentRef.current
@@ -152,12 +154,13 @@ export default function AppShell() {
     const checkOverflow = () => {
       const sh = el.scrollHeight
       const vh = window.innerHeight
-      setPortraitPaddingDvh((prev) => {
+      setPortraitPaddingBottomDvh((prev) => {
         if (sh > vh) return 5
         if (sh <= vh - HYSTERESIS_PX) return 10
         return prev
       })
     }
+    setPortraitPaddingTopDvh(5)
     checkOverflow()
     const ro = new ResizeObserver(checkOverflow)
     ro.observe(el)
@@ -233,10 +236,10 @@ export default function AppShell() {
               <div className="h-dvh w-screen overflow-hidden flex flex-col">
                 <div
                   ref={portraitContentRef}
-                  className={`px-4 sm:px-6 flex-1 min-h-0 flex flex-col overflow-hidden ${portraitPaddingDvh === 5 ? 'gap-2' : 'gap-4'}`}
+                  className={`px-4 sm:px-6 flex-1 min-h-0 flex flex-col overflow-hidden ${portraitPaddingBottomDvh === 5 ? 'gap-2' : 'gap-4'}`}
                   style={{
-                    paddingTop: `${portraitPaddingDvh}dvh`,
-                    paddingBottom: `${portraitPaddingDvh}dvh`,
+                    paddingTop: `${portraitPaddingTopDvh}dvh`,
+                    paddingBottom: `${portraitPaddingBottomDvh}dvh`,
                   }}
                 >
                   {/* Header: logo */}
