@@ -185,7 +185,7 @@ export default function AppShell() {
       const sw = el.scrollWidth
       const vh = window.innerHeight
       const vw = window.innerWidth
-      const availableW = vw * 0.8
+      const availableW = vw * 0.9
       const availableH = vh * 0.8
       setLandscapeContentSize({ width: sw, height: sh })
       let scale = Math.min(1, availableH / sh, availableW / sw)
@@ -289,7 +289,7 @@ export default function AppShell() {
               </div>
             ) : (
               /* Landscape: 10% air on sides (and top/bottom); scale content to fit the remaining 80% */
-              <div className="h-dvh w-screen overflow-hidden flex justify-center items-center p-[10dvh_10dvw]">
+              <div className="h-dvh w-screen overflow-hidden flex justify-center items-center py-[10dvh] px-[5dvw]">
                 <div
                   className="flex-shrink-0 max-w-full max-h-full"
                   style={{
