@@ -202,7 +202,7 @@ export default function AppShell() {
               <div className="h-dvh w-screen overflow-hidden flex flex-col">
                 <div
                   ref={portraitContentRef}
-                  className="pt-6 pb-3 px-4 sm:px-6 flex-1 min-h-0 flex flex-col gap-3"
+                  className="pt-[10dvh] pb-[10dvh] px-4 sm:px-6 flex-1 min-h-0 flex flex-col gap-4"
                 >
                   {/* Header: logo */}
                   {(customLogo || currentGame.assets?.logo) && (
@@ -225,7 +225,7 @@ export default function AppShell() {
                     </div>
                   )}
                   {/* Main: GameScreen fills remaining space, no internal scroll */}
-                  <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8">
+                  <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-5 sm:p-6 lg:p-8">
                     <currentGame.GameScreen
                       key={`game-${gameId}-${gameConfigVersion}`}
                       gameName={gameName}
