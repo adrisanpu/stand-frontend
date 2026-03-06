@@ -246,7 +246,7 @@ export default function AppShell() {
                 >
                   <div
                     ref={portraitContentRef}
-                    className="pt-[10vh] pb-[5vh] px-[10vw] h-full w-full overflow-hidden flex flex-col gap-4"
+                    className="pt-[10vh] pb-[5vh] px-[4vw] h-full w-full overflow-hidden flex flex-col gap-4"
                   >
                     <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8">
                   <div className="flex-1 min-h-0" aria-hidden />
@@ -270,7 +270,7 @@ export default function AppShell() {
                         )}
                       </div>
                     )}
-                    <div className="flex-1 w-full min-h-0 overflow-hidden flex flex-col justify-center max-h-[70vh]">
+                    <div className="flex-1 w-full min-h-0 overflow-y-auto flex flex-col max-h-[70vh]">
                       <currentGame.GameScreen key={`game-${gameId}-${gameConfigVersion}`} gameName={gameName} gameId={gameId} />
                     </div>
                   </div>

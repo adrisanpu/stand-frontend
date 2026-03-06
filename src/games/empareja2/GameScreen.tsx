@@ -169,7 +169,7 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
   }
 
   return (
-    <div className="w-full flex flex-col flex-1 min-h-0 justify-center gap-6">
+    <div className="w-full flex flex-col gap-6">
       <div className={showJoinBlock ? 'flex flex-col gap-6' : 'flex flex-col flex-1 min-h-0 gap-6'}>
       {/* Game Code - Always visible */}
       <div className="text-center flex-shrink-0">
