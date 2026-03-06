@@ -12,6 +12,10 @@ const STORAGE_KEY_COLORS = 'app_custom_color_palette'
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 const STORAGE_KEY_THEME_MODE = 'app_theme_mode' // 'dark' | 'light'
 
+const STORED_LOGOS = [
+  { id: 'zoco_salamandra', label: 'Zoco Salamandra', path: '/images/zoco_salamandra.png' },
+] as const
+
 // Default Stand palette (used when no game is selected)
 const DEFAULT_STAND_PALETTE: ThemeColors = {
   primary: '#9CA3AF',
@@ -104,6 +108,14 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
   const handleRemoveLogo = () => {
     setLogoPreview(null)
     localStorage.removeItem(STORAGE_KEY_LOGO)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleSelectStoredLogo = (path: string) => {
+    setLogoPreview(path)
+    setLogoError(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -355,6 +367,33 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
           <div className={`relative ${!features.advancedCustomization ? 'opacity-50' : ''}`}>
             <h3 className="text-lg font-semibold mb-3">Logo Personalizado</h3>
             <div className="space-y-4">
+              {features.advancedCustomization && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-300 mb-2">Logos almacenados</h4>
+                  <div className="flex flex-wrap gap-3">
+                    {STORED_LOGOS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handleSelectStoredLogo(preset.path)}
+                        className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                          logoPreview === preset.path
+                            ? 'border-primary bg-primary/10'
+                            : 'border-white/10 bg-[rgba(255,255,255,0.05)] hover:border-white/20'
+                        }`}
+                      >
+                        <img
+                          src={preset.path}
+                          alt={preset.label}
+                          className="h-16 w-16 object-contain rounded-lg"
+                        />
+                        <span className="text-xs font-medium text-gray-300">{preset.label}</span>
+                        <span className="text-[10px] text-gray-500">Usar este logo</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-4">
                 {logoPreview ? (
                   <div className="relative">

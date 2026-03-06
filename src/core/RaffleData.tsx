@@ -224,8 +224,6 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
     )
   }
 
-  const displayWinners = compact ? winners.slice(0, 3) : winners.slice(0, 5)
-
   return (
     <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6 min-h-0 flex-1 overflow-hidden'}`}>
       <h2 className={`font-bold text-textMain mb-1 sm:mb-2 flex items-center gap-2 flex-shrink-0 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>
@@ -246,29 +244,18 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
           </div>
         )}
 
-        {/* Previous Winners */}
+        {/* Last winner only */}
         {winners.length > 0 ? (
           <div>
-            <div className={`text-textSub mb-2 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>Ganadores anteriores:</div>
+            <div className={`text-textSub mb-2 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>Último ganador:</div>
             <div className={compact ? 'space-y-1' : 'space-y-1 sm:space-y-2'}>
-              {displayWinners.map((winner, index) => (
-                <div
-                  key={index}
-                  className={`flex items-center gap-2 rounded-lg bg-surface border border-white/10 ${compact ? 'p-1.5' : 'p-2 sm:p-2.5'}`}
-                >
-                  <span className={`text-[var(--color-primary)] font-bold flex-shrink-0 ${compact ? 'text-xs w-4' : 'text-xs sm:text-sm w-4 sm:w-5'}`}>
-                    {index + 1}
-                  </span>
-                  <span className={`text-textMain font-medium truncate flex-1 ${compact ? 'text-base' : 'text-xs sm:text-sm'}`}>
-                    {winner.username}
-                  </span>
-                </div>
-              ))}
-              {winners.length > (compact ? 3 : 5) && (
-                <p className={`text-textSub text-center mt-1 ${compact ? 'text-xs' : 'text-[10px] sm:text-xs'}`}>
-                  +{winners.length - (compact ? 3 : 5)} más
-                </p>
-              )}
+              <div
+                className={`flex items-center gap-2 rounded-lg bg-surface border border-white/10 ${compact ? 'p-1.5' : 'p-2 sm:p-2.5'}`}
+              >
+                <span className={`text-textMain font-medium truncate flex-1 ${compact ? 'text-base' : 'text-xs sm:text-sm'}`}>
+                  {winners[0].username}
+                </span>
+              </div>
             </div>
           </div>
         ) : (
