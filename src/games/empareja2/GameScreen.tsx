@@ -138,8 +138,8 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
               <h3 className="text-base font-semibold text-textMain">Validador de Parejas</h3>
               {error && gameState === 'invalid' && showInvalidMessage && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
               <div className="grid grid-cols-2 gap-5">
-                <div><label htmlFor="code1" className="block text-sm font-medium text-gray-300 mb-2">Código del Jugador 1</label><input id="code1" type="text" value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} placeholder="1234" maxLength={4} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
-                <div><label htmlFor="code2" className="block text-sm font-medium text-gray-300 mb-2">Código del Jugador 2</label><input id="code2" type="text" value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} placeholder="5678" maxLength={4} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+                <div><label htmlFor="code1" className="block text-sm font-medium text-gray-300 mb-2">Código del Jugador 1</label><input id="code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} placeholder="1234" className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+                <div><label htmlFor="code2" className="block text-sm font-medium text-gray-300 mb-2">Código del Jugador 2</label><input id="code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} placeholder="5678" className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
               </div>
               <button onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"><div className="flex items-center justify-center gap-3"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Validar Códigos</div></button>
             </div>
@@ -224,11 +224,13 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
               </label>
               <input
                 id="code1"
-                type="text"
+                type="number"
+                inputMode="numeric"
+                min={1000}
+                max={9999}
                 value={code1}
                 onChange={(e) => handleCodeChange(e.target.value, setCode1)}
                 placeholder="1234"
-                maxLength={4}
                 className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
             </div>
@@ -239,11 +241,13 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
               </label>
               <input
                 id="code2"
-                type="text"
+                type="number"
+                inputMode="numeric"
+                min={1000}
+                max={9999}
                 value={code2}
                 onChange={(e) => handleCodeChange(e.target.value, setCode2)}
                 placeholder="5678"
-                maxLength={4}
                 className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
             </div>
