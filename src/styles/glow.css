@@ -4,6 +4,11 @@
 
 :root { color-scheme: dark; }
 
+/* Fluid base font: scales with viewport so text and components are larger on big screens (e.g. touchscreen). Max 30px for big displays. */
+html {
+  font-size: clamp(14px, 1.4vw + 12px, 30px);
+}
+
 html,body,#root { height: 100%; background: #0B0A12; }
 
 /* Light mode support */
@@ -34,8 +39,7 @@ html.light-mode #root {
 }
 .card {
   background: var(--color-surface, rgba(255,255,255,0.04));
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: clamp(12px, 1.2rem, 24px);
   backdrop-filter: blur(8px);
   box-shadow: 0 10px 30px rgba(0,0,0,0.35);
   position: relative;
@@ -44,14 +48,13 @@ html.light-mode #root {
 /* Light mode card styles */
 html.light-mode .card {
   background: var(--color-surface, #FFFFFF);
-  border: 2px solid rgba(0,0,0,0.15);
   box-shadow: 0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
 }
 .card::before{
   content:'';
   position:absolute; inset:-1px;
-  border-radius: 18px;
-  padding:1px; pointer-events:none;
+  border-radius: clamp(12px, 1.2rem, 24px);
+  padding:2px; pointer-events:none;
   background: linear-gradient(120deg, var(--color-border-gradient-1, rgba(176,38,255,0.65)), var(--color-border-gradient-2, rgba(34,211,238,0.65)));
   -webkit-mask:
      linear-gradient(#000 0 0) content-box, 
@@ -61,6 +64,7 @@ html.light-mode .card {
 
 /* Light mode card border - more visible and prominent gradient */
 html.light-mode .card::before {
+  border-radius: clamp(12px, 1.2rem, 24px);
   background: linear-gradient(120deg, var(--color-border-gradient-1, rgba(176,38,255,0.6)), var(--color-border-gradient-2, rgba(34,211,238,0.6)));
   padding: 2px;
 }

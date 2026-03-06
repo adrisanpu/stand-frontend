@@ -8,8 +8,8 @@ type QRCodeProps = {
 
 export default function QRCode({ 
   data, 
-  size = 300, 
-  margin = 8, 
+  size = 400, 
+  margin = 12, 
   className = '',
   alt = 'QR Code'
 }: QRCodeProps) {

@@ -3,6 +3,12 @@ import React from 'react'
 export interface GameScreenProps {
   gameId: string
   gameName: string
+  /** When 'landscape', the game may render a 3-column layout (logo+code+QR | validation+animation | sidebar) */
+  orientation?: 'portrait' | 'landscape'
+  /** For landscape: node to place in column 1 (e.g. logo) */
+  logoElement?: React.ReactNode
+  /** For landscape: node to place in column 3 (e.g. Players, Ranking, RaffleData) */
+  sidebarElement?: React.ReactNode
 }
 
 export interface ThemeColors {

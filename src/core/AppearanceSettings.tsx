@@ -361,7 +361,7 @@ export default function AppearanceSettings({ onClose, gameDefinition }: Appearan
                     <img
                       src={logoPreview}
                       alt="Logo personalizado"
-                      className="h-24 w-auto object-contain rounded-lg border border-white/10"
+                      className="h-28 w-auto object-contain rounded-lg border border-white/10"
                     />
                     {features.advancedCustomization && (
                       <button
