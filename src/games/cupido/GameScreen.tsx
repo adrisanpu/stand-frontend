@@ -122,8 +122,8 @@ export default function CupidoGameScreen({ gameName, gameId, orientation, logoEl
               <h3 className="text-base font-semibold text-textMain">Validador de Parejas</h3>
               {error && gameState === 'invalid' && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
               <div className="grid grid-cols-2 gap-5">
-                <div><label htmlFor="cupido-code1" className="block text-sm font-medium text-gray-300 mb-2">Código Jugador 1</label><input id="cupido-code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} placeholder="1234" className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
-                <div><label htmlFor="cupido-code2" className="block text-sm font-medium text-gray-300 mb-2">Código Jugador 2</label><input id="cupido-code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} placeholder="5678" className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+                <div><label htmlFor="cupido-code1" className="block text-sm font-medium text-gray-300 mb-2">Código Jugador 1</label><input id="cupido-code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+                <div><label htmlFor="cupido-code2" className="block text-sm font-medium text-gray-300 mb-2">Código Jugador 2</label><input id="cupido-code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
               </div>
               <button onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl border font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)` }}><div className="flex items-center justify-center gap-3"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Validar Códigos</div></button>
             </div>
@@ -276,7 +276,6 @@ export default function CupidoGameScreen({ gameName, gameId, orientation, logoEl
                 max={9999}
                 value={code1}
                 onChange={(e) => handleCodeChange(e.target.value, setCode1)}
-                placeholder="1234"
                 className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
             </div>
@@ -292,7 +291,6 @@ export default function CupidoGameScreen({ gameName, gameId, orientation, logoEl
                 max={9999}
                 value={code2}
                 onChange={(e) => handleCodeChange(e.target.value, setCode2)}
-                placeholder="5678"
                 className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
             </div>

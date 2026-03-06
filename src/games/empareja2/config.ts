@@ -1,5 +1,6 @@
 import type { GameDefinition } from '../../core/types'
 import Empareja2GameScreen from './GameScreen'
+import Empareja2GameConfig from './GameConfig'
 
 export const empareja2Definition: GameDefinition = {
   id: 'empareja2',
@@ -21,5 +22,6 @@ export const empareja2Definition: GameDefinition = {
   },
   GameScreen: Empareja2GameScreen,
   showRanking: false,
+  GameConfigComponent: Empareja2GameConfig,
 }
 

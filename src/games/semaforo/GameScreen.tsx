@@ -302,11 +302,11 @@ export default function SemaforoGameScreen({ gameName, gameId, orientation, logo
           <div className="grid grid-cols-2 gap-5">
             <div>
               <label htmlFor="semaforo-code1" className="block text-base font-medium text-gray-300 mb-2">Código Jugador 1</label>
-              <input id="semaforo-code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} placeholder="1234" className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" />
+              <input id="semaforo-code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" />
             </div>
             <div>
               <label htmlFor="semaforo-code2" className="block text-base font-medium text-gray-300 mb-2">Código Jugador 2</label>
-              <input id="semaforo-code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} placeholder="5678" className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" />
+              <input id="semaforo-code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" />
             </div>
           </div>
           <button onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.3)] hover:bg-[rgba(34,197,94,0.3)] transition-colors font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed">

@@ -16,6 +16,8 @@ const STORAGE_KEY_LOGO = 'app_custom_logo'
 const GAME_SCREEN_LOGO_CLASS = 'h-32 sm:h-36 lg:h-40 xl:h-44 2xl:h-52 w-auto object-contain'
 // Letras overlapping bottom half of logo, larger than logo
 const GAME_SCREEN_LETRAS_CLASS = 'h-40 sm:h-44 lg:h-48 xl:h-52 2xl:h-60 w-auto object-contain -mt-24 sm:-mt-28 lg:-mt-32 xl:-mt-36 2xl:-mt-40'
+// Landscape: letras closer to logo (stronger negative margin)
+const GAME_SCREEN_LETRAS_CLASS_LANDSCAPE = 'h-40 sm:h-44 lg:h-48 xl:h-52 2xl:h-60 w-auto object-contain -mt-28 sm:-mt-32 lg:-mt-36 xl:-mt-40 2xl:-mt-44'
 
 export default function AppShell() {
   const { loading: userLoading } = useCurrentUser()
@@ -29,6 +31,9 @@ export default function AppShell() {
   const portraitContentRef = useRef<HTMLDivElement>(null)
   const [portraitScale, setPortraitScale] = useState(1)
   const [portraitContentSize, setPortraitContentSize] = useState<{ width: number; height: number } | null>(null)
+  const landscapeContentRef = useRef<HTMLDivElement>(null)
+  const [landscapeScale, setLandscapeScale] = useState(1)
+  const [landscapeContentSize, setLandscapeContentSize] = useState<{ width: number; height: number } | null>(null)
 
   // Load custom logo from localStorage
   useEffect(() => {
@@ -167,6 +172,36 @@ export default function AppShell() {
       window.removeEventListener('resize', updateScale)
     }
   }, [isPortrait, gameId, gameConfigVersion])
+
+  // Scale-to-fit in landscape: measure content and scale down when it overflows (e.g. 32" WebOS)
+  useEffect(() => {
+    if (isPortrait) {
+      setLandscapeScale(1)
+      setLandscapeContentSize(null)
+      return
+    }
+    const el = landscapeContentRef.current
+    if (!el) return
+    const updateScale = () => {
+      const sh = el.scrollHeight
+      const sw = el.scrollWidth
+      const vh = window.innerHeight
+      const vw = window.innerWidth
+      setLandscapeContentSize({ width: sw, height: sh })
+      let scale = Math.min(1, vh / sh, vw / sw)
+      if (sh <= vh && sw <= vw) scale = Math.min(scale, 0.85)
+      scale = Math.min(scale, 0.9)
+      setLandscapeScale(scale)
+    }
+    updateScale()
+    const ro = new ResizeObserver(updateScale)
+    ro.observe(el)
+    window.addEventListener('resize', updateScale)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', updateScale)
+    }
+  }, [isPortrait, gameId, gameConfigVersion])
   if (userLoading) {
     return (
       <ThemeProvider game={currentGame}>
@@ -185,10 +220,10 @@ export default function AppShell() {
         {/* Settings Icon */}
         <button
           onClick={() => setShowSettings(true)}
-          className="fixed top-4 left-4 z-40 p-2 min-w-[44px] min-h-[44px] rounded-full bg-black/20 backdrop-blur-sm border border-white/10 hover:bg-black/30 transition-all duration-200 flex items-center justify-center"
+          className={`fixed top-4 left-4 z-40 p-2 rounded-full bg-black/20 backdrop-blur-sm border border-white/10 hover:bg-black/30 transition-all duration-200 flex items-center justify-center ${isPortrait ? 'min-w-[44px] min-h-[44px]' : 'min-w-[36px] min-h-[36px]'}`}
           aria-label="Configuración"
         >
-          <svg className="w-6 h-6 lg:w-7 lg:h-7 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className={`${isPortrait ? 'w-6 h-6 lg:w-7 lg:h-7' : 'w-5 h-5'} text-white/70`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
@@ -243,7 +278,7 @@ export default function AppShell() {
                 </div>
                   <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
                   <div className="flex-1 min-w-[160px]">
-                    <Players gameName={gameName} />
+                    <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} />
                   </div>
                   {currentGame.showRanking && (
                     <div className="flex-1 min-w-[160px]">
@@ -258,43 +293,59 @@ export default function AppShell() {
               </div>
             </div>
             ) : (
-              /* Landscape: 10% margin all sides, no scroll */
-              <div className="py-[10vh] px-[10vw] h-full w-full overflow-hidden flex flex-col">
-                <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                  <currentGame.GameScreen
-                  key={`game-${gameId}-${gameConfigVersion}`}
-                  gameName={gameName}
-                  gameId={gameId}
-                  orientation="landscape"
-                  logoElement={
-                    (customLogo || currentGame.assets?.logo) ? (
-                      <div className="flex flex-col items-center -mt-3">
-                        <img
-                          src={customLogo ?? currentGame.assets!.logo}
-                          alt={customLogo ? 'Logo del cliente' : currentGame.name}
-                          className={GAME_SCREEN_LOGO_CLASS}
-                        />
-                        {customLogo && currentGame && (
-                          <img
-                            src={`/images/${currentGame.id}-letras.png`}
-                            alt=""
-                            className={GAME_SCREEN_LETRAS_CLASS}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none'
-                            }}
-                          />
-                        )}
-                      </div>
-                    ) : null
-                  }
-                  sidebarElement={
-                    <div className="flex flex-col gap-3">
-                      <Players gameName={gameName} compact />
-                      {currentGame.showRanking && <Ranking gameId={gameId} compact />}
-                      <RaffleData gameId={gameId} gameName={gameName} compact />
+              /* Landscape: scale-to-fit so content fits viewport on large horizontal screens (e.g. 32" WebOS) */
+              <div className="h-screen-dvh w-screen overflow-hidden flex justify-center items-center">
+                <div
+                  className="flex-shrink-0"
+                  style={{
+                    ...(landscapeContentSize
+                      ? { width: landscapeContentSize.width, height: landscapeContentSize.height }
+                      : { width: '100%', height: '100%' }),
+                    transform: `scale(${landscapeScale})`,
+                    transformOrigin: 'center center',
+                  }}
+                >
+                  <div
+                    ref={landscapeContentRef}
+                    className="py-[10vh] px-[10vw] h-full w-full overflow-hidden flex flex-col"
+                  >
+                    <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                      <currentGame.GameScreen
+                        key={`game-${gameId}-${gameConfigVersion}`}
+                        gameName={gameName}
+                        gameId={gameId}
+                        orientation="landscape"
+                        logoElement={
+                          (customLogo || currentGame.assets?.logo) ? (
+                            <div className="flex flex-col items-center -mt-3">
+                              <img
+                                src={customLogo ?? currentGame.assets!.logo}
+                                alt={customLogo ? 'Logo del cliente' : currentGame.name}
+                                className={GAME_SCREEN_LOGO_CLASS}
+                              />
+                              {customLogo && currentGame && (
+                                <img
+                                  src={`/images/${currentGame.id}-letras.png`}
+                                  alt=""
+                                  className={GAME_SCREEN_LETRAS_CLASS_LANDSCAPE}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none'
+                                  }}
+                                />
+                              )}
+                            </div>
+                          ) : null
+                        }
+                        sidebarElement={
+                          <div className="flex flex-col gap-3">
+                            <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} />
+                            {currentGame.showRanking && <Ranking gameId={gameId} compact />}
+                            <RaffleData gameId={gameId} gameName={gameName} compact />
+                          </div>
+                        }
+                      />
                     </div>
-                  }
-                />
+                  </div>
                 </div>
               </div>
             )
@@ -320,7 +371,7 @@ export default function AppShell() {
         )}
 
         {/* Logo fijo - always stand logo in bottom right corner */}
-        <div className="fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity z-10 w-14 h-14 lg:w-16 lg:h-16 2xl:w-20 2xl:h-20">
+        <div className={`fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity z-10 ${isPortrait ? 'w-14 h-14 lg:w-16 lg:h-16 2xl:w-20 2xl:h-20' : 'w-10 h-10 lg:w-12 lg:h-12'}`}>
           <img 
             src="/images/stand-logo.png" 
             alt="Stand" 
