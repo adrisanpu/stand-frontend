@@ -232,66 +232,57 @@ export default function AppShell() {
         <div className={gameId && gameName && currentGame ? 'h-screen overflow-hidden' : 'min-h-screen grid place-items-center px-4 sm:px-6 lg:px-6 xl:px-8'}>
           {gameId && gameName && currentGame ? (
             isPortrait ? (
-              /* Portrait: scale-to-fit so content fits viewport on large vertical screens */
-              <div className="h-screen-dvh w-screen overflow-hidden flex justify-center items-start">
+              /* Portrait: fixed height (100dvh) so footer (Sorteo, Validador de Parejas) is always visible without scroll */
+              <div className="h-dvh w-screen overflow-hidden flex flex-col">
                 <div
-                  className="flex-shrink-0"
-                  style={{
-                    ...(portraitContentSize
-                      ? { width: portraitContentSize.width, height: portraitContentSize.height }
-                      : { width: '100%', height: '100%' }),
-                    transform: `scale(${portraitScale})`,
-                    transformOrigin: 'top center',
-                  }}
+                  ref={portraitContentRef}
+                  className="pt-6 pb-3 px-4 sm:px-6 flex-1 min-h-0 flex flex-col gap-3"
                 >
-                  <div
-                    ref={portraitContentRef}
-                    className="pt-[10vh] pb-[5vh] px-[4vw] h-full w-full overflow-hidden flex flex-col gap-4"
-                  >
-                    <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8">
-                  <div className="flex-1 min-h-0" aria-hidden />
-                  <div className="flex flex-col items-center gap-6 flex-shrink-0 w-full">
-                    {(customLogo || currentGame.assets?.logo) && (
-                      <div className="flex flex-col items-center -mt-3">
+                  {/* Header: logo */}
+                  {(customLogo || currentGame.assets?.logo) && (
+                    <div className="flex-shrink-0 flex flex-col items-center -mt-1">
+                      <img
+                        src={customLogo ?? currentGame.assets!.logo}
+                        alt={customLogo ? 'Logo del cliente' : currentGame.name}
+                        className={GAME_SCREEN_LOGO_CLASS}
+                      />
+                      {customLogo && currentGame && (
                         <img
-                          src={customLogo ?? currentGame.assets!.logo}
-                          alt={customLogo ? 'Logo del cliente' : currentGame.name}
-                          className={GAME_SCREEN_LOGO_CLASS}
+                          src={`/images/${currentGame.id}-letras.png`}
+                          alt=""
+                          className={GAME_SCREEN_LETRAS_CLASS}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none'
+                          }}
                         />
-                        {customLogo && currentGame && (
-                          <img
-                            src={`/images/${currentGame.id}-letras.png`}
-                            alt=""
-                            className={GAME_SCREEN_LETRAS_CLASS}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none'
-                            }}
-                          />
-                        )}
-                      </div>
-                    )}
-                    <div className="flex-1 w-full min-h-0 overflow-y-auto flex flex-col max-h-[70vh]">
-                      <currentGame.GameScreen key={`game-${gameId}-${gameConfigVersion}`} gameName={gameName} gameId={gameId} />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-h-0" aria-hidden />
-                </div>
-                  <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
-                  <div className="flex-1 min-w-[160px]">
-                    <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} />
-                  </div>
-                  {currentGame.showRanking && (
-                    <div className="flex-1 min-w-[160px]">
-                      <Ranking gameId={gameId} />
+                      )}
                     </div>
                   )}
-                  <div className="flex-1 min-w-[160px]">
-                    <RaffleData gameId={gameId} gameName={gameName} />
+                  {/* Main: GameScreen fills remaining space, no internal scroll */}
+                  <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8">
+                    <currentGame.GameScreen
+                      key={`game-${gameId}-${gameConfigVersion}`}
+                      gameName={gameName}
+                      gameId={gameId}
+                      orientation="portrait"
+                    />
+                  </div>
+                  {/* Footer: Sorteo + Validador de Parejas (Players) always visible */}
+                  <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
+                    <div className="flex-1 min-w-[160px]">
+                      <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} />
+                    </div>
+                    {currentGame.showRanking && (
+                      <div className="flex-1 min-w-[160px]">
+                        <Ranking gameId={gameId} />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-[160px]">
+                      <RaffleData gameId={gameId} gameName={gameName} />
+                    </div>
                   </div>
                 </div>
-                </div>
               </div>
-            </div>
             ) : (
               /* Landscape: scale-to-fit so content fits viewport on large horizontal screens (e.g. 32" WebOS) */
               <div className="h-screen-dvh w-screen overflow-hidden flex justify-center items-center">
