@@ -29,8 +29,6 @@ export default function AppShell() {
   const [customLogo, setCustomLogo] = useState<string | null>(null)
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
   const portraitContentRef = useRef<HTMLDivElement>(null)
-  const [portraitScale, setPortraitScale] = useState(1)
-  const [portraitContentSize, setPortraitContentSize] = useState<{ width: number; height: number } | null>(null)
   const landscapeContentRef = useRef<HTMLDivElement>(null)
   const [landscapeScale, setLandscapeScale] = useState(1)
   const [landscapeContentSize, setLandscapeContentSize] = useState<{ width: number; height: number } | null>(null)
@@ -140,38 +138,6 @@ export default function AppShell() {
   // Use game definition if available, otherwise use a default theme (no specific game)
   const currentGame = gameDefinition
   const isPortrait = useOrientation()
-
-  // Scale-to-fit in portrait: measure content and scale down when it overflows the viewport
-  useEffect(() => {
-    if (!isPortrait) {
-      setPortraitScale(1)
-      setPortraitContentSize(null)
-      return
-    }
-    const el = portraitContentRef.current
-    if (!el) return
-    const updateScale = () => {
-      const sh = el.scrollHeight
-      const sw = el.scrollWidth
-      const vh = window.innerHeight
-      const vw = window.innerWidth
-      setPortraitContentSize({ width: sw, height: sh })
-      let scale = Math.min(1, vh / sh, vw / sw)
-      // Fallback when measurement doesn't show overflow (e.g. WebOS)
-      if (sh <= vh && sw <= vw) scale = Math.min(scale, 0.85)
-      // Cap so portrait is always a bit smaller
-      scale = Math.min(scale, 0.9)
-      setPortraitScale(scale)
-    }
-    updateScale()
-    const ro = new ResizeObserver(updateScale)
-    ro.observe(el)
-    window.addEventListener('resize', updateScale)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', updateScale)
-    }
-  }, [isPortrait, gameId, gameConfigVersion])
 
   // Scale-to-fit in landscape: measure content and scale down when it overflows (e.g. 32" WebOS)
   useEffect(() => {
