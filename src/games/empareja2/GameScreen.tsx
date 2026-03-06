@@ -147,10 +147,10 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
           )}
           {gameState === 'validating' && <div className="text-center py-10"><div className="flex items-center justify-center gap-4"><svg className="w-8 h-8 animate-spin text-neonMagenta" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><p className="text-2xl font-semibold text-neonMagenta">Validando códigos...</p></div></div>}
           {gameState === 'valid' && validationResult?.valid && validationResult.players && validationResult.players.length === 2 && (
-            <div className="animate-fade-in grid grid-cols-3 gap-4 items-center">
-              <div className="flex flex-col items-center space-y-3 animate-scale-in">{(() => { const player = validationResult.players[0]; const imgUrl = player.characterImageUrl || null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || 'Jugador 1'} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">Imagen jugador 1</div>}</div>{player.instagramUsername && <div className="text-center"><p className="text-base font-semibold text-neonMagenta">{player.instagramUsername}</p></div>}</>); })()}</div>
+            <div className="animate-fade-in grid grid-cols-[1.5fr_1fr_1.5fr] gap-4 items-center">
+              <div className="flex flex-col items-center space-y-3 animate-scale-in min-w-0">{(() => { const player = validationResult.players[0]; const imgUrl = player.characterImageUrl || null; return (<><div className="aspect-square w-full max-w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || 'Jugador 1'} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">Imagen jugador 1</div>}</div>{player.instagramUsername && <div className="text-center"><p className="text-base font-semibold text-neonMagenta">{player.instagramUsername}</p></div>}</>); })()}</div>
               <div className="flex flex-col items-center justify-center space-y-4 text-center"><span className="text-2xl font-semibold text-green-400">¡Pareja Válida!</span><BackButton onClick={handleReset} aria-label="Validar otra pareja" /></div>
-              <div className="flex flex-col items-center space-y-3 animate-scale-in" style={{ animationDelay: '0.2s' }}>{(() => { const player = validationResult.players[1]; const imgUrl = player.characterImageUrl || null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || 'Jugador 2'} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">Imagen jugador 2</div>}</div>{player.instagramUsername && <div className="text-center"><p className="text-base font-semibold text-neonMagenta">{player.instagramUsername}</p></div>}</>); })()}</div>
+              <div className="flex flex-col items-center space-y-3 animate-scale-in min-w-0" style={{ animationDelay: '0.2s' }}>{(() => { const player = validationResult.players[1]; const imgUrl = player.characterImageUrl || null; return (<><div className="aspect-square w-full max-w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || 'Jugador 2'} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">Imagen jugador 2</div>}</div>{player.instagramUsername && <div className="text-center"><p className="text-base font-semibold text-neonMagenta">{player.instagramUsername}</p></div>}</>); })()}</div>
             </div>
           )}
           {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in"><div className="flex items-center justify-center gap-3 mb-2"><svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg><span className="text-xl font-semibold text-red-400">Pareja Inválida</span></div>{(validationResult.message || error) && <p className="text-base text-red-300">{validationResult.message || error}</p>}</div>}
@@ -169,18 +169,18 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
   }
 
   return (
-    <div className="w-full h-full min-h-0 flex flex-col gap-3 overflow-hidden">
-      <div className={`flex flex-col gap-3 overflow-hidden min-h-0 ${showJoinBlock ? 'flex-1' : 'flex-1 flex'}`}>
+    <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
+      <div className={`flex flex-col overflow-hidden min-h-0 ${showJoinBlock ? 'flex-1' : 'flex-1 flex'} ${orientation === 'portrait' ? 'justify-center gap-8' : 'gap-3'}`}>
       {/* Game Code - Always visible */}
       <div className="text-center flex-shrink-0">
-        <div className="p-3 sm:p-4 rounded-xl bg-[rgba(176,38,255,0.12)]">
+        <div className={`rounded-xl bg-[rgba(176,38,255,0.12)] ${orientation === 'portrait' ? 'p-4 sm:p-5' : 'p-3 sm:p-4'}`}>
           <p className="text-sm text-gray-300 mb-1">Código de partida {gameName}:</p>
           <p className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-wider text-neonMagenta">{gameId}</p>
         </div>
       </div>
 
-      {/* QR Code and Instructions - flex-1 so Validador stays visible */}
-      <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* QR Code and Instructions - only as tall as content so no big gap before Validator */}
+      <div className={`flex-shrink-0 overflow-hidden grid grid-cols-1 md:grid-cols-2 ${orientation === 'portrait' ? 'gap-5' : 'gap-4'}`}>
           <div className="flex justify-center items-start min-w-0">
             <QRCode
               data={INSTAGRAM_DM_URL}
@@ -191,9 +191,9 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
             />
           </div>
 
-          <div className="space-y-2 min-h-0 overflow-hidden flex flex-col">
-            <h3 className="text-base font-semibold text-textMain mb-1 flex-shrink-0">Instrucciones</h3>
-              <ol className="space-y-2 text-sm text-gray-300 flex-1 min-h-0">
+          <div className="space-y-2 min-w-0">
+            <h3 className="text-base font-semibold text-textMain mb-1">Instrucciones</h3>
+              <ol className="space-y-2 text-sm text-gray-300">
                 <li className="flex gap-2">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">1</span>
                   <span className="pt-0.5">📥 QR y envía el código de partida por Instagram DM para unirte.</span>
@@ -216,7 +216,7 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
 
       {/* Validator - Only show when idle or invalid */}
       {(gameState === 'idle' || gameState === 'invalid') && (
-        <div className="space-y-3 flex-shrink-0">
+        <div className={`flex-shrink-0 ${orientation === 'portrait' ? 'space-y-4' : 'space-y-3'}`}>
           <h3 className="text-lg font-semibold text-textMain">Validador de Parejas</h3>
           
           {error && gameState === 'invalid' && showInvalidMessage && (
@@ -292,7 +292,7 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
       {gameState === 'valid' && validationResult?.valid && validationResult.players && validationResult.players.length === 2 && (
         <div className={`animate-fade-in flex-1 flex flex-col min-h-0 justify-center overflow-hidden`}>
           {/* Player 1 | Success Message | Player 2 - All in one row */}
-          <div className="grid grid-cols-3 gap-3 sm:gap-4 items-center min-h-0">
+          <div className={`grid items-center min-h-0 ${orientation === 'portrait' ? 'grid-cols-[1.5fr_1fr_1.5fr] gap-4' : 'grid-cols-[1.5fr_1fr_1.5fr] gap-3 sm:gap-4'}`}>
             {/* Player 1 */}
             <div className="flex flex-col items-center space-y-2 animate-scale-in min-w-0">
               {(() => {
@@ -300,7 +300,7 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
                 const imgUrl = player.characterImageUrl || null
                 return (
                   <>
-                    <div className={`aspect-square w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg ${orientation === 'portrait' ? 'max-w-[120px]' : showJoinBlock ? 'max-w-[180px]' : 'max-w-[min(320px,90vw)]'}`}>
+                    <div className={`aspect-square w-full max-w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg ${orientation === 'portrait' ? 'min-w-0' : ''}`}>
                       {imgUrl ? (
                         <img
                           src={imgUrl}
@@ -336,7 +336,7 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
                 const imgUrl = player.characterImageUrl || null
                 return (
                   <>
-                    <div className={`aspect-square w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg ${orientation === 'portrait' ? 'max-w-[120px]' : showJoinBlock ? 'max-w-[180px]' : 'max-w-[min(320px,90vw)]'}`}>
+                    <div className={`aspect-square w-full max-w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg ${orientation === 'portrait' ? 'min-w-0' : ''}`}>
                       {imgUrl ? (
                         <img
                           src={imgUrl}
