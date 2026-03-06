@@ -5,7 +5,6 @@ import { api } from '../../api/api'
 export type Empareja2Settings = {
   maxValidations?: number
   numPairs?: number
-  estimatedPlayers?: number
 }
 
 interface GameDataResponse {
@@ -26,11 +25,6 @@ export default function Empareja2GameConfig({ gameId, gameName, settings, onChan
       ? String((settings as Empareja2Settings).numPairs)
       : ''
   )
-  const [estimatedPlayersInput, setEstimatedPlayersInput] = useState<string>(
-    (settings as Empareja2Settings | null)?.estimatedPlayers != null
-      ? String((settings as Empareja2Settings).estimatedPlayers)
-      : ''
-  )
   const [catalogPairCount, setCatalogPairCount] = useState<number | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -39,7 +33,6 @@ export default function Empareja2GameConfig({ gameId, gameName, settings, onChan
       const s = settings as Empareja2Settings
       setMaxValidationsInput(s.maxValidations != null ? String(s.maxValidations) : '')
       setNumPairsInput(s.numPairs != null ? String(s.numPairs) : '')
-      setEstimatedPlayersInput(s.estimatedPlayers != null ? String(s.estimatedPlayers) : '')
     }
   }, [settings])
 
@@ -67,17 +60,14 @@ export default function Empareja2GameConfig({ gameId, gameName, settings, onChan
   const handleSave = async () => {
     const trimmedMax = maxValidationsInput.trim()
     const trimmedNum = numPairsInput.trim()
-    const trimmedEst = estimatedPlayersInput.trim()
+    const maxPairs = catalogPairCount ?? 50
     const maxValidations = trimmedMax === '' ? undefined : Math.max(0, Math.floor(Number(trimmedMax)) || 0)
-    const numPairs = trimmedNum === '' ? undefined : Math.max(1, Math.floor(Number(trimmedNum)) || 1)
-    const estimatedPlayers = trimmedEst === '' ? undefined : Math.max(0, Math.floor(Number(trimmedEst)) || 0)
-    const maxPairs = catalogPairCount ?? 99
-    const numPairsClamped = numPairs == null ? undefined : Math.min(numPairs, maxPairs)
+    const numPairs = trimmedNum === '' ? maxPairs : Math.max(1, Math.floor(Number(trimmedNum)) || 1)
+    const numPairsClamped = Math.min(numPairs, maxPairs)
 
     const newSettings: Empareja2Settings = {
       maxValidations,
       numPairs: numPairsClamped,
-      estimatedPlayers: estimatedPlayers || undefined,
     }
     onChange(newSettings)
     setSaveError(null)
@@ -99,16 +89,19 @@ export default function Empareja2GameConfig({ gameId, gameName, settings, onChan
     }
   }
 
-  const estimatedNum = estimatedPlayersInput.trim() === '' ? null : Math.floor(Number(estimatedPlayersInput)) || 0
-  const approxPremios = estimatedNum != null && estimatedNum >= 0 ? Math.floor(estimatedNum / 2) : null
-  const maxPairs = catalogPairCount ?? 99
+  const maxPairs = catalogPairCount ?? 1
+  const numPairsValue =
+    numPairsInput.trim() === ''
+      ? maxPairs
+      : Math.min(maxPairs, Math.max(1, Math.floor(Number(numPairsInput)) || 1))
+  const sliderDisabled = catalogPairCount == null
 
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold mb-2">Configurar {gameName}</h3>
         <p className="text-sm text-gray-400">
-          Máximo de validaciones (premios), dificultad para encontrar pareja y estimación de premios.
+          Máximo de validaciones (premios) y dificultad para encontrar pareja.
         </p>
       </div>
 
@@ -135,48 +128,32 @@ export default function Empareja2GameConfig({ gameId, gameName, settings, onChan
           <label className="block text-sm font-medium text-gray-300 mb-2">
             Dificultad para encontrar a tu pareja
           </label>
-          <input
-            type="number"
-            min={1}
-            max={maxPairs}
-            step={1}
-            value={numPairsInput}
-            onChange={(e) => setNumPairsInput(e.target.value)}
-            placeholder="Todas"
-            className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            Número de parejas de personajes a usar (de {catalogPairCount ?? '—'} en sistema). Menos parejas = más
-            fácil (la misma pareja se asigna a más jugadores). Más parejas = más difícil.
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Estimación de jugadores
-          </label>
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={estimatedPlayersInput}
-            onChange={(e) => setEstimatedPlayersInput(e.target.value)}
-            placeholder="Opcional"
-            className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
-          />
-          {approxPremios != null && (
-            <p className="text-sm text-gray-300 mt-2">
-              Aproximadamente necesitarás <strong>{approxPremios}</strong> premios (parejas que validarán).
-              {' '}
-              <button
-                type="button"
-                onClick={() => setMaxValidationsInput(String(approxPremios))}
-                className="underline hover:no-underline text-neonMagenta focus:outline-none"
-              >
-                Usar como máximo de validaciones
-              </button>
-            </p>
+          {sliderDisabled ? (
+            <p className="text-sm text-gray-500 py-2">Cargando número de parejas del catálogo...</p>
+          ) : (
+            <>
+              <div className="flex justify-between text-xs text-gray-400 mb-1">
+                <span>1 pareja (+fácil)</span>
+                <span>{maxPairs} parejas (+difícil)</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={maxPairs}
+                value={numPairsValue}
+                onChange={(e) => setNumPairsInput(e.target.value)}
+                disabled={sliderDisabled}
+                className="empareja2-difficulty-slider w-full h-3 rounded-full appearance-none bg-[rgba(255,255,255,0.1)] border border-white/10 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Número de parejas (dificultad)"
+              />
+              <p className="text-sm text-gray-300 mt-2">
+                <strong>{numPairsValue}</strong> pareja{numPairsValue !== 1 ? 's' : ''} seleccionada{numPairsValue !== 1 ? 's' : ''}.
+              </p>
+            </>
           )}
+          <p className="text-xs text-gray-400 mt-1">
+            Menos parejas = más fácil (la misma pareja se asigna a más jugadores). Más parejas = más difícil.
+          </p>
         </div>
       </div>
 
