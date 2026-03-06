@@ -9,6 +9,13 @@ html {
   font-size: clamp(14px, 1.4vw + 12px, 30px);
 }
 
+/* Portrait: smaller base font so content (logo, instructions, validation) fits on vertical screens (e.g. WebOS, 32"). */
+@media (orientation: portrait) {
+  html {
+    font-size: clamp(12px, 1.1vw + 10px, 20px);
+  }
+}
+
 html,body,#root { height: 100%; background: #0B0A12; }
 
 /* Viewport height for portrait scale-to-fit (avoids address bar issues) */
