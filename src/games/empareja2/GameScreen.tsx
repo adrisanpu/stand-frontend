@@ -115,19 +115,19 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
             <ol className="flex flex-col gap-2 space-y-2 text-sm text-gray-300">
               <li className="flex gap-2 items-start">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">1</span>
-                <span>Escanea el QR para obtener tu código de jugador.</span>
+                <span>📥 QR y envía el código de partida por Instagram DM para unirte.</span>
               </li>
               <li className="flex gap-2 items-start">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">2</span>
-                <span>Envía el código de partida en ese chat para recibir tu pareja asignada.</span>
+                <span>🎟️ Recibe tu pareja asignada y tu código de validación.</span>
               </li>
               <li className="flex gap-2 items-start">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">3</span>
-                <span>Encuentra a tu pareja físicamente.</span>
+                <span>👥 Encuentra a tu pareja físicamente.</span>
               </li>
               <li className="flex gap-2 items-start">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">4</span>
-                <span>Cuando os encontréis, validad juntos vuestros códigos.</span>
+                <span>🏆 Cuando os encontréis, validad juntos vuestros códigos.</span>
               </li>
             </ol>
           </div>
@@ -169,45 +169,45 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
   }
 
   return (
-    <div className="w-full flex flex-col gap-6">
-      <div className={showJoinBlock ? 'flex flex-col gap-6' : 'flex flex-col flex-1 min-h-0 gap-6'}>
+    <div className="w-full h-full min-h-0 flex flex-col gap-3 overflow-hidden">
+      <div className={`flex flex-col gap-3 overflow-hidden min-h-0 ${showJoinBlock ? 'flex-1' : 'flex-1 flex'}`}>
       {/* Game Code - Always visible */}
       <div className="text-center flex-shrink-0">
-        <div className="p-5 rounded-xl bg-[rgba(176,38,255,0.12)]">
-          <p className="text-base text-gray-300 mb-2">Código de partida {gameName}:</p>
-          <p className="text-4xl lg:text-5xl font-bold tracking-wider text-neonMagenta">{gameId}</p>
+        <div className="p-3 sm:p-4 rounded-xl bg-[rgba(176,38,255,0.12)]">
+          <p className="text-sm text-gray-300 mb-1">Código de partida {gameName}:</p>
+          <p className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-wider text-neonMagenta">{gameId}</p>
         </div>
       </div>
 
-      {/* QR Code and Instructions - Always visible (portrait) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="flex justify-center items-start">
+      {/* QR Code and Instructions - flex-1 so Validador stays visible */}
+      <div className="flex-1 min-h-0 overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex justify-center items-start min-w-0">
             <QRCode
               data={INSTAGRAM_DM_URL}
-              size={380}
-              margin={12}
+              size={orientation === 'portrait' ? 260 : 380}
+              margin={orientation === 'portrait' ? 8 : 12}
               alt="QR Code para Instagram DM"
               className="!border-0 !bg-transparent"
             />
           </div>
 
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
-              <ol className="space-y-4 text-base text-gray-300">
-                <li className="flex gap-4">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-sm">1</span>
+          <div className="space-y-2 min-h-0 overflow-hidden flex flex-col">
+            <h3 className="text-base font-semibold text-textMain mb-1 flex-shrink-0">Instrucciones</h3>
+              <ol className="space-y-2 text-sm text-gray-300 flex-1 min-h-0">
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">1</span>
                   <span className="pt-0.5">📥 QR y envía el código de partida por Instagram DM para unirte.</span>
                 </li>
-                <li className="flex gap-4">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-sm">2</span>
-                  <span className="pt-0.5">🎟️ Recibe tu pareja asignada y tu código de validación. </span>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">2</span>
+                  <span className="pt-0.5">🎟️ Recibe tu pareja asignada y tu código de validación.</span>
                 </li>
-                <li className="flex gap-4">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-sm">3</span>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">3</span>
                   <span className="pt-0.5">👥 Encuentra a tu pareja físicamente.</span>
                 </li>
-                <li className="flex gap-4">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-sm">4</span>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">4</span>
                   <span className="pt-0.5">🏆 Cuando os encontréis, validad juntos vuestros códigos.</span>
                 </li>
               </ol>
@@ -216,19 +216,19 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
 
       {/* Validator - Only show when idle or invalid */}
       {(gameState === 'idle' || gameState === 'invalid') && (
-        <div className="space-y-4">
-          <h3 className="text-xl font-semibold text-textMain">Validador de Parejas</h3>
+        <div className="space-y-3 flex-shrink-0">
+          <h3 className="text-lg font-semibold text-textMain">Validador de Parejas</h3>
           
           {error && gameState === 'invalid' && showInvalidMessage && (
-            <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">
+            <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
               {error}
             </div>
           )}
 
           {/* Code Input Fields - Side by side */}
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="code1" className="block text-base font-medium text-gray-300 mb-2">
+              <label htmlFor="code1" className="block text-sm font-medium text-gray-300 mb-1">
                 Código del Jugador 1
               </label>
               <input
@@ -239,12 +239,12 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
                 max={9999}
                 value={code1}
                 onChange={(e) => handleCodeChange(e.target.value, setCode1)}
-                className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
+                className="w-full h-12 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
             </div>
 
             <div>
-              <label htmlFor="code2" className="block text-base font-medium text-gray-300 mb-2">
+              <label htmlFor="code2" className="block text-sm font-medium text-gray-300 mb-1">
                 Código del Jugador 2
               </label>
               <input
@@ -255,7 +255,7 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
                 max={9999}
                 value={code2}
                 onChange={(e) => handleCodeChange(e.target.value, setCode2)}
-                className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
+                className="w-full h-12 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
             </div>
           </div>
@@ -264,7 +264,7 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
           <button
             onClick={validateCodes}
             disabled={code1.length !== 4 || code2.length !== 4}
-            className="w-full p-5 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
+            className="w-full p-4 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
           >
             <div className="flex items-center justify-center gap-3">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -278,29 +278,29 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
 
       {/* Validating State */}
       {gameState === 'validating' && (
-        <div className="text-center py-10">
+        <div className="text-center py-6 flex-shrink-0">
           <div className="flex items-center justify-center gap-4">
             <svg className="w-8 h-8 animate-spin text-neonMagenta" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <p className="text-2xl font-semibold text-neonMagenta">Validando códigos...</p>
+            <p className="text-xl font-semibold text-neonMagenta">Validando códigos...</p>
           </div>
         </div>
       )}
 
       {/* Winning Animation - Show when validated successfully */}
       {gameState === 'valid' && validationResult?.valid && validationResult.players && validationResult.players.length === 2 && (
-        <div className={`animate-fade-in ${!showJoinBlock ? 'flex-1 flex flex-col min-h-0 justify-center' : ''}`}>
+        <div className={`animate-fade-in flex-1 flex flex-col min-h-0 justify-center overflow-hidden`}>
           {/* Player 1 | Success Message | Player 2 - All in one row */}
-          <div className={`grid grid-cols-3 gap-4 items-center ${!showJoinBlock ? 'gap-6' : ''}`}>
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 items-center min-h-0">
             {/* Player 1 */}
-            <div className="flex flex-col items-center space-y-3 animate-scale-in">
+            <div className="flex flex-col items-center space-y-2 animate-scale-in min-w-0">
               {(() => {
                 const player = validationResult.players[0]
                 const imgUrl = player.characterImageUrl || null
                 return (
                   <>
-                    <div className={`aspect-square w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg ${showJoinBlock ? 'max-w-[180px]' : 'max-w-[min(320px,90vw)]'}`}>
+                    <div className={`aspect-square w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg ${orientation === 'portrait' ? 'max-w-[120px]' : showJoinBlock ? 'max-w-[180px]' : 'max-w-[min(320px,90vw)]'}`}>
                       {imgUrl ? (
                         <img
                           src={imgUrl}
@@ -313,7 +313,7 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
                     </div>
                     {player.instagramUsername && (
                       <div className="text-center">
-                        <p className={showJoinBlock ? 'text-base font-semibold text-neonMagenta' : 'text-xl font-semibold text-neonMagenta'}>{player.instagramUsername}</p>
+                        <p className={orientation === 'portrait' ? 'text-sm font-semibold text-neonMagenta' : showJoinBlock ? 'text-base font-semibold text-neonMagenta' : 'text-xl font-semibold text-neonMagenta'}>{player.instagramUsername}</p>
                       </div>
                     )}
                   </>
@@ -322,21 +322,21 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
             </div>
 
             {/* Success Message - Middle: only "¡Pareja Válida!" and back button below */}
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
-              <span className={showJoinBlock ? 'text-2xl font-semibold text-green-400' : 'text-3xl font-semibold text-green-400'}>¡Pareja Válida!</span>
+            <div className="flex flex-col items-center justify-center space-y-3 text-center">
+              <span className={orientation === 'portrait' ? 'text-xl font-semibold text-green-400' : showJoinBlock ? 'text-2xl font-semibold text-green-400' : 'text-3xl font-semibold text-green-400'}>¡Pareja Válida!</span>
               {!showJoinBlock && (
                 <BackButton onClick={handleReset} aria-label="Validar otra pareja" />
               )}
             </div>
 
             {/* Player 2 */}
-            <div className="flex flex-col items-center space-y-3 animate-scale-in" style={{ animationDelay: '0.2s' }}>
+            <div className="flex flex-col items-center space-y-2 animate-scale-in min-w-0" style={{ animationDelay: '0.2s' }}>
               {(() => {
                 const player = validationResult.players[1]
                 const imgUrl = player.characterImageUrl || null
                 return (
                   <>
-                    <div className={`aspect-square w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg ${showJoinBlock ? 'max-w-[180px]' : 'max-w-[min(320px,90vw)]'}`}>
+                    <div className={`aspect-square w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg ${orientation === 'portrait' ? 'max-w-[120px]' : showJoinBlock ? 'max-w-[180px]' : 'max-w-[min(320px,90vw)]'}`}>
                       {imgUrl ? (
                         <img
                           src={imgUrl}
@@ -349,7 +349,7 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
                     </div>
                     {player.instagramUsername && (
                       <div className="text-center">
-                        <p className={showJoinBlock ? 'text-base font-semibold text-neonMagenta' : 'text-xl font-semibold text-neonMagenta'}>{player.instagramUsername}</p>
+                        <p className={orientation === 'portrait' ? 'text-sm font-semibold text-neonMagenta' : showJoinBlock ? 'text-base font-semibold text-neonMagenta' : 'text-xl font-semibold text-neonMagenta'}>{player.instagramUsername}</p>
                       </div>
                     )}
                   </>
@@ -362,15 +362,15 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
 
       {/* Invalid Result - Show error message only for 3 seconds */}
       {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && (
-        <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in">
+        <div className="p-4 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in flex-shrink-0">
           <div className="flex items-center justify-center gap-3 mb-2">
-            <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-            <span className="text-xl font-semibold text-red-400">Pareja Inválida</span>
+            <span className="text-lg font-semibold text-red-400">Pareja Inválida</span>
           </div>
           {(validationResult.message || error) && (
-            <p className="text-base text-red-300">{validationResult.message || error}</p>
+            <p className="text-sm text-red-300">{validationResult.message || error}</p>
           )}
         </div>
       )}

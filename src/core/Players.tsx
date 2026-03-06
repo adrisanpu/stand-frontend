@@ -101,7 +101,7 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
           </div>
           {maxValidations !== undefined && (
             <div>
-              <div className={`text-textSub ${compact ? 'text-xs mb-0.5' : 'text-sm mb-1'}`}>Validados / Límite</div>
+              <div className={`text-textSub ${compact ? 'text-xs mb-0.5' : 'text-sm mb-1'}`}>Validadas / Límite</div>
               <div className={`flex items-center gap-2 ${compact ? 'text-base' : ''}`}>
                 <span className={`font-bold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-xl sm:text-2xl'}`}>
                   {validatedCount}
@@ -113,7 +113,7 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
           )}
           {maxValidations === undefined && (
             <div>
-              <div className={`text-textSub ${compact ? 'text-xs mb-0.5' : 'text-sm mb-1'}`}>Validados</div>
+              <div className={`text-textSub ${compact ? 'text-xs mb-0.5' : 'text-sm mb-1'}`}>Validadas</div>
               <div className={`font-bold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-xl sm:text-2xl'}`}>
                 {validatedCount}
               </div>
