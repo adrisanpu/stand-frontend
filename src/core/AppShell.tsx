@@ -30,6 +30,7 @@ export default function AppShell() {
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
   const portraitContentRef = useRef<HTMLDivElement>(null)
   const landscapeContentRef = useRef<HTMLDivElement>(null)
+  const [portraitPaddingDvh, setPortraitPaddingDvh] = useState(10)
   const [landscapeScale, setLandscapeScale] = useState(1)
   const [landscapeContentSize, setLandscapeContentSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -139,6 +140,34 @@ export default function AppShell() {
   const currentGame = gameDefinition
   const isPortrait = useOrientation()
 
+  // Portrait: reduce top/bottom padding when content overflows (e.g. Sorteo with countdown) so nothing is hidden
+  useEffect(() => {
+    if (!isPortrait) {
+      setPortraitPaddingDvh(10)
+      return
+    }
+    const el = portraitContentRef.current
+    if (!el) return
+    const HYSTERESIS_PX = 40
+    const checkOverflow = () => {
+      const sh = el.scrollHeight
+      const vh = window.innerHeight
+      setPortraitPaddingDvh((prev) => {
+        if (sh > vh) return 5
+        if (sh <= vh - HYSTERESIS_PX) return 10
+        return prev
+      })
+    }
+    checkOverflow()
+    const ro = new ResizeObserver(checkOverflow)
+    ro.observe(el)
+    window.addEventListener('resize', checkOverflow)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', checkOverflow)
+    }
+  }, [isPortrait, gameId, gameConfigVersion])
+
   // Scale-to-fit in landscape: measure content and scale down when it overflows (e.g. 32" WebOS)
   useEffect(() => {
     if (isPortrait) {
@@ -202,7 +231,11 @@ export default function AppShell() {
               <div className="h-dvh w-screen overflow-hidden flex flex-col">
                 <div
                   ref={portraitContentRef}
-                  className="pt-[10dvh] pb-[10dvh] px-4 sm:px-6 flex-1 min-h-0 flex flex-col gap-4"
+                  className={`px-4 sm:px-6 flex-1 min-h-0 flex flex-col overflow-hidden ${portraitPaddingDvh === 5 ? 'gap-2' : 'gap-4'}`}
+                  style={{
+                    paddingTop: `${portraitPaddingDvh}dvh`,
+                    paddingBottom: `${portraitPaddingDvh}dvh`,
+                  }}
                 >
                   {/* Header: logo */}
                   {(customLogo || currentGame.assets?.logo) && (
