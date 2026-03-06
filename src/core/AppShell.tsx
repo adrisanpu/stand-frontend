@@ -30,6 +30,7 @@ export default function AppShell() {
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
   const portraitContentRef = useRef<HTMLDivElement>(null)
   const landscapeContentRef = useRef<HTMLDivElement>(null)
+  const [portraitPaddingDvh, setPortraitPaddingDvh] = useState(10)
   const [landscapeScale, setLandscapeScale] = useState(1)
   const [landscapeContentSize, setLandscapeContentSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -139,7 +140,35 @@ export default function AppShell() {
   const currentGame = gameDefinition
   const isPortrait = useOrientation()
 
-  // Scale-to-fit in landscape: measure content and scale down when it overflows (e.g. 32" WebOS)
+  // Portrait: reduce top/bottom padding when content overflows (e.g. Sorteo with countdown) so nothing is hidden
+  useEffect(() => {
+    if (!isPortrait) {
+      setPortraitPaddingDvh(10)
+      return
+    }
+    const el = portraitContentRef.current
+    if (!el) return
+    const HYSTERESIS_PX = 40
+    const checkOverflow = () => {
+      const sh = el.scrollHeight
+      const vh = window.innerHeight
+      setPortraitPaddingDvh((prev) => {
+        if (sh > vh) return 5
+        if (sh <= vh - HYSTERESIS_PX) return 10
+        return prev
+      })
+    }
+    checkOverflow()
+    const ro = new ResizeObserver(checkOverflow)
+    ro.observe(el)
+    window.addEventListener('resize', checkOverflow)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', checkOverflow)
+    }
+  }, [isPortrait, gameId, gameConfigVersion])
+
+  // Scale-to-fit in landscape: content fits in the central 80% (10% air each side and top/bottom)
   useEffect(() => {
     if (isPortrait) {
       setLandscapeScale(1)
@@ -153,9 +182,11 @@ export default function AppShell() {
       const sw = el.scrollWidth
       const vh = window.innerHeight
       const vw = window.innerWidth
+      const availableW = vw * 0.8
+      const availableH = vh * 0.8
       setLandscapeContentSize({ width: sw, height: sh })
-      let scale = Math.min(1, vh / sh, vw / sw)
-      if (sh <= vh && sw <= vw) scale = Math.min(scale, 0.85)
+      let scale = Math.min(1, availableH / sh, availableW / sw)
+      if (sh <= availableH && sw <= availableW) scale = Math.min(scale, 0.85)
       scale = Math.min(scale, 0.9)
       setLandscapeScale(scale)
     }
@@ -202,7 +233,11 @@ export default function AppShell() {
               <div className="h-dvh w-screen overflow-hidden flex flex-col">
                 <div
                   ref={portraitContentRef}
-                  className="pt-[10dvh] pb-[10dvh] px-4 sm:px-6 flex-1 min-h-0 flex flex-col gap-4"
+                  className={`px-4 sm:px-6 flex-1 min-h-0 flex flex-col overflow-hidden ${portraitPaddingDvh === 5 ? 'gap-2' : 'gap-4'}`}
+                  style={{
+                    paddingTop: `${portraitPaddingDvh}dvh`,
+                    paddingBottom: `${portraitPaddingDvh}dvh`,
+                  }}
                 >
                   {/* Header: logo */}
                   {(customLogo || currentGame.assets?.logo) && (
@@ -250,10 +285,10 @@ export default function AppShell() {
                 </div>
               </div>
             ) : (
-              /* Landscape: scale-to-fit so content fits viewport on large horizontal screens (e.g. 32" WebOS) */
-              <div className="h-screen-dvh w-screen overflow-hidden flex justify-center items-center">
+              /* Landscape: 10% air on sides (and top/bottom); scale content to fit the remaining 80% */
+              <div className="h-dvh w-screen overflow-hidden flex justify-center items-center p-[10dvh_10dvw]">
                 <div
-                  className="flex-shrink-0"
+                  className="flex-shrink-0 max-w-full max-h-full"
                   style={{
                     ...(landscapeContentSize
                       ? { width: landscapeContentSize.width, height: landscapeContentSize.height }
@@ -264,7 +299,7 @@ export default function AppShell() {
                 >
                   <div
                     ref={landscapeContentRef}
-                    className="py-[10vh] px-[10vw] h-full w-full overflow-hidden flex flex-col"
+                    className="h-full w-full overflow-hidden flex flex-col"
                   >
                     <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                       <currentGame.GameScreen
