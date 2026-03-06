@@ -11,6 +11,9 @@ html {
 
 html,body,#root { height: 100%; background: #0B0A12; }
 
+/* Viewport height for portrait scale-to-fit (avoids address bar issues) */
+.h-screen-dvh { height: 100dvh; }
+
 /* Light mode support */
 html.light-mode {
   color-scheme: light;
@@ -136,6 +139,17 @@ html.light-mode textarea:focus {
   outline: none !important;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important; /* subtle focus ring */
 }
+
+/* Hide number input spinners (validation code inputs - numeric keyboard on webOS/mobile) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 @keyframes glowPulse { 0%,100%{opacity:.55} 50%{opacity:1} }
 @keyframes shake { 10%,90%{transform:translateX(-1px)} 20%,80%{transform:translateX(2px)} 30%,50%,70%{transform:translateX(-4px)} 40%,60%{transform:translateX(4px)} }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

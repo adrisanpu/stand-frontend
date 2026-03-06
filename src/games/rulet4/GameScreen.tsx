@@ -70,7 +70,7 @@ export default function Rulet4GameScreen({ gameName, gameId, orientation, logoEl
     try {
       const data = await api.post<{ valid: boolean; playerId?: string; username?: string; message?: string; error?: string }>('/v1/game/validate', {
         gameId: gameId,
-        codes: [playerCode.toUpperCase()]
+        codes: [String(playerCode).trim()]
       })
       
       if (data.valid && data.playerId) {
@@ -246,11 +246,14 @@ export default function Rulet4GameScreen({ gameName, gameId, orientation, logoEl
                   <div className="flex gap-3">
                     <input
                       id="player-code-landscape"
-                      type="text"
+                      type="number"
+                      inputMode="numeric"
+                      min={1000}
+                      max={9999}
                       value={playerCode}
-                      onChange={(e) => setPlayerCode(e.target.value.toUpperCase())}
+                      onChange={(e) => setPlayerCode(String(e.target.value))}
                       placeholder="Ingresa tu código"
-                      className="flex-1 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20 uppercase"
+                      className="flex-1 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
                       onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }}
                     />
                     <button
@@ -414,11 +417,14 @@ export default function Rulet4GameScreen({ gameName, gameId, orientation, logoEl
               <div className="flex gap-3">
                 <input
                   id="player-code"
-                  type="text"
+                  type="number"
+                  inputMode="numeric"
+                  min={1000}
+                  max={9999}
                   value={playerCode}
-                  onChange={(e) => setPlayerCode(e.target.value.toUpperCase())}
+                  onChange={(e) => setPlayerCode(String(e.target.value))}
                   placeholder="Ingresa tu código"
-                  className="flex-1 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20 uppercase"
+                  className="flex-1 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       handleValidate()

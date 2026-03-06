@@ -79,8 +79,8 @@ export default function L3trasGameScreen({ gameName, gameId, orientation, logoEl
   }, [settings?.objectiveWord])
 
   const handleCodeChange = (index: number, value: string) => {
-    // Only allow alphanumeric, limit length
-    const cleaned = value.replace(/[^A-Za-z0-9]/g, '').slice(0, 10).toUpperCase()
+    // Only allow digits, limit to 10 (numeric keyboard on webOS/mobile)
+    const cleaned = value.replace(/\D/g, '').slice(0, 10)
     const newCodes = [...codes]
     newCodes[index] = cleaned
     setCodes(newCodes)
@@ -246,7 +246,7 @@ export default function L3trasGameScreen({ gameName, gameId, orientation, logoEl
                 {codes.map((code, index) => (
                   <div key={index}>
                     <label htmlFor={`code-input-${index}`} className="block text-sm font-medium text-gray-400 mb-2">Código {index + 1}</label>
-                    <input id={`code-input-${index}`} type="text" value={code} onChange={(e) => handleCodeChange(index, e.target.value)} onKeyPress={(e) => { if (e.key === 'Enter' && allCodesFilled) validateWord() }} placeholder={`Código ${index + 1}`} maxLength={10} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-[rgba(16,185,129,0.5)] focus:outline-none uppercase" />
+                    <input id={`code-input-${index}`} type="number" inputMode="numeric" min={0} max={9999999999} value={code} onChange={(e) => handleCodeChange(index, e.target.value)} onKeyPress={(e) => { if (e.key === 'Enter' && allCodesFilled) validateWord() }} placeholder={`Código ${index + 1}`} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-[rgba(16,185,129,0.5)] focus:outline-none uppercase" />
                   </div>
                 ))}
               </div>
@@ -340,7 +340,10 @@ export default function L3trasGameScreen({ gameName, gameId, orientation, logoEl
                 </label>
                 <input
                   id={`code-input-${index}`}
-                  type="text"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={9999999999}
                   value={code}
                   onChange={(e) => handleCodeChange(index, e.target.value)}
                   onKeyPress={(e) => {
@@ -349,7 +352,6 @@ export default function L3trasGameScreen({ gameName, gameId, orientation, logoEl
                     }
                   }}
                   placeholder={`Código ${index + 1}`}
-                  maxLength={10}
                   className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-[rgba(16,185,129,0.5)] focus:outline-none uppercase"
                 />
               </div>

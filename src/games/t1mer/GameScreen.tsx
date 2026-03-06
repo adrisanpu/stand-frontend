@@ -94,7 +94,7 @@ export default function T1merGameScreen({ gameName, gameId, orientation, logoEle
     try {
       const data = await api.post<{ valid: boolean; playerId?: string; username?: string; message?: string; error?: string }>('/v1/game/validate', {
         gameId: gameId,
-        codes: [playerCode.toUpperCase()]
+        codes: [String(playerCode).trim()]
       })
       
       if (data.valid && data.playerId) {
@@ -198,7 +198,7 @@ export default function T1merGameScreen({ gameName, gameId, orientation, logoEle
               <div className="space-y-2">
                 <label htmlFor="player-code-landscape" className="text-sm text-gray-300">Tu código de jugador</label>
                 <div className="flex gap-3">
-                  <input id="player-code-landscape" type="text" value={playerCode} onChange={(e) => setPlayerCode(e.target.value.toUpperCase())} placeholder="Ingresa tu código" className="flex-1 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20 uppercase" onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }} />
+                  <input id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder="Ingresa tu código" className="flex-1 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }} />
                   <button onClick={handleValidate} disabled={!playerCode.trim() || isValidating} className="px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg">{isValidating ? 'Validando...' : 'Validar'}</button>
                 </div>
               </div>
@@ -298,11 +298,14 @@ export default function T1merGameScreen({ gameName, gameId, orientation, logoEle
             <div className="flex gap-3">
               <input
                 id="player-code"
-                type="text"
+                type="number"
+                inputMode="numeric"
+                min={1000}
+                max={9999}
                 value={playerCode}
-                onChange={(e) => setPlayerCode(e.target.value.toUpperCase())}
+                onChange={(e) => setPlayerCode(String(e.target.value))}
                 placeholder="Ingresa tu código"
-                className="flex-1 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20 uppercase"
+                className="flex-1 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
                     handleValidate()
