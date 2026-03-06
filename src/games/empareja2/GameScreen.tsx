@@ -97,8 +97,8 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
   if (isLandscape) {
     return (
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_200px] gap-4 sm:gap-6 items-stretch h-full min-h-0">
+        {/* Left: QR + code + instructions (large, readable) */}
         <div className="card flex flex-col gap-3 p-4 sm:p-5 overflow-hidden min-h-0">
-          {logoElement}
           <div className="grid grid-cols-2 gap-3 items-center flex-shrink-0">
             <div className="flex justify-center">
               <QRCode data={INSTAGRAM_DM_URL} size={200} margin={8} alt="QR Code para Instagram DM" className="!border-0 !bg-transparent" />
@@ -110,36 +110,37 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
               </div>
             </div>
           </div>
-          <div className="min-h-0 flex-shrink-0">
+          <div className="min-h-0 flex-1 overflow-auto">
             <h3 className="text-sm font-semibold text-textMain mb-2">Instrucciones</h3>
-            <ol className="grid grid-cols-4 gap-2 text-[10px] text-gray-300">
-              <li className="flex flex-col gap-1">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">1</span>
+            <ol className="flex flex-col gap-2 space-y-2 text-sm text-gray-300">
+              <li className="flex gap-2 items-start">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">1</span>
                 <span>Escanea el QR para obtener tu código de jugador.</span>
               </li>
-              <li className="flex flex-col gap-1">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">2</span>
+              <li className="flex gap-2 items-start">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">2</span>
                 <span>Envía el código de partida en ese chat para recibir tu pareja asignada.</span>
               </li>
-              <li className="flex flex-col gap-1">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">3</span>
+              <li className="flex gap-2 items-start">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">3</span>
                 <span>Encuentra a tu pareja físicamente.</span>
               </li>
-              <li className="flex flex-col gap-1">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">4</span>
+              <li className="flex gap-2 items-start">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">4</span>
                 <span>Cuando os encontréis, validad juntos vuestros códigos.</span>
               </li>
             </ol>
           </div>
         </div>
-        <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
+        {/* Center: validation + animations (large) */}
+        <div className="card flex flex-col justify-center p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
           {(gameState === 'idle' || gameState === 'invalid') && (
             <div className="space-y-4">
               <h3 className="text-base font-semibold text-textMain">Validador de Parejas</h3>
               {error && gameState === 'invalid' && showInvalidMessage && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
               <div className="grid grid-cols-2 gap-5">
-                <div><label htmlFor="code1" className="block text-sm font-medium text-gray-300 mb-2">Código del Jugador 1</label><input id="code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} placeholder="1234" className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
-                <div><label htmlFor="code2" className="block text-sm font-medium text-gray-300 mb-2">Código del Jugador 2</label><input id="code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} placeholder="5678" className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+                <div><label htmlFor="code1" className="block text-sm font-medium text-gray-300 mb-2">Código del Jugador 1</label><input id="code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+                <div><label htmlFor="code2" className="block text-sm font-medium text-gray-300 mb-2">Código del Jugador 2</label><input id="code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
               </div>
               <button onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"><div className="flex items-center justify-center gap-3"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Validar Códigos</div></button>
             </div>
@@ -148,13 +149,21 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
           {gameState === 'valid' && validationResult?.valid && validationResult.players && validationResult.players.length === 2 && (
             <div className="animate-fade-in grid grid-cols-3 gap-4 items-center">
               <div className="flex flex-col items-center space-y-3 animate-scale-in">{(() => { const player = validationResult.players[0]; const imgUrl = player.characterImageUrl || null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || 'Jugador 1'} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">Imagen jugador 1</div>}</div>{player.instagramUsername && <div className="text-center"><p className="text-base font-semibold text-neonMagenta">{player.instagramUsername}</p></div>}</>); })()}</div>
-              <div className="flex flex-col items-center justify-center space-y-2 text-center"><span className="text-2xl font-semibold text-green-400">¡Pareja Válida!</span></div>
+              <div className="flex flex-col items-center justify-center space-y-4 text-center"><span className="text-2xl font-semibold text-green-400">¡Pareja Válida!</span><BackButton onClick={handleReset} aria-label="Validar otra pareja" /></div>
               <div className="flex flex-col items-center space-y-3 animate-scale-in" style={{ animationDelay: '0.2s' }}>{(() => { const player = validationResult.players[1]; const imgUrl = player.characterImageUrl || null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || 'Jugador 2'} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">Imagen jugador 2</div>}</div>{player.instagramUsername && <div className="text-center"><p className="text-base font-semibold text-neonMagenta">{player.instagramUsername}</p></div>}</>); })()}</div>
             </div>
           )}
           {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in"><div className="flex items-center justify-center gap-3 mb-2"><svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg><span className="text-xl font-semibold text-red-400">Pareja Inválida</span></div>{(validationResult.message || error) && <p className="text-base text-red-300">{validationResult.message || error}</p>}</div>}
         </div>
-        <div className="card flex flex-col gap-3 p-4 min-w-0 min-h-0 overflow-hidden items-start">{sidebarElement}</div>
+        {/* Right: logo + letras, then mini containers (no scroll, fit; tight gap) */}
+        <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full max-w-[200px]">
+          <div className="flex justify-center shrink-0 origin-top -mb-3" style={{ transform: 'scale(0.88)', transformOrigin: 'top center' }}>
+            {logoElement}
+          </div>
+          <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full bg-transparent border-0">
+            {sidebarElement}
+          </div>
+        </div>
       </div>
     )
   }
@@ -230,7 +239,6 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
                 max={9999}
                 value={code1}
                 onChange={(e) => handleCodeChange(e.target.value, setCode1)}
-                placeholder="1234"
                 className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
             </div>
@@ -247,7 +255,6 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
                 max={9999}
                 value={code2}
                 onChange={(e) => handleCodeChange(e.target.value, setCode2)}
-                placeholder="5678"
                 className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
             </div>

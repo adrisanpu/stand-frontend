@@ -16,6 +16,13 @@ html {
   }
 }
 
+/* Landscape: slightly smaller base font so content fits on large horizontal screens (e.g. 32" WebOS) without scroll. */
+@media (orientation: landscape) {
+  html {
+    font-size: clamp(12px, 1vw + 10px, 22px);
+  }
+}
+
 html,body,#root { height: 100%; background: #0B0A12; }
 
 /* Viewport height for portrait scale-to-fit (avoids address bar issues) */
