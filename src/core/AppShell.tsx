@@ -168,7 +168,7 @@ export default function AppShell() {
     }
   }, [isPortrait, gameId, gameConfigVersion])
 
-  // Scale-to-fit in landscape: measure content and scale down when it overflows (e.g. 32" WebOS)
+  // Scale-to-fit in landscape: content fits in the central 80% (10% air each side and top/bottom)
   useEffect(() => {
     if (isPortrait) {
       setLandscapeScale(1)
@@ -182,9 +182,11 @@ export default function AppShell() {
       const sw = el.scrollWidth
       const vh = window.innerHeight
       const vw = window.innerWidth
+      const availableW = vw * 0.8
+      const availableH = vh * 0.8
       setLandscapeContentSize({ width: sw, height: sh })
-      let scale = Math.min(1, vh / sh, vw / sw)
-      if (sh <= vh && sw <= vw) scale = Math.min(scale, 0.85)
+      let scale = Math.min(1, availableH / sh, availableW / sw)
+      if (sh <= availableH && sw <= availableW) scale = Math.min(scale, 0.85)
       scale = Math.min(scale, 0.9)
       setLandscapeScale(scale)
     }
@@ -283,10 +285,10 @@ export default function AppShell() {
                 </div>
               </div>
             ) : (
-              /* Landscape: scale-to-fit so content fits viewport on large horizontal screens (e.g. 32" WebOS) */
-              <div className="h-screen-dvh w-screen overflow-hidden flex justify-center items-center">
+              /* Landscape: 10% air on sides (and top/bottom); scale content to fit the remaining 80% */
+              <div className="h-dvh w-screen overflow-hidden flex justify-center items-center p-[10dvh_10dvw]">
                 <div
-                  className="flex-shrink-0"
+                  className="flex-shrink-0 max-w-full max-h-full"
                   style={{
                     ...(landscapeContentSize
                       ? { width: landscapeContentSize.width, height: landscapeContentSize.height }
@@ -297,7 +299,7 @@ export default function AppShell() {
                 >
                   <div
                     ref={landscapeContentRef}
-                    className="py-[10vh] px-[10vw] h-full w-full overflow-hidden flex flex-col"
+                    className="h-full w-full overflow-hidden flex flex-col"
                   >
                     <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                       <currentGame.GameScreen
