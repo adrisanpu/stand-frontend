@@ -19,9 +19,10 @@ interface RankingResponse {
 interface RankingProps {
   gameId: string
   refreshInterval?: number // in milliseconds, 0 to disable
+  compact?: boolean // when true (e.g. landscape sidebar), reduce padding and show fewer items
 }
 
-export default function Ranking({ gameId, refreshInterval = 10000 }: RankingProps) {
+export default function Ranking({ gameId, refreshInterval = 10000, compact = false }: RankingProps) {
   const [ranking, setRanking] = useState<RankingEntry[] | null>(null)
 
   const fetchRanking = async () => {
@@ -35,50 +36,55 @@ export default function Ranking({ gameId, refreshInterval = 10000 }: RankingProp
 
   if (ranking === null) {
     return (
-      <div className="card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-neon">
-        <h2 className="text-lg sm:text-xl font-bold text-textMain mb-2 sm:mb-4">Ranking</h2>
-        <p className="text-textSub text-sm sm:text-base">Cargando...</p>
+      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6'}`}>
+        <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>Ranking</h2>
+        <p className="text-textSub text-xs sm:text-sm">Cargando...</p>
       </div>
     )
   }
 
+  const displayList = compact ? ranking.slice(0, 4) : ranking
+
   return (
-    <div className="card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-neon h-full flex flex-col">
-      <h2 className="text-lg sm:text-xl font-bold text-textMain mb-2 sm:mb-4 flex items-center gap-2">
+    <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6 min-h-0 flex-1 overflow-hidden'}`}>
+      <h2 className={`font-bold text-textMain flex items-center gap-2 flex-shrink-0 ${compact ? 'text-sm mb-1' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>
         Ranking
         {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
       </h2>
-      <div className="flex-1 overflow-y-auto space-y-1 sm:space-y-2">
+      <div className={`${compact ? 'space-y-0.5' : 'flex-1 min-h-0 overflow-y-auto space-y-1 sm:space-y-2'}`}>
         {ranking.length === 0 ? (
-          <p className="text-textSub text-xs sm:text-sm">No hay puntuaciones aún</p>
+          <p className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>No hay puntuaciones aún</p>
         ) : (
-          ranking.map((entry, index) => (
+          displayList.map((entry, index) => (
             <div
               key={entry.rank || index}
-              className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-surface border border-white/10"
+              className={`flex items-center justify-between rounded-lg bg-surface border border-white/10 ${compact ? 'p-1.5 gap-1' : 'p-2 sm:p-3 gap-2 sm:gap-3'}`}
             >
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                <span className="text-[var(--color-primary)] font-bold text-base sm:text-lg w-5 sm:w-6 flex-shrink-0">
+              <div className="flex items-center min-w-0 flex-1 gap-2 sm:gap-3">
+                <span className={`text-[var(--color-primary)] font-bold flex-shrink-0 ${compact ? 'text-base w-5' : 'text-base sm:text-lg w-5 sm:w-6'}`}>
                   {entry.rank || index + 1}
                 </span>
-                <span className="text-textMain font-medium text-xs sm:text-sm truncate">
+                <span className={`text-textMain font-medium truncate ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
                   {entry.username || 'Anónimo'}
                 </span>
               </div>
               <div className="text-right flex-shrink-0 ml-2">
-                <div className="text-textMain font-semibold text-xs sm:text-sm">
+                <div className={`text-textMain font-semibold ${compact ? 'text-base' : 'text-xs sm:text-sm'}`}>
                   {entry.timer !== undefined && typeof entry.timer === 'number'
                     ? `${entry.timer.toFixed(3)}s`
                     : 'N/A'}
                 </div>
                 {entry.score !== undefined && typeof entry.score === 'number' && (
-                  <div className="text-textSub text-[10px] sm:text-xs">
+                  <div className={`text-textSub ${compact ? 'text-xs' : 'text-[10px] sm:text-xs'}`}>
                     {entry.score.toFixed(0)}ms
                   </div>
                 )}
               </div>
             </div>
           ))
+        )}
+        {compact && ranking.length > 4 && (
+          <p className="text-textSub text-xs pt-0.5">+{ranking.length - 4} más</p>
         )}
       </div>
     </div>

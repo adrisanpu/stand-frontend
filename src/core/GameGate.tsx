@@ -233,13 +233,13 @@ export default function GameGate({ onGameCreated }: GameGateProps){
             <img 
               src={customLogo} 
               alt="Logo personalizado" 
-              className="h-20 w-auto object-contain"
+              className="h-28 w-auto object-contain"
             />
           ) : (
             <img 
               src={standLogo} 
               alt="Stand" 
-              className="h-20 w-auto object-contain"
+              className="h-28 w-auto object-contain"
               onError={(e) => {
                 // Fallback to stand-logo.png if logo doesn't exist
                 const target = e.target as HTMLImageElement

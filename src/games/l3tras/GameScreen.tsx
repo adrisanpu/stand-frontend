@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/QRCode'
+import BackButton from '../../core/BackButton'
 import type { L3trasSettings } from './GameConfig'
 import { api } from '../../api/api'
 
@@ -26,7 +27,7 @@ type ValidationResponse = {
   message?: string
 }
 
-export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) {
+export default function L3trasGameScreen({ gameName, gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [settings, setSettings] = useState<L3trasSettings | null>(null)
   const [codes, setCodes] = useState<string[]>([])
@@ -206,75 +207,135 @@ export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) 
   const requiredCount = objectiveWord.length
   const allCodesFilled = codes.every(c => c.trim().length > 0)
 
+  const showJoinBlock = gameState !== 'success'
+
+  const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
+  if (isLandscape) {
+    return (
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_200px] gap-4 sm:gap-6 items-stretch h-full min-h-0">
+        <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0">
+          {logoElement}
+          <div className="text-center">
+            <div className="p-3 rounded-xl bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.3)]">
+              <p className="text-xs text-gray-300 mb-1">Código de partida {gameName}:</p>
+              <p className="text-xl font-bold tracking-wider text-[#10B981]">{gameId}</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 min-h-0 flex-1">
+            <div className="flex justify-center flex-shrink-0"><QRCode data={INSTAGRAM_DM_URL} size={260} margin={8} alt="QR Code para Instagram DM" /></div>
+            <div className="space-y-1.5 min-h-0">
+              <h3 className="text-sm font-semibold text-textMain mb-1">Instrucciones</h3>
+              <ol className="space-y-1.5 text-xs text-gray-300">
+                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">1</span><span className="pt-0.5">Escanea el QR y envía el código de partida al chat de Instagram.</span></li>
+                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">2</span><span className="pt-0.5">Cada jugador recibirá un código de validación asociado a una letra.</span></li>
+                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">3</span><span className="pt-0.5">Reuníos y juntad todos los códigos (tantos como letras tenga la palabra).</span></li>
+                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">4</span><span className="pt-0.5">Introducidlos en el validador para comprobar si formáis la palabra objetivo.</span></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+        <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
+          {(gameState === 'idle' || gameState === 'error') && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-textMain">Validador de Palabra</h3>
+                {settings?.objectiveWord && <p className="text-sm text-gray-400">Se requieren {requiredCount} código{requiredCount !== 1 ? 's' : ''}</p>}
+              </div>
+              {error && gameState === 'error' && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {codes.map((code, index) => (
+                  <div key={index}>
+                    <label htmlFor={`code-input-${index}`} className="block text-sm font-medium text-gray-400 mb-2">Código {index + 1}</label>
+                    <input id={`code-input-${index}`} type="text" value={code} onChange={(e) => handleCodeChange(index, e.target.value)} onKeyPress={(e) => { if (e.key === 'Enter' && allCodesFilled) validateWord() }} placeholder={`Código ${index + 1}`} maxLength={10} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-[rgba(16,185,129,0.5)] focus:outline-none uppercase" />
+                  </div>
+                ))}
+              </div>
+              <button onClick={validateWord} disabled={!allCodesFilled} className="w-full p-5 rounded-xl bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.3)] hover:bg-[rgba(16,185,129,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"><div className="flex items-center justify-center gap-3"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Validar Palabra</div></button>
+            </div>
+          )}
+          {gameState === 'checking' && <div className="text-center py-10"><div className="flex items-center justify-center gap-4"><svg className="w-8 h-8 animate-spin text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><p className="text-2xl font-semibold text-[#10B981]">Validando códigos...</p></div></div>}
+          {gameState === 'success' && <div className="space-y-4 animate-fade-in"><div className="p-6 rounded-xl bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.3)] text-center"><div className="flex items-center justify-center gap-2 mb-4"><svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg><span className="text-2xl font-semibold text-green-400">¡Habéis ganado!</span></div>{message && <p className="text-lg text-green-300">{message}</p>}</div></div>}
+        </div>
+        <div className="card flex flex-col gap-3 p-4 min-w-0 min-h-0 overflow-hidden items-start">{sidebarElement}</div>
+      </div>
+    )
+  }
+
   return (
-    <div className="w-full space-y-6">
+    <div className={`w-full flex flex-col ${!showJoinBlock ? 'min-h-[70vh]' : ''}`}>
+      {!showJoinBlock && (
+        <div className="flex justify-end mb-2">
+          <BackButton onClick={handleReset} aria-label="Volver" />
+        </div>
+      )}
+      <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
       {/* Game Code - Always visible */}
-      <div className="text-center">
-        <div className="p-4 rounded-xl bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.3)]">
-          <p className="text-sm text-gray-300 mb-2">Código de partida {gameName}:</p>
-          <p className="text-3xl font-bold tracking-wider text-[#10B981]">{gameId}</p>
+      <div className="text-center flex-shrink-0">
+        <div className="p-5 rounded-xl bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.3)]">
+          <p className="text-base text-gray-300 mb-2">Código de partida {gameName}:</p>
+          <p className="text-4xl lg:text-5xl font-bold tracking-wider text-[#10B981]">{gameId}</p>
         </div>
       </div>
 
-      {/* QR Code and Instructions - Two columns, always visible */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* QR Code - Left column */}
-        <div className="flex justify-center items-start">
-          <QRCode 
-            data={INSTAGRAM_DM_URL}
-            size={200}
-            margin={8}
-            alt="QR Code para Instagram DM"
-          />
-        </div>
+      {/* QR Code and Instructions - Always visible (portrait) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* QR Code - Left column */}
+          <div className="flex justify-center items-start">
+            <QRCode 
+              data={INSTAGRAM_DM_URL}
+              size={380}
+              margin={12}
+              alt="QR Code para Instagram DM"
+            />
+          </div>
 
-        {/* Instructions - Right column */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-semibold text-textMain mb-3">Instrucciones</h3>
-          <ol className="space-y-3 text-sm text-gray-300">
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-xs">1</span>
-              <span className="pt-0.5">Escanea el QR y envía el código de partida al chat de Instagram.</span>
-            </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-xs">2</span>
-              <span className="pt-0.5">Cada jugador recibirá un código de validación asociado a una letra.</span>
-            </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-xs">3</span>
-              <span className="pt-0.5">Reuníos y juntad todos los códigos (tantos como letras tenga la palabra).</span>
-            </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-xs">4</span>
-              <span className="pt-0.5">Introducidlos en el validador para comprobar si formáis la palabra objetivo.</span>
-            </li>
-          </ol>
+          {/* Instructions - Right column */}
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
+            <ol className="space-y-4 text-base text-gray-300">
+              <li className="flex gap-4">
+                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-sm">1</span>
+                <span className="pt-0.5">Escanea el QR y envía el código de partida al chat de Instagram.</span>
+              </li>
+              <li className="flex gap-4">
+                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-sm">2</span>
+                <span className="pt-0.5">Cada jugador recibirá un código de validación asociado a una letra.</span>
+              </li>
+              <li className="flex gap-4">
+                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-sm">3</span>
+                <span className="pt-0.5">Reuníos y juntad todos los códigos (tantos como letras tenga la palabra).</span>
+              </li>
+              <li className="flex gap-4">
+                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-sm">4</span>
+                <span className="pt-0.5">Introducidlos en el validador para comprobar si formáis la palabra objetivo.</span>
+              </li>
+            </ol>
+          </div>
         </div>
-      </div>
 
       {/* Validator - Only show when idle or error */}
       {(gameState === 'idle' || gameState === 'error') && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-textMain">Validador de Palabra</h3>
+            <h3 className="text-xl font-semibold text-textMain">Validador de Palabra</h3>
             {settings?.objectiveWord && (
-              <p className="text-sm text-gray-400">
+              <p className="text-base text-gray-400">
                 Se requieren {requiredCount} código{requiredCount !== 1 ? 's' : ''}
               </p>
             )}
           </div>
 
           {error && gameState === 'error' && (
-            <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+            <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">
               {error}
             </div>
           )}
 
           {/* Code Input Fields */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {codes.map((code, index) => (
               <div key={index}>
-                <label htmlFor={`code-input-${index}`} className="block text-xs font-medium text-gray-400 mb-1">
+                <label htmlFor={`code-input-${index}`} className="block text-sm font-medium text-gray-400 mb-2">
                   Código {index + 1}
                 </label>
                 <input
@@ -289,7 +350,7 @@ export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) 
                   }}
                   placeholder={`Código ${index + 1}`}
                   maxLength={10}
-                  className="w-full h-11 px-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-[rgba(16,185,129,0.5)] focus:outline-none uppercase"
+                  className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-[rgba(16,185,129,0.5)] focus:outline-none uppercase"
                 />
               </div>
             ))}
@@ -299,10 +360,10 @@ export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) 
           <button
             onClick={validateWord}
             disabled={!allCodesFilled}
-            className="w-full p-3 rounded-xl bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.3)] hover:bg-[rgba(16,185,129,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="w-full p-5 rounded-xl bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.3)] hover:bg-[rgba(16,185,129,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
           >
-            <div className="flex items-center justify-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center justify-center gap-3">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Validar Palabra
@@ -313,39 +374,39 @@ export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) 
 
       {/* Checking State */}
       {gameState === 'checking' && (
-        <div className="text-center py-8">
-          <div className="flex items-center justify-center gap-3">
-            <svg className="w-6 h-6 animate-spin text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="text-center py-10">
+          <div className="flex items-center justify-center gap-4">
+            <svg className="w-8 h-8 animate-spin text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <p className="text-xl font-semibold text-[#10B981]">Validando códigos...</p>
+            <p className="text-2xl font-semibold text-[#10B981]">Validando códigos...</p>
           </div>
         </div>
       )}
 
       {/* Success State */}
       {gameState === 'success' && (
-        <div className="space-y-4 animate-fade-in">
-          <div className="p-6 rounded-xl bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.3)] text-center">
+        <div className={`animate-fade-in ${!showJoinBlock ? 'flex-1 flex flex-col min-h-0 justify-center space-y-4' : 'space-y-4'}`}>
+          <div className={`rounded-xl bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.3)] text-center ${showJoinBlock ? 'p-6' : 'p-8'}`}>
             <div className="flex items-center justify-center gap-2 mb-4">
-              <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={showJoinBlock ? 'w-8 h-8' : 'w-12 h-12'} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span className="text-2xl font-semibold text-green-400">¡Habéis ganado!</span>
+              <span className={showJoinBlock ? 'text-2xl font-semibold text-green-400' : 'text-3xl font-semibold text-green-400'}>¡Habéis ganado!</span>
             </div>
             
             {message && (
-              <p className="text-lg text-green-300 mb-4">{message}</p>
+              <p className={showJoinBlock ? 'text-lg text-green-300 mb-4' : 'text-xl text-green-300 mb-4'}>{message}</p>
             )}
 
             {/* Letter Tiles */}
             <div className="mb-4">
-              <p className="text-sm text-gray-300 mb-3">Palabra formada:</p>
+              <p className={showJoinBlock ? 'text-sm text-gray-300 mb-3' : 'text-base text-gray-300 mb-3'}>Palabra formada:</p>
               <div className="flex flex-wrap justify-center gap-2">
                 {letters.map((letter, index) => (
                   <div
                     key={index}
-                    className="w-12 h-12 rounded-xl bg-[rgba(16,185,129,0.2)] border-2 border-[rgba(16,185,129,0.5)] flex items-center justify-center text-2xl font-bold text-[#10B981] shadow-lg animate-scale-in"
+                    className={`rounded-xl bg-[rgba(16,185,129,0.2)] border-2 border-[rgba(16,185,129,0.5)] flex items-center justify-center font-bold text-[#10B981] shadow-lg animate-scale-in ${showJoinBlock ? 'w-12 h-12 text-2xl' : 'w-16 h-16 text-3xl'}`}
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
                     {letter}
@@ -357,7 +418,7 @@ export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) 
             {/* Objective Word Display */}
             <div className="mt-4 p-3 rounded-lg bg-[rgba(52,211,153,0.2)] border border-[rgba(52,211,153,0.3)]">
               <p className="text-xs text-gray-400 mb-1">Palabra objetivo:</p>
-              <p className="text-xl font-bold text-[#34D399]">
+              <p className={showJoinBlock ? 'text-xl font-bold text-[#34D399]' : 'text-2xl font-bold text-[#34D399]'}>
                 {objectiveWord.split('').join(' ')}
               </p>
             </div>
@@ -390,6 +451,7 @@ export default function L3trasGameScreen({ gameName, gameId }: GameScreenProps) 
           </button>
         </div>
       )}
+    </div>
     </div>
   )
 }

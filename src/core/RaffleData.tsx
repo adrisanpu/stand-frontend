@@ -35,6 +35,7 @@ interface RaffleDataProps {
   gameId: string
   gameName: string
   refreshInterval?: number // in milliseconds, 0 to disable
+  compact?: boolean // when true (e.g. landscape sidebar), reduce padding and show fewer items
 }
 
 const getStorageKey = (gameId: string) => `raffle_auto_${gameId}`
@@ -51,7 +52,7 @@ const loadAutoRaffleConfig = (gameId: string): AutoRaffleConfig | null => {
   return null
 }
 
-export default function RaffleData({ gameId, gameName, refreshInterval = 10000 }: RaffleDataProps) {
+export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false }: RaffleDataProps) {
   const [winners, setWinners] = useState<RaffleWinner[]>([])
   const [nextRaffleTime, setNextRaffleTime] = useState<Date | null>(null)
   const [timeUntilNext, setTimeUntilNext] = useState<number | null>(null)
@@ -216,60 +217,49 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000 }
 
   if (loading) {
     return (
-      <div className="card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-neon">
-        <h2 className="text-lg sm:text-xl font-bold text-textMain mb-2 sm:mb-4">Sorteo</h2>
-        <p className="text-textSub text-sm sm:text-base">Cargando...</p>
+      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6'}`}>
+        <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>Sorteo</h2>
+        <p className="text-textSub text-xs sm:text-sm">Cargando...</p>
       </div>
     )
   }
 
   return (
-    <div className="card rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-neon h-full flex flex-col">
-      <h2 className="text-lg sm:text-xl font-bold text-textMain mb-2 sm:mb-4 flex items-center gap-2">
+    <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6 min-h-0 flex-1 overflow-hidden'}`}>
+      <h2 className={`font-bold text-textMain mb-1 sm:mb-2 flex items-center gap-2 flex-shrink-0 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>
         Sorteo
         {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
       </h2>
-      <div className="flex-1 overflow-y-auto space-y-3 sm:space-y-4">
+      <div className={`${compact ? 'space-y-1' : 'flex-1 min-h-0 overflow-y-auto space-y-3 sm:space-y-4'}`}>
         {/* Next Raffle Countdown */}
         {timeUntilNext !== null && timeUntilNext > 0 && autoRaffleConfig?.enabled && (
-          <div className="p-2 sm:p-3 rounded-lg bg-surface border border-white/10">
-            <div className="text-xs sm:text-sm text-textSub mb-1">Próximo en:</div>
-            <div className="text-base sm:text-lg font-semibold text-[var(--color-primary)]">
+          <div className={`rounded-lg bg-surface border border-white/10 ${compact ? 'p-2' : 'p-2 sm:p-3'}`}>
+            <div className={`text-textSub mb-1 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>Próximo en:</div>
+            <div className={`font-semibold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-base sm:text-lg'}`}>
               {formatTime(timeUntilNext)}
             </div>
-            <div className="text-[10px] sm:text-xs text-textSub mt-1">
+            <div className={`text-textSub mt-1 ${compact ? 'text-xs' : 'text-[10px] sm:text-xs'}`}>
               Cada {autoRaffleConfig.intervalMinutes} minuto{autoRaffleConfig.intervalMinutes !== 1 ? 's' : ''}
             </div>
           </div>
         )}
 
-        {/* Previous Winners */}
+        {/* Last winner only */}
         {winners.length > 0 ? (
           <div>
-            <div className="text-xs sm:text-sm text-textSub mb-2">Ganadores anteriores:</div>
-            <div className="space-y-1 sm:space-y-2">
-              {winners.slice(0, 5).map((winner, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 p-2 sm:p-2.5 rounded-lg bg-surface border border-white/10"
-                >
-                  <span className="text-[var(--color-primary)] font-bold text-xs sm:text-sm w-4 sm:w-5 flex-shrink-0">
-                    {index + 1}
-                  </span>
-                  <span className="text-textMain font-medium text-xs sm:text-sm truncate flex-1">
-                    {winner.username}
-                  </span>
-                </div>
-              ))}
-              {winners.length > 5 && (
-                <p className="text-textSub text-[10px] sm:text-xs text-center mt-1">
-                  +{winners.length - 5} más
-                </p>
-              )}
+            <div className={`text-textSub mb-2 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>Último ganador:</div>
+            <div className={compact ? 'space-y-1' : 'space-y-1 sm:space-y-2'}>
+              <div
+                className={`flex items-center gap-2 rounded-lg bg-surface border border-white/10 ${compact ? 'p-1.5' : 'p-2 sm:p-2.5'}`}
+              >
+                <span className={`text-textMain font-medium truncate flex-1 ${compact ? 'text-base' : 'text-xs sm:text-sm'}`}>
+                  {winners[0].username}
+                </span>
+              </div>
             </div>
           </div>
         ) : (
-          <p className="text-textSub text-xs sm:text-sm">No hay ganadores aún</p>
+          <p className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>No hay ganadores aún</p>
         )}
       </div>
     </div>

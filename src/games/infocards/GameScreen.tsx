@@ -52,7 +52,7 @@ function getCardLayouts(gameId: string): Record<string, CardLayoutPosition> {
   return {}
 }
 
-export default function InfocardsGameScreen({ gameId }: GameScreenProps) {
+export default function InfocardsGameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
   const [cards, setCards] = useState<InfoCard[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -188,33 +188,33 @@ export default function InfocardsGameScreen({ gameId }: GameScreenProps) {
   const renderJoinCard = () => (
     <div key={INFOCARDS_JOIN_CARD_ID} className={baseClass} style={cardStyle}>
       <div className="text-center mb-2 flex-shrink-0">
-        <div className="p-4 rounded-xl bg-[rgba(99,102,241,0.15)] border border-[rgba(99,102,241,0.3)]">
-          <p className="text-sm text-gray-300 mb-2">Código de partida:</p>
-          <p className="text-3xl font-bold tracking-wider text-[#6366F1]">{gameId}</p>
+        <div className="p-5 rounded-xl bg-[rgba(99,102,241,0.15)] border border-[rgba(99,102,241,0.3)]">
+          <p className="text-base text-gray-300 mb-2">Código de partida:</p>
+          <p className="text-4xl lg:text-5xl font-bold tracking-wider text-[#6366F1]">{gameId}</p>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 flex-1 min-h-0 overflow-hidden">
         <div className="flex justify-center items-start">
           <QRCode
             data={INSTAGRAM_DM_URL}
-            size={200}
-            margin={8}
+            size={380}
+            margin={12}
             alt="QR Code para Instagram DM"
           />
         </div>
-        <div className="space-y-3">
-          <h3 className="text-lg font-semibold text-textMain mb-3">Instrucciones</h3>
-          <ol className="space-y-3 text-sm text-gray-300">
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-xs">1</span>
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
+          <ol className="space-y-4 text-base text-gray-300">
+            <li className="flex gap-4">
+              <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-sm">1</span>
               <span className="pt-0.5">Escanea el QR y envía el código de partida por Instagram DM para unirte.</span>
             </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-xs">2</span>
+            <li className="flex gap-4">
+              <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-sm">2</span>
               <span className="pt-0.5">En el chat podrás hacer un pequeño quiz y demostrar lo aprendido.</span>
             </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-xs">3</span>
+            <li className="flex gap-4">
+              <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-sm">3</span>
               <span className="pt-0.5">Participa en los sorteos.</span>
             </li>
           </ol>
@@ -263,6 +263,54 @@ export default function InfocardsGameScreen({ gameId }: GameScreenProps) {
         {mediaBlock && (
           <div className="min-w-0 h-full rounded-xl overflow-hidden">{mediaBlock}</div>
         )}
+      </div>
+    )
+  }
+
+  const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
+  if (isLandscape) {
+    return (
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_200px] gap-4 sm:gap-6 items-stretch w-full min-h-0 h-full">
+        <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0">
+          {logoElement}
+          <div className="text-center">
+            <div className="p-3 rounded-xl bg-[rgba(99,102,241,0.15)] border border-[rgba(99,102,241,0.3)]">
+              <p className="text-xs text-gray-300 mb-1">Código de partida:</p>
+              <p className="text-xl font-bold tracking-wider text-[#6366F1]">{gameId}</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 min-h-0 flex-1">
+            <div className="flex justify-center flex-shrink-0"><QRCode data={INSTAGRAM_DM_URL} size={260} margin={8} alt="QR Code para Instagram DM" /></div>
+            <div className="space-y-1.5 min-h-0">
+              <h3 className="text-sm font-semibold text-textMain mb-1">Instrucciones</h3>
+              <ol className="space-y-1.5 text-xs text-gray-300">
+                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">1</span><span className="pt-0.5">Escanea el QR y envía el código de partida por Instagram DM para unirte.</span></li>
+                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">2</span><span className="pt-0.5">En el chat podrás hacer un pequeño quiz y demostrar lo aprendido.</span></li>
+                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">3</span><span className="pt-0.5">Participa en los sorteos.</span></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+        <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 items-center gap-6">
+          <div className={`w-full flex-shrink-0 ${CARD_CONTAINER_HEIGHT_CLASS}`}>
+            {isJoinCard ? renderJoinCard() : renderCard()}
+          </div>
+          <div className="flex items-center gap-6">
+            <button onClick={goToPrev} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label="Tarjeta anterior">
+              <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <div className="flex gap-2">
+              {displayCards.map((_, idx) => (
+                <button key={idx} onClick={() => setCurrentIndex(idx)} className="rounded-full transition-all duration-200" style={{ width: idx === currentIndex ? '20px' : '8px', height: '8px', background: idx === currentIndex ? 'var(--color-primary, #6366F1)' : 'rgba(255,255,255,0.2)' }} aria-label={`Ir a tarjeta ${idx + 1}`} />
+              ))}
+            </div>
+            <button onClick={goToNext} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label="Tarjeta siguiente">
+              <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+          <p className="text-textSub text-xs">{currentIndex + 1} / {displayCards.length}</p>
+        </div>
+        <div className="card flex flex-col gap-3 p-4 min-w-0 min-h-0 overflow-hidden items-start">{sidebarElement}</div>
       </div>
     )
   }
