@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { ThemeProvider } from './theme'
 import GameGate from './GameGate'
 import SettingsMenu from './SettingsMenu'
@@ -26,6 +26,9 @@ export default function AppShell() {
   const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
   const [customLogo, setCustomLogo] = useState<string | null>(null)
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
+  const portraitContentRef = useRef<HTMLDivElement>(null)
+  const [portraitScale, setPortraitScale] = useState(1)
+  const [portraitContentSize, setPortraitContentSize] = useState<{ width: number; height: number } | null>(null)
 
   // Load custom logo from localStorage
   useEffect(() => {
@@ -133,7 +136,37 @@ export default function AppShell() {
   const currentGame = gameDefinition
   const isPortrait = useOrientation()
 
-  // Show loading state while fetching user
+  // Scale-to-fit in portrait: measure content and scale down when it overflows the viewport
+  useEffect(() => {
+    if (!isPortrait) {
+      setPortraitScale(1)
+      setPortraitContentSize(null)
+      return
+    }
+    const el = portraitContentRef.current
+    if (!el) return
+    const updateScale = () => {
+      const sh = el.scrollHeight
+      const sw = el.scrollWidth
+      const vh = window.innerHeight
+      const vw = window.innerWidth
+      setPortraitContentSize({ width: sw, height: sh })
+      let scale = Math.min(1, vh / sh, vw / sw)
+      // Fallback when measurement doesn't show overflow (e.g. WebOS)
+      if (sh <= vh && sw <= vw) scale = Math.min(scale, 0.85)
+      // Cap so portrait is always a bit smaller
+      scale = Math.min(scale, 0.9)
+      setPortraitScale(scale)
+    }
+    updateScale()
+    const ro = new ResizeObserver(updateScale)
+    ro.observe(el)
+    window.addEventListener('resize', updateScale)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', updateScale)
+    }
+  }, [isPortrait, gameId, gameConfigVersion])
   if (userLoading) {
     return (
       <ThemeProvider game={currentGame}>
@@ -164,9 +197,23 @@ export default function AppShell() {
         <div className={gameId && gameName && currentGame ? 'h-screen overflow-hidden' : 'min-h-screen grid place-items-center px-4 sm:px-6 lg:px-6 xl:px-8'}>
           {gameId && gameName && currentGame ? (
             isPortrait ? (
-              /* Portrait: less bottom padding, main block centered vertically with spacers */
-              <div className="pt-[10vh] pb-[5vh] px-[10vw] h-full w-full overflow-hidden flex flex-col gap-4">
-                <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8">
+              /* Portrait: scale-to-fit so content fits viewport on large vertical screens */
+              <div className="h-screen-dvh w-screen overflow-hidden flex justify-center items-start">
+                <div
+                  className="flex-shrink-0"
+                  style={{
+                    ...(portraitContentSize
+                      ? { width: portraitContentSize.width, height: portraitContentSize.height }
+                      : { width: '100%', height: '100%' }),
+                    transform: `scale(${portraitScale})`,
+                    transformOrigin: 'top center',
+                  }}
+                >
+                  <div
+                    ref={portraitContentRef}
+                    className="pt-[10vh] pb-[5vh] px-[10vw] h-full w-full overflow-hidden flex flex-col gap-4"
+                  >
+                    <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8">
                   <div className="flex-1 min-h-0" aria-hidden />
                   <div className="flex flex-col items-center gap-6 flex-shrink-0 w-full">
                     {(customLogo || currentGame.assets?.logo) && (
@@ -194,7 +241,7 @@ export default function AppShell() {
                   </div>
                   <div className="flex-1 min-h-0" aria-hidden />
                 </div>
-                <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
+                  <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
                   <div className="flex-1 min-w-[160px]">
                     <Players gameName={gameName} />
                   </div>
@@ -207,7 +254,9 @@ export default function AppShell() {
                     <RaffleData gameId={gameId} gameName={gameName} />
                   </div>
                 </div>
+                </div>
               </div>
+            </div>
             ) : (
               /* Landscape: 10% margin all sides, no scroll */
               <div className="py-[10vh] px-[10vw] h-full w-full overflow-hidden flex flex-col">
