@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/api'
 import { usePolling } from '../hooks/usePolling'
 
@@ -36,6 +36,8 @@ function truncateUsername(username: string | undefined, maxLen: number): string 
 export default function Ranking({ gameId, refreshInterval = 10000, compact = false, prizeLabel, topX, gameType }: RankingProps) {
   const isT1mer = (gameType || '').toUpperCase() === 'T1MER'
   const [ranking, setRanking] = useState<RankingEntry[] | null>(null)
+  const [compactListMaxHeight, setCompactListMaxHeight] = useState<number | null>(null)
+  const firstRowRef = useRef<HTMLDivElement | null>(null)
 
   const fetchRanking = async () => {
     if (!gameId) return
@@ -47,6 +49,26 @@ export default function Ranking({ gameId, refreshInterval = 10000, compact = fal
 
   const { isStale } = usePolling(fetchRanking, [gameId, topX], { interval: refreshInterval })
 
+  useEffect(() => {
+    if (!compact) {
+      setCompactListMaxHeight(null)
+      return
+    }
+    if (!ranking || ranking.length === 0) {
+      setCompactListMaxHeight(null)
+      return
+    }
+    if (firstRowRef.current) {
+      const rowHeight = firstRowRef.current.offsetHeight
+      if (rowHeight > 0) {
+        const GAP_PX = 4 // ~space-y-0.5
+        const visibleRows = Math.min(3, ranking.length)
+        const totalHeight = rowHeight * visibleRows + GAP_PX * Math.max(visibleRows - 1, 0)
+        setCompactListMaxHeight(totalHeight)
+      }
+    }
+  }, [compact, ranking])
+
   if (ranking === null) {
     return (
       <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
@@ -56,7 +78,7 @@ export default function Ranking({ gameId, refreshInterval = 10000, compact = fal
     )
   }
 
-  const displayList = topX != null ? ranking : compact ? ranking.slice(0, 4) : ranking
+  const displayList = topX != null ? ranking : ranking
 
   return (
     <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6 min-h-0 flex-1 overflow-hidden'}`}>
@@ -69,13 +91,23 @@ export default function Ranking({ gameId, refreshInterval = 10000, compact = fal
           {topX != null ? `Premio top ${topX}: ${prizeLabel}` : `Premio: ${prizeLabel}`}
         </p>
       )}
-      <div className={`min-h-0 overflow-y-auto ${compact ? 'space-y-0.5 min-w-0 max-h-40' : 'flex-1 max-h-64 space-y-1 sm:space-y-2'}`}>
+      <div
+        className={`min-h-0 overflow-y-auto ${compact ? 'space-y-0.5 min-w-0' : 'flex-1 max-h-64 space-y-1 sm:space-y-2'}`}
+        style={
+          compact && compactListMaxHeight != null
+            ? { maxHeight: compactListMaxHeight }
+            : compact
+            ? { maxHeight: '10rem' } // fallback aproximado a 3 filas
+            : undefined
+        }
+      >
         {ranking.length === 0 ? (
           <p className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>No hay puntuaciones aún</p>
         ) : (
           displayList.map((entry, index) => (
             <div
               key={entry.rank || index}
+              ref={compact && index === 0 ? firstRowRef : undefined}
               className={`flex items-center justify-between rounded-lg bg-surface border border-white/10 min-w-0 ${compact ? 'p-1.5 gap-1' : 'p-2 sm:p-3 gap-2 sm:gap-3'}`}
             >
               <div className="flex items-center min-w-0 flex-1 gap-2 sm:gap-3 overflow-hidden">
@@ -101,8 +133,8 @@ export default function Ranking({ gameId, refreshInterval = 10000, compact = fal
             </div>
           ))
         )}
-        {compact && ranking.length > 4 && topX == null && (
-          <p className="text-textSub text-xs pt-0.5">+{ranking.length - 4} más</p>
+        {!compact && topX == null && ranking.length > displayList.length && (
+          <p className="text-textSub text-xs pt-0.5">+{ranking.length - displayList.length} más</p>
         )}
       </div>
     </div>

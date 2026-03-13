@@ -265,8 +265,8 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
     >
       <div className="absolute inset-0 bg-black/70" onClick={onClose} aria-hidden="true" />
-      <div className="relative card w-full max-w-lg p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="relative card w-full max-w-lg p-6 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between mb-6 flex-shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={onBack}
@@ -290,233 +290,238 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
           </button>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-            {error}
-          </div>
-        )}
-
-        {!winners ? (
-          <>
-            {/* Number of Winners Input */}
-            <div className="mb-4">
-              <label htmlFor="number-of-winners" className="block text-sm font-medium text-gray-300 mb-2">
-                Número de ganadores
-              </label>
-              <input
-                id="number-of-winners"
-                type="number"
-                min="1"
-                value={numberOfWinners}
-                onChange={(e) => handleNumberChange(e.target.value)}
-                className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-white/20 focus:outline-none"
-              />
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+              {error}
             </div>
+          )}
 
-            {/* Applicable To Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-300 mb-3">
-                Aplicable a
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors">
-                  <input
-                    type="radio"
-                    name="applicableOnlyValidated"
-                    checked={!applicableOnlyValidated}
-                    onChange={() => setApplicableOnlyValidated(false)}
-                    className="w-4 h-4 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">Todos los jugadores</div>
-                    <div className="text-xs text-gray-400">Incluye todos los participantes del juego</div>
-                  </div>
+          {!winners ? (
+            <>
+              {/* Number of Winners Input */}
+              <div className="mb-4">
+                <label htmlFor="number-of-winners" className="block text-sm font-medium text-gray-300 mb-2">
+                  Número de ganadores
                 </label>
-                <label className="flex items-center gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors">
-                  <input
-                    type="radio"
-                    name="applicableOnlyValidated"
-                    checked={applicableOnlyValidated}
-                    onChange={() => setApplicableOnlyValidated(true)}
-                    className="w-4 h-4 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">Parejas validadas</div>
-                    <div className="text-xs text-gray-400">Solo jugadores que han validado su pareja</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Requisitos para ganar: cuentas de Instagram a seguir */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Requisitos para ganar (cuentas a seguir)
-              </label>
-              <p className="text-xs text-gray-400 mb-3">
-                Para participar en el sorteo deben seguir estas cuentas. Comprobamos automáticamente que sigan a @stand_official; el resto se notifica por DM.
-              </p>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {requiredFollows.map((handle) => (
-                  <span
-                    key={handle}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] border border-white/10 text-sm"
-                  >
-                    @{handle}
-                    <button
-                      type="button"
-                      onClick={() => removeRequiredFollow(handle)}
-                      className="ml-1 p-0.5 rounded hover:bg-white/20 text-gray-400 hover:text-white"
-                      aria-label={`Quitar @${handle}`}
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <div className="flex gap-2">
                 <input
-                  type="text"
-                  placeholder="Añadir @usuario (sin @)"
-                  value={newHandle}
-                  onChange={(e) => setNewHandle(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addRequiredFollow())}
-                  className="flex-1 h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm placeholder-gray-500 focus:border-white/20 focus:outline-none"
+                  id="number-of-winners"
+                  type="number"
+                  min="1"
+                  value={numberOfWinners}
+                  onChange={(e) => handleNumberChange(e.target.value)}
+                  className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-white/20 focus:outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={addRequiredFollow}
-                  className="px-4 h-10 rounded-lg bg-[rgba(255,255,255,0.1)] border border-white/10 hover:bg-white/15 text-sm font-medium"
-                >
-                  Añadir
-                </button>
               </div>
-              {requiredFollows.length > 0 && (
-                <button
-                  type="button"
-                  onClick={saveRequiredFollows}
-                  disabled={savingFollows}
-                  className="mt-2 text-xs text-purple-400 hover:text-purple-300 disabled:opacity-50"
-                >
-                  {savingFollows ? 'Guardando...' : 'Guardar lista'}
-                </button>
-              )}
-            </div>
 
-            {/* Run Raffle Button */}
-            <div className="mb-6">
-              <button
-                onClick={runRaffle}
-                disabled={isRunning || numberOfWinners < 1}
-                className="w-full p-3 rounded-xl bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-center justify-center gap-2">
-                  {isRunning ? (
-                    <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                    </svg>
-                  )}
-                  {isRunning ? 'Ejecutando sorteo...' : 'Ejecutar Sorteo'}
-                </div>
-              </button>
-            </div>
-
-            {/* Automatic Raffles Configuration */}
-            <div className="mb-4 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-300 mb-1">Sorteos Automáticos</h3>
-                  <p className="text-xs text-gray-400">Ejecutar sorteos automáticamente cada cierto tiempo</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={autoRaffleEnabled}
-                    onChange={(e) => {
-                      setAutoRaffleEnabled(e.target.checked)
-                      if (e.target.checked && gameId) {
-                        // Set initial last raffle time when enabling
-                        const config = loadAutoRaffleConfig(gameId)
-                        if (config) {
-                          config.lastAutoRaffleTime = Date.now()
-                          saveAutoRaffleConfig(gameId, config)
-                        }
-                      }
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+              {/* Applicable To Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-3">
+                  Aplicable a
                 </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors">
+                    <input
+                      type="radio"
+                      name="applicableOnlyValidated"
+                      checked={!applicableOnlyValidated}
+                      onChange={() => setApplicableOnlyValidated(false)}
+                      className="w-4 h-4 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">Todos los jugadores</div>
+                      <div className="text-xs text-gray-400">Incluye todos los participantes del juego</div>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors">
+                    <input
+                      type="radio"
+                      name="applicableOnlyValidated"
+                      checked={applicableOnlyValidated}
+                      onChange={() => setApplicableOnlyValidated(true)}
+                      className="w-4 h-4 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">Parejas validadas</div>
+                      <div className="text-xs text-gray-400">Solo jugadores que han validado su pareja</div>
+                    </div>
+                  </label>
+                </div>
               </div>
 
-              {autoRaffleEnabled && (
-                <div className="mt-4">
-                  <label htmlFor="auto-interval" className="block text-xs font-medium text-gray-300 mb-2">
-                    Intervalo (minutos)
-                  </label>
-                  <input
-                    id="auto-interval"
-                    type="number"
-                    min="1"
-                    value={autoRaffleInterval}
-                    onChange={(e) => handleAutoIntervalChange(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-white/20 focus:outline-none"
-                  />
-                  <p className="text-[10px] text-gray-500 mt-1">
-                    Número de ganadores y «aplicable a» = los del sorteo manual arriba.
-                  </p>
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Confetti Animation */}
-            <Confetti active={winners.length > 0} />
-            
-            {/* Winners Display */}
-            <div className="mb-4">
-              <div className="p-4 rounded-xl bg-green-500/20 border border-green-500/30">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                  </svg>
-                  <span className="font-medium text-green-300 text-lg">
-                    ¡Ganadores del Sorteo!
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {winners.map((winner, index) => (
-                    <div
-                      key={index}
-                      className="p-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10"
+              {/* Requisitos para ganar: cuentas de Instagram a seguir */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Requisitos para ganar (cuentas a seguir)
+                </label>
+                <p className="text-xs text-gray-400 mb-3">
+                  Para participar en el sorteo deben seguir estas cuentas. Comprobamos automáticamente que sigan a @stand_official; el resto se notifica por DM.
+                </p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {requiredFollows.map((handle) => (
+                    <span
+                      key={handle}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] border border-white/10 text-sm"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center font-semibold text-green-400 text-xs">
-                          {index + 1}
-                        </span>
-                        <span className="text-gray-200 font-medium">{winner}</span>
-                      </div>
-                    </div>
+                      @{handle}
+                      <button
+                        type="button"
+                        onClick={() => removeRequiredFollow(handle)}
+                        className="ml-1 p-0.5 rounded hover:bg-white/20 text-gray-400 hover:text-white"
+                        aria-label={`Quitar @${handle}`}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
                   ))}
                 </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Añadir @usuario (sin @)"
+                    value={newHandle}
+                    onChange={(e) => setNewHandle(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addRequiredFollow())}
+                    className="flex-1 h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm placeholder-gray-500 focus:border-white/20 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={addRequiredFollow}
+                    className="px-4 h-10 rounded-lg bg-[rgba(255,255,255,0.1)] border border-white/10 hover:bg-white/15 text-sm font-medium"
+                  >
+                    Añadir
+                  </button>
+                </div>
+                {requiredFollows.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={saveRequiredFollows}
+                    disabled={savingFollows}
+                    className="mt-2 text-xs text-purple-400 hover:text-purple-300 disabled:opacity-50"
+                  >
+                    {savingFollows ? 'Guardando...' : 'Guardar lista'}
+                  </button>
+                )}
               </div>
-            </div>
 
-            {/* Reset Button */}
+              {/* Run Raffle Button */}
+              <div className="mb-6">
+                <button
+                  onClick={runRaffle}
+                  disabled={isRunning || numberOfWinners < 1}
+                  className="w-full p-3 rounded-xl bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    {isRunning ? (
+                      <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                      </svg>
+                    )}
+                    {isRunning ? 'Ejecutando sorteo...' : 'Ejecutar Sorteo'}
+                  </div>
+                </button>
+              </div>
+
+              {/* Automatic Raffles Configuration */}
+              <div className="mb-4 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-300 mb-1">Sorteos Automáticos</h3>
+                    <p className="text-xs text-gray-400">Ejecutar sorteos automáticamente cada cierto tiempo</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoRaffleEnabled}
+                      onChange={(e) => {
+                        setAutoRaffleEnabled(e.target.checked)
+                        if (e.target.checked && gameId) {
+                          // Set initial last raffle time when enabling
+                          const config = loadAutoRaffleConfig(gameId)
+                          if (config) {
+                            config.lastAutoRaffleTime = Date.now()
+                            saveAutoRaffleConfig(gameId, config)
+                          }
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                  </label>
+                </div>
+
+                {autoRaffleEnabled && (
+                  <div className="mt-4">
+                    <label htmlFor="auto-interval" className="block text-xs font-medium text-gray-300 mb-2">
+                      Intervalo (minutos)
+                    </label>
+                    <input
+                      id="auto-interval"
+                      type="number"
+                      min="1"
+                      value={autoRaffleInterval}
+                      onChange={(e) => handleAutoIntervalChange(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-white/20 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      Número de ganadores y «aplicable a» = los del sorteo manual arriba.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Confetti Animation */}
+              <Confetti active={winners.length > 0} />
+              
+              {/* Winners Display */}
+              <div className="mb-4">
+                <div className="p-4 rounded-xl bg-green-500/20 border border-green-500/30">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    <span className="font-medium text-green-300 text-lg">
+                      ¡Ganadores del Sorteo!
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {winners.map((winner, index) => (
+                      <div
+                        key={index}
+                        className="p-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center font-semibold text-green-400 text-xs">
+                            {index + 1}
+                          </span>
+                          <span className="text-gray-200 font-medium">{winner}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {winners && (
+          <div className="flex-shrink-0 mt-4">
             <button
               onClick={resetRaffle}
               className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
             >
               Realizar otro sorteo
             </button>
-          </>
+          </div>
         )}
       </div>
     </div>
