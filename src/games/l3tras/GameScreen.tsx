@@ -3,10 +3,8 @@ import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/QRCode'
 import BackButton from '../../core/BackButton'
 import type { L3trasSettings } from './GameConfig'
+import { getInstagramDmUrl } from '../../core/instagram'
 import { api } from '../../api/api'
-
-const INSTAGRAM_HANDLE = 'stand_official'
-const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
 
 type GameState = 'idle' | 'checking' | 'success' | 'error'
 
@@ -27,7 +25,7 @@ type ValidationResponse = {
   message?: string
 }
 
-export default function L3trasGameScreen({ gameName, gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
+export default function L3trasGameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [settings, setSettings] = useState<L3trasSettings | null>(null)
   const [codes, setCodes] = useState<string[]>([])
@@ -212,27 +210,25 @@ export default function L3trasGameScreen({ gameName, gameId, orientation, logoEl
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_200px] gap-4 sm:gap-6 items-stretch h-full min-h-0">
+      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
         <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0">
-          {logoElement}
-          <div className="text-center">
-            <div className="p-3 rounded-xl bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.3)]">
-              <p className="text-xs text-gray-300 mb-1">Código de partida {gameName}:</p>
-              <p className="text-xl font-bold tracking-wider text-[#10B981]">{gameId}</p>
+          <div className="grid grid-cols-2 gap-2 items-center flex-shrink-0 min-h-0">
+            <div className="flex justify-center min-h-0 w-full min-w-0">
+              <QRCode data={getInstagramDmUrl(gameId)} size={200} margin={6} containerClassName="max-h-[min(18vh,160px)] w-full" alt="QR Code para Instagram DM" className="!border-0 !bg-transparent !p-0" />
+            </div>
+            <div className="flex justify-center items-center min-h-0">
+              {logoElement}
             </div>
           </div>
-          <div className="flex flex-col gap-2 min-h-0 flex-1">
-            <div className="flex justify-center flex-shrink-0"><QRCode data={INSTAGRAM_DM_URL} size={260} margin={8} alt="QR Code para Instagram DM" /></div>
-            <div className="space-y-1.5 min-h-0">
-              <h3 className="text-sm font-semibold text-textMain mb-1">Instrucciones</h3>
-              <ol className="space-y-1.5 text-xs text-gray-300">
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">1</span><span className="pt-0.5">Escanea el QR y envía el código de partida al chat de Instagram.</span></li>
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">2</span><span className="pt-0.5">Cada jugador recibirá un código de validación asociado a una letra.</span></li>
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">3</span><span className="pt-0.5">Reuníos y juntad todos los códigos (tantos como letras tenga la palabra).</span></li>
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">4</span><span className="pt-0.5">Introducidlos en el validador para comprobar si formáis la palabra objetivo.</span></li>
+          <div className="flex-shrink-0 min-h-0 overflow-hidden">
+            <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
+            <ol className="flex flex-col gap-1.5 text-xs text-gray-300">
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">1</span><span className="pt-0.5">📸 Escanea el QR y pulsa JUGAR.</span></li>
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">2</span><span className="pt-0.5">🔤 Cada jugador recibe un código (letra).</span></li>
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">3</span><span className="pt-0.5">👥 Reunid todos los códigos.</span></li>
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-[10px]">4</span><span className="pt-0.5">✅ Introducidlos en el validador.</span></li>
               </ol>
             </div>
-          </div>
         </div>
         <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
           {(gameState === 'idle' || gameState === 'error') && (
@@ -256,7 +252,11 @@ export default function L3trasGameScreen({ gameName, gameId, orientation, logoEl
           {gameState === 'checking' && <div className="text-center py-10"><div className="flex items-center justify-center gap-4"><svg className="w-8 h-8 animate-spin text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><p className="text-2xl font-semibold text-[#10B981]">Validando códigos...</p></div></div>}
           {gameState === 'success' && <div className="space-y-4 animate-fade-in"><div className="p-6 rounded-xl bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.3)] text-center"><div className="flex items-center justify-center gap-2 mb-4"><svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg><span className="text-2xl font-semibold text-green-400">¡Habéis ganado!</span></div>{message && <p className="text-lg text-green-300">{message}</p>}</div></div>}
         </div>
-        <div className="card flex flex-col gap-3 p-4 min-w-0 min-h-0 overflow-hidden items-start">{sidebarElement}</div>
+        <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
+          <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
+            {sidebarElement}
+          </div>
+        </div>
       </div>
     )
   }
@@ -269,20 +269,12 @@ export default function L3trasGameScreen({ gameName, gameId, orientation, logoEl
         </div>
       )}
       <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
-      {/* Game Code - Always visible */}
-      <div className="text-center flex-shrink-0">
-        <div className="p-5 rounded-xl bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.3)]">
-          <p className="text-base text-gray-300 mb-2">Código de partida {gameName}:</p>
-          <p className="text-4xl lg:text-5xl font-bold tracking-wider text-[#10B981]">{gameId}</p>
-        </div>
-      </div>
-
-      {/* QR Code and Instructions - Always visible (portrait) */}
+      {/* QR and instructions first (no game code block) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* QR Code - Left column */}
           <div className="flex justify-center items-start">
             <QRCode 
-              data={INSTAGRAM_DM_URL}
+              data={getInstagramDmUrl(gameId)}
               size={380}
               margin={12}
               alt="QR Code para Instagram DM"
@@ -295,7 +287,7 @@ export default function L3trasGameScreen({ gameName, gameId, orientation, logoEl
             <ol className="space-y-4 text-base text-gray-300">
               <li className="flex gap-4">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-sm">1</span>
-                <span className="pt-0.5">Escanea el QR y envía el código de partida al chat de Instagram.</span>
+                <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram.</span>
               </li>
               <li className="flex gap-4">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-sm">2</span>

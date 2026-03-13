@@ -65,12 +65,13 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       const { close: shouldClose, refreshGameScreen, ...toPersist } = merged
       localStorage.setItem(storageKey, JSON.stringify(toPersist))
       setGameSettings(toPersist)
+      // Notify AppShell so it refreshes gameSettings (top X, premios, etc.) in the main view
+      onConfigSaved?.()
       if (refreshGameScreen === true) {
-        onConfigSaved?.()
+        // already notified above
       }
       if (shouldClose === true) {
         setShowGameConfig(false)
-        onConfigSaved?.()
         onClose()
       }
     }

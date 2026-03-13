@@ -1,4 +1,5 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '../api/api'
 import { usePolling } from '../hooks/usePolling'
 
@@ -6,6 +7,7 @@ interface RaffleWinner {
   username: string
   timestamp?: string
   raffleId?: string
+  prizeDelivered?: boolean
 }
 
 interface GameDataRaffleWinner {
@@ -14,6 +16,7 @@ interface GameDataRaffleWinner {
   instagramUsername: string
   playerId: number
   instagramPSID: string
+  prizeDelivered?: boolean
 }
 
 interface GameDataResponse {
@@ -22,6 +25,7 @@ interface GameDataResponse {
   playerCount?: number
   validatedCount?: number
   raffleWinners?: GameDataRaffleWinner[]
+  raffleRequiredFollows?: string[]
   quiz?: { enabled: boolean; questionsCount: number }
 }
 
@@ -36,6 +40,7 @@ interface RaffleDataProps {
   gameName: string
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and show fewer items
+  prizeLabel?: string // e.g. "🎁 Entrada gratis" — shown below title when set
 }
 
 const getStorageKey = (gameId: string) => `raffle_auto_${gameId}`
@@ -52,13 +57,67 @@ const loadAutoRaffleConfig = (gameId: string): AutoRaffleConfig | null => {
   return null
 }
 
-export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false }: RaffleDataProps) {
+export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false, prizeLabel }: RaffleDataProps) {
   const [winners, setWinners] = useState<RaffleWinner[]>([])
+  const [updatingDelivered, setUpdatingDelivered] = useState(false)
+  const [raffleRequiredFollows, setRaffleRequiredFollows] = useState<string[]>([])
   const [nextRaffleTime, setNextRaffleTime] = useState<Date | null>(null)
   const [timeUntilNext, setTimeUntilNext] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [gameType, setGameType] = useState<string | null>(null)
   const [autoRaffleConfig, setAutoRaffleConfig] = useState<AutoRaffleConfig | null>(null)
   const autoRaffleInProgressRef = useRef(false)
+  const [winnersDropdownOpen, setWinnersDropdownOpen] = useState(false)
+  const winnersDropdownRef = useRef<HTMLDivElement>(null)
+  const winnersButtonRef = useRef<HTMLButtonElement>(null)
+  const dropdownPortalRef = useRef<HTMLDivElement>(null)
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number; minWidth: number } | null>(null)
+
+  const updateDropdownPosition = useCallback(() => {
+    const btn = winnersButtonRef.current
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    setDropdownPosition({
+      top: rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+      minWidth: rect.width,
+    })
+  }, [])
+
+  // Set dropdown position before paint so the portal appears in the right place immediately
+  useLayoutEffect(() => {
+    if (!winnersDropdownOpen) {
+      setDropdownPosition(null)
+      return
+    }
+    updateDropdownPosition()
+  }, [winnersDropdownOpen, updateDropdownPosition])
+
+  useEffect(() => {
+    if (!winnersDropdownOpen) return
+    const onScrollOrResize = () => updateDropdownPosition()
+    window.addEventListener('scroll', onScrollOrResize, true)
+    window.addEventListener('resize', onScrollOrResize)
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true)
+      window.removeEventListener('resize', onScrollOrResize)
+    }
+  }, [winnersDropdownOpen, updateDropdownPosition])
+
+  useEffect(() => {
+    if (!winnersDropdownOpen) return
+    const onOutside = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (
+        !winnersDropdownRef.current?.contains(target) &&
+        !dropdownPortalRef.current?.contains(target)
+      ) {
+        setWinnersDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onOutside)
+    return () => document.removeEventListener('mousedown', onOutside)
+  }, [winnersDropdownOpen])
 
   const calculateNextAutoRaffleTime = (config: AutoRaffleConfig): Date | null => {
     if (!config.enabled) return null
@@ -97,17 +156,23 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
     const data = await api.get<GameDataResponse>(`/v1/game?gameName=${encodeURIComponent(gameName)}`)
     if (!data.ok) throw new Error('API response not ok')
 
+    if (data.game?.gameType) {
+      setGameType(data.game.gameType)
+    }
+
     const mappedWinners: RaffleWinner[] = (data.raffleWinners ?? [])
       .map(w => ({
         username: w.instagramUsername,
         timestamp: w.wonAt,
         raffleId: w.playerId.toString(),
+        prizeDelivered: w.prizeDelivered ?? false,
       }))
       .sort((a, b) => {
         if (!a.timestamp || !b.timestamp) return 0
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       })
     setWinners(mappedWinners)
+    setRaffleRequiredFollows(Array.isArray(data.raffleRequiredFollows) ? data.raffleRequiredFollows : [])
     setLoading(false)
   }, [gameId, gameName])
 
@@ -215,9 +280,33 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
     return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
   }
 
+  const handleToggleDelivered = async (raffleId: string, currentDelivered: boolean) => {
+    if (!gameId || !gameType) return
+    setUpdatingDelivered(true)
+    const next = !currentDelivered
+    try {
+      setWinners(prev => prev.map(w => w.raffleId === raffleId ? { ...w, prizeDelivered: next } : w))
+      await api.put('/v1/game', {
+        gameId,
+        settings: {
+          prizeDelivered: {
+            gameType: gameType.toUpperCase(),
+            playerId: parseInt(raffleId, 10),
+            delivered: next,
+          },
+        },
+      })
+    } catch (e) {
+      console.error('Error updating prizeDelivered', e)
+      setWinners(prev => prev.map(w => w.raffleId === raffleId ? { ...w, prizeDelivered: currentDelivered } : w))
+    } finally {
+      setUpdatingDelivered(false)
+    }
+  }
+
   if (loading) {
     return (
-      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6'}`}>
+      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
         <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>Sorteo</h2>
         <p className="text-textSub text-xs sm:text-sm">Cargando...</p>
       </div>
@@ -225,15 +314,28 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
   }
 
   return (
-    <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6 min-h-0 flex-1 overflow-hidden'}`}>
+    <div
+      className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col relative ${compact ? 'p-2 sm:p-3 min-w-0' : 'p-3 sm:p-4 lg:p-6 min-h-0 flex-1'} ${winnersDropdownOpen ? 'overflow-visible' : 'overflow-hidden'}`}
+      ref={winnersDropdownRef}
+    >
       <h2 className={`font-bold text-textMain mb-1 sm:mb-2 flex items-center gap-2 flex-shrink-0 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>
         Sorteo
         {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
       </h2>
-      <div className={`${compact ? 'space-y-1' : 'flex-1 min-h-0 overflow-y-auto space-y-3 sm:space-y-4'}`}>
+      {prizeLabel && (
+        <p className={`text-textSub flex-shrink-0 mb-1 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
+          Premio: {prizeLabel}
+        </p>
+      )}
+      {raffleRequiredFollows.length > 0 && (
+        <p className={`text-textSub flex-shrink-0 mb-1 ${compact ? 'text-[10px]' : 'text-xs'}`}>
+          Para participar deben seguir: {raffleRequiredFollows.map(h => `@${h}`).join(', ')}. Comprobamos que sigan a @stand_official.
+        </p>
+      )}
+      <div className={`flex-1 min-h-0 flex flex-col ${compact ? 'gap-1' : 'gap-3 sm:gap-4'}`}>
         {/* Next Raffle Countdown */}
         {timeUntilNext !== null && timeUntilNext > 0 && autoRaffleConfig?.enabled && (
-          <div className={`rounded-lg bg-surface border border-white/10 ${compact ? 'p-2' : 'p-2 sm:p-3'}`}>
+          <div className={`rounded-lg bg-surface border border-white/10 flex-shrink-0 ${compact ? 'p-2' : 'p-2 sm:p-3'}`}>
             <div className={`text-textSub mb-1 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>Próximo en:</div>
             <div className={`font-semibold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-base sm:text-lg'}`}>
               {formatTime(timeUntilNext)}
@@ -244,19 +346,65 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
           </div>
         )}
 
-        {/* Last winner only */}
+        {/* Winners dropdown: panel from Ganadores button, above the Sorteo container */}
         {winners.length > 0 ? (
-          <div>
-            <div className={`text-textSub mb-2 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>Último ganador:</div>
-            <div className={compact ? 'space-y-1' : 'space-y-1 sm:space-y-2'}>
-              <div
-                className={`flex items-center gap-2 rounded-lg bg-surface border border-white/10 ${compact ? 'p-1.5' : 'p-2 sm:p-2.5'}`}
-              >
-                <span className={`text-textMain font-medium truncate flex-1 ${compact ? 'text-base' : 'text-xs sm:text-sm'}`}>
-                  {winners[0].username}
-                </span>
-              </div>
-            </div>
+          <div className="relative flex-shrink-0">
+            <button
+              ref={winnersButtonRef}
+              type="button"
+              onClick={() => setWinnersDropdownOpen(open => !open)}
+              className={`w-full rounded-lg bg-surface border border-white/10 px-3 py-2 text-left text-textMain flex items-center justify-between ${compact ? 'text-xs' : 'text-sm'}`}
+              aria-expanded={winnersDropdownOpen}
+              aria-haspopup="listbox"
+              aria-label={`Ganadores (${winners.length}). ${winnersDropdownOpen ? 'Cerrar lista' : 'Ver lista'}`}
+            >
+              <span>Ganadores ({winners.length})</span>
+              <span className="text-textSub ml-2">{winnersDropdownOpen ? '▲' : '▼'}</span>
+            </button>
+            {winnersDropdownOpen &&
+              dropdownPosition &&
+              createPortal(
+                <div
+                  ref={dropdownPortalRef}
+                  className="fixed z-[9999] rounded-xl border border-white/15 bg-[rgba(30,30,40,0.98)] shadow-lg shadow-purple-500/10 max-h-56 overflow-hidden flex flex-col w-max min-w-0"
+                  style={{
+                    top: dropdownPosition.top,
+                    right: dropdownPosition.right,
+                    minWidth: dropdownPosition.minWidth,
+                    maxWidth: 'calc(100vw - 2rem)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(147,51,234,0.25)',
+                  }}
+                  role="listbox"
+                  aria-label="Lista de ganadores"
+                >
+                  <div
+                    className="overflow-y-auto overflow-x-auto overscroll-contain p-1.5 min-w-0"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {winners.map((w, index) => (
+                      <label
+                        key={w.raffleId ?? index}
+                        role="option"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg min-w-0 cursor-pointer border-b border-white/5 last:border-b-0 hover:bg-white/10 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!w.prizeDelivered}
+                          onChange={() => handleToggleDelivered(w.raffleId!, w.prizeDelivered ?? false)}
+                          disabled={updatingDelivered || !gameType}
+                          className="w-4 h-4 flex-shrink-0 rounded border-white/20 text-purple-500 focus:ring-purple-500"
+                          onClick={e => e.stopPropagation()}
+                          aria-label={`Premio entregado para ${w.username}`}
+                        />
+                        <span className="text-textMain font-medium whitespace-nowrap shrink-0 text-xs sm:text-sm" title={w.username}>
+                          {w.username}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>,
+                document.body
+              )}
           </div>
         ) : (
           <p className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>No hay ganadores aún</p>

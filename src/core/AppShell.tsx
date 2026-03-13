@@ -16,8 +16,9 @@ const STORAGE_KEY_LOGO = 'app_custom_logo'
 const GAME_SCREEN_LOGO_CLASS = 'h-32 sm:h-36 lg:h-40 xl:h-44 2xl:h-52 w-auto object-contain'
 // Letras overlapping bottom half of logo, larger than logo
 const GAME_SCREEN_LETRAS_CLASS = 'h-40 sm:h-44 lg:h-48 xl:h-52 2xl:h-60 w-auto object-contain -mt-24 sm:-mt-28 lg:-mt-32 xl:-mt-36 2xl:-mt-40'
-// Landscape: letras closer to logo (stronger negative margin)
-const GAME_SCREEN_LETRAS_CLASS_LANDSCAPE = 'h-40 sm:h-44 lg:h-48 xl:h-52 2xl:h-60 w-auto object-contain -mt-28 sm:-mt-32 lg:-mt-36 xl:-mt-40 2xl:-mt-44'
+// Landscape: slightly smaller logo/letras so left column fits without scroll
+const GAME_SCREEN_LOGO_CLASS_LANDSCAPE = 'h-28 sm:h-32 lg:h-36 xl:h-40 2xl:h-44 w-auto object-contain'
+const GAME_SCREEN_LETRAS_CLASS_LANDSCAPE = 'h-32 sm:h-36 lg:h-40 xl:h-44 2xl:h-48 w-auto object-contain -mt-24 sm:-mt-28 lg:-mt-32 xl:-mt-36 2xl:-mt-40'
 
 export default function AppShell() {
   const { loading: userLoading } = useCurrentUser()
@@ -28,6 +29,8 @@ export default function AppShell() {
   const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
   const [customLogo, setCustomLogo] = useState<string | null>(null)
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
+  const [gameSettings, setGameSettings] = useState<Record<string, unknown> | null>(null)
+  const [counterActive, setCounterActive] = useState(false)
   const portraitContentRef = useRef<HTMLDivElement>(null)
   const landscapeContentRef = useRef<HTMLDivElement>(null)
   const [portraitPaddingTopDvh, setPortraitPaddingTopDvh] = useState(5)
@@ -101,6 +104,25 @@ export default function AppShell() {
     }
   }, [gameType])
 
+  // Load game settings from localStorage (for prize labels in minicontainers)
+  useEffect(() => {
+    if (gameId && gameDefinition?.id) {
+      const storageKey = `${gameDefinition.id}_settings_${gameId}`
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        try {
+          setGameSettings(JSON.parse(saved))
+        } catch {
+          setGameSettings(null)
+        }
+      } else {
+        setGameSettings(null)
+      }
+    } else {
+      setGameSettings(null)
+    }
+  }, [gameId, gameDefinition?.id, gameConfigVersion])
+
   // Map game type names to game IDs
   const mapGameTypeToId = (type: string | undefined): string => {
     if (!type) return 'empareja2'
@@ -140,6 +162,25 @@ export default function AppShell() {
   // Use game definition if available, otherwise use a default theme (no specific game)
   const currentGame = gameDefinition
   const isPortrait = useOrientation()
+
+  // Derive prize labels for minicontainers from game settings
+  const normalizedGameType = gameType?.toLowerCase()
+  const playersPrizeLabel =
+    normalizedGameType === 'empareja2' && gameSettings && typeof gameSettings.prizeValidation === 'string' && gameSettings.prizeValidation.trim()
+      ? gameSettings.prizeValidation.trim()
+      : undefined
+  const rankingPrizeLabel =
+    normalizedGameType === 't1mer' && gameSettings && typeof gameSettings.prizeTopX === 'string' && gameSettings.prizeTopX.trim()
+      ? gameSettings.prizeTopX.trim()
+      : undefined
+  const rankingTopX =
+    normalizedGameType === 't1mer' && gameSettings && typeof gameSettings.topX === 'number' && gameSettings.topX >= 1
+      ? gameSettings.topX
+      : undefined
+  const rafflePrizeLabel =
+    gameSettings && typeof gameSettings.prizeRaffle === 'string' && gameSettings.prizeRaffle.trim()
+      ? gameSettings.prizeRaffle.trim()
+      : undefined
 
   // Portrait: 5% air at top (logo), 10% at bottom; reduce bottom when content overflows so nothing is hidden
   useEffect(() => {
@@ -266,23 +307,25 @@ export default function AppShell() {
                   <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-5 sm:p-6 lg:p-8">
                     <currentGame.GameScreen
                       key={`game-${gameId}-${gameConfigVersion}`}
-                      gameName={gameName}
                       gameId={gameId}
                       orientation="portrait"
+                      topX={rankingTopX}
+                      prizeLabel={rankingPrizeLabel}
+                      onCounterActiveChange={setCounterActive}
                     />
                   </div>
                   {/* Footer: Sorteo + Validador de Parejas (Players) always visible */}
                   <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
                     <div className="flex-1 min-w-[160px]">
-                      <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} />
+                      <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
                     </div>
                     {currentGame.showRanking && (
                       <div className="flex-1 min-w-[160px]">
-                        <Ranking gameId={gameId} />
+                        <Ranking gameId={gameId} gameType={gameType ?? undefined} prizeLabel={rankingPrizeLabel} topX={rankingTopX} refreshInterval={counterActive ? 0 : 10000} />
                       </div>
                     )}
                     <div className="flex-1 min-w-[160px]">
-                      <RaffleData gameId={gameId} gameName={gameName} />
+                      <RaffleData gameId={gameId} gameName={gameName} prizeLabel={rafflePrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
                     </div>
                   </div>
                 </div>
@@ -300,23 +343,25 @@ export default function AppShell() {
                     transformOrigin: 'center center',
                   }}
                 >
-                  <div
-                    ref={landscapeContentRef}
-                    className="h-full w-full overflow-hidden flex flex-col"
-                  >
+                    <div
+                      ref={landscapeContentRef}
+                      className="h-full w-full overflow-hidden flex flex-col"
+                    >
                     <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                       <currentGame.GameScreen
                         key={`game-${gameId}-${gameConfigVersion}`}
-                        gameName={gameName}
                         gameId={gameId}
                         orientation="landscape"
+                        topX={rankingTopX}
+                        prizeLabel={rankingPrizeLabel}
+                        onCounterActiveChange={setCounterActive}
                         logoElement={
                           (customLogo || currentGame.assets?.logo) ? (
-                            <div className="flex flex-col items-center -mt-3">
+                            <div className="flex flex-col items-center -mt-2">
                               <img
                                 src={customLogo ?? currentGame.assets!.logo}
                                 alt={customLogo ? 'Logo del cliente' : currentGame.name}
-                                className={GAME_SCREEN_LOGO_CLASS}
+                                className={GAME_SCREEN_LOGO_CLASS_LANDSCAPE}
                               />
                               {customLogo && currentGame && (
                                 <img
@@ -333,9 +378,9 @@ export default function AppShell() {
                         }
                         sidebarElement={
                           <div className="flex flex-col gap-3">
-                            <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} />
-                            {currentGame.showRanking && <Ranking gameId={gameId} compact />}
-                            <RaffleData gameId={gameId} gameName={gameName} compact />
+                            <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
+                            {currentGame.showRanking && <Ranking gameId={gameId} gameType={gameType ?? undefined} compact prizeLabel={rankingPrizeLabel} topX={rankingTopX} refreshInterval={counterActive ? 0 : 10000} />}
+                            <RaffleData gameId={gameId} gameName={gameName} compact prizeLabel={rafflePrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
                           </div>
                         }
                       />

@@ -2,10 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/QRCode'
 import BackButton from '../../core/BackButton'
+import { getInstagramDmUrl } from '../../core/instagram'
 import { api } from '../../api/api'
-
-const INSTAGRAM_HANDLE = 'stand_official'
-const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
 
 const CROSS_QUIZ_QUESTION_COUNT = 3
 const CROSS_QUIZ_TIME_SEC = 5
@@ -84,7 +82,7 @@ function buildCrossQuizRounds(res: ValidationResponse): CrossQuizRound[] {
   return shuffleArray(rounds)
 }
 
-export default function SemaforoGameScreen({ gameName, gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
+export default function SemaforoGameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
   const [stats] = useState<SemaforoStats>({ redCount: 0, yellowCount: 0, greenCount: 0 })
   const [statsLoading] = useState(false)
   const [gameState, setGameState] = useState<GameState>('idle')
@@ -398,32 +396,34 @@ export default function SemaforoGameScreen({ gameName, gameId, orientation, logo
 
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_200px] gap-4 sm:gap-6 items-stretch h-full min-h-0">
+      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
         <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0">
-          {logoElement}
-          <div className="text-center">
-            <div className="p-3 rounded-xl bg-[rgba(34,197,94,0.15)] border border-[rgba(34,197,94,0.3)]">
-              <p className="text-xs text-gray-300 mb-1">Código de partida {gameName}:</p>
-              <p className="text-xl font-bold tracking-wider text-green-500">{gameId}</p>
+          <div className="grid grid-cols-2 gap-2 items-center flex-shrink-0 min-h-0">
+            <div className="flex justify-center min-h-0 w-full min-w-0">
+              <QRCode data={getInstagramDmUrl(gameId)} size={200} margin={6} containerClassName="max-h-[min(18vh,160px)] w-full" alt="QR Code para Instagram DM" className="!border-0 !bg-transparent !p-0" />
+            </div>
+            <div className="flex justify-center items-center min-h-0">
+              {logoElement}
             </div>
           </div>
-          <div className="flex flex-col gap-2 min-h-0 flex-1">
-            <div className="flex justify-center flex-shrink-0"><QRCode data={INSTAGRAM_DM_URL} size={260} margin={8} alt="QR Code para Instagram DM" /></div>
-            <div className="space-y-1.5 min-h-0">
-              <h3 className="text-sm font-semibold text-textMain mb-1">Instrucciones</h3>
-              <ol className="space-y-1.5 text-xs text-gray-300">
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-[10px]">1</span><span className="pt-0.5">Escanea el QR y responde al quiz (estado sentimental / interés social).</span></li>
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-[10px]">2</span><span className="pt-0.5">Te asignamos a un grupo: 🔴 Casado, 🟡 Puede ser, 🟢 Soltero.</span></li>
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-[10px]">3</span><span className="pt-0.5">Aquí ves cuánta gente hay en cada grupo.</span></li>
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-[10px]">4</span><span className="pt-0.5">Cuando os encontréis, validad juntos vuestros códigos aquí.</span></li>
+          <div className="flex-shrink-0 min-h-0 overflow-hidden">
+            <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
+              <ol className="flex flex-col gap-1.5 text-xs text-gray-300">
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-[10px]">1</span><span className="pt-0.5">📸 Escanea el QR y pulsa JUGAR. Responde al quiz.</span></li>
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-[10px]">2</span><span className="pt-0.5">🔴🟡🟢 Te asignamos un grupo (Casado / Puede ser / Soltero).</span></li>
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-[10px]">3</span><span className="pt-0.5">👥 Aquí ves cuánta gente hay en cada grupo.</span></li>
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-[10px]">4</span><span className="pt-0.5">✅ Validad juntos vuestros códigos aquí.</span></li>
               </ol>
             </div>
-          </div>
         </div>
         <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
           {semaforoMainContent}
         </div>
-        <div className="card flex flex-col gap-3 p-4 min-w-0 min-h-0 overflow-hidden items-start">{sidebarElement}</div>
+        <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
+          <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
+            {sidebarElement}
+          </div>
+        </div>
       </div>
     )
   }
@@ -436,24 +436,17 @@ export default function SemaforoGameScreen({ gameName, gameId, orientation, logo
         </div>
       )}
       <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
-      <div className="text-center flex-shrink-0">
-        <div className="p-5 rounded-xl bg-[rgba(34,197,94,0.15)] border border-[rgba(34,197,94,0.3)]">
-          <p className="text-base text-gray-300 mb-2">Código de partida {gameName}:</p>
-          <p className="text-4xl lg:text-5xl font-bold tracking-wider text-green-500">{gameId}</p>
-        </div>
-      </div>
-
-      {/* QR Code and Instructions - Always visible (portrait) */}
+      {/* QR and instructions first (no game code block) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="flex justify-center items-start">
-            <QRCode data={INSTAGRAM_DM_URL} size={380} margin={12} alt="QR Code para Instagram DM" />
+            <QRCode data={getInstagramDmUrl(gameId)} size={380} margin={12} alt="QR Code para Instagram DM" />
           </div>
           <div className="space-y-4">
             <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
             <ol className="space-y-4 text-base text-gray-300">
               <li className="flex gap-4">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-sm">1</span>
-                <span className="pt-0.5">Escanea el QR y responde al quiz (estado sentimental / interés social).</span>
+                <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram. Luego responde al quiz (estado sentimental / interés social).</span>
               </li>
               <li className="flex gap-4">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-sm">2</span>

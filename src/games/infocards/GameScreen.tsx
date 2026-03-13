@@ -3,11 +3,10 @@ import type { GameScreenProps } from '../../core/types'
 import type { CardLayoutPosition } from './GameConfig'
 import { api } from '../../api/api'
 import QRCode from '../../core/QRCode'
+import { getInstagramDmUrl } from '../../core/instagram'
 
 const INFOCARDS_SETTINGS_KEY_PREFIX = 'infocards_settings_'
 const CARD_CONTAINER_HEIGHT_CLASS = 'h-[420px]'
-const INSTAGRAM_HANDLE = 'stand_official'
-const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
 const INFOCARDS_JOIN_CARD_ID = '__infocards_join__'
 
 type InfoCard = {
@@ -187,16 +186,10 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
 
   const renderJoinCard = () => (
     <div key={INFOCARDS_JOIN_CARD_ID} className={baseClass} style={cardStyle}>
-      <div className="text-center mb-2 flex-shrink-0">
-        <div className="p-5 rounded-xl bg-[rgba(99,102,241,0.15)] border border-[rgba(99,102,241,0.3)]">
-          <p className="text-base text-gray-300 mb-2">Código de partida:</p>
-          <p className="text-4xl lg:text-5xl font-bold tracking-wider text-[#6366F1]">{gameId}</p>
-        </div>
-      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 flex-1 min-h-0 overflow-hidden">
         <div className="flex justify-center items-start">
           <QRCode
-            data={INSTAGRAM_DM_URL}
+            data={getInstagramDmUrl(gameId)}
             size={380}
             margin={12}
             alt="QR Code para Instagram DM"
@@ -207,7 +200,7 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
           <ol className="space-y-4 text-base text-gray-300">
             <li className="flex gap-4">
               <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-sm">1</span>
-              <span className="pt-0.5">Escanea el QR y envía el código de partida por Instagram DM para unirte.</span>
+              <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.</span>
             </li>
             <li className="flex gap-4">
               <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-sm">2</span>
@@ -270,26 +263,24 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_200px] gap-4 sm:gap-6 items-stretch w-full min-h-0 h-full">
+      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0 w-full">
         <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0">
-          {logoElement}
-          <div className="text-center">
-            <div className="p-3 rounded-xl bg-[rgba(99,102,241,0.15)] border border-[rgba(99,102,241,0.3)]">
-              <p className="text-xs text-gray-300 mb-1">Código de partida:</p>
-              <p className="text-xl font-bold tracking-wider text-[#6366F1]">{gameId}</p>
+          <div className="grid grid-cols-2 gap-2 items-center flex-shrink-0 min-h-0">
+            <div className="flex justify-center min-h-0 w-full min-w-0">
+              <QRCode data={getInstagramDmUrl(gameId)} size={200} margin={6} containerClassName="max-h-[min(18vh,160px)] w-full" alt="QR Code para Instagram DM" className="!border-0 !bg-transparent !p-0" />
+            </div>
+            <div className="flex justify-center items-center min-h-0">
+              {logoElement}
             </div>
           </div>
-          <div className="flex flex-col gap-2 min-h-0 flex-1">
-            <div className="flex justify-center flex-shrink-0"><QRCode data={INSTAGRAM_DM_URL} size={260} margin={8} alt="QR Code para Instagram DM" /></div>
-            <div className="space-y-1.5 min-h-0">
-              <h3 className="text-sm font-semibold text-textMain mb-1">Instrucciones</h3>
-              <ol className="space-y-1.5 text-xs text-gray-300">
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">1</span><span className="pt-0.5">Escanea el QR y envía el código de partida por Instagram DM para unirte.</span></li>
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">2</span><span className="pt-0.5">En el chat podrás hacer un pequeño quiz y demostrar lo aprendido.</span></li>
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">3</span><span className="pt-0.5">Participa en los sorteos.</span></li>
+          <div className="flex-shrink-0 min-h-0 overflow-hidden">
+            <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
+            <ol className="flex flex-col gap-1.5 text-xs text-gray-300">
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">1</span><span className="pt-0.5">📸 Escanea el QR y pulsa JUGAR para unirte.</span></li>
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">2</span><span className="pt-0.5">📝 Quiz en el chat.</span></li>
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">3</span><span className="pt-0.5">🎉 Participa en sorteos.</span></li>
               </ol>
             </div>
-          </div>
         </div>
         <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 items-center gap-6">
           <div className={`w-full flex-shrink-0 ${CARD_CONTAINER_HEIGHT_CLASS}`}>
@@ -310,7 +301,11 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
           </div>
           <p className="text-textSub text-xs">{currentIndex + 1} / {displayCards.length}</p>
         </div>
-        <div className="card flex flex-col gap-3 p-4 min-w-0 min-h-0 overflow-hidden items-start">{sidebarElement}</div>
+        <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
+          <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
+            {sidebarElement}
+          </div>
+        </div>
       </div>
     )
   }

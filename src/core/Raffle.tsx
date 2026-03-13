@@ -5,11 +5,13 @@ type RaffleProps = {
   onBack: () => void
   onClose: () => void
   gameId?: string
+  gameName?: string
 }
 
 type RaffleResponse = {
   gameId: string
   winners: string[]
+  raffleRequiredFollows?: string[]
 }
 
 interface AutoRaffleConfig {
@@ -42,16 +44,37 @@ const saveAutoRaffleConfig = (gameId: string | undefined, config: AutoRaffleConf
   }
 }
 
-export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
+export default function Raffle({ onBack, onClose, gameId, gameName }: RaffleProps) {
   const [numberOfWinners, setNumberOfWinners] = useState<number>(1)
   const [applicableOnlyValidated, setApplicableOnlyValidated] = useState<boolean>(false)
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [winners, setWinners] = useState<string[] | null>(null)
-  
+  const [requiredFollows, setRequiredFollows] = useState<string[]>([])
+  const [newHandle, setNewHandle] = useState('')
+  const [savingFollows, setSavingFollows] = useState(false)
+
   // Auto raffle: solo activar/desactivar e intervalo. El resto (número de ganadores, aplicable a) se toma de los inputs del sorteo manual.
   const [autoRaffleEnabled, setAutoRaffleEnabled] = useState<boolean>(false)
   const [autoRaffleInterval, setAutoRaffleInterval] = useState<number>(30) // minutes
+
+  // Load game raffleRequiredFollows on mount (by gameId for owner)
+  useEffect(() => {
+    if (!gameId) return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const data = await api.get<{ ok: boolean; raffleRequiredFollows?: string[] }>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
+        if (!cancelled && data?.raffleRequiredFollows && Array.isArray(data.raffleRequiredFollows)) {
+          setRequiredFollows(data.raffleRequiredFollows)
+        }
+      } catch (_) {
+        // may 401 if not owner; ignore
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [gameId])
 
   // Load auto raffle config on mount
   useEffect(() => {
@@ -89,6 +112,36 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
       setAutoRaffleInterval(num)
     } else if (value === '') {
       setAutoRaffleInterval(1)
+    }
+  }
+
+  const addRequiredFollow = () => {
+    const h = newHandle.trim().toLowerCase().replace(/^@/, '')
+    if (!h) return
+    if (requiredFollows.includes(h)) {
+      setNewHandle('')
+      return
+    }
+    setRequiredFollows([...requiredFollows, h])
+    setNewHandle('')
+  }
+
+  const removeRequiredFollow = (handle: string) => {
+    setRequiredFollows(requiredFollows.filter((x) => x !== handle))
+  }
+
+  const saveRequiredFollows = async () => {
+    if (!gameId) return
+    setSavingFollows(true)
+    try {
+      await api.put('/v1/game', {
+        gameId,
+        settings: { raffle: { requiredFollows: requiredFollows } },
+      })
+    } catch (err: any) {
+      setError(err.message || 'Error al guardar las cuentas')
+    } finally {
+      setSavingFollows(false)
     }
   }
 
@@ -294,6 +347,63 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                   </div>
                 </label>
               </div>
+            </div>
+
+            {/* Requisitos para ganar: cuentas de Instagram a seguir */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Requisitos para ganar (cuentas a seguir)
+              </label>
+              <p className="text-xs text-gray-400 mb-3">
+                Para participar en el sorteo deben seguir estas cuentas. Comprobamos automáticamente que sigan a @stand_official; el resto se notifica por DM.
+              </p>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {requiredFollows.map((handle) => (
+                  <span
+                    key={handle}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] border border-white/10 text-sm"
+                  >
+                    @{handle}
+                    <button
+                      type="button"
+                      onClick={() => removeRequiredFollow(handle)}
+                      className="ml-1 p-0.5 rounded hover:bg-white/20 text-gray-400 hover:text-white"
+                      aria-label={`Quitar @${handle}`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Añadir @usuario (sin @)"
+                  value={newHandle}
+                  onChange={(e) => setNewHandle(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addRequiredFollow())}
+                  className="flex-1 h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm placeholder-gray-500 focus:border-white/20 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={addRequiredFollow}
+                  className="px-4 h-10 rounded-lg bg-[rgba(255,255,255,0.1)] border border-white/10 hover:bg-white/15 text-sm font-medium"
+                >
+                  Añadir
+                </button>
+              </div>
+              {requiredFollows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={saveRequiredFollows}
+                  disabled={savingFollows}
+                  className="mt-2 text-xs text-purple-400 hover:text-purple-300 disabled:opacity-50"
+                >
+                  {savingFollows ? 'Guardando...' : 'Guardar lista'}
+                </button>
+              )}
             </div>
 
             {/* Run Raffle Button */}

@@ -4,6 +4,22 @@
 
 :root { color-scheme: dark; }
 
+/* Segment7: solo fuente local en public/fonts/segment7/Segment7Standard.otf */
+@font-face {
+  font-family: 'Segment7Standard';
+  src: url('/fonts/segment7/Segment7Standard.otf') format('opentype');
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Aplicar Segment7 al contador en todas las vistas (vertical y horizontal) */
+.font-digital {
+  font-family: 'Segment7Standard', ui-monospace, monospace;
+  font-style: italic;
+  font-weight: normal;
+}
+
 /* Fluid base font: scales with viewport so text and components are larger on big screens (e.g. touchscreen). Max 30px for big displays. */
 html {
   font-size: clamp(14px, 1.4vw + 12px, 30px);

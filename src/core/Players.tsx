@@ -21,6 +21,7 @@ interface PlayersProps {
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and avoid scroll
   countersOnly?: boolean // when true (e.g. empareja2 landscape), show only Validadas block, no title
+  prizeLabel?: string // e.g. "🎁 Entrada gratis" — shown below title when set
 }
 
 const EMPAREJA2_SETTINGS_KEY = 'empareja2_settings_'
@@ -39,7 +40,7 @@ function getEmpareja2MaxValidations(gameId: string | undefined): number | undefi
   }
 }
 
-export default function Players({ gameName, gameId, gameType, refreshInterval = 10000, compact = false, countersOnly = false }: PlayersProps) {
+export default function Players({ gameName, gameId, gameType, refreshInterval = 10000, compact = false, countersOnly = false, prizeLabel }: PlayersProps) {
   const { plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const [playerCount, setPlayerCount] = useState<number | null>(null)
@@ -68,7 +69,7 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
 
   if (playerCount === null) {
     return (
-      <div className={`card rounded-xl sm:rounded-2xl shadow-neon ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6'}`}>
+      <div className={`card rounded-xl sm:rounded-2xl shadow-neon ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
         {!countersOnly && (
           <>
             <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>Jugadores</h2>
@@ -82,7 +83,7 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
 
   if (countersOnly && isEmpareja2) {
     return (
-      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6'}`}>
+      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
         {isStale && <span className="text-[10px] font-normal text-yellow-500 mb-1 block">● sin señal</span>}
         <div className="space-y-2">
           <div>
@@ -119,13 +120,18 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
               </div>
             </div>
           )}
+          {prizeLabel && (
+            <div className={`text-textSub ${compact ? 'text-xs' : 'text-sm'}`}>
+              Premio: {prizeLabel}
+            </div>
+          )}
         </div>
       </div>
     )
   }
 
   return (
-    <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6'}`}>
+    <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
       <h2 className={`font-bold text-textMain flex items-center gap-2 ${compact ? 'text-sm mb-1' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>
         Jugadores
         {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
@@ -167,6 +173,11 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
             )}
           </div>
         </div>
+      )}
+      {prizeLabel && (
+        <p className={`text-textSub mt-2 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
+          Premio: {prizeLabel}
+        </p>
       )}
     </div>
   )

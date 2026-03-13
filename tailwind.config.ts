@@ -21,7 +21,10 @@ export default {
       boxShadow: {
         neon: '0 0 20px rgba(176,38,255,0.35), 0 0 28px rgba(34,211,238,0.25)',
       },
-      backdropBlur: { xs: '2px' }
+      backdropBlur: { xs: '2px' },
+      fontFamily: {
+        digital: ['Segment7Standard', 'ui-monospace', 'monospace'],
+      },
     },
     fontFamily: { sans: ['Inter','system-ui','sans-serif'] }
   },
