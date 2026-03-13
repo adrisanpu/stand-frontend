@@ -5,7 +5,6 @@ type RaffleProps = {
   onBack: () => void
   onClose: () => void
   gameId?: string
-  gameName?: string
 }
 
 type RaffleResponse = {
@@ -44,7 +43,7 @@ const saveAutoRaffleConfig = (gameId: string | undefined, config: AutoRaffleConf
   }
 }
 
-export default function Raffle({ onBack, onClose, gameId, gameName }: RaffleProps) {
+export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
   const [numberOfWinners, setNumberOfWinners] = useState<number>(1)
   const [applicableOnlyValidated, setApplicableOnlyValidated] = useState<boolean>(false)
   const [isRunning, setIsRunning] = useState(false)
