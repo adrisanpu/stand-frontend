@@ -2,10 +2,8 @@ import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/QRCode'
 import BackButton from '../../core/BackButton'
+import { getInstagramDmUrl } from '../../core/instagram'
 import { api } from '../../api/api'
-
-const INSTAGRAM_HANDLE = 'stand_official'
-const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
 
@@ -24,7 +22,7 @@ type ValidationResponse = {
   notified?: boolean
 }
 
-export default function Empareja2GameScreen({ gameName, gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
+export default function Empareja2GameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
@@ -96,26 +94,30 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_200px] gap-4 sm:gap-6 items-stretch h-full min-h-0">
-        {/* Left: QR + code + instructions (large, readable) */}
-        <div className="card flex flex-col gap-3 p-4 sm:p-5 overflow-hidden min-h-0">
-          <div className="grid grid-cols-2 gap-3 items-center flex-shrink-0">
-            <div className="flex justify-center">
-              <QRCode data={INSTAGRAM_DM_URL} size={200} margin={8} alt="QR Code para Instagram DM" className="!border-0 !bg-transparent" />
+      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
+        {/* Left: QR + logo + instructions */}
+        <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0">
+          <div className="grid grid-cols-2 gap-2 items-center flex-shrink-0 min-h-0">
+            <div className="flex justify-center min-h-0 w-full min-w-0">
+              <QRCode
+                data={getInstagramDmUrl(gameId)}
+                size={200}
+                margin={6}
+                containerClassName="max-h-[min(18vh,160px)] w-full"
+                alt="QR Code para Instagram DM"
+                className="!border-0 !bg-transparent !p-0"
+              />
             </div>
-            <div className="text-center">
-              <div className="p-3 rounded-xl bg-[rgba(176,38,255,0.12)]">
-                <p className="text-xs text-gray-300 mb-1">Código de partida {gameName}:</p>
-                <p className="text-xl font-bold tracking-wider text-neonMagenta">{gameId}</p>
-              </div>
+            <div className="flex justify-center items-center min-h-0">
+              {logoElement}
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto">
-            <h3 className="text-sm font-semibold text-textMain mb-2">Instrucciones</h3>
-            <ol className="flex flex-col gap-2 space-y-2 text-sm text-gray-300">
+          <div className="flex-shrink-0 min-h-0 overflow-hidden">
+            <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
+            <ol className="flex flex-col gap-1.5 text-xs text-gray-300">
               <li className="flex gap-2 items-start">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">1</span>
-                <span>📥 QR y envía el código de partida por Instagram DM para unirte.</span>
+                <span>📸 Escanea el QR y pulsa JUGAR en el chat.</span>
               </li>
               <li className="flex gap-2 items-start">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">2</span>
@@ -157,12 +159,9 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
           )}
           {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in"><div className="flex items-center justify-center gap-3 mb-2"><svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg><span className="text-xl font-semibold text-red-400">Pareja Inválida</span></div>{(validationResult.message || error) && <p className="text-base text-red-300">{validationResult.message || error}</p>}</div>}
         </div>
-        {/* Right: logo + letras, then mini containers (no scroll, fit; tight gap) */}
-        <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full max-w-[200px]">
-          <div className="flex justify-center shrink-0 origin-top -mb-3" style={{ transform: 'scale(0.88)', transformOrigin: 'top center' }}>
-            {logoElement}
-          </div>
-          <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full bg-transparent border-0">
+        {/* Right: sidebar only (logo is next to QR in left column) */}
+        <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
+          <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
             {sidebarElement}
           </div>
         </div>
@@ -173,43 +172,35 @@ export default function Empareja2GameScreen({ gameName, gameId, orientation, log
   return (
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
       <div className={`flex flex-col overflow-hidden min-h-0 ${showJoinBlock ? 'flex-1' : 'flex-1 flex'} ${orientation === 'portrait' ? 'justify-center gap-8' : 'gap-3'}`}>
-      {/* Game Code - Always visible */}
-      <div className="text-center flex-shrink-0">
-        <div className={`rounded-xl bg-[rgba(176,38,255,0.12)] ${orientation === 'portrait' ? 'p-4 sm:p-5' : 'p-3 sm:p-4'}`}>
-          <p className="text-sm text-gray-300 mb-1">Código de partida:</p>
-          <p className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-wider text-neonMagenta">{gameId}</p>
-        </div>
-      </div>
-
-      {/* QR Code and Instructions - only as tall as content so no big gap before Validator */}
-      <div className={`flex-shrink-0 overflow-hidden grid grid-cols-1 md:grid-cols-2 ${orientation === 'portrait' ? 'gap-5' : 'gap-4'}`}>
+      {/* QR and instructions first (no game code block) */}
+      <div className={`flex-shrink-0 overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-4`}>
           <div className="flex justify-center items-start min-w-0">
             <QRCode
-              data={INSTAGRAM_DM_URL}
-              size={orientation === 'portrait' ? 200 : 380}
-              margin={orientation === 'portrait' ? 8 : 12}
+              data={getInstagramDmUrl(gameId)}
+              size={orientation === 'portrait' ? 180 : 380}
+              margin={orientation === 'portrait' ? 6 : 12}
               alt="QR Code para Instagram DM"
               className="!border-0 !bg-transparent"
             />
           </div>
 
-          <div className="space-y-2 min-w-0">
-            <h3 className="text-base font-semibold text-textMain mb-1">Instrucciones</h3>
-              <ol className="space-y-2 text-sm text-gray-300">
-                <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">1</span>
-                  <span className="pt-0.5">📥 QR y envía el código de partida por Instagram DM para unirte.</span>
+          <div className="space-y-1.5 min-w-0 overflow-hidden">
+            <h3 className="text-sm font-semibold text-textMain mb-1">Instrucciones</h3>
+              <ol className="space-y-1.5 text-xs text-gray-300">
+                <li className="flex gap-2 items-start">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">1</span>
+                  <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.</span>
                 </li>
-                <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">2</span>
+                <li className="flex gap-2 items-start">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">2</span>
                   <span className="pt-0.5">🎟️ Recibe tu pareja asignada y tu código de validación.</span>
                 </li>
-                <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">3</span>
+                <li className="flex gap-2 items-start">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">3</span>
                   <span className="pt-0.5">👥 Encuentra a tu pareja físicamente.</span>
                 </li>
-                <li className="flex gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">4</span>
+                <li className="flex gap-2 items-start">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">4</span>
                   <span className="pt-0.5">🏆 Cuando os encontréis, validad juntos vuestros códigos.</span>
                 </li>
               </ol>

@@ -2,10 +2,8 @@ import { useState } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/QRCode'
 import BackButton from '../../core/BackButton'
+import { getInstagramDmUrl } from '../../core/instagram'
 import { api } from '../../api/api'
-
-const INSTAGRAM_HANDLE = 'stand_official'
-const INSTAGRAM_DM_URL = `https://ig.me/m/${INSTAGRAM_HANDLE}`
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
 
@@ -33,7 +31,7 @@ type ValidationResponse = {
 const CUPIDO_PRIMARY = '#E11D48'
 const CUPIDO_PRIMARY_RGB = '225, 29, 72'
 
-export default function CupidoGameScreen({ gameName, gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
+export default function CupidoGameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
@@ -91,26 +89,24 @@ export default function CupidoGameScreen({ gameName, gameId, orientation, logoEl
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_200px] gap-4 sm:gap-6 items-stretch h-full min-h-0">
+      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
         <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0">
-          {logoElement}
-          <div className="text-center">
-            <div className="p-3 rounded-xl border" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.15)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)` }}>
-              <p className="text-xs text-gray-300 mb-1">Código de partida {gameName}:</p>
-              <p className="text-xl font-bold tracking-wider" style={{ color: CUPIDO_PRIMARY }}>{gameId}</p>
+          <div className="grid grid-cols-2 gap-2 items-center flex-shrink-0 min-h-0">
+            <div className="flex justify-center min-h-0 w-full min-w-0">
+              <QRCode data={getInstagramDmUrl(gameId)} size={200} margin={6} containerClassName="max-h-[min(18vh,160px)] w-full" alt="QR Code para Instagram DM" className="!border-0 !bg-transparent !p-0" />
+            </div>
+            <div className="flex justify-center items-center min-h-0">
+              {logoElement}
             </div>
           </div>
-          <div className="flex flex-col gap-2 min-h-0 flex-1">
-            <div className="flex justify-center flex-shrink-0"><QRCode data={INSTAGRAM_DM_URL} size={260} margin={8} alt="QR Code para Instagram DM" /></div>
-            <div className="space-y-1.5 min-h-0">
-              <h3 className="text-sm font-semibold text-textMain mb-1">Instrucciones</h3>
-              <ol className="space-y-1.5 text-xs text-gray-300">
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center font-semibold text-[10px] text-white" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>1</span><span className="pt-0.5">Escanea el QR y responde al quiz (gustos, aficiones…).</span></li>
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center font-semibold text-[10px] text-white" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>2</span><span className="pt-0.5">Cupido te empareja con alguien de gustos afines (pareja o amigos).</span></li>
-                <li className="flex gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center font-semibold text-[10px] text-white" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>3</span><span className="pt-0.5">Encuentra a tu pareja y validad juntos vuestros códigos aquí.</span></li>
+          <div className="flex-shrink-0 min-h-0 overflow-hidden">
+            <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
+              <ol className="flex flex-col gap-1.5 text-xs text-gray-300">
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center font-semibold text-[10px] text-white" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>1</span><span className="pt-0.5">📸 Escanea el QR y pulsa JUGAR. Responde al quiz.</span></li>
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center font-semibold text-[10px] text-white" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>2</span><span className="pt-0.5">❤️ Cupido te empareja con alguien afín.</span></li>
+                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center font-semibold text-[10px] text-white" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>3</span><span className="pt-0.5">✅ Encuentra a tu pareja y validad códigos aquí.</span></li>
               </ol>
             </div>
-          </div>
         </div>
         <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.08)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)` }}>
@@ -138,7 +134,11 @@ export default function CupidoGameScreen({ gameName, gameId, orientation, logoEl
           )}
           {gameState === 'invalid' && validationResult && !validationResult.valid && <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center"><span className="text-4xl" aria-hidden>💔</span><span className="text-base font-semibold text-red-400">Pareja inválida</span>{(validationResult.message || error) && <p className="text-sm text-red-300 mt-2">{validationResult.message || error}</p>}</div>}
         </div>
-        <div className="card flex flex-col gap-3 p-4 min-w-0 min-h-0 overflow-hidden items-start">{sidebarElement}</div>
+        <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
+          <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
+            {sidebarElement}
+          </div>
+        </div>
       </div>
     )
   }
@@ -151,27 +151,11 @@ export default function CupidoGameScreen({ gameName, gameId, orientation, logoEl
         </div>
       )}
       <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
-      {/* Game Code */}
-      <div className="text-center flex-shrink-0">
-        <div
-          className="p-5 rounded-xl border"
-          style={{
-            backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.15)`,
-            borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)`,
-          }}
-        >
-          <p className="text-base text-gray-300 mb-2">Código de partida {gameName}:</p>
-          <p className="text-4xl lg:text-5xl font-bold tracking-wider" style={{ color: CUPIDO_PRIMARY }}>
-            {gameId}
-          </p>
-        </div>
-      </div>
-
-      {/* QR + Instructions - Always visible (portrait) */}
+      {/* QR and instructions first (no game code block) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="flex justify-center items-start">
             <QRCode
-              data={INSTAGRAM_DM_URL}
+              data={getInstagramDmUrl(gameId)}
               size={380}
               margin={12}
               alt="QR Code para Instagram DM"
@@ -190,7 +174,7 @@ export default function CupidoGameScreen({ gameName, gameId, orientation, logoEl
                 >
                   1
                 </span>
-                <span className="pt-0.5">Escanea el QR y responde al quiz (gustos, aficiones…).</span>
+                <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram. Luego responde al quiz (gustos, aficiones…).</span>
               </li>
               <li className="flex gap-4">
                 <span

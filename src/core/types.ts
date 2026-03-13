@@ -2,13 +2,18 @@ import React from 'react'
 
 export interface GameScreenProps {
   gameId: string
-  gameName: string
   /** When 'landscape', the game may render a 3-column layout (logo+code+QR | validation+animation | sidebar) */
   orientation?: 'portrait' | 'landscape'
   /** For landscape: node to place in column 1 (e.g. logo) */
   logoElement?: React.ReactNode
   /** For landscape: node to place in column 3 (e.g. Players, Ranking, RaffleData) */
   sidebarElement?: React.ReactNode
+  /** Optional: top X positions that get a prize (e.g. 3); used to show "Premio por top X" in result screen */
+  topX?: number
+  /** Optional: label for the prize (e.g. "Merchandising"); shown when player ranks in top X */
+  prizeLabel?: string
+  /** When the in-game counter/timer is running, call with true to pause API polling (score, ranking, game) and avoid lag */
+  onCounterActiveChange?: (active: boolean) => void
 }
 
 export interface ThemeColors {

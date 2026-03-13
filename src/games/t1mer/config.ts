@@ -1,5 +1,6 @@
 import type { GameDefinition } from '../../core/types'
 import T1merGameScreen from './GameScreen'
+import T1merGameConfig from './GameConfig'
 
 export const t1merDefinition: GameDefinition = {
   id: 't1mer',
@@ -22,5 +23,6 @@ export const t1merDefinition: GameDefinition = {
   },
   GameScreen: T1merGameScreen,
   showRanking: true,
+  GameConfigComponent: T1merGameConfig,
 }
 
