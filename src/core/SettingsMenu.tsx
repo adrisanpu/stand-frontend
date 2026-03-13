@@ -312,8 +312,8 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
         <div className="absolute inset-0 bg-black/70" onClick={() => setShowUserInfo(false)} aria-hidden="true" />
-        <div className="relative card w-full max-w-md p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="relative card w-full max-w-md p-6 max-h-[90vh] flex flex-col">
+          <div className="flex items-center justify-between mb-6 flex-shrink-0">
             <h2 id="user-info-title" className="text-xl font-semibold">Información del Usuario</h2>
             <button
               onClick={() => setShowUserInfo(false)}
@@ -326,87 +326,91 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             </button>
           </div>
 
-          {userLoading ? (
-            <div className="text-center py-8">
-              <p className="text-textSub">Cargando información...</p>
-            </div>
-          ) : user ? (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
-                <div className="space-y-3">
-                  <div>
-                    <div className="text-xs text-gray-400 mb-1">Email</div>
-                    <div className="text-textMain font-medium">{user.email || 'No disponible'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-400 mb-1">Plan</div>
-                    <div className="text-textMain font-medium">
-                      {planLabels[user.plan] || user.plan.toUpperCase()}
-                    </div>
-                  </div>
-                  {user.activeUntil && (
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+            {userLoading ? (
+              <div className="text-center py-8">
+                <p className="text-textSub">Cargando información...</p>
+              </div>
+            ) : user ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
+                  <div className="space-y-3">
                     <div>
-                      <div className="text-xs text-gray-400 mb-1">Activo hasta</div>
-                      <div className="text-textMain">
-                        <Countdown targetDate={user.activeUntil} />
+                      <div className="text-xs text-gray-400 mb-1">Email</div>
+                      <div className="text-textMain font-medium">{user.email || 'No disponible'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400 mb-1">Plan</div>
+                      <div className="text-textMain font-medium">
+                        {planLabels[user.plan] || user.plan.toUpperCase()}
                       </div>
                     </div>
-                  )}
-                  <div>
-                    <div className="text-xs text-gray-400 mb-1">Cuenta creada</div>
-                    <div className="text-textMain text-sm">{formatDate(user.createdAt)}</div>
-                  </div>
-                  {user.updatedAt && user.updatedAt !== user.createdAt && (
+                    {user.activeUntil && (
+                      <div>
+                        <div className="text-xs text-gray-400 mb-1">Activo hasta</div>
+                        <div className="text-textMain">
+                          <Countdown targetDate={user.activeUntil} />
+                        </div>
+                      </div>
+                    )}
                     <div>
-                      <div className="text-xs text-gray-400 mb-1">Última actualización</div>
-                      <div className="text-textMain text-sm">{formatDate(user.updatedAt)}</div>
+                      <div className="text-xs text-gray-400 mb-1">Cuenta creada</div>
+                      <div className="text-textMain text-sm">{formatDate(user.createdAt)}</div>
                     </div>
-                  )}
+                    {user.updatedAt && user.updatedAt !== user.createdAt && (
+                      <div>
+                        <div className="text-xs text-gray-400 mb-1">Última actualización</div>
+                        <div className="text-textMain text-sm">{formatDate(user.updatedAt)}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-red-300">No se pudo cargar la información del usuario</p>
-            </div>
-          )}
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-red-300">No se pudo cargar la información del usuario</p>
+              </div>
+            )}
 
-          {/* Upgrade to Event Plan Button */}
-          {plan === 'free' && (
-            <div className="mt-6 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30">
-              <p className="text-sm text-blue-300 mb-3">
-                Actualiza a Event 24h para desbloquear todas las funciones
-              </p>
-              <button
-                onClick={handleStartCheckout}
-                disabled={isStartingCheckout}
-                className="w-full p-3 rounded-xl bg-blue-500/30 border border-blue-500/40 hover:bg-blue-500/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
-              >
-                {isStartingCheckout ? (
-                  <>
-                    <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Activar 24h
-                  </>
-                )}
-              </button>
-            </div>
-          )}
+            {/* Upgrade to Event Plan Button */}
+            {plan === 'free' && (
+              <div className="mt-2 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30">
+                <p className="text-sm text-blue-300 mb-3">
+                  Actualiza a Event 24h para desbloquear todas las funciones
+                </p>
+                <button
+                  onClick={handleStartCheckout}
+                  disabled={isStartingCheckout}
+                  className="w-full p-3 rounded-xl bg-blue-500/30 border border-blue-500/40 hover:bg-blue-500/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+                >
+                  {isStartingCheckout ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Activar 24h
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
 
-          <button
-            onClick={() => setShowUserInfo(false)}
-            className="w-full mt-6 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-          >
-            Cerrar
-          </button>
+          <div className="flex-shrink-0 mt-6">
+            <button
+              onClick={() => setShowUserInfo(false)}
+              className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -457,8 +461,8 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
         <div className="absolute inset-0 bg-black/70" onClick={() => setShowExportQuiz(false)} aria-hidden="true" />
-        <div className="relative card w-full max-w-sm p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="relative card w-full max-w-sm p-6 max-h-[90vh] flex flex-col">
+          <div className="flex items-center justify-between mb-6 flex-shrink-0">
             <h2 id="export-quiz-title" className="text-xl font-semibold">Exportar Datos del Quiz</h2>
             <button
               onClick={() => {
@@ -476,115 +480,119 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             </button>
           </div>
 
-          <div className="mb-6 space-y-4">
-            {!showExportShareOptions ? (
-              <>
-                <p className="text-sm text-gray-300">
-                  Antes de terminar el juego, puedes exportar los datos del quiz para conservarlos.
-                </p>
-                {!features.exportResults && (
-                  <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
-                    <p className="text-yellow-300 text-sm">
-                      Disponible en el plan Event
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="mb-6 space-y-4">
+              {!showExportShareOptions ? (
+                <>
+                  <p className="text-sm text-gray-300">
+                    Antes de terminar el juego, puedes exportar los datos del quiz para conservarlos.
+                  </p>
+                  {!features.exportResults && (
+                    <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+                      <p className="text-yellow-300 text-sm">
+                        Disponible en el plan Event
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleExportQuizBeforeTerminate}
+                    disabled={isExportingQuiz || !gameId || !features.exportResults}
+                    className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={!features.exportResults ? 'Disponible en el plan Event' : undefined}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      {isExportingQuiz ? (
+                        <>
+                          <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Exportando...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                          Exportar Datos del Quiz
+                        </>
+                      )}
+                    </div>
+                  </button>
+                  {exportQuizError && (
+                    <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+                      {exportQuizError}
+                    </div>
+                  )}
+                  <button
+                    onClick={proceedWithTermination}
+                    disabled={isTerminating}
+                    className="w-full p-3 rounded-xl bg-yellow-500/20 border border-yellow-500/30 hover:bg-yellow-500/30 transition-colors disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      {isTerminating ? (
+                        <>
+                          <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Terminando...
+                        </>
+                      ) : (
+                        <>
+                          Omitir y terminar juego
+                        </>
+                      )}
+                    </div>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="p-3 rounded-lg bg-green-500/20 border border-green-500/30">
+                    <p className="text-green-300 text-sm">
+                      ✓ Datos del quiz exportados exitosamente
                     </p>
                   </div>
-                )}
-                <button
-                  onClick={handleExportQuizBeforeTerminate}
-                  disabled={isExportingQuiz || !gameId || !features.exportResults}
-                  className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={!features.exportResults ? 'Disponible en el plan Event' : undefined}
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    {isExportingQuiz ? (
-                      <>
-                        <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleShareQuizData}
+                      className="w-full p-3 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                         </svg>
-                        Exportando...
-                      </>
-                    ) : (
-                      <>
+                        Compartir
+                      </div>
+                    </button>
+                    <button
+                      onClick={handleDownloadQuizData}
+                      className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-2">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 8m4-4v12" />
                         </svg>
-                        Exportar Datos del Quiz
-                      </>
-                    )}
+                        Descargar
+                      </div>
+                    </button>
                   </div>
-                </button>
-                {exportQuizError && (
-                  <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-                    {exportQuizError}
-                  </div>
-                )}
-                <button
-                  onClick={proceedWithTermination}
-                  disabled={isTerminating}
-                  className="w-full p-3 rounded-xl bg-yellow-500/20 border border-yellow-500/30 hover:bg-yellow-500/30 transition-colors disabled:opacity-50"
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    {isTerminating ? (
-                      <>
-                        <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Terminando...
-                      </>
-                    ) : (
-                      <>
-                        Omitir y terminar juego
-                      </>
-                    )}
-                  </div>
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="p-3 rounded-lg bg-green-500/20 border border-green-500/30">
-                  <p className="text-green-300 text-sm">
-                    ✓ Datos del quiz exportados exitosamente
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <button
-                    onClick={handleShareQuizData}
-                    className="w-full p-3 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                      </svg>
-                      Compartir
-                    </div>
-                  </button>
-                  <button
-                    onClick={handleDownloadQuizData}
-                    className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors"
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 8m4-4v12" />
-                      </svg>
-                      Descargar
-                    </div>
-                  </button>
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
 
-          <button
-            onClick={() => {
-              setShowExportQuiz(false)
-              setExportQuizError(null)
-              setExportQuizData(null)
-              setShowExportShareOptions(false)
-            }}
-            className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-          >
-            Cancelar
-          </button>
+          <div className="flex-shrink-0 mt-4">
+            <button
+              onClick={() => {
+                setShowExportQuiz(false)
+                setExportQuizError(null)
+                setExportQuizData(null)
+                setShowExportShareOptions(false)
+              }}
+              className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -599,8 +607,8 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
         <div className="absolute inset-0 bg-black/70" onClick={() => setShowExitConfirm(false)} aria-hidden="true" />
-        <div className="relative card w-full max-w-sm p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="relative card w-full max-w-sm p-6 max-h-[90vh] flex flex-col">
+          <div className="flex items-center justify-between mb-6 flex-shrink-0">
             <h2 id="exit-confirm-title" className="text-xl font-semibold">
               {(gameType?.toLowerCase() === 'empareja2' || gameType?.toLowerCase() === 'cupido' || gameType?.toLowerCase() === 'semaforo') ? 'Salir de la partida' : 'Terminar el juego'}
             </h2>
@@ -615,72 +623,76 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             </button>
           </div>
 
-          <div className="mb-6 space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="mb-6 space-y-4">
+              <button
+                onClick={() => {
+                  setShowExitConfirm(false)
+                  if (onLeaveGame) {
+                    onLeaveGame()
+                  }
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              >
+                <div className="p-2 rounded-lg bg-yellow-500/20">
+                  <svg className="w-5 h-5 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" />
+                  </svg>
+                </div>
+                <div className="text-left flex-1">
+                  <div className="font-medium">Salir del juego</div>
+                  <div className="text-sm text-gray-400">Volver a la selección de partida</div>
+                </div>
+              </button>
+
+              <div className="relative">
+                <button
+                  onClick={handleTerminateGame}
+                  disabled={isTerminating}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                >
+                  <div className="p-2 rounded-lg bg-red-500/20">
+                    {isTerminating ? (
+                      <svg className="w-5 h-5 text-red-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="text-left flex-1">
+                    <div className="font-medium">{isTerminating ? 'Terminando...' : 'Terminar el juego'}</div>
+                    <div className="text-sm text-gray-400">Desactivar la partida permanentemente</div>
+                  </div>
+                </button>
+                <div className="mt-2 p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+                  <p className="text-yellow-300 text-sm">
+                    ⚠️ Esta acción no se puede deshacer.
+                  </p>
+                </div>
+              </div>
+
+              {terminateError && (
+                <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+                  {terminateError}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex-shrink-0 mt-4">
             <button
               onClick={() => {
                 setShowExitConfirm(false)
-                if (onLeaveGame) {
-                  onLeaveGame()
-                }
+                setTerminateError(null)
               }}
-              className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
             >
-              <div className="p-2 rounded-lg bg-yellow-500/20">
-                <svg className="w-5 h-5 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" />
-                </svg>
-              </div>
-              <div className="text-left flex-1">
-                <div className="font-medium">Salir del juego</div>
-                <div className="text-sm text-gray-400">Volver a la selección de partida</div>
-              </div>
+              Cancelar
             </button>
-
-            <div className="relative">
-              <button
-                onClick={handleTerminateGame}
-                disabled={isTerminating}
-                className="w-full flex items-center gap-3 p-4 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50"
-              >
-                <div className="p-2 rounded-lg bg-red-500/20">
-                  {isTerminating ? (
-                    <svg className="w-5 h-5 text-red-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  )}
-                </div>
-                <div className="text-left flex-1">
-                  <div className="font-medium">{isTerminating ? 'Terminando...' : 'Terminar el juego'}</div>
-                  <div className="text-sm text-gray-400">Desactivar la partida permanentemente</div>
-                </div>
-              </button>
-              <div className="mt-2 p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
-                <p className="text-yellow-300 text-sm">
-                  ⚠️ Esta acción no se puede deshacer.
-                </p>
-              </div>
-            </div>
-
-            {terminateError && (
-              <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-                {terminateError}
-              </div>
-            )}
           </div>
-
-          <button
-            onClick={() => {
-              setShowExitConfirm(false)
-              setTerminateError(null)
-            }}
-            className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-          >
-            Cancelar
-          </button>
         </div>
       </div>
     )
@@ -695,8 +707,8 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
         <div className="absolute inset-0 bg-black/70" onClick={() => setShowRemovePlayer(false)} aria-hidden="true" />
-        <div className="relative card w-full max-w-sm p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="relative card w-full max-w-sm p-6 max-h-[90vh] flex flex-col">
+          <div className="flex items-center justify-between mb-6 flex-shrink-0">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowRemovePlayer(false)}
@@ -720,87 +732,91 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             </button>
           </div>
 
-          {removeSuccess ? (
-            <div className="text-center">
-              <div className="p-4 rounded-xl bg-green-500/20 border border-green-500/30 mb-4">
-                <div className="flex items-center justify-center gap-2 text-green-300 mb-2">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="font-medium">Jugador Eliminado</span>
-                </div>
-                <p className="text-sm text-green-400">
-                  El jugador @{usernameToDelete.replace(/^@/, '')} ha sido eliminado del juego.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="mb-6 space-y-4">
-                <div>
-                  <label htmlFor="delete-username" className="block text-sm text-gray-300 mb-2">
-                    Nombre de usuario a eliminar
-                  </label>
-                  <input
-                    id="delete-username"
-                    type="text"
-                    value={usernameToDelete}
-                    onChange={(e) => setUsernameToDelete(e.target.value)}
-                    placeholder="ej. usuario123"
-                    className="w-full h-11 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 outline-none focus:border-white/20"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Ingresa el nombre de usuario (con o sin @)
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {removeSuccess ? (
+              <div className="text-center">
+                <div className="p-4 rounded-xl bg-green-500/20 border border-green-500/30 mb-4">
+                  <div className="flex items-center justify-center gap-2 text-green-300 mb-2">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="font-medium">Jugador Eliminado</span>
+                  </div>
+                  <p className="text-sm text-green-400">
+                    El jugador @{usernameToDelete.replace(/^@/, '')} ha sido eliminado del juego.
                   </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mb-6 space-y-4">
+                  <div>
+                    <label htmlFor="delete-username" className="block text-sm text-gray-300 mb-2">
+                      Nombre de usuario a eliminar
+                    </label>
+                    <input
+                      id="delete-username"
+                      type="text"
+                      value={usernameToDelete}
+                      onChange={(e) => setUsernameToDelete(e.target.value)}
+                      placeholder="ej. usuario123"
+                      className="w-full h-11 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 outline-none focus:border-white/20"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Ingresa el nombre de usuario (con o sin @)
+                    </p>
+                  </div>
+                  
+                  <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+                    <p className="text-yellow-300 text-sm">
+                      ⚠️ Esta acción no se puede deshacer.
+                    </p>
+                  </div>
                 </div>
                 
-                <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
-                  <p className="text-yellow-300 text-sm">
-                    ⚠️ Esta acción no se puede deshacer.
-                  </p>
-                </div>
-              </div>
+                {removeError && (
+                  <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+                    {removeError}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
-              {removeError && (
-                <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-                  {removeError}
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowRemovePlayer(false)
-                    setUsernameToDelete('')
-                    setRemoveError(null)
-                  }}
-                  className="flex-1 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleRemovePlayer}
-                  disabled={isRemoving || !usernameToDelete.trim()}
-                  className="flex-1 p-3 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isRemoving ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Eliminando...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      Eliminar
-                    </>
-                  )}
-                </button>
-              </div>
-            </>
+          {!removeSuccess && (
+            <div className="flex gap-3 flex-shrink-0 mt-4">
+              <button
+                onClick={() => {
+                  setShowRemovePlayer(false)
+                  setUsernameToDelete('')
+                  setRemoveError(null)
+                }}
+                className="flex-1 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleRemovePlayer}
+                disabled={isRemoving || !usernameToDelete.trim()}
+                className="flex-1 p-3 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isRemoving ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Eliminar
+                  </>
+                )}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -815,8 +831,8 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
     >
       <div className="absolute inset-0 bg-black/70" onClick={onClose} aria-hidden="true" />
-      <div className="relative card w-full max-w-sm p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="relative card w-full max-w-sm p-6 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between mb-6 flex-shrink-0">
           <h2 id="settings-title" className="text-xl font-semibold">Configuración</h2>
           <button
             onClick={onClose}
@@ -829,7 +845,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 flex-1 min-h-0 overflow-y-auto">
           {/* User Info - Only available when no game is active */}
           {!gameType && (
             <button

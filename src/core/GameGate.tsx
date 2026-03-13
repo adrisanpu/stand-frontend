@@ -307,40 +307,38 @@ export default function GameGate({ onGameCreated }: GameGateProps){
             </label>
           </div>
           {/* List with fixed min-height so layout does not jump when filtering */}
-          <div className="min-h-[420px] overflow-y-auto rounded-xl">
+          <div className="min-h-[360px] md:min-h-[420px] overflow-y-auto rounded-xl">
             {hasNoGames ? (
               <p className="text-center text-textSub text-sm py-6">
                 Ningún juego con los filtros seleccionados.
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-6 justify-items-center">
                 {filteredGames.map((game) => (
                   <button
                     key={game.id}
                     onClick={() => handleGameSelect(game)}
-                    className="w-full p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/20 text-left"
+                    type="button"
+                    aria-label={game.name}
+                    className="w-full max-w-[120px] sm:max-w-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-3xl transition-transform duration-150 ease-out hover:scale-[1.04]"
                   >
-                    <div className="flex items-center gap-4">
-                      {game.assets?.logo && (
-                        <div className="flex-shrink-0">
-                          <img 
-                            src={game.assets.logo} 
-                            alt={game.name} 
-                            className="h-16 w-16 object-contain"
+                    <div className="flex flex-col items-center">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-[rgba(255,255,255,0.08)] border border-white/10 shadow-[0_10px_25px_rgba(0,0,0,0.55)] flex items-center justify-center overflow-hidden mb-2">
+                        {game.assets?.logo ? (
+                          <img
+                            src={game.assets.logo}
+                            alt={game.name}
+                            className="w-14 h-14 sm:w-16 sm:h-16 object-contain"
                           />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-textMain mb-1">{game.name}</h3>
-                        {game.description && (
-                          <p className="text-sm text-textSub line-clamp-2">{game.description}</p>
+                        ) : (
+                          <span className="text-lg sm:text-xl font-semibold text-textMain">
+                            {game.name.slice(0, 2).toUpperCase()}
+                          </span>
                         )}
                       </div>
-                      <div className="flex-shrink-0">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
+                      <h3 className="text-xs sm:text-sm font-medium text-textMain text-center leading-snug line-clamp-2">
+                        {game.name}
+                      </h3>
                     </div>
                   </button>
                 ))}

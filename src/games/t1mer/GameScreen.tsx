@@ -156,7 +156,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
 
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)_minmax(200px,320px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
+      <div className="grid grid-cols-[25%_40%_25%] gap-4 items-stretch h-full min-h-0">
         <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0 min-w-0 items-center">
           <div className="grid grid-cols-2 gap-2 items-center flex-shrink-0 min-h-0">
             <div className="flex justify-center min-h-0 w-full min-w-0">

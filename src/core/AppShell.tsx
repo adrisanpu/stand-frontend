@@ -316,23 +316,23 @@ export default function AppShell() {
                   </div>
                   {/* Footer: Sorteo + Validador de Parejas (Players) always visible */}
                   <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
-                    <div className="flex-1 min-w-[160px]">
+                    <div className="flex-1 min-w-[200px]">
                       <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
                     </div>
                     {currentGame.showRanking && (
-                      <div className="flex-1 min-w-[160px]">
+                      <div className="flex-1 min-w-[200px]">
                         <Ranking gameId={gameId} gameType={gameType ?? undefined} prizeLabel={rankingPrizeLabel} topX={rankingTopX} refreshInterval={counterActive ? 0 : 10000} />
                       </div>
                     )}
-                    <div className="flex-1 min-w-[160px]">
+                    <div className="flex-1 min-w-[200px]">
                       <RaffleData gameId={gameId} gameName={gameName} prizeLabel={rafflePrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              /* Landscape: 10% air on sides (and top/bottom); scale content to fit the remaining 80% */
-              <div className="h-dvh w-screen overflow-hidden flex justify-center items-center py-[10dvh] px-[5dvw]">
+              /* Landscape: menos aire lateral, algo más pegado al borde derecho */
+              <div className="h-dvh w-screen overflow-hidden flex justify-center items-center py-[10dvh] pl-[3dvw] pr-[1.5dvw]">
                 <div
                   className="flex-shrink-0 max-w-full max-h-full"
                   style={{
@@ -377,7 +377,7 @@ export default function AppShell() {
                           ) : null
                         }
                         sidebarElement={
-                          <div className="flex flex-col gap-3">
+                          <div className="flex flex-col gap-2 w-full min-w-0">
                             <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
                             {currentGame.showRanking && <Ranking gameId={gameId} gameType={gameType ?? undefined} compact prizeLabel={rankingPrizeLabel} topX={rankingTopX} refreshInterval={counterActive ? 0 : 10000} />}
                             <RaffleData gameId={gameId} gameName={gameName} compact prizeLabel={rafflePrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
@@ -391,7 +391,7 @@ export default function AppShell() {
             )
           ) : (
             /* GameGate Catalog */
-            <div className="card w-full max-w-md p-8">
+            <div className="card w-full max-w-md sm:max-w-xl lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl p-6 sm:p-8 lg:p-10">
               <GameGate onGameCreated={handleGameCreated} />
             </div>
           )}

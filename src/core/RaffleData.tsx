@@ -304,6 +304,10 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
     }
   }
 
+  const winnersSortedByName = winners
+    .slice()
+    .sort((a, b) => a.username.localeCompare(b.username, 'es', { sensitivity: 'base' }))
+
   if (loading) {
     return (
       <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
@@ -366,7 +370,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
               createPortal(
                 <div
                   ref={dropdownPortalRef}
-                  className="fixed z-[9999] rounded-xl border border-white/15 bg-[rgba(30,30,40,0.98)] shadow-lg shadow-purple-500/10 max-h-56 overflow-hidden flex flex-col w-max min-w-0"
+                  className="fixed z-[9999] rounded-xl border border-white/15 bg-[rgba(30,30,40,0.98)] shadow-lg shadow-purple-500/10 overflow-hidden flex flex-col w-max min-w-0"
                   style={{
                     top: dropdownPosition.top,
                     right: dropdownPosition.right,
@@ -378,10 +382,10 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
                   aria-label="Lista de ganadores"
                 >
                   <div
-                    className="overflow-y-auto overflow-x-auto overscroll-contain p-1.5 min-w-0"
+                    className="overflow-y-auto overflow-x-auto overscroll-contain p-1.5 min-w-0 max-h-40"
                     onClick={e => e.stopPropagation()}
                   >
-                    {winners.map((w, index) => (
+                    {winnersSortedByName.map((w, index) => (
                       <label
                         key={w.raffleId ?? index}
                         role="option"
