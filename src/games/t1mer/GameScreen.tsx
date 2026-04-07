@@ -22,26 +22,34 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   const startTimeRef = useRef<number>(0)
   const startButtonRef = useRef<HTMLButtonElement | null>(null)
   const stopButtonRef = useRef<HTMLButtonElement | null>(null)
+  const resetBackRef = useRef<HTMLButtonElement | null>(null)
 
-  // Magic Remote / webOS: OK debe activar el botón principal. Si el foco sigue en el input de código,
-  // inputManager no emite `select` en campos editables; además el SO puede mostrar el cursor del puntero.
+  const focusScrollPrimary = (el: HTMLElement | null) => {
+    if (!el) return
+    el.focus()
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
+
+  // webOS / mando: foco + scroll al control principal (EMPEZAR / DETENER / reiniciar) para que OK ≈ click.
   useEffect(() => {
-    if (gameState === 'preparing') {
-      const active = document.activeElement as HTMLElement | null
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-        active.blur()
+    const id = window.requestAnimationFrame(() => {
+      if (gameState === 'preparing') {
+        const active = document.activeElement as HTMLElement | null
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+          active.blur()
+        }
+        focusScrollPrimary(startButtonRef.current)
+        return
       }
-      const id = window.requestAnimationFrame(() => {
-        startButtonRef.current?.focus()
-      })
-      return () => window.cancelAnimationFrame(id)
-    }
-    if (gameState === 'playing' || gameState === 'hidden') {
-      const id = window.requestAnimationFrame(() => {
-        stopButtonRef.current?.focus()
-      })
-      return () => window.cancelAnimationFrame(id)
-    }
+      if (gameState === 'playing' || gameState === 'hidden') {
+        focusScrollPrimary(stopButtonRef.current)
+        return
+      }
+      if (gameState === 'finished') {
+        focusScrollPrimary(resetBackRef.current)
+      }
+    })
+    return () => window.cancelAnimationFrame(id)
   }, [gameState])
 
   // Notify parent when counter is running so API polling can be paused (avoid lag)
@@ -295,7 +303,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
                 </div>
               )}
               <div className="flex justify-center">
-                <BackButton onClick={handleReset} aria-label="Volver a validar" />
+                <BackButton ref={resetBackRef} onClick={handleReset} aria-label="Volver a validar" />
               </div>
             </div>
           )}
@@ -452,7 +460,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
               </div>
             )}
             <div className="flex justify-center">
-              <BackButton onClick={handleReset} aria-label="Volver a validar" />
+              <BackButton ref={resetBackRef} onClick={handleReset} aria-label="Volver a validar" />
             </div>
           </div>
 
