@@ -8,7 +8,9 @@ import RaffleData from './RaffleData'
 import { getGameById } from '../games'
 import type { GameDefinition } from './types'
 import { useCurrentUser } from '../auth/useCurrentUser'
+import { getFeaturesByPlan } from '../auth/featureFlags'
 import { useOrientation } from '../hooks/useOrientation'
+import { readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle } from './operatorPrizeSlots'
 
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 
@@ -21,7 +23,8 @@ const GAME_SCREEN_LOGO_CLASS_LANDSCAPE = 'h-28 sm:h-32 lg:h-36 xl:h-40 2xl:h-44 
 const GAME_SCREEN_LETRAS_CLASS_LANDSCAPE = 'h-32 sm:h-36 lg:h-40 xl:h-44 2xl:h-48 w-auto object-contain -mt-24 sm:-mt-28 lg:-mt-32 xl:-mt-36 2xl:-mt-40'
 
 export default function AppShell() {
-  const { loading: userLoading } = useCurrentUser()
+  const { loading: userLoading, plan } = useCurrentUser()
+  const features = getFeaturesByPlan(plan)
   const [showSettings, setShowSettings] = useState(false)
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameName, setGameName] = useState<string | null>(null)
@@ -164,23 +167,24 @@ export default function AppShell() {
   const isPortrait = useOrientation()
 
   // Derive prize labels for minicontainers from game settings
-  const normalizedGameType = gameType?.toLowerCase()
+  const gs = gameSettings as Record<string, unknown> | null
   const playersPrizeLabel =
-    normalizedGameType === 'empareja2' && gameSettings && typeof gameSettings.prizeValidation === 'string' && gameSettings.prizeValidation.trim()
-      ? gameSettings.prizeValidation.trim()
+    gs && typeof gs.prizeValidation === 'string' && gs.prizeValidation.trim()
+      ? gs.prizeValidation.trim()
       : undefined
   const rankingPrizeLabel =
-    normalizedGameType === 't1mer' && gameSettings && typeof gameSettings.prizeTopX === 'string' && gameSettings.prizeTopX.trim()
-      ? gameSettings.prizeTopX.trim()
+    currentGame?.showRanking && gs && typeof gs.prizeTopX === 'string' && gs.prizeTopX.trim()
+      ? gs.prizeTopX.trim()
       : undefined
   const rankingTopX =
-    normalizedGameType === 't1mer' && gameSettings && typeof gameSettings.topX === 'number' && gameSettings.topX >= 1
-      ? gameSettings.topX
+    currentGame?.showRanking && gs && typeof gs.topX === 'number' && gs.topX >= 1
+      ? gs.topX
       : undefined
+  const maxPrizeValidationFromSettings = readMaxPrizeValidation(gs)
+  const maxPrizeRankingFromSettings = readMaxPrizeRanking(gs)
+  const maxPrizeRaffleFromSettings = readMaxPrizeRaffle(gs)
   const rafflePrizeLabel =
-    gameSettings && typeof gameSettings.prizeRaffle === 'string' && gameSettings.prizeRaffle.trim()
-      ? gameSettings.prizeRaffle.trim()
-      : undefined
+    gs && typeof gs.prizeRaffle === 'string' && gs.prizeRaffle.trim() ? gs.prizeRaffle.trim() : undefined
 
   // Portrait: 5% air at top (logo), 10% at bottom; reduce bottom when content overflows so nothing is hidden
   useEffect(() => {
@@ -303,31 +307,57 @@ export default function AppShell() {
                       )}
                     </div>
                   )}
-                  {/* Main: GameScreen fills remaining space, no internal scroll */}
-                  <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-5 sm:p-6 lg:p-8">
-                    <currentGame.GameScreen
-                      key={`game-${gameId}-${gameConfigVersion}`}
-                      gameId={gameId}
-                      orientation="portrait"
-                      topX={rankingTopX}
-                      prizeLabel={rankingPrizeLabel}
-                      onCounterActiveChange={setCounterActive}
-                    />
-                  </div>
-                  {/* Footer: Sorteo + Validador de Parejas (Players) always visible */}
-                  <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
-                    <div className="flex-1 min-w-[200px]">
-                      <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
-                    </div>
-                    {currentGame.showRanking && (
-                      <div className="flex-1 min-w-[200px]">
-                        <Ranking gameId={gameId} gameType={gameType ?? undefined} prizeLabel={rankingPrizeLabel} topX={rankingTopX} refreshInterval={counterActive ? 0 : 10000} />
+                  {/* Main: con ranking, repartimos altura (juego : panel inferior) para que el ranking use el hueco */}
+                  {currentGame.showRanking ? (
+                    <div className="flex-1 min-h-0 flex flex-col gap-2 min-w-0 overflow-hidden">
+                      <div className="card grow-[3] basis-0 shrink min-h-0 w-full overflow-hidden flex flex-col p-5 sm:p-6 lg:p-8">
+                        <currentGame.GameScreen
+                          key={`game-${gameId}-${gameConfigVersion}`}
+                          gameId={gameId}
+                          orientation="portrait"
+                          topX={rankingTopX}
+                          prizeLabel={rankingPrizeLabel}
+                          onCounterActiveChange={setCounterActive}
+                        />
                       </div>
-                    )}
-                    <div className="flex-1 min-w-[200px]">
-                      <RaffleData gameId={gameId} gameName={gameName} prizeLabel={rafflePrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
+                      <div className="grow-[2] basis-0 shrink min-h-0 flex flex-col gap-3 min-w-0 overflow-hidden">
+                        <div className="flex-shrink-0 w-full">
+                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                        </div>
+                        <div className="min-h-0 flex-1 flex flex-col min-w-0">
+                          <Ranking gameId={gameId} gameType={gameType ?? undefined} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                        </div>
+                        {features.raffles && (
+                          <div className="flex-shrink-0 w-full">
+                            <RaffleData gameId={gameId} gameName={gameName} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-5 sm:p-6 lg:p-8">
+                        <currentGame.GameScreen
+                          key={`game-${gameId}-${gameConfigVersion}`}
+                          gameId={gameId}
+                          orientation="portrait"
+                          topX={rankingTopX}
+                          prizeLabel={rankingPrizeLabel}
+                          onCounterActiveChange={setCounterActive}
+                        />
+                      </div>
+                      <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
+                        <div className="flex-1 min-w-[200px]">
+                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                        </div>
+                        {features.raffles && (
+                          <div className="flex-1 min-w-[200px]">
+                            <RaffleData gameId={gameId} gameName={gameName} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
@@ -377,10 +407,20 @@ export default function AppShell() {
                           ) : null
                         }
                         sidebarElement={
-                          <div className="flex flex-col gap-2 w-full min-w-0">
-                            <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
-                            {currentGame.showRanking && <Ranking gameId={gameId} gameType={gameType ?? undefined} compact prizeLabel={rankingPrizeLabel} topX={rankingTopX} refreshInterval={counterActive ? 0 : 10000} />}
-                            <RaffleData gameId={gameId} gameName={gameName} compact prizeLabel={rafflePrizeLabel} refreshInterval={counterActive ? 0 : 10000} />
+                          <div className="flex flex-col gap-2 w-full min-w-0 min-h-0 flex-1 h-full overflow-hidden self-stretch">
+                            <div className="flex-shrink-0 w-full">
+                              <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                            </div>
+                            {currentGame.showRanking && (
+                              <div className="min-h-0 flex-1 flex flex-col w-full overflow-hidden">
+                                <Ranking gameId={gameId} gameType={gameType ?? undefined} compact prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                              </div>
+                            )}
+                            {features.raffles && (
+                              <div className="flex-shrink-0 w-full">
+                                <RaffleData gameId={gameId} gameName={gameName} compact prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                              </div>
+                            )}
                           </div>
                         }
                       />

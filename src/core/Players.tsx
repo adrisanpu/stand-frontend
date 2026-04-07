@@ -20,8 +20,10 @@ interface PlayersProps {
   gameType?: string
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and avoid scroll
-  countersOnly?: boolean // when true (e.g. empareja2 landscape), show only Validadas block, no title
+  countersOnly?: boolean // when true (e.g. empareja2 landscape), compact card without main "Jugadores" heading
   prizeLabel?: string // e.g. "🎁 Entrada gratis" — shown below title when set
+  /** Límite premio validación (localStorage; empareja2 también API) */
+  maxPrizeValidationLimit?: number
 }
 
 const EMPAREJA2_SETTINGS_KEY = 'empareja2_settings_'
@@ -32,7 +34,7 @@ function getEmpareja2MaxValidations(gameId: string | undefined): number | undefi
     const raw = localStorage.getItem(`${EMPAREJA2_SETTINGS_KEY}${gameId}`)
     if (!raw) return undefined
     const parsed = JSON.parse(raw)
-    const n = parsed?.maxValidations
+    const n = parsed?.maxPrizeValidation ?? parsed?.maxValidations
     if (typeof n !== 'number' || n < 0) return undefined
     return n
   } catch {
@@ -40,7 +42,34 @@ function getEmpareja2MaxValidations(gameId: string | undefined): number | undefi
   }
 }
 
-export default function Players({ gameName, gameId, gameType, refreshInterval = 10000, compact = false, countersOnly = false, prizeLabel }: PlayersProps) {
+function PrizeLine({
+  label,
+  current,
+  max,
+  compact,
+}: {
+  label: string
+  current: number
+  max: number | undefined
+  compact: boolean
+}) {
+  return (
+    <div
+      className={`flex items-baseline justify-between gap-2 min-w-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'} text-textSub mt-2`}
+    >
+      <span className="min-w-0 truncate">
+        Premio: {label}
+      </span>
+      {max !== undefined && (
+        <span className="flex-shrink-0 text-[10px] sm:text-xs text-textSub tabular-nums">
+          {current}/{max}
+        </span>
+      )}
+    </div>
+  )
+}
+
+export default function Players({ gameName, gameId, gameType, refreshInterval = 10000, compact = false, countersOnly = false, prizeLabel, maxPrizeValidationLimit }: PlayersProps) {
   const { plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const [playerCount, setPlayerCount] = useState<number | null>(null)
@@ -49,9 +78,9 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
 
   const maxPlayers = features.maxPlayers === Infinity ? null : features.maxPlayers
   const isEmpareja2 = gameType?.toLowerCase() === 'empareja2'
-  const maxValidations = isEmpareja2
-    ? (maxValidationsFromApi ?? getEmpareja2MaxValidations(gameId))
-    : undefined
+  const effectiveMax = isEmpareja2
+    ? (maxValidationsFromApi ?? maxPrizeValidationLimit ?? getEmpareja2MaxValidations(gameId))
+    : maxPrizeValidationLimit
 
   const fetchCount = async () => {
     if (!gameName) return
@@ -88,42 +117,25 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
         <div className="space-y-2">
           <div>
             <div className={`text-textSub ${compact ? 'text-xs mb-0.5' : 'text-sm mb-1'}`}>Jugadores</div>
-            <div className={`flex items-center gap-2 ${compact ? 'text-base' : ''}`}>
-              <span className={`font-bold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-xl sm:text-2xl'}`}>
-                {playerCount}
-              </span>
-              {maxPlayers !== null && (
-                <>
-                  <span className="text-textSub">/</span>
-                  <span className="font-semibold text-textMain">{maxPlayers}</span>
-                </>
+            <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${compact ? 'text-base' : ''}`}>
+              <div className="flex items-center gap-2">
+                <span className={`font-bold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-xl sm:text-2xl'}`}>
+                  {playerCount}
+                </span>
+                {maxPlayers !== null && (
+                  <>
+                    <span className="text-textSub">/</span>
+                    <span className="font-semibold text-textMain">{maxPlayers}</span>
+                  </>
+                )}
+              </div>
+              {maxPlayers !== null && playerCount >= maxPlayers && (
+                <span className="text-red-400 text-xs whitespace-nowrap">Límite alcanzado</span>
               )}
             </div>
           </div>
-          {maxValidations !== undefined && (
-            <div>
-              <div className={`text-textSub ${compact ? 'text-xs mb-0.5' : 'text-sm mb-1'}`}>Validadas / Límite</div>
-              <div className={`flex items-center gap-2 ${compact ? 'text-base' : ''}`}>
-                <span className={`font-bold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-xl sm:text-2xl'}`}>
-                  {validatedCount}
-                </span>
-                <span className="text-textSub">/</span>
-                <span className="font-semibold text-textMain">{maxValidations}</span>
-              </div>
-            </div>
-          )}
-          {maxValidations === undefined && (
-            <div>
-              <div className={`text-textSub ${compact ? 'text-xs mb-0.5' : 'text-sm mb-1'}`}>Validadas</div>
-              <div className={`font-bold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-xl sm:text-2xl'}`}>
-                {validatedCount}
-              </div>
-            </div>
-          )}
           {prizeLabel && (
-            <div className={`text-textSub ${compact ? 'text-xs' : 'text-sm'}`}>
-              Premio: {prizeLabel}
-            </div>
+            <PrizeLine label={prizeLabel} current={validatedCount} max={effectiveMax} compact={compact} />
           )}
         </div>
       </div>
@@ -136,48 +148,30 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
         Jugadores
         {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
       </h2>
-      <div className={`flex items-center gap-2 ${compact ? 'text-base' : ''}`}>
-        <div className={`font-bold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-2xl sm:text-3xl'}`}>
-          {playerCount}
+      <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${compact ? 'text-base' : ''}`}>
+        <div className="flex items-center gap-2">
+          <div className={`font-bold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-2xl sm:text-3xl'}`}>
+            {playerCount}
+          </div>
+          {maxPlayers !== null ? (
+            <>
+              <div className={`text-textSub ${compact ? 'text-xs' : 'text-sm sm:text-base'}`}>/</div>
+              <div className={`font-semibold text-textMain ${compact ? 'text-base' : 'text-lg sm:text-xl'}`}>
+                {maxPlayers}
+              </div>
+            </>
+          ) : (
+            <div className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>jugadores</div>
+          )}
         </div>
-        {maxPlayers !== null ? (
-          <>
-            <div className={`text-textSub ${compact ? 'text-xs' : 'text-sm sm:text-base'}`}>/</div>
-            <div className={`font-semibold text-textMain ${compact ? 'text-base' : 'text-lg sm:text-xl'}`}>
-              {maxPlayers}
-            </div>
-          </>
-        ) : (
-          <div className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>jugadores</div>
+        {maxPlayers !== null && playerCount >= maxPlayers && (
+          <span className={`text-red-400 whitespace-nowrap ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
+            Límite alcanzado
+          </span>
         )}
       </div>
-      {maxPlayers !== null && playerCount >= maxPlayers && (
-        <p className={`text-red-400 mt-2 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-          Límite alcanzado
-        </p>
-      )}
-      {isEmpareja2 && (
-        <div className={`mt-3 pt-3 border-t border-white/10 ${compact ? 'mt-2 pt-2' : ''}`}>
-          <div className={`text-textSub ${compact ? 'text-xs mb-0.5' : 'text-sm mb-1'}`}>Validadas</div>
-          <div className={`flex items-center gap-2 ${compact ? 'text-base' : ''}`}>
-            <div className={`font-bold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-xl sm:text-2xl'}`}>
-              {validatedCount}
-            </div>
-            {maxValidations !== undefined && (
-              <>
-                <div className={`text-textSub ${compact ? 'text-xs' : 'text-sm'}`}>/</div>
-                <div className={`font-semibold text-textMain ${compact ? 'text-base' : 'text-lg'}`}>
-                  {maxValidations}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
       {prizeLabel && (
-        <p className={`text-textSub mt-2 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-          Premio: {prizeLabel}
-        </p>
+        <PrizeLine label={prizeLabel} current={validatedCount} max={effectiveMax} compact={compact} />
       )}
     </div>
   )

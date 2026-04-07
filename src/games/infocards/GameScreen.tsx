@@ -6,7 +6,7 @@ import QRCode from '../../core/QRCode'
 import { getInstagramDmUrl } from '../../core/instagram'
 
 const INFOCARDS_SETTINGS_KEY_PREFIX = 'infocards_settings_'
-const CARD_CONTAINER_HEIGHT_CLASS = 'h-[420px]'
+const CARD_CONTAINER_HEIGHT_CLASS = 'h-[340px] sm:h-[380px] lg:h-[410px]'
 const INFOCARDS_JOIN_CARD_ID = '__infocards_join__'
 
 type InfoCard = {
@@ -51,7 +51,7 @@ function getCardLayouts(gameId: string): Record<string, CardLayoutPosition> {
   return {}
 }
 
-export default function InfocardsGameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
+export default function InfocardsGameScreen({ gameId, orientation, sidebarElement }: GameScreenProps) {
   const [cards, setCards] = useState<InfoCard[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -130,8 +130,8 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
 
   const cardContent = (
     <>
-      <h2 className="text-2xl font-bold text-textMain leading-tight">{card.title}</h2>
-      <p className="text-textSub text-base leading-relaxed whitespace-pre-line">{card.body}</p>
+      <h2 className="text-xl sm:text-2xl font-bold text-textMain leading-tight">{card.title}</h2>
+      <p className="text-textSub text-sm sm:text-base leading-relaxed whitespace-pre-line">{card.body}</p>
     </>
   )
 
@@ -168,20 +168,20 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
         muted
         playsInline
         controls
-        className="w-full max-h-48 object-cover rounded-xl"
+        className="w-full max-h-40 sm:max-h-44 object-cover rounded-xl"
         aria-label={card.title}
       />
     ) : (
       <img
         src={card.imageUrl!}
         alt={card.title}
-        className="w-full max-h-48 object-cover rounded-xl"
+        className="w-full max-h-40 sm:max-h-44 object-cover rounded-xl"
         style={{ objectPosition: `${card.imagePositionX ?? 50}% ${card.imagePositionY ?? 50}%` }}
       />
     )
   ) : null
 
-  const baseClass = 'w-full h-full min-h-0 rounded-2xl p-8 flex flex-col gap-4'
+  const baseClass = 'w-full h-full min-h-0 rounded-2xl p-5 sm:p-6 flex flex-col gap-3'
   const cardStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }
 
   const renderJoinCard = () => (
@@ -216,7 +216,7 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
     </div>
   )
 
-  const rowClassGrid = 'w-full h-full min-h-0 rounded-2xl p-8 grid grid-cols-2 gap-6 overflow-hidden'
+  const rowClassGrid = 'w-full h-full min-h-0 rounded-2xl p-5 sm:p-6 grid grid-cols-2 gap-4 sm:gap-5 overflow-hidden'
 
   const renderCard = () => {
     if (layout === 'top') {
@@ -260,33 +260,15 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
     )
   }
 
-  const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
+  const isLandscape = orientation === 'landscape' && sidebarElement != null
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0 w-full">
-        <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0">
-          <div className="grid grid-cols-2 gap-2 items-center flex-shrink-0 min-h-0">
-            <div className="flex justify-center min-h-0 w-full min-w-0">
-              <QRCode data={getInstagramDmUrl(gameId)} size={200} margin={6} containerClassName="max-h-[min(18vh,160px)] w-full" alt="QR Code para Instagram DM" className="!border-0 !bg-transparent !p-0" />
-            </div>
-            <div className="flex justify-center items-center min-h-0">
-              {logoElement}
-            </div>
-          </div>
-          <div className="flex-shrink-0 min-h-0 overflow-hidden">
-            <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
-            <ol className="flex flex-col gap-1.5 text-xs text-gray-300">
-                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">1</span><span className="pt-0.5">📸 Escanea el QR y pulsa JUGAR para unirte.</span></li>
-                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">2</span><span className="pt-0.5">📝 Quiz en el chat.</span></li>
-                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-[10px]">3</span><span className="pt-0.5">🎉 Participa en sorteos.</span></li>
-              </ol>
-            </div>
-        </div>
-        <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 items-center gap-6">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-5 items-stretch h-full min-h-0 w-full">
+        <div className="card flex flex-col p-4 sm:p-5 overflow-hidden min-h-0 items-center justify-between gap-3">
           <div className={`w-full flex-shrink-0 ${CARD_CONTAINER_HEIGHT_CLASS}`}>
             {isJoinCard ? renderJoinCard() : renderCard()}
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             <button onClick={goToPrev} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label="Tarjeta anterior">
               <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
@@ -299,7 +281,6 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
               <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
           </div>
-          <p className="text-textSub text-xs">{currentIndex + 1} / {displayCards.length}</p>
         </div>
         <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
           <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
@@ -311,14 +292,14 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 w-full">
+    <div className="flex flex-col items-center gap-4 w-full">
       {/* Card */}
       <div className={`w-full flex-shrink-0 ${CARD_CONTAINER_HEIGHT_CLASS}`}>
         {isJoinCard ? renderJoinCard() : renderCard()}
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4">
         <button
           onClick={goToPrev}
           className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10"
@@ -359,10 +340,6 @@ export default function InfocardsGameScreen({ gameId, orientation, logoElement, 
         </button>
       </div>
 
-      {/* Counter */}
-      <p className="text-textSub text-xs">
-        {currentIndex + 1} / {displayCards.length}
-      </p>
     </div>
   )
 }

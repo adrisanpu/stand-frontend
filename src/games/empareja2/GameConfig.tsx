@@ -3,35 +3,21 @@ import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
 
 export type Empareja2Settings = {
-  maxValidations?: number
   numPairs?: number
-  prizeValidation?: string
-  prizeRaffle?: string
 }
 
 interface GameDataResponse {
   ok: boolean
   game?: { gameId: string; gameName: string; gameType: string }
-  settings?: { empareja2?: { numPairs?: number; maxValidations?: number; prizeValidation?: string; prizeRaffle?: string } }
+  settings?: { empareja2?: { numPairs?: number } }
   empareja2CatalogPairCount?: number
 }
 
 export default function Empareja2GameConfig({ gameId, gameName: _gameName, settings, onChange }: GameConfigProps) {
-  const [maxValidationsInput, setMaxValidationsInput] = useState<string>(
-    (settings as Empareja2Settings | null)?.maxValidations != null
-      ? String((settings as Empareja2Settings).maxValidations)
-      : ''
-  )
   const [numPairsInput, setNumPairsInput] = useState<string>(
     (settings as Empareja2Settings | null)?.numPairs != null
       ? String((settings as Empareja2Settings).numPairs)
       : ''
-  )
-  const [prizeValidationInput, setPrizeValidationInput] = useState<string>(
-    (settings as Empareja2Settings | null)?.prizeValidation ?? ''
-  )
-  const [prizeRaffleInput, setPrizeRaffleInput] = useState<string>(
-    (settings as Empareja2Settings | null)?.prizeRaffle ?? ''
   )
   const [catalogPairCount, setCatalogPairCount] = useState<number | null>(null)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
@@ -40,14 +26,10 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
   useEffect(() => {
     if (settings) {
       const s = settings as Empareja2Settings
-      setMaxValidationsInput(s.maxValidations != null ? String(s.maxValidations) : '')
       setNumPairsInput(s.numPairs != null ? String(s.numPairs) : '')
-      setPrizeValidationInput(s.prizeValidation ?? '')
-      setPrizeRaffleInput(s.prizeRaffle ?? '')
     }
   }, [settings])
 
-  // Load catalog pair count and backend settings when gameId is available
   useEffect(() => {
     if (!gameId) return
     let cancelled = false
@@ -57,32 +39,24 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
         if (cancelled || !data.ok) return
         if (data.empareja2CatalogPairCount != null) setCatalogPairCount(data.empareja2CatalogPairCount)
         const backend = data.settings?.empareja2
-        if (backend) {
-          if (backend.maxValidations != null) setMaxValidationsInput(String(backend.maxValidations))
-          if (backend.numPairs != null) setNumPairsInput(String(backend.numPairs))
-          if (backend.prizeValidation != null) setPrizeValidationInput(backend.prizeValidation)
-          if (backend.prizeRaffle != null) setPrizeRaffleInput(backend.prizeRaffle)
-        }
+        if (backend?.numPairs != null) setNumPairsInput(String(backend.numPairs))
       } catch {
         // ignore; keep UI working with localStorage only
       }
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [gameId])
 
   const handleSave = async () => {
-    const trimmedMax = maxValidationsInput.trim()
     const trimmedNum = numPairsInput.trim()
     const maxPairs = catalogPairCount ?? 50
-    const maxValidations = trimmedMax === '' ? undefined : Math.max(0, Math.floor(Number(trimmedMax)) || 0)
     const numPairs = trimmedNum === '' ? maxPairs : Math.max(1, Math.floor(Number(trimmedNum)) || 1)
     const numPairsClamped = Math.min(numPairs, maxPairs)
 
     const newSettings: Empareja2Settings = {
-      maxValidations,
       numPairs: numPairsClamped,
-      prizeValidation: prizeValidationInput.trim() || undefined,
-      prizeRaffle: prizeRaffleInput.trim() || undefined,
     }
     onChange(newSettings)
     setSaveStatus('idle')
@@ -96,10 +70,7 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
           gameId,
           settings: {
             empareja2: {
-              ...(maxValidations !== undefined && { maxValidations }),
-              ...(numPairsClamped !== undefined && { numPairs: numPairsClamped }),
-              ...(prizeValidationInput.trim() && { prizeValidation: prizeValidationInput.trim() }),
-              ...(prizeRaffleInput.trim() && { prizeRaffle: prizeRaffleInput.trim() }),
+              numPairs: numPairsClamped,
             },
           },
         })
@@ -109,9 +80,9 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
           setSaveStatus('idle')
           setSaveMessage('')
         }, 3000)
-      } catch (e: any) {
+      } catch (e: unknown) {
         setSaveStatus('error')
-        setSaveMessage(e?.message || 'Error al guardar en el servidor')
+        setSaveMessage(e instanceof Error ? e.message : 'Error al guardar en el servidor')
       }
     } else {
       setSaveStatus('success')
@@ -132,22 +103,11 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Máximo de validaciones (premios)
-          </label>
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={maxValidationsInput}
-            onChange={(e) => setMaxValidationsInput(e.target.value)}
-            placeholder="∞"
-            className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
-          />
-        </div>
+      <p className="text-sm text-gray-400">
+        Los premios y el máximo de validaciones están en Ajustes → Premios y límites.
+      </p>
 
+      <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
             Dificultad para encontrar a tu pareja
@@ -176,32 +136,6 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
             </>
           )}
         </div>
-
-        <div className="border-t border-white/10 pt-4">
-          <h3 className="text-sm font-medium text-gray-300 mb-3">Premios</h3>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Premio por validar pareja</label>
-              <input
-                type="text"
-                value={prizeValidationInput}
-                onChange={(e) => setPrizeValidationInput(e.target.value)}
-                placeholder="🎁 Descripción del premio"
-                className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Premio por ganar sorteo</label>
-              <input
-                type="text"
-                value={prizeRaffleInput}
-                onChange={(e) => setPrizeRaffleInput(e.target.value)}
-                placeholder="🎁 Descripción del premio"
-                className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
       </div>
 
       {saveStatus !== 'idle' && (
@@ -222,6 +156,7 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       )}
 
       <button
+        type="button"
         onClick={handleSave}
         disabled={saveStatus === 'saving'}
         className="w-full p-3 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
