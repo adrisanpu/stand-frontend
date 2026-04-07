@@ -131,6 +131,16 @@ export default function GameGate({ onGameCreated }: GameGateProps){
     setError(null)
   }
 
+  useEffect(() => {
+    if (selectedGame) return
+    const id = window.requestAnimationFrame(() => {
+      const root = document.querySelector('[data-focus-root]')
+      const el = root?.querySelector<HTMLElement>('button')
+      el?.focus()
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [selectedGame])
+
   const handleCreate = async () => {
     if (!selectedGame) return
     

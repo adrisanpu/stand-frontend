@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Raffle from './Raffle'
 import Quiz from './Quiz'
 import AppearanceSettings from './AppearanceSettings'
@@ -7,6 +7,7 @@ import type { GameDefinition } from './types'
 import { api } from '../api/api'
 import { useCurrentUser } from '../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../auth/featureFlags'
+import { inputManager } from './input/inputManager'
 
 type SettingsMenuProps = {
   onClose: () => void
@@ -42,6 +43,94 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [isStartingCheckout, setIsStartingCheckout] = useState(false)
   const { user, loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
+
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  const settingsMainListRef = useRef<HTMLDivElement>(null)
+
+  const modalSnapRef = useRef({
+    showRaffle: false,
+    showQuiz: false,
+    showRemovePlayer: false,
+    showExitConfirm: false,
+    showExportQuiz: false,
+    showExportShareOptions: false,
+    showGameConfig: false,
+    showOperatorPrizes: false,
+    showAppearanceSettings: false,
+    showUserInfo: false,
+  })
+  modalSnapRef.current = {
+    showRaffle,
+    showQuiz,
+    showRemovePlayer,
+    showExitConfirm,
+    showExportQuiz,
+    showExportShareOptions,
+    showGameConfig,
+    showOperatorPrizes,
+    showAppearanceSettings,
+    showUserInfo,
+  }
+
+  useEffect(() => {
+    return inputManager.registerBackInterceptor(() => {
+      const s = modalSnapRef.current
+      if (s.showExportShareOptions) {
+        setShowExportShareOptions(false)
+        return true
+      }
+      if (s.showExportQuiz) {
+        setShowExportQuiz(false)
+        setExportQuizError(null)
+        setExportQuizData(null)
+        setShowExportShareOptions(false)
+        return true
+      }
+      if (s.showExitConfirm) {
+        setShowExitConfirm(false)
+        return true
+      }
+      if (s.showRemovePlayer) {
+        setShowRemovePlayer(false)
+        return true
+      }
+      if (s.showOperatorPrizes) {
+        setShowOperatorPrizes(false)
+        return true
+      }
+      if (s.showGameConfig) {
+        setShowGameConfig(false)
+        return true
+      }
+      if (s.showUserInfo) {
+        setShowUserInfo(false)
+        return true
+      }
+      if (s.showAppearanceSettings) {
+        setShowAppearanceSettings(false)
+        return true
+      }
+      if (s.showQuiz) {
+        setShowQuiz(false)
+        return true
+      }
+      if (s.showRaffle) {
+        setShowRaffle(false)
+        return true
+      }
+      onCloseRef.current()
+      return true
+    })
+  }, [])
+
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      settingsMainListRef.current?.querySelector('button')?.focus()
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [])
 
   // Load game settings from localStorage when gameId changes
   useEffect(() => {
@@ -902,7 +991,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
           </button>
         </div>
 
-        <div className="space-y-3 flex-1 min-h-0 overflow-y-auto">
+        <div ref={settingsMainListRef} className="space-y-3 flex-1 min-h-0 overflow-y-auto">
           {/* User Info - Only available when no game is active */}
           {!gameType && (
             <button

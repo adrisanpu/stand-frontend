@@ -9,6 +9,7 @@ import Logout from './auth/Logout'
 import BillingSuccess from './pages/BillingSuccess'
 import BillingCancel from './pages/BillingCancel'
 import BillingCheckout from './pages/BillingCheckout'
+import InputDebugOverlay from './core/input/InputDebugOverlay'
 
 function RootRedirect() {
   const { isAuthenticated } = useAuth()
@@ -62,6 +63,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <InputDebugOverlay />
       </AuthProvider>
     </BrowserRouter>
   )

@@ -1,4 +1,4 @@
-import type { GameAction, KeyMap } from './types'
+import type { GameAction, KeyMap, CodeMap, KeyCodeMap } from './types'
 
 const DEFAULT_KEY_MAP: KeyMap = {
   ArrowUp: 'up',
@@ -10,29 +10,55 @@ const DEFAULT_KEY_MAP: KeyMap = {
   Escape: 'back',
 }
 
-const BACK_KEY_CODES = new Set([461])
-const PAUSE_KEY_CODES = new Set([19])
-/** webOS / TV remotes often send Enter/OK as keyCode 13 with empty or Unidentified `key`. */
-const SELECT_KEY_CODES = new Set([13])
+/** Flechas por `event.code` cuando `key` viene vacío o Unidentified (TV / webOS). */
+const DEFAULT_CODE_MAP: CodeMap = {
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  BrowserBack: 'back',
+  GoBack: 'back',
+}
 
-export function mapKeyboardEventToAction(event: KeyboardEvent, customMap?: KeyMap): GameAction | null {
-  const mergedMap: KeyMap = { ...DEFAULT_KEY_MAP, ...(customMap || {}) }
+const DEFAULT_KEY_CODE_MAP: KeyCodeMap = {
+  461: 'back',
+  19: 'pause',
+  37: 'left',
+  38: 'up',
+  39: 'right',
+  40: 'down',
+}
 
-  if (BACK_KEY_CODES.has(event.keyCode)) {
-    return 'back'
+export type KeyboardMapOptions = {
+  keyMap?: KeyMap
+  codeMap?: CodeMap
+  keyCodeMap?: KeyCodeMap
+}
+
+/**
+ * Precedencia: keyCodeMap (461, pause, 37–40 + overrides) → key en keyMap → code en codeMap → keyCode 13 → select (OK webOS).
+ */
+export function mapKeyboardEventToAction(event: KeyboardEvent, opts?: KeyboardMapOptions): GameAction | null {
+  const keyMap: KeyMap = { ...DEFAULT_KEY_MAP, ...(opts?.keyMap || {}) }
+  const codeMap: CodeMap = { ...DEFAULT_CODE_MAP, ...(opts?.codeMap || {}) }
+  const keyCodeMap: KeyCodeMap = { ...DEFAULT_KEY_CODE_MAP, ...(opts?.keyCodeMap || {}) }
+
+  const fromKeyCode = keyCodeMap[event.keyCode]
+  if (fromKeyCode) {
+    return fromKeyCode
   }
-  if (PAUSE_KEY_CODES.has(event.keyCode)) {
-    return 'pause'
+
+  if (event.key in keyMap) {
+    return keyMap[event.key] || null
   }
 
-  if (event.key in mergedMap) {
-    return mergedMap[event.key] || null
+  if (event.code && event.code in codeMap) {
+    return codeMap[event.code] || null
   }
 
-  if (SELECT_KEY_CODES.has(event.keyCode)) {
+  if (event.keyCode === 13) {
     return 'select'
   }
 
   return null
 }
-

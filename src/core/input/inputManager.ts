@@ -9,17 +9,28 @@ import type {
   InputSource,
 } from './types'
 
+type BackInterceptor = (event: KeyboardEvent) => boolean
+
 class InputManager {
   private handlers = new Map<GameAction, Set<ActionHandler>>()
+  private backInterceptors: BackInterceptor[] = []
   private started = false
   private enabled = true
   private contextId: InputContextId | null = null
-  private options: Required<InputManagerOptions> = {
+  private options: Required<
+    Pick<InputManagerOptions, 'preferExistingInputs' | 'supportTouchMode' | 'disableBackHistoryAPI' | 'enablePointerEvents'>
+  > &
+    Pick<InputManagerOptions, 'keyMap' | 'codeMap' | 'keyCodeMap'> = {
     preferExistingInputs: true,
     supportTouchMode: 'none',
     disableBackHistoryAPI: false,
+    enablePointerEvents: true,
+    keyMap: undefined,
+    codeMap: undefined,
+    keyCodeMap: undefined,
   }
-  private lastTouchTimestamp = 0
+  private lastEmittedClickAt = 0
+  private lastEmittedClickKey = ''
 
   start(options?: InputManagerOptions) {
     if (this.started) return
@@ -29,15 +40,8 @@ class InputManager {
     }
     this.started = true
     window.addEventListener('keydown', this.onKeyDown, { capture: true })
-    window.addEventListener('click', this.onClick, { capture: true })
-    window.addEventListener('pointerdown', this.onPointerDown, { capture: true })
-    window.addEventListener('focus', this.onFocus)
-    window.addEventListener('blur', this.onBlur)
-    window.addEventListener('cursorStateChange', this.onCursorStateChange as EventListener)
-    window.addEventListener('keyboardStateChange', this.onKeyboardStateChange as EventListener)
-    if (this.options.supportTouchMode === 'full') {
-      window.addEventListener('touchstart', this.onTouchStart, { capture: true, passive: true })
-      window.addEventListener('touchend', this.onTouchEnd, { capture: true })
+    if (this.options.enablePointerEvents) {
+      window.addEventListener('click', this.onClick, { capture: true })
     }
     if (!this.options.disableBackHistoryAPI) {
       window.addEventListener('popstate', this.onPopState)
@@ -49,14 +53,19 @@ class InputManager {
     this.started = false
     window.removeEventListener('keydown', this.onKeyDown, { capture: true } as EventListenerOptions)
     window.removeEventListener('click', this.onClick, { capture: true } as EventListenerOptions)
-    window.removeEventListener('pointerdown', this.onPointerDown, { capture: true } as EventListenerOptions)
-    window.removeEventListener('focus', this.onFocus)
-    window.removeEventListener('blur', this.onBlur)
-    window.removeEventListener('cursorStateChange', this.onCursorStateChange as EventListener)
-    window.removeEventListener('keyboardStateChange', this.onKeyboardStateChange as EventListener)
-    window.removeEventListener('touchstart', this.onTouchStart, { capture: true } as EventListenerOptions)
-    window.removeEventListener('touchend', this.onTouchEnd, { capture: true } as EventListenerOptions)
     window.removeEventListener('popstate', this.onPopState)
+  }
+
+  /**
+   * LIFO: el último registrado se ejecuta primero (p. ej. SettingsMenu antes que AppShell).
+   * Devuelve true si consumió el Back (no se hace emit a suscriptores `back`).
+   */
+  registerBackInterceptor(handler: BackInterceptor): () => void {
+    this.backInterceptors.push(handler)
+    return () => {
+      const i = this.backInterceptors.indexOf(handler)
+      if (i >= 0) this.backInterceptors.splice(i, 1)
+    }
   }
 
   subscribe(action: GameAction, handler: ActionHandler): () => void {
@@ -79,6 +88,11 @@ class InputManager {
     this.contextId = contextId
   }
 
+  private keyboardSource(): InputSource {
+    const caps = detectWebOSCapabilities(this.options.disableBackHistoryAPI, this.options.supportTouchMode)
+    return caps.isWebOS ? 'remote' : 'keyboard'
+  }
+
   private emit(action: GameAction, source: InputSource, nativeEvent: Event, partial?: Partial<InputEventEnvelope>) {
     if (!this.enabled) return
     const payload: InputEventEnvelope = {
@@ -87,6 +101,7 @@ class InputManager {
       timestamp: Date.now(),
       contextId: this.contextId,
       key: partial?.key,
+      code: partial?.code,
       keyCode: partial?.keyCode,
       pointerType: partial?.pointerType,
       target: partial?.target ?? nativeEvent.target,
@@ -98,13 +113,18 @@ class InputManager {
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
-    const action = mapKeyboardEventToAction(event)
+    const action = mapKeyboardEventToAction(event, {
+      keyMap: this.options.keyMap,
+      codeMap: this.options.codeMap,
+      keyCodeMap: this.options.keyCodeMap,
+    })
     if (!action) return
     const target = event.target as HTMLElement | null
     const isEditableTarget =
       !!target &&
       (target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
         target.isContentEditable)
 
     if (isEditableTarget && action !== 'back') {
@@ -112,6 +132,12 @@ class InputManager {
     }
 
     if (action === 'back') {
+      for (let i = this.backInterceptors.length - 1; i >= 0; i--) {
+        if (this.backInterceptors[i](event)) {
+          event.preventDefault()
+          return
+        }
+      }
       const capabilities = detectWebOSCapabilities(this.options.disableBackHistoryAPI, this.options.supportTouchMode)
       if (capabilities.backMode === 'manual' && event.keyCode === 461) {
         event.preventDefault()
@@ -120,52 +146,36 @@ class InputManager {
       event.preventDefault()
     }
 
-    this.emit(action, 'keyboard', event, { key: event.key, keyCode: event.keyCode })
+    this.emit(action, this.keyboardSource(), event, {
+      key: event.key,
+      code: event.code,
+      keyCode: event.keyCode,
+    })
+  }
+
+  private clickDedupeKey(ev: MouseEvent): string {
+    const t = ev.target as Node | null
+    const x = ev.clientX
+    const y = ev.clientY
+    return `${t?.nodeName || ''}:${x}:${y}`
   }
 
   private onClick = (event: MouseEvent) => {
-    if (this.options.supportTouchMode === 'full' && Date.now() - this.lastTouchTimestamp < 500) {
+    if (!this.options.enablePointerEvents) return
+    const now = Date.now()
+    const key = this.clickDedupeKey(event)
+    if (now - this.lastEmittedClickAt < 400 && key === this.lastEmittedClickKey) {
       return
     }
-    this.emit('click', 'pointer', event, { pointerType: 'mouse' })
-  }
-
-  private onPointerDown = (event: PointerEvent) => {
-    this.emit('click', 'pointer', event, { pointerType: event.pointerType })
-  }
-
-  private onTouchStart = (event: TouchEvent) => {
-    this.lastTouchTimestamp = Date.now()
-    if (this.options.supportTouchMode !== 'full') return
-    this.emit('click', 'touch', event, { pointerType: 'touch' })
-  }
-
-  private onTouchEnd = (event: TouchEvent) => {
-    this.lastTouchTimestamp = Date.now()
-    if (this.options.supportTouchMode !== 'full') return
-    this.emit('select', 'touch', event, { pointerType: 'touch' })
+    this.lastEmittedClickAt = now
+    this.lastEmittedClickKey = key
+    const pointerType = event.detail === 0 ? 'touch-synthetic' : 'mouse'
+    this.emit('click', 'pointer', event, { pointerType })
   }
 
   private onPopState = (event: PopStateEvent) => {
     this.emit('back', 'system', event)
   }
-
-  private onFocus = (event: FocusEvent) => {
-    this.emit('pause', 'system', event)
-  }
-
-  private onBlur = (event: FocusEvent) => {
-    this.emit('pause', 'system', event)
-  }
-
-  private onCursorStateChange = (event: Event) => {
-    this.emit('pause', 'system', event)
-  }
-
-  private onKeyboardStateChange = (event: Event) => {
-    this.emit('pause', 'system', event)
-  }
 }
 
 export const inputManager = new InputManager()
-

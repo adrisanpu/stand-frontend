@@ -41,6 +41,25 @@ html {
 
 html,body,#root { height: 100%; background: #0B0A12; }
 
+/* Mando / teclado: foco visible sin depender de hover (webOS, SRS23CW) */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.65);
+  outline-offset: 2px;
+}
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 3px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 1px;
+}
+
 /* Viewport height for portrait scale-to-fit (avoids address bar issues) */
 .h-screen-dvh { height: 100dvh; }
 
