@@ -6,6 +6,11 @@ import { getInstagramDmUrl } from '../../core/instagram'
 import { api } from '../../api/api'
 import { useGameInput } from '../../core/input/useGameInput'
 import { syncPointerToElement } from '../../core/input/pointerSync'
+import {
+  isWebOSBrowser,
+  shouldHijackOkPointerToPrimary,
+  webosOkHijackDisabled,
+} from '../../core/input/webosOkPointerPrimary'
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
 
@@ -229,6 +234,64 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
     setPlayerId(null)
     setUsername(null)
   }
+
+  const handleStartRef = useRef(handleStart)
+  const handleStopRef = useRef(handleStop)
+  const handleValidateRef = useRef(handleValidate)
+  const handleResetFnRef = useRef(handleReset)
+  handleStartRef.current = handleStart
+  handleStopRef.current = handleStop
+  handleValidateRef.current = handleValidate
+  handleResetFnRef.current = handleReset
+
+  // webOS: OK en modo puntero → pointerdown:mouse donde está el cursor (no se puede mover por JS).
+  // Si el clic no cae en otro botón/enlace/input, ejecutamos la acción del CTA del estado actual.
+  useEffect(() => {
+    if (!isWebOSBrowser() || webosOkHijackDisabled()) return
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return
+
+      let primary: HTMLElement | null = null
+      let onActivate: (() => void) | null = null
+
+      switch (gameState) {
+        case 'preparing':
+          primary = startButtonRef.current
+          onActivate = () => handleStartRef.current()
+          break
+        case 'playing':
+        case 'hidden':
+          primary = stopButtonRef.current
+          onActivate = () => handleStopRef.current()
+          break
+        case 'finished':
+          primary = resetBackRef.current
+          onActivate = () => handleResetFnRef.current()
+          break
+        case 'idle': {
+          const v = validateButtonRef.current
+          if (v && !v.disabled) {
+            primary = v
+            onActivate = () => void handleValidateRef.current()
+          }
+          break
+        }
+        default:
+          return
+      }
+
+      if (!primary || !onActivate) return
+      if (!shouldHijackOkPointerToPrimary(e.target, primary)) return
+
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      onActivate()
+    }
+
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [gameState])
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
 
