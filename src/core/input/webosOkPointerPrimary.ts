@@ -21,6 +21,14 @@ export function shouldHijackOkPointerToPrimary(target: EventTarget | null, prima
   return true
 }
 
-export function webosOkHijackDisabled(): boolean {
-  return import.meta.env.VITE_WEBOS_OK_HIJACK === 'false'
+/**
+ * Último recurso: redirigir pointerdown aislados al CTA del juego.
+ * Por defecto desactivado; activar con VITE_WEBOS_OK_HIJACK=true o ?webosOkHijack=1
+ */
+export function webosOkHijackEnabled(): boolean {
+  if (typeof window !== 'undefined') {
+    if (/\bwebosOkHijack=0\b/.test(window.location.search)) return false
+    if (/\bwebosOkHijack=1\b/.test(window.location.search)) return true
+  }
+  return import.meta.env.VITE_WEBOS_OK_HIJACK === 'true'
 }

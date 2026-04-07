@@ -5,11 +5,10 @@ import BackButton from '../../core/BackButton'
 import { getInstagramDmUrl } from '../../core/instagram'
 import { api } from '../../api/api'
 import { useGameInput } from '../../core/input/useGameInput'
-import { syncPointerToElement } from '../../core/input/pointerSync'
 import {
   isWebOSBrowser,
   shouldHijackOkPointerToPrimary,
-  webosOkHijackDisabled,
+  webosOkHijackEnabled,
 } from '../../core/input/webosOkPointerPrimary'
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
@@ -30,65 +29,28 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   const stopButtonRef = useRef<HTMLButtonElement | null>(null)
   const resetBackRef = useRef<HTMLButtonElement | null>(null)
   const validateButtonRef = useRef<HTMLButtonElement | null>(null)
-  const codeInputRef = useRef<HTMLInputElement | null>(null)
 
-  /** Foco + scroll al centro visible + sincronizar puntero/hover (TV / magic remote). */
-  const pinPrimaryControl = (el: HTMLElement | null) => {
-    if (!el) return
-    try {
-      el.focus({ preventScroll: true })
-    } catch {
-      el.focus()
-    }
-    el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' })
-    syncPointerToElement(el)
-  }
-
-  // webOS / mando: foco + scroll + puntero lógico al control principal en cada estado.
+  // webOS / 5-way: mantener un CTA con foco al cambiar de paso (sin scroll ni pointer sintético).
   useEffect(() => {
-    let alive = true
     const id = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        if (!alive) return
-        if (gameState === 'idle') {
-          const btn = validateButtonRef.current
-          const input = codeInputRef.current
-          if (btn && !btn.disabled) {
-            pinPrimaryControl(btn)
-          } else {
-            if (input) {
-              try {
-                input.focus({ preventScroll: true })
-              } catch {
-                input.focus()
-              }
-              input.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' })
-            }
-            syncPointerToElement(btn ?? input)
-          }
-          return
-        }
-        if (gameState === 'preparing') {
-          const active = document.activeElement as HTMLElement | null
-          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-            active.blur()
-          }
-          pinPrimaryControl(startButtonRef.current)
-          return
-        }
-        if (gameState === 'playing' || gameState === 'hidden') {
-          pinPrimaryControl(stopButtonRef.current)
-          return
-        }
-        if (gameState === 'finished') {
-          pinPrimaryControl(resetBackRef.current)
-        }
-      })
+      if (gameState === 'preparing') {
+        startButtonRef.current?.focus()
+        return
+      }
+      if (gameState === 'playing' || gameState === 'hidden') {
+        stopButtonRef.current?.focus()
+        return
+      }
+      if (gameState === 'finished') {
+        resetBackRef.current?.focus()
+        return
+      }
+      if (gameState === 'idle') {
+        const v = validateButtonRef.current
+        if (v && !v.disabled) v.focus()
+      }
     })
-    return () => {
-      alive = false
-      window.cancelAnimationFrame(id)
-    }
+    return () => window.cancelAnimationFrame(id)
   }, [gameState])
 
   // Notify parent when counter is running so API polling can be paused (avoid lag)
@@ -247,7 +209,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   // webOS: OK en modo puntero → pointerdown:mouse donde está el cursor (no se puede mover por JS).
   // Si el clic no cae en otro botón/enlace/input, ejecutamos la acción del CTA del estado actual.
   useEffect(() => {
-    if (!isWebOSBrowser() || webosOkHijackDisabled()) return
+    if (!isWebOSBrowser() || !webosOkHijackEnabled()) return
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse' || e.button !== 0) return
@@ -336,7 +298,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
               </div>
               <div className="max-w-md mx-auto w-full space-y-2">
                 <div className="flex gap-3">
-                  <input ref={codeInputRef} id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder="Ingresa tu código" className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }} />
+                  <input id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder="Ingresa tu código" className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }} />
                   <button ref={validateButtonRef} type="button" onClick={handleValidate} disabled={!playerCode.trim() || isValidating} className="px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0">{isValidating ? 'Validando...' : 'Validar'}</button>
                 </div>
               </div>
@@ -471,7 +433,6 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
                 <div className="space-y-2">
                   <div className="flex gap-3">
                     <input
-                      ref={codeInputRef}
                       id="player-code"
                       type="number"
                       inputMode="numeric"
