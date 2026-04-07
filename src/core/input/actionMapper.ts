@@ -12,6 +12,8 @@ const DEFAULT_KEY_MAP: KeyMap = {
 
 const BACK_KEY_CODES = new Set([461])
 const PAUSE_KEY_CODES = new Set([19])
+/** webOS / TV remotes often send Enter/OK as keyCode 13 with empty or Unidentified `key`. */
+const SELECT_KEY_CODES = new Set([13])
 
 export function mapKeyboardEventToAction(event: KeyboardEvent, customMap?: KeyMap): GameAction | null {
   const mergedMap: KeyMap = { ...DEFAULT_KEY_MAP, ...(customMap || {}) }
@@ -25,6 +27,10 @@ export function mapKeyboardEventToAction(event: KeyboardEvent, customMap?: KeyMa
 
   if (event.key in mergedMap) {
     return mergedMap[event.key] || null
+  }
+
+  if (SELECT_KEY_CODES.has(event.keyCode)) {
+    return 'select'
   }
 
   return null
