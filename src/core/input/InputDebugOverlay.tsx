@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 type DebugState = {
   type: string
@@ -10,15 +11,23 @@ type DebugState = {
   t: number
 }
 
+/** Por defecto activo (incl. GameScreen). Desactivar: VITE_INPUT_DEBUG=false o ?inputDebug=0 */
 function inputDebugEnabled(): boolean {
-  if (import.meta.env.VITE_INPUT_DEBUG === 'true') return true
-  if (typeof window === 'undefined') return false
-  return /\binputDebug=1\b/.test(window.location.search)
+  if (typeof window !== 'undefined') {
+    if (/\binputDebug=0\b/.test(window.location.search)) return false
+    if (/\binputDebug=1\b/.test(window.location.search)) return true
+  }
+  const env = import.meta.env.VITE_INPUT_DEBUG as string | undefined
+  if (env === 'false') return false
+  if (env === 'true') return true
+  return true
 }
+
+const OVERLAY_Z = 2147483000
 
 /**
  * Overlay para validar en TV (SRS23CW): última tecla, code, keyCode y flags click/touch.
- * Activa con VITE_INPUT_DEBUG=true o ?inputDebug=1
+ * Activo por defecto; portal a document.body para que no quede detrás de juegos/modales.
  */
 export default function InputDebugOverlay() {
   const [s, setS] = useState<DebugState | null>(null)
@@ -83,22 +92,15 @@ export default function InputDebugOverlay() {
 
   if (!enabled) return null
 
-  if (!s) {
-    return (
-      <div
-        className="fixed bottom-2 left-2 z-[9999] rounded-lg border border-white/20 bg-black/85 px-3 py-2 font-mono text-[11px] text-amber-200/90 pointer-events-none"
-        aria-hidden
-      >
-        Input debug activo — esperando eventos…
-      </div>
-    )
-  }
+  const panelClass =
+    'fixed bottom-2 left-2 max-w-[min(100vw-1rem,420px)] rounded-lg border border-white/20 bg-black/85 px-3 py-2 font-mono text-[11px] leading-snug pointer-events-none shadow-lg'
 
-  return (
-    <div
-      className="fixed bottom-2 left-2 z-[9999] max-w-[min(100vw-1rem,420px)] rounded-lg border border-white/20 bg-black/85 px-3 py-2 font-mono text-[11px] leading-snug text-green-300 shadow-lg pointer-events-none"
-      aria-hidden
-    >
+  const node = !s ? (
+    <div className={`${panelClass} text-amber-200/90`} style={{ zIndex: OVERLAY_Z }} aria-hidden>
+      Input debug activo — esperando eventos…
+    </div>
+  ) : (
+    <div className={`${panelClass} text-green-300`} style={{ zIndex: OVERLAY_Z }} aria-hidden>
       <div className="text-white/60 text-[10px] uppercase tracking-wide mb-1">Input debug</div>
       <div>evt: {s.type}</div>
       <div>key: {s.key || '—'}</div>
@@ -109,4 +111,7 @@ export default function InputDebugOverlay() {
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(node, document.body)
 }
