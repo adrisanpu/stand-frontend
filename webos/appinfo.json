@@ -1,0 +1,11 @@
+{
+  "id": "app.playstand.operator",
+  "title": "Stand Operator",
+  "version": "1.0.0",
+  "vendor": "Stand",
+  "type": "web",
+  "main": "index.html",
+  "disableBackHistoryAPI": false,
+  "supportTouchMode": "full"
+}
+

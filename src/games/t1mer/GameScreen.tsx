@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/QRCode'
 import BackButton from '../../core/BackButton'
 import { getInstagramDmUrl } from '../../core/instagram'
 import { api } from '../../api/api'
+import { useGameInput } from '../../core/input/useGameInput'
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
 
@@ -118,31 +119,22 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
     }
   }
 
-  useEffect(() => {
-    const handleRemoteConfirm = (event: KeyboardEvent) => {
-      const isConfirmKey =
-        event.key === 'Enter' ||
-        event.key === 'NumpadEnter' ||
-        event.keyCode === 13
-
-      if (!isConfirmKey) {
-        return
-      }
-
+  const inputHandlers = useMemo(() => ({
+    select: () => {
       if (gameState === 'preparing') {
-        event.preventDefault()
         handleStart()
       } else if (gameState === 'playing' || gameState === 'hidden') {
-        event.preventDefault()
         handleStop()
       }
-    }
+    },
+    back: () => {
+      if (gameState !== 'idle') {
+        handleReset()
+      }
+    },
+  }), [gameState])
 
-    window.addEventListener('keydown', handleRemoteConfirm)
-    return () => {
-      window.removeEventListener('keydown', handleRemoteConfirm)
-    }
-  }, [gameState, handleStart, handleStop])
+  useGameInput(`t1mer:${gameId}`, inputHandlers)
 
   const submitScore = async (time: number, difference: number) => {
     if (!playerId || !gameId) {

@@ -4,6 +4,7 @@ import type { CardLayoutPosition } from './GameConfig'
 import { api } from '../../api/api'
 import QRCode from '../../core/QRCode'
 import { getInstagramDmUrl } from '../../core/instagram'
+import { useGameInput } from '../../core/input/useGameInput'
 
 const INFOCARDS_SETTINGS_KEY_PREFIX = 'infocards_settings_'
 const CARD_CONTAINER_HEIGHT_CLASS = 'h-[340px] sm:h-[380px] lg:h-[410px]'
@@ -86,6 +87,18 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
 
   const goToPrev = () => setCurrentIndex(i => (i > 0 ? i - 1 : displayCards.length - 1))
   const goToNext = () => setCurrentIndex(i => (i < displayCards.length - 1 ? i + 1 : 0))
+
+  useGameInput(`infocards:${gameId}`, {
+    left: () => {
+      if (displayCards.length > 0) goToPrev()
+    },
+    right: () => {
+      if (displayCards.length > 0) goToNext()
+    },
+    select: () => {
+      if (displayCards.length > 0) goToNext()
+    },
+  })
 
   if (loading) {
     return (
