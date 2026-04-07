@@ -142,8 +142,16 @@ class InputManager {
       if (capabilities.backMode === 'manual' && event.keyCode === 461) {
         event.preventDefault()
       }
-    } else if (action === 'up' || action === 'down' || action === 'left' || action === 'right' || action === 'select') {
+    } else if (action === 'up' || action === 'down' || action === 'left' || action === 'right') {
       event.preventDefault()
+    } else if (action === 'select') {
+      const active = document.activeElement
+      const allowNativeActivate =
+        active instanceof HTMLButtonElement ||
+        (active instanceof HTMLAnchorElement && active.hasAttribute('href'))
+      if (!allowNativeActivate) {
+        event.preventDefault()
+      }
     }
 
     this.emit(action, this.keyboardSource(), event, {
