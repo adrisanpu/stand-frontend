@@ -9,10 +9,16 @@ const envTouchMode = (import.meta.env.VITE_WEBOS_TOUCH_MODE as string | undefine
 const supportTouchMode: TouchMode =
   envTouchMode === 'full' || envTouchMode === 'virtual' ? envTouchMode : 'none'
 
+const isWebOS = typeof navigator !== 'undefined' && /web0s|webos|smarttv/i.test(navigator.userAgent || '')
+const pointerEnv = import.meta.env.VITE_ENABLE_POINTER_INPUT as string | undefined
+const enablePointerEvents =
+  pointerEnv === 'true' || (pointerEnv !== 'false' && !isWebOS)
+
 inputManager.start({
   preferExistingInputs: true,
   supportTouchMode,
   disableBackHistoryAPI: import.meta.env.VITE_WEBOS_DISABLE_BACK_HISTORY_API === 'true',
+  enablePointerEvents,
 })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

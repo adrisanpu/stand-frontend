@@ -11,6 +11,7 @@ import { useCurrentUser } from '../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../auth/featureFlags'
 import { useOrientation } from '../hooks/useOrientation'
 import { readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle } from './operatorPrizeSlots'
+import { inputManager } from './input/inputManager'
 
 const STORAGE_KEY_LOGO = 'app_custom_logo'
 
@@ -155,6 +156,29 @@ export default function AppShell() {
     setShowSettings(false)
   }
 
+  const backShellRef = useRef({ showSettings: false, inGame: false })
+  const leaveGameRef = useRef(handleLeaveGame)
+  leaveGameRef.current = handleLeaveGame
+  useEffect(() => {
+    backShellRef.current = {
+      showSettings,
+      inGame: !!(gameId && gameName && gameDefinition),
+    }
+  }, [showSettings, gameId, gameName, gameDefinition])
+
+  useEffect(() => {
+    return inputManager.registerBackInterceptor(() => {
+      if (backShellRef.current.showSettings) {
+        return false
+      }
+      if (backShellRef.current.inGame) {
+        leaveGameRef.current()
+        return true
+      }
+      return false
+    })
+  }, [])
+
   const handleExitApp = () => {
     // Clear all localStorage
     localStorage.clear()
@@ -264,8 +288,9 @@ export default function AppShell() {
       <div className="bg-club text-textMain font-sans">
         {/* Settings Icon */}
         <button
+          type="button"
           onClick={() => setShowSettings(true)}
-          className={`fixed top-4 left-4 z-40 p-2 rounded-full bg-black/20 backdrop-blur-sm border border-white/10 hover:bg-black/30 transition-all duration-200 flex items-center justify-center ${isPortrait ? 'min-w-[44px] min-h-[44px]' : 'min-w-[36px] min-h-[36px]'}`}
+          className={`fixed top-4 left-4 z-40 p-2 rounded-full bg-black/20 backdrop-blur-sm border border-white/10 hover:bg-black/30 transition-all duration-200 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 ${isPortrait ? 'min-w-[44px] min-h-[44px]' : 'min-w-[36px] min-h-[36px]'}`}
           aria-label="Configuración"
         >
           <svg className={`${isPortrait ? 'w-6 h-6 lg:w-7 lg:h-7' : 'w-5 h-5'} text-white/70`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -431,7 +456,10 @@ export default function AppShell() {
             )
           ) : (
             /* GameGate Catalog */
-            <div className="card w-full max-w-md sm:max-w-xl lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl p-6 sm:p-8 lg:p-10">
+            <div
+              data-focus-root
+              className="card w-full max-w-md sm:max-w-xl lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl p-6 sm:p-8 lg:p-10"
+            >
               <GameGate onGameCreated={handleGameCreated} />
             </div>
           )}

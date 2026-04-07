@@ -150,11 +150,6 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
         handleStop()
       }
     },
-    back: () => {
-      if (gameState !== 'idle') {
-        handleReset()
-      }
-    },
   }), [gameState])
 
   useGameInput(`t1mer:${gameId}`, inputHandlers)
