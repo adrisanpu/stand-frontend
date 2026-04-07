@@ -20,6 +20,29 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   const [resultRank, setResultRank] = useState<number | null>(null)
   const intervalRef = useRef<number | null>(null)
   const startTimeRef = useRef<number>(0)
+  const startButtonRef = useRef<HTMLButtonElement | null>(null)
+  const stopButtonRef = useRef<HTMLButtonElement | null>(null)
+
+  // Magic Remote / webOS: OK debe activar el botón principal. Si el foco sigue en el input de código,
+  // inputManager no emite `select` en campos editables; además el SO puede mostrar el cursor del puntero.
+  useEffect(() => {
+    if (gameState === 'preparing') {
+      const active = document.activeElement as HTMLElement | null
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        active.blur()
+      }
+      const id = window.requestAnimationFrame(() => {
+        startButtonRef.current?.focus()
+      })
+      return () => window.cancelAnimationFrame(id)
+    }
+    if (gameState === 'playing' || gameState === 'hidden') {
+      const id = window.requestAnimationFrame(() => {
+        stopButtonRef.current?.focus()
+      })
+      return () => window.cancelAnimationFrame(id)
+    }
+  }, [gameState])
 
   // Notify parent when counter is running so API polling can be paused (avoid lag)
   useEffect(() => {
@@ -234,7 +257,14 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
                   <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-gray-600 font-digital opacity-50">00:00.0</div>
                 </div>
                 <div className="w-full min-w-0">
-                  <button onClick={handleStart} className="w-full p-8 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"><span className="text-2xl sm:text-3xl font-bold">EMPEZAR</span></button>
+                  <button
+                    ref={startButtonRef}
+                    type="button"
+                    onClick={handleStart}
+                    className="w-full p-8 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+                  >
+                    <span className="text-2xl sm:text-3xl font-bold">EMPEZAR</span>
+                  </button>
                 </div>
               </div>
             </>
@@ -249,7 +279,14 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
               </div>
               {gameState !== 'finished' && (
                 <div className="w-full min-w-0">
-                  <button onClick={handleStop} className="w-full p-8 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"><span className="text-2xl sm:text-3xl font-bold">DETENER</span></button>
+                  <button
+                    ref={stopButtonRef}
+                    type="button"
+                    onClick={handleStop}
+                    className="w-full p-8 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+                  >
+                    <span className="text-2xl sm:text-3xl font-bold">DETENER</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -370,7 +407,12 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
                 <div className="font-normal text-gray-600 font-digital opacity-50 text-6xl sm:text-7xl lg:text-8xl">00:00.0</div>
               </div>
               <div className="w-full min-w-0 flex-shrink-0">
-                <button onClick={handleStart} className="w-full rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors p-8">
+                <button
+                  ref={startButtonRef}
+                  type="button"
+                  onClick={handleStart}
+                  className="w-full rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors p-8"
+                >
                   <span className="text-2xl sm:text-3xl lg:text-4xl font-bold">EMPEZAR</span>
                 </button>
               </div>
@@ -385,7 +427,12 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
               </div>
               {gameState !== 'finished' && (
                 <div className="w-full min-w-0 flex-shrink-0">
-                  <button onClick={handleStop} className="w-full rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors p-8">
+                  <button
+                    ref={stopButtonRef}
+                    type="button"
+                    onClick={handleStop}
+                    className="w-full rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors p-8"
+                  >
                     <span className="text-2xl sm:text-3xl lg:text-4xl font-bold">DETENER</span>
                   </button>
                 </div>
