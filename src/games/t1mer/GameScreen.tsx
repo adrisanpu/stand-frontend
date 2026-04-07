@@ -118,6 +118,32 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
     }
   }
 
+  useEffect(() => {
+    const handleRemoteConfirm = (event: KeyboardEvent) => {
+      const isConfirmKey =
+        event.key === 'Enter' ||
+        event.key === 'NumpadEnter' ||
+        event.keyCode === 13
+
+      if (!isConfirmKey) {
+        return
+      }
+
+      if (gameState === 'preparing') {
+        event.preventDefault()
+        handleStart()
+      } else if (gameState === 'playing' || gameState === 'hidden') {
+        event.preventDefault()
+        handleStop()
+      }
+    }
+
+    window.addEventListener('keydown', handleRemoteConfirm)
+    return () => {
+      window.removeEventListener('keydown', handleRemoteConfirm)
+    }
+  }, [gameState, handleStart, handleStop])
+
   const submitScore = async (time: number, difference: number) => {
     if (!playerId || !gameId) {
       console.error('Missing playerId or gameId')
@@ -157,17 +183,13 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   if (isLandscape) {
     return (
       <div className="grid grid-cols-[25%_40%_25%] gap-4 items-stretch h-full min-h-0">
-        <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0 min-w-0 items-center">
-          <div className="grid grid-cols-2 gap-2 items-center flex-shrink-0 min-h-0">
-            <div className="flex justify-center min-h-0 w-full min-w-0">
-              <QRCode data={getInstagramDmUrl(gameId)} size={200} margin={6} containerClassName="max-h-[min(18vh,160px)] w-full" alt="QR Code para Instagram DM" className="!border-0 !bg-transparent !p-0" />
-            </div>
-            <div className="flex justify-center items-center min-h-0 min-w-0">
-              {logoElement}
-            </div>
+        <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0 min-w-0">
+          <div className="flex-shrink-0 flex justify-center items-center w-full min-h-0 min-w-0">
+            {logoElement}
           </div>
-          <div className="flex-shrink-0 min-h-0 overflow-hidden">
-            <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col justify-center">
+            <div className="flex-shrink-0 w-full min-w-0">
+              <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
               <ol className="flex flex-col gap-1.5 text-xs text-gray-300">
                 <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">1</span><span className="pt-0.5">📸 Escanea el QR y pulsa JUGAR.</span></li>
                 <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">2</span><span className="pt-0.5">✅ Ingresa tu código y valida.</span></li>
@@ -175,6 +197,20 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
                 <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">4</span><span className="pt-0.5">🎯 Detén en 10 segundos.</span></li>
               </ol>
             </div>
+          </div>
+          <div className="flex-shrink-0 grid grid-cols-2 w-full min-h-0 gap-2 pt-1 pb-2 items-center">
+            <div aria-hidden className="min-h-0 min-w-0" />
+            <div className="flex justify-center items-center min-h-0 min-w-0">
+              <QRCode
+                data={getInstagramDmUrl(gameId)}
+                size={320}
+                margin={6}
+                containerClassName="h-[clamp(92px,16vh,156px)] w-[clamp(92px,11vw,156px)]"
+                alt="QR Code para Instagram DM"
+                className="!border-0 !bg-transparent !p-0"
+              />
+            </div>
+          </div>
         </div>
         <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 min-w-0 space-y-6 items-center">
           {/* Idle: temporizador + código + Validar (validación a escondidas, mismo formulario) */}

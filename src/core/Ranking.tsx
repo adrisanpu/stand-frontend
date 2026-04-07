@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../api/api'
 import { usePolling } from '../hooks/usePolling'
 
@@ -24,6 +24,7 @@ interface RankingProps {
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and show fewer items
   prizeLabel?: string // e.g. "🎁 Merchandising" — shown below title when set
   topX?: number // e.g. 3 — "Premio top 3: {prizeLabel}"
+  maxPrizeRanking?: number // límite mostrado como current/max junto al premio
   gameType?: string // when "T1MER", show only position + username (truncated), no timer/score
 }
 
@@ -33,81 +34,88 @@ function truncateUsername(username: string | undefined, maxLen: number): string 
   return raw.slice(0, maxLen) + '...'
 }
 
-export default function Ranking({ gameId, refreshInterval = 10000, compact = false, prizeLabel, topX, gameType }: RankingProps) {
+function rankingFetchLimit(topX: number | undefined, maxPrizeRanking: number | undefined): number {
+  const topXN = topX != null ? topX : 10
+  if (maxPrizeRanking != null) {
+    return Math.max(topXN, maxPrizeRanking, 10)
+  }
+  return topX != null ? topX : 10
+}
+
+export default function Ranking({
+  gameId,
+  refreshInterval = 10000,
+  compact = false,
+  prizeLabel,
+  topX,
+  maxPrizeRanking,
+  gameType,
+}: RankingProps) {
   const isT1mer = (gameType || '').toUpperCase() === 'T1MER'
   const [ranking, setRanking] = useState<RankingEntry[] | null>(null)
-  const [compactListMaxHeight, setCompactListMaxHeight] = useState<number | null>(null)
-  const firstRowRef = useRef<HTMLDivElement | null>(null)
+
+  const limit = rankingFetchLimit(topX, maxPrizeRanking)
 
   const fetchRanking = async () => {
     if (!gameId) return
-    const limit = topX != null ? topX : 10
-    const data = await api.get<RankingResponse>(`/v1/game/score?gameId=${encodeURIComponent(gameId)}&limit=${limit}`)
+    const data = await api.get<RankingResponse>(
+      `/v1/game/score?gameId=${encodeURIComponent(gameId)}&limit=${limit}`
+    )
     if (!data.ok) throw new Error('API response not ok')
     setRanking(Array.isArray(data.results) ? data.results : [])
   }
 
-  const { isStale } = usePolling(fetchRanking, [gameId, topX], { interval: refreshInterval })
+  const { isStale } = usePolling(fetchRanking, [gameId, topX, maxPrizeRanking], { interval: refreshInterval })
 
-  useEffect(() => {
-    if (!compact) {
-      setCompactListMaxHeight(null)
-      return
-    }
-    if (!ranking || ranking.length === 0) {
-      setCompactListMaxHeight(null)
-      return
-    }
-    if (firstRowRef.current) {
-      const rowHeight = firstRowRef.current.offsetHeight
-      if (rowHeight > 0) {
-        const GAP_PX = 4 // ~space-y-0.5
-        const visibleRows = Math.min(3, ranking.length)
-        const totalHeight = rowHeight * visibleRows + GAP_PX * Math.max(visibleRows - 1, 0)
-        setCompactListMaxHeight(totalHeight)
-      }
-    }
-  }, [compact, ranking])
+  const displayCap = topX != null ? topX : ranking?.length ?? 0
+  const displayList =
+    ranking == null ? [] : ranking.slice(0, Math.min(displayCap, ranking.length))
 
   if (ranking === null) {
     return (
-      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
+      <div
+        className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 h-full ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden flex-1' : 'p-3 sm:p-4 lg:p-6 flex-1'}`}
+      >
         <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>Ranking</h2>
         <p className="text-textSub text-xs sm:text-sm">Cargando...</p>
       </div>
     )
   }
 
-  const displayList = topX != null ? ranking : ranking
+  const fullCount = ranking.length
+  const showPrizeFraction = maxPrizeRanking !== undefined && prizeLabel
 
   return (
-    <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6 min-h-0 flex-1 overflow-hidden'}`}>
+    <div
+      className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 h-full ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden flex-1' : 'p-3 sm:p-4 lg:p-6 flex-1 overflow-hidden'}`}
+    >
       <h2 className={`font-bold text-textMain flex items-center gap-2 flex-shrink-0 ${compact ? 'text-sm mb-1' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>
         Ranking
         {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
       </h2>
       {prizeLabel && (
-        <p className={`text-textSub flex-shrink-0 mb-1 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-          {topX != null ? `Premio top ${topX}: ${prizeLabel}` : `Premio: ${prizeLabel}`}
-        </p>
+        <div
+          className={`text-textSub flex-shrink-0 mb-1 flex items-baseline justify-between gap-2 min-w-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}
+        >
+          <span className="min-w-0 truncate">
+            {topX != null ? `Premio top ${topX}: ${prizeLabel}` : `Premio: ${prizeLabel}`}
+          </span>
+          {showPrizeFraction && (
+            <span className="flex-shrink-0 text-[10px] sm:text-xs tabular-nums">
+              {fullCount}/{maxPrizeRanking}
+            </span>
+          )}
+        </div>
       )}
       <div
-        className={`min-h-0 overflow-y-auto ${compact ? 'space-y-0.5 min-w-0' : 'flex-1 max-h-64 space-y-1 sm:space-y-2'}`}
-        style={
-          compact && compactListMaxHeight != null
-            ? { maxHeight: compactListMaxHeight }
-            : compact
-            ? { maxHeight: '10rem' } // fallback aproximado a 3 filas
-            : undefined
-        }
+        className={`min-h-0 overflow-y-auto flex-1 ${compact ? 'space-y-0.5 min-w-0' : 'space-y-1 sm:space-y-2'}`}
       >
-        {ranking.length === 0 ? (
+        {displayList.length === 0 ? (
           <p className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>No hay puntuaciones aún</p>
         ) : (
           displayList.map((entry, index) => (
             <div
               key={entry.rank || index}
-              ref={compact && index === 0 ? firstRowRef : undefined}
               className={`flex items-center justify-between rounded-lg bg-surface border border-white/10 min-w-0 ${compact ? 'p-1.5 gap-1' : 'p-2 sm:p-3 gap-2 sm:gap-3'}`}
             >
               <div className="flex items-center min-w-0 flex-1 gap-2 sm:gap-3 overflow-hidden">

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Raffle from './Raffle'
 import Quiz from './Quiz'
 import AppearanceSettings from './AppearanceSettings'
+import OperatorPrizeSettings from './OperatorPrizeSettings'
 import type { GameDefinition } from './types'
 import { api } from '../api/api'
 import { useCurrentUser } from '../auth/useCurrentUser'
@@ -34,6 +35,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [showExportShareOptions, setShowExportShareOptions] = useState(false)
   const [exportQuizError, setExportQuizError] = useState<string | null>(null)
   const [showGameConfig, setShowGameConfig] = useState(false)
+  const [showOperatorPrizes, setShowOperatorPrizes] = useState(false)
   const [gameSettings, setGameSettings] = useState<any>(null)
   const [showAppearanceSettings, setShowAppearanceSettings] = useState(false)
   const [showUserInfo, setShowUserInfo] = useState(false)
@@ -74,6 +76,23 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         setShowGameConfig(false)
         onClose()
       }
+    }
+  }
+
+  const handleOperatorPrizePersist = (patch: Record<string, unknown>) => {
+    if (!gameId || !gameDefinition?.id) return
+    const storageKey = `${gameDefinition.id}_settings_${gameId}`
+    const merged = { ...(gameSettings || {}), ...patch }
+    const { close: shouldClose, refreshGameScreen, ...toPersist } = merged as Record<string, unknown> & {
+      close?: boolean
+      refreshGameScreen?: boolean
+    }
+    localStorage.setItem(storageKey, JSON.stringify(toPersist))
+    setGameSettings(toPersist)
+    onConfigSaved?.()
+    if (shouldClose === true) {
+      setShowOperatorPrizes(false)
+      onClose()
     }
   }
 
@@ -410,6 +429,44 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             >
               Cerrar
             </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (showOperatorPrizes && gameId && gameDefinition) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="operator-prizes-title"
+        className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      >
+        <div className="absolute inset-0 bg-black/70" onClick={() => setShowOperatorPrizes(false)} aria-hidden="true" />
+        <div className="relative card w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
+            <h2 id="operator-prizes-title" className="text-xl font-semibold">Premios y límites</h2>
+            <button
+              type="button"
+              onClick={() => setShowOperatorPrizes(false)}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              aria-label="Cerrar"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6">
+            <OperatorPrizeSettings
+              gameId={gameId}
+              gameDefinition={gameDefinition}
+              settings={gameSettings}
+              plan={plan}
+              onClose={() => setShowOperatorPrizes(false)}
+              onPersist={handleOperatorPrizePersist}
+            />
           </div>
         </div>
       </div>
@@ -912,6 +969,28 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
           {/* Game-specific options */}
           {gameType && (
             <>
+              {/* Premios y límites — todos los juegos con partida */}
+              {gameId && gameDefinition && (
+                <button
+                  type="button"
+                  onClick={() => setShowOperatorPrizes(true)}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+                >
+                  <div className="p-2 rounded-lg bg-amber-500/20">
+                    <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112-2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">Premios y límites</div>
+                    <div className="text-sm text-gray-400">Textos de premio y máximo de validaciones</div>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
+
               {/* Quiz - For all games, disabled for FREE plan */}
               <div className="relative">
                 <button

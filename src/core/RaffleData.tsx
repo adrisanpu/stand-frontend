@@ -41,6 +41,7 @@ interface RaffleDataProps {
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and show fewer items
   prizeLabel?: string // e.g. "🎁 Entrada gratis" — shown below title when set
+  maxPrizeRaffle?: number
 }
 
 const getStorageKey = (gameId: string) => `raffle_auto_${gameId}`
@@ -57,7 +58,7 @@ const loadAutoRaffleConfig = (gameId: string): AutoRaffleConfig | null => {
   return null
 }
 
-export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false, prizeLabel }: RaffleDataProps) {
+export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false, prizeLabel, maxPrizeRaffle }: RaffleDataProps) {
   const [winners, setWinners] = useState<RaffleWinner[]>([])
   const [updatingDelivered, setUpdatingDelivered] = useState(false)
   const [raffleRequiredFollows, setRaffleRequiredFollows] = useState<string[]>([])
@@ -327,9 +328,16 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
         {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
       </h2>
       {prizeLabel && (
-        <p className={`text-textSub flex-shrink-0 mb-1 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-          Premio: {prizeLabel}
-        </p>
+        <div
+          className={`text-textSub flex-shrink-0 mb-1 flex items-baseline justify-between gap-2 min-w-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}
+        >
+          <span className="min-w-0 truncate">Premio: {prizeLabel}</span>
+          {maxPrizeRaffle !== undefined && (
+            <span className="flex-shrink-0 text-[10px] sm:text-xs tabular-nums">
+              {winners.length}/{maxPrizeRaffle}
+            </span>
+          )}
+        </div>
       )}
       {raffleRequiredFollows.length > 0 && (
         <p className={`text-textSub flex-shrink-0 mb-1 ${compact ? 'text-[10px]' : 'text-xs'}`}>

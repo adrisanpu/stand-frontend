@@ -1,0 +1,47 @@
+---
+description: Game module architecture for stand-frontend
+globs: src/games/**
+alwaysApply: false
+---
+
+# Game Architecture Rules
+
+## GameDefinition interface (src/core/types.ts)
+```typescript
+interface GameDefinition {
+  id: string;          // lowercase: 'empareja2', 't1mer', etc.
+  name: string;        // display name: 'Empareja2', 'T1mer', etc.
+  type: string;        // UPPERCASE: 'EMPAREJA2', 'T1MER', etc.
+  colors: {
+    primary: string;   // hex color for game theme
+    accent: string;    // hex accent color
+  };
+  GameScreen: React.ComponentType<GameScreenProps>;
+  GameConfig: React.ComponentType<GameConfigProps>;
+}
+```
+
+## Game IDs and their types
+| id (frontend) | type (DB) | primary color |
+|--------------|-----------|---------------|
+| empareja2 | EMPAREJA2 | #B026FF |
+| t1mer | T1MER | #EF4444 |
+| rulet4 | RULET4 | #FACC15 |
+| l3tras | L3TRAS | #10B981 |
+| cupido | CUPIDO | #E11D48 |
+| semaforo | SEMAFORO | #22C55E |
+| infocards | INFOCARDS | #6366F1 |
+
+## AppShell state (src/core/AppShell.tsx)
+- Reads gameId, gameName, gameType from localStorage
+- `mapGameTypeToId()` converts lowercase id → UPPERCASE type for API calls
+- All game routing goes through AppShell — don't create standalone game routes
+
+## ThemeProvider (src/core/theme.tsx)
+- Wraps game screens with CSS variables from GameDefinition.colors
+- Use `var(--game-primary)` and `var(--game-accent)` in game component styles
+- Don't hardcode colors inside game components — use CSS vars
+
+## Orientation layout
+- Games can specify landscape/portrait preference
+- AppShell handles orientation prompts — don't add your own rotation logic
