@@ -1,19 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
-import { games } from '../games'
-import type { GameDefinition, GameIdealFor, GamePlayerMode } from './types'
-import { IDEAL_FOR_LABELS } from './types'
-import { api } from '../api/api'
-import { useCurrentUser } from '../auth/useCurrentUser'
-import { getFeaturesByPlan } from '../auth/featureFlags'
-import { useStandLogo } from './logoUtils'
+import { games } from '../../games'
+import type { GameDefinition, GameIdealFor, GamePlayerMode } from '../types'
+import { IDEAL_FOR_LABELS } from '../types'
+import { api } from '../../api/api'
+import { useCurrentUser } from '../../auth/useCurrentUser'
+import { getFeaturesByPlan } from '../../auth/featureFlags'
+import { useStandLogo } from '../theme'
+import { STORAGE_KEY_LOGO } from '../storageKeys'
 
 const GAME_RE = /^[A-Za-z0-9._-]{1,40}$/
 
 type GameGateProps = {
   onGameCreated: (gameName: string, gameId: string, gameType?: string) => void
 }
-
-const STORAGE_KEY_LOGO = 'app_custom_logo'
 
 interface UserGame {
   gameId: string

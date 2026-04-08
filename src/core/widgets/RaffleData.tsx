@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { api } from '../api/api'
-import { usePolling } from '../hooks/usePolling'
+import { api } from '../../api/api'
+import { usePolling } from '../../hooks/usePolling'
 
 interface RaffleWinner {
   username: string

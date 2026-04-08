@@ -1,5 +1,5 @@
-import type { GameDefinition } from './types'
-import type { FeatureFlags } from '../auth/featureFlags'
+import type { GameDefinition } from '../types'
+import type { FeatureFlags } from '../../auth/featureFlags'
 
 /** Juegos con flujo de validación que pueden mostrar premio/límite de validación */
 export const VALIDATION_PRIZE_GAME_IDS = ['empareja2', 'cupido', 'semaforo', 'l3tras'] as const

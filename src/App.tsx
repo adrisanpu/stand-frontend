@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
-import AppShell from './core/AppShell'
+import AppShell from './core/shell/AppShell'
 import Login from './pages/Login'
 import AuthStart from './auth/AuthStart'
 import AuthCallback from './auth/AuthCallback'

@@ -1,15 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { GameScreenProps } from '../../core/types'
-import QRCode from '../../core/QRCode'
-import BackButton from '../../core/BackButton'
-import { getInstagramDmUrl } from '../../core/instagram'
+import QRCode from '../../core/widgets/QRCode'
+import BackButton from '../../core/widgets/BackButton'
+import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
 import { useGameInput } from '../../core/input/useGameInput'
-import {
-  isWebOSBrowser,
-  shouldHijackOkPointerToPrimary,
-  webosOkHijackEnabled,
-} from '../../core/input/webosOkPointerPrimary'
+import { isWebOSBrowser, shouldHijackOkPointerToPrimary, webosOkHijackEnabled } from './webosOkHijack'
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
 
@@ -29,29 +25,6 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   const stopButtonRef = useRef<HTMLButtonElement | null>(null)
   const resetBackRef = useRef<HTMLButtonElement | null>(null)
   const validateButtonRef = useRef<HTMLButtonElement | null>(null)
-
-  // webOS / 5-way: mantener un CTA con foco al cambiar de paso (sin scroll ni pointer sintético).
-  useEffect(() => {
-    const id = window.requestAnimationFrame(() => {
-      if (gameState === 'preparing') {
-        startButtonRef.current?.focus()
-        return
-      }
-      if (gameState === 'playing' || gameState === 'hidden') {
-        stopButtonRef.current?.focus()
-        return
-      }
-      if (gameState === 'finished') {
-        resetBackRef.current?.focus()
-        return
-      }
-      if (gameState === 'idle') {
-        const v = validateButtonRef.current
-        if (v && !v.disabled) v.focus()
-      }
-    })
-    return () => window.cancelAnimationFrame(id)
-  }, [gameState])
 
   // Notify parent when counter is running so API polling can be paused (avoid lag)
   useEffect(() => {

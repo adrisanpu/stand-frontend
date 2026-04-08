@@ -1,13 +1,66 @@
-import { mapKeyboardEventToAction } from './actionMapper'
-import { detectWebOSCapabilities } from './webosCapabilities'
-import type {
-  ActionHandler,
-  GameAction,
-  InputContextId,
-  InputEventEnvelope,
-  InputManagerOptions,
-  InputSource,
-} from './types'
+import type { ActionHandler, GameAction, InputContextId, InputEventEnvelope } from './types'
+
+type InputSource = InputEventEnvelope['source']
+
+type KeyMap = Partial<Record<string, GameAction>>
+type CodeMap = Partial<Record<string, GameAction>>
+type KeyCodeMap = Partial<Record<number, GameAction>>
+
+const DEFAULT_KEY_MAP: KeyMap = {
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  Enter: 'select',
+  NumpadEnter: 'select',
+  Escape: 'back',
+}
+
+const DEFAULT_CODE_MAP: CodeMap = {
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  BrowserBack: 'back',
+  GoBack: 'back',
+}
+
+const DEFAULT_KEY_CODE_MAP: KeyCodeMap = {
+  461: 'back',
+  19: 'pause',
+  37: 'left',
+  38: 'up',
+  39: 'right',
+  40: 'down',
+}
+
+function mapKeyboardEventToAction(
+  event: KeyboardEvent,
+  opts?: { keyMap?: KeyMap; codeMap?: CodeMap; keyCodeMap?: KeyCodeMap }
+): GameAction | null {
+  const keyMap = { ...DEFAULT_KEY_MAP, ...opts?.keyMap }
+  const codeMap = { ...DEFAULT_CODE_MAP, ...opts?.codeMap }
+  const keyCodeMap = { ...DEFAULT_KEY_CODE_MAP, ...opts?.keyCodeMap }
+
+  const fromKeyCode = keyCodeMap[event.keyCode]
+  if (fromKeyCode) return fromKeyCode
+  if (event.key in keyMap) return keyMap[event.key] || null
+  if (event.code && event.code in codeMap) return codeMap[event.code] || null
+  if (event.keyCode === 13) return 'select'
+  return null
+}
+
+function isWebOSUA(): boolean {
+  return typeof navigator !== 'undefined' && /web0s|webos|smarttv/i.test(navigator.userAgent || '')
+}
+
+export type InputManagerOptions = {
+  disableBackHistoryAPI?: boolean
+  enablePointerEvents?: boolean
+  keyMap?: KeyMap
+  codeMap?: CodeMap
+  keyCodeMap?: KeyCodeMap
+}
 
 type BackInterceptor = (event: KeyboardEvent) => boolean
 
@@ -17,12 +70,8 @@ class InputManager {
   private started = false
   private enabled = true
   private contextId: InputContextId | null = null
-  private options: Required<
-    Pick<InputManagerOptions, 'preferExistingInputs' | 'supportTouchMode' | 'disableBackHistoryAPI' | 'enablePointerEvents'>
-  > &
+  private options: Required<Pick<InputManagerOptions, 'disableBackHistoryAPI' | 'enablePointerEvents'>> &
     Pick<InputManagerOptions, 'keyMap' | 'codeMap' | 'keyCodeMap'> = {
-    preferExistingInputs: true,
-    supportTouchMode: 'none',
     disableBackHistoryAPI: false,
     enablePointerEvents: true,
     keyMap: undefined,
@@ -34,10 +83,7 @@ class InputManager {
 
   start(options?: InputManagerOptions) {
     if (this.started) return
-    this.options = {
-      ...this.options,
-      ...(options || {}),
-    }
+    this.options = { ...this.options, ...(options || {}) }
     this.started = true
     window.addEventListener('keydown', this.onKeyDown, { capture: true })
     if (this.options.enablePointerEvents) {
@@ -56,10 +102,6 @@ class InputManager {
     window.removeEventListener('popstate', this.onPopState)
   }
 
-  /**
-   * LIFO: el último registrado se ejecuta primero (p. ej. SettingsMenu antes que AppShell).
-   * Devuelve true si consumió el Back (no se hace emit a suscriptores `back`).
-   */
   registerBackInterceptor(handler: BackInterceptor): () => void {
     this.backInterceptors.push(handler)
     return () => {
@@ -74,9 +116,7 @@ class InputManager {
     this.handlers.set(action, set)
     return () => {
       set.delete(handler)
-      if (set.size === 0) {
-        this.handlers.delete(action)
-      }
+      if (set.size === 0) this.handlers.delete(action)
     }
   }
 
@@ -89,8 +129,7 @@ class InputManager {
   }
 
   private keyboardSource(): InputSource {
-    const caps = detectWebOSCapabilities(this.options.disableBackHistoryAPI, this.options.supportTouchMode)
-    return caps.isWebOS ? 'remote' : 'keyboard'
+    return isWebOSUA() ? 'remote' : 'keyboard'
   }
 
   private emit(action: GameAction, source: InputSource, nativeEvent: Event, partial?: Partial<InputEventEnvelope>) {
@@ -127,9 +166,7 @@ class InputManager {
         target.tagName === 'SELECT' ||
         target.isContentEditable)
 
-    if (isEditableTarget && action !== 'back') {
-      return
-    }
+    if (isEditableTarget && action !== 'back') return
 
     if (action === 'back') {
       for (let i = this.backInterceptors.length - 1; i >= 0; i--) {
@@ -138,8 +175,7 @@ class InputManager {
           return
         }
       }
-      const capabilities = detectWebOSCapabilities(this.options.disableBackHistoryAPI, this.options.supportTouchMode)
-      if (capabilities.backMode === 'manual' && event.keyCode === 461) {
+      if (this.options.disableBackHistoryAPI && event.keyCode === 461) {
         event.preventDefault()
       }
     } else if (action === 'up' || action === 'down' || action === 'left' || action === 'right') {
@@ -163,18 +199,14 @@ class InputManager {
 
   private clickDedupeKey(ev: MouseEvent): string {
     const t = ev.target as Node | null
-    const x = ev.clientX
-    const y = ev.clientY
-    return `${t?.nodeName || ''}:${x}:${y}`
+    return `${t?.nodeName || ''}:${ev.clientX}:${ev.clientY}`
   }
 
   private onClick = (event: MouseEvent) => {
     if (!this.options.enablePointerEvents) return
     const now = Date.now()
     const key = this.clickDedupeKey(event)
-    if (now - this.lastEmittedClickAt < 400 && key === this.lastEmittedClickKey) {
-      return
-    }
+    if (now - this.lastEmittedClickAt < 400 && key === this.lastEmittedClickKey) return
     this.lastEmittedClickAt = now
     this.lastEmittedClickKey = key
     const pointerType = event.detail === 0 ? 'touch-synthetic' : 'mouse'

@@ -28,9 +28,9 @@ const { mockGames } = vi.hoisted(() => ({
   ],
 }))
 
-vi.mock('../games', () => ({ games: mockGames }))
+vi.mock('../../games', () => ({ games: mockGames }))
 
-vi.mock('../api/api', () => ({
+vi.mock('../../api/api', () => ({
   api: {
     get: vi.fn().mockResolvedValue({ ok: true, games: [] }),
     post: vi.fn().mockResolvedValue({ ok: true }),
@@ -38,18 +38,18 @@ vi.mock('../api/api', () => ({
 }))
 
 const mockUseCurrentUser = vi.fn()
-vi.mock('../auth/useCurrentUser', () => ({
+vi.mock('../../auth/useCurrentUser', () => ({
   useCurrentUser: () => mockUseCurrentUser(),
 }))
 
-vi.mock('../auth/featureFlags', () => ({
+vi.mock('../../auth/featureFlags', () => ({
   getFeaturesByPlan: (plan: string) => ({
     maxPlayers: plan === 'free' ? 20 : Infinity,
     maxGames: plan === 'free' ? 1 : Infinity,
   }),
 }))
 
-vi.mock('./logoUtils', () => ({
+vi.mock('../theme', () => ({
   useStandLogo: () => '/stand-logo.png',
 }))
 
@@ -167,7 +167,7 @@ describe('GameGate – create/join view', () => {
   })
 
   it('calls onGameCreated after successful Crear', async () => {
-    const { api } = await import('../api/api')
+    const { api } = await import('../../api/api')
     vi.mocked(api.post).mockResolvedValueOnce({
       message: 'Created',
       game: { gameId: 'GID1', gameName: 'TORNEOTEST', gameType: 'T1MER', createdAt: '', maxPlayers: 100, ownerUserId: '', isActive: true, updatedAt: '' },

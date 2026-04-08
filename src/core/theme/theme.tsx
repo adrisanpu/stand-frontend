@@ -1,5 +1,6 @@
 import { useEffect, createContext, useContext, ReactNode } from 'react'
-import type { GameDefinition, ThemeColors } from './types'
+import type { GameDefinition, ThemeColors } from '../types'
+import { STORAGE_KEY_COLORS, STORAGE_KEY_THEME_MODE } from '../storageKeys'
 
 // Helper function to convert hex to RGB
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -17,9 +18,6 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType>({ game: null })
 
-const STORAGE_KEY_COLORS = 'app_custom_color_palette'
-const STORAGE_KEY_THEME_MODE = 'app_theme_mode'
-
 // Default Stand palette (used when no game is selected)
 const DEFAULT_STAND_PALETTE: ThemeColors = {
   primary: '#9CA3AF',
@@ -30,12 +28,12 @@ const DEFAULT_STAND_PALETTE: ThemeColors = {
   textSub: '#9AA0A6',
 }
 
-export function ThemeProvider({ 
-  game, 
-  children 
-}: { 
+export function ThemeProvider({
+  game,
+  children
+}: {
   game: GameDefinition | null
-  children: ReactNode 
+  children: ReactNode
 }) {
   useEffect(() => {
     // Check for custom color palette in localStorage
@@ -76,7 +74,7 @@ export function ThemeProvider({
         textSub: '#475569', // Darker gray for better contrast (slate-600)
       }
     }
-    
+
     // If using custom colors in light mode, ensure surface is visible and text is dark
     if (customColors && !isDarkMode) {
       // Check if surface is transparent (dark mode style)
@@ -105,7 +103,7 @@ export function ThemeProvider({
     root.style.setProperty('--color-surface', colors.surface)
     root.style.setProperty('--color-text-main', colors.textMain)
     root.style.setProperty('--color-text-sub', colors.textSub)
-    
+
     // Apply theme mode class to html element
     if (isDarkMode) {
       document.documentElement.classList.remove('light-mode')
@@ -114,15 +112,15 @@ export function ThemeProvider({
       document.documentElement.classList.remove('dark-mode')
       document.documentElement.classList.add('light-mode')
     }
-    
+
     // Extract RGB values for gradient backgrounds
     const primaryRgb = hexToRgb(colors.primary) || { r: 176, g: 38, b: 255 }
     const accentRgb = hexToRgb(colors.accent) || { r: 34, g: 211, b: 238 }
-    
+
     // Apply RGB values for use in CSS rgba() functions
     root.style.setProperty('--color-primary-rgb', `${primaryRgb.r},${primaryRgb.g},${primaryRgb.b}`)
     root.style.setProperty('--color-accent-rgb', `${accentRgb.r},${accentRgb.g},${accentRgb.b}`)
-    
+
     // Apply pre-computed rgba values for gradients (for better browser compatibility)
     root.style.setProperty('--color-primary-gradient-1', `rgba(${primaryRgb.r},${primaryRgb.g},${primaryRgb.b},0.18)`)
     root.style.setProperty('--color-primary-gradient-2', `rgba(${primaryRgb.r},${primaryRgb.g},${primaryRgb.b},0.10)`)
@@ -145,4 +143,3 @@ export function useTheme() {
   }
   return context
 }
-

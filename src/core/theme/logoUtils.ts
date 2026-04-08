@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
+import { STORAGE_KEY_THEME_MODE } from '../storageKeys'
 
 /**
  * Get the appropriate Stand logo based on theme mode
  */
 export function getStandLogo(): string {
-  const themeMode = localStorage.getItem('app_theme_mode')
+  const themeMode = localStorage.getItem(STORAGE_KEY_THEME_MODE)
   const isDarkMode = themeMode !== 'light'
-  
-  return isDarkMode 
+
+  return isDarkMode
     ? '/images/logo_stand_letters_white.png'
     : '/images/logo_stand_letters_black.png'
 }
@@ -26,10 +27,10 @@ export function useStandLogo(): string {
 
     // Check for theme changes periodically (simple approach for MVP)
     const interval = setInterval(updateLogo, 500)
-    
+
     // Also listen to storage changes
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'app_theme_mode') {
+      if (e.key === STORAGE_KEY_THEME_MODE) {
         updateLogo()
       }
     }
@@ -43,4 +44,3 @@ export function useStandLogo(): string {
 
   return logo
 }
-
