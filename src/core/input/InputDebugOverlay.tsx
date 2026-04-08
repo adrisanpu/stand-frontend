@@ -18,15 +18,13 @@ type DebugEntry = {
   hint: string
 }
 
+/** Desactivado por defecto. Activar: ?inputDebug=1 o VITE_INPUT_DEBUG=true */
 function inputDebugEnabled(): boolean {
   if (typeof window !== 'undefined') {
     if (/\binputDebug=0\b/.test(window.location.search)) return false
     if (/\binputDebug=1\b/.test(window.location.search)) return true
   }
-  const env = import.meta.env.VITE_INPUT_DEBUG as string | undefined
-  if (env === 'false') return false
-  if (env === 'true') return true
-  return true
+  return import.meta.env.VITE_INPUT_DEBUG === 'true'
 }
 
 const OVERLAY_Z = 2147483000

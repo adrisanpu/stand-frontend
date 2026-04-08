@@ -256,18 +256,6 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
     }
   }
 
-  const resetQuiz = () => {
-    setQuestions([
-      {
-        id: 'q1',
-        text: '',
-        options: [{ title: '', payload: '' }]
-      }
-    ])
-    setError(null)
-    setSuccess(false)
-  }
-
   const handleGenerate = async () => {
     if (!gameId) return
     if (!generateText.trim()) {
@@ -614,67 +602,59 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
           )}
         </div>
 
-        <div className="flex gap-3 flex-shrink-0 mt-4">
+        <div className="flex gap-3 flex-shrink-0 mt-4 min-w-0">
           <button
-            onClick={resetQuiz}
-            className="flex-1 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-          >
-            Reiniciar
-          </button>
-          <button
+            type="button"
             onClick={submitQuiz}
             disabled={isSubmitting}
-            className="flex-1 p-3 rounded-xl bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 min-w-0 p-3 rounded-xl bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex items-center justify-center gap-2">
               {isSubmitting ? (
                 <>
-                  <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  Creando quiz...
+                  <span className="truncate">Creando quiz...</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  Crear Quiz
+                  <span className="truncate">Crear quiz</span>
+                </>
+              )}
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={exportQuizData}
+            disabled={isExporting || !gameId}
+            className="flex-1 min-w-0 p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="flex items-center justify-center gap-2">
+              {isExporting ? (
+                <>
+                  <svg className="w-5 h-5 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span className="truncate">Exportando...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  <span className="truncate">Exportar</span>
                 </>
               )}
             </div>
           </button>
         </div>
 
-        {/* Export Quiz Data Button */}
-        <div className="flex-shrink-0 mt-3">
-          <button
-            onClick={exportQuizData}
-            disabled={isExporting || !gameId}
-            className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="flex items-center justify-center gap-2">
-              {isExporting ? (
-                <>
-                  <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Exportando...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  Exportar Datos del Quiz
-                </>
-              )}
-            </div>
-          </button>
-
-          {/* Share Options */}
-          {showShareOptions && exportData && (
-            <div className="mt-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
+        {showShareOptions && exportData && (
+            <div className="flex-shrink-0 mt-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-gray-300">Opciones de compartir</h3>
                 <button
@@ -715,8 +695,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                 </button>
               </div>
             </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   )

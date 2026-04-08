@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
+import GameLandscapeInfoColumn from '../../core/widgets/GameLandscapeInfoColumn'
 import BackButton from '../../core/widgets/BackButton'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
@@ -96,44 +97,12 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
     return (
       <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
         {/* Left: QR + logo + instructions */}
-        <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0">
-          <div className="grid grid-cols-2 gap-2 items-center flex-shrink-0 min-h-0">
-            <div className="flex justify-center min-h-0 w-full min-w-0">
-              <QRCode
-                data={getInstagramDmUrl(gameId)}
-                size={200}
-                margin={6}
-                containerClassName="max-h-[min(18vh,160px)] w-full"
-                alt="QR Code para Instagram DM"
-                className="!border-0 !bg-transparent !p-0"
-              />
-            </div>
-            <div className="flex justify-center items-center min-h-0">
-              {logoElement}
-            </div>
-          </div>
-          <div className="flex-shrink-0 min-h-0 overflow-hidden">
-            <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
-            <ol className="flex flex-col gap-1.5 text-xs text-gray-300">
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">1</span>
-                <span>📸 Escanea el QR y pulsa JUGAR en el chat.</span>
-              </li>
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">2</span>
-                <span>🎟️ Recibe tu pareja asignada y tu código de validación.</span>
-              </li>
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">3</span>
-                <span>👥 Encuentra a tu pareja físicamente.</span>
-              </li>
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-xs">4</span>
-                <span>🏆 Cuando os encontréis, validad juntos vuestros códigos.</span>
-              </li>
-            </ol>
-          </div>
-        </div>
+        <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
+          <p>📸 Escanea el QR y pulsa JUGAR en el chat.</p>
+          <p>🎟️ Recibe tu pareja asignada y tu código de validación.</p>
+          <p>👥 Encuentra a tu pareja físicamente.</p>
+          <p>🏆 Cuando os encontréis, validad juntos vuestros códigos.</p>
+        </GameLandscapeInfoColumn>
         {/* Center: validation + animations (large) */}
         <div className="card flex flex-col justify-center p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
           {(gameState === 'idle' || gameState === 'invalid') && (

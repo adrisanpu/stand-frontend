@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
+import GameLandscapeInfoColumn from '../../core/widgets/GameLandscapeInfoColumn'
 import BackButton from '../../core/widgets/BackButton'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
@@ -90,24 +91,11 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
   if (isLandscape) {
     return (
       <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
-        <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0">
-          <div className="grid grid-cols-2 gap-2 items-center flex-shrink-0 min-h-0">
-            <div className="flex justify-center min-h-0 w-full min-w-0">
-              <QRCode data={getInstagramDmUrl(gameId)} size={200} margin={6} containerClassName="max-h-[min(18vh,160px)] w-full" alt="QR Code para Instagram DM" className="!border-0 !bg-transparent !p-0" />
-            </div>
-            <div className="flex justify-center items-center min-h-0">
-              {logoElement}
-            </div>
-          </div>
-          <div className="flex-shrink-0 min-h-0 overflow-hidden">
-            <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
-              <ol className="flex flex-col gap-1.5 text-xs text-gray-300">
-                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center font-semibold text-[10px] text-white" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>1</span><span className="pt-0.5">📸 Escanea el QR y pulsa JUGAR. Responde al quiz.</span></li>
-                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center font-semibold text-[10px] text-white" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>2</span><span className="pt-0.5">❤️ Cupido te empareja con alguien afín.</span></li>
-                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center font-semibold text-[10px] text-white" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>3</span><span className="pt-0.5">✅ Encuentra a tu pareja y validad códigos aquí.</span></li>
-              </ol>
-            </div>
-        </div>
+        <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
+          <p>📸 Escanea el QR y pulsa JUGAR. Responde al quiz.</p>
+          <p>❤️ Cupido te empareja con alguien afín.</p>
+          <p>✅ Encuentra a tu pareja y validad códigos aquí.</p>
+        </GameLandscapeInfoColumn>
         <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.08)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)` }}>
             {statsLoading ? <span className="text-base text-gray-500">Cargando…</span> : (<><div className="flex items-center gap-2"><span className="text-xl" aria-hidden>👨</span><span className="text-base text-gray-400">Chicos</span><span className="text-lg font-semibold text-textMain">{maleCount}</span></div><div className="flex items-center gap-2"><span className="text-xl" aria-hidden>👩</span><span className="text-base text-gray-400">Chicas</span><span className="text-lg font-semibold text-textMain">{femaleCount}</span></div></>)}

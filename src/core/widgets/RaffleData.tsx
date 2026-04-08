@@ -61,7 +61,6 @@ const loadAutoRaffleConfig = (gameId: string): AutoRaffleConfig | null => {
 export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false, prizeLabel, maxPrizeRaffle }: RaffleDataProps) {
   const [winners, setWinners] = useState<RaffleWinner[]>([])
   const [updatingDelivered, setUpdatingDelivered] = useState(false)
-  const [raffleRequiredFollows, setRaffleRequiredFollows] = useState<string[]>([])
   const [nextRaffleTime, setNextRaffleTime] = useState<Date | null>(null)
   const [timeUntilNext, setTimeUntilNext] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -173,7 +172,6 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       })
     setWinners(mappedWinners)
-    setRaffleRequiredFollows(Array.isArray(data.raffleRequiredFollows) ? data.raffleRequiredFollows : [])
     setLoading(false)
   }, [gameId, gameName])
 
@@ -339,21 +337,15 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
           )}
         </div>
       )}
-      {raffleRequiredFollows.length > 0 && (
-        <p className={`text-textSub flex-shrink-0 mb-1 ${compact ? 'text-[10px]' : 'text-xs'}`}>
-          Para participar deben seguir: {raffleRequiredFollows.map(h => `@${h}`).join(', ')}. Comprobamos que sigan a @stand_official.
-        </p>
-      )}
       <div className={`flex-1 min-h-0 flex flex-col ${compact ? 'gap-1' : 'gap-3 sm:gap-4'}`}>
         {/* Next Raffle Countdown */}
         {timeUntilNext !== null && timeUntilNext > 0 && autoRaffleConfig?.enabled && (
           <div className={`rounded-lg bg-surface border border-white/10 flex-shrink-0 ${compact ? 'p-2' : 'p-2 sm:p-3'}`}>
-            <div className={`text-textSub mb-1 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>Próximo en:</div>
-            <div className={`font-semibold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-base sm:text-lg'}`}>
-              {formatTime(timeUntilNext)}
-            </div>
-            <div className={`text-textSub mt-1 ${compact ? 'text-xs' : 'text-[10px] sm:text-xs'}`}>
-              Cada {autoRaffleConfig.intervalMinutes} minuto{autoRaffleConfig.intervalMinutes !== 1 ? 's' : ''}
+            <div className={`flex flex-row flex-wrap items-baseline justify-start gap-x-2 gap-y-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
+              <span className="text-textSub shrink-0">Próximo en:</span>
+              <span className={`font-semibold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-base sm:text-lg'}`}>
+                {formatTime(timeUntilNext)}
+              </span>
             </div>
           </div>
         )}

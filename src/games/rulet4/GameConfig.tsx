@@ -18,7 +18,7 @@ const DEFAULT_PANELS: Rulet4PanelConfig[] = [
   { id: '3', label: 'Verde', color: '#22C55E', count: 1 },
 ]
 
-export default function Rulet4GameConfig({ gameName, settings, onChange }: GameConfigProps) {
+export default function Rulet4GameConfig({ settings, onChange }: GameConfigProps) {
   const [panels, setPanels] = useState<Rulet4PanelConfig[]>(
     (settings as Rulet4Settings | null)?.panels || DEFAULT_PANELS
   )
@@ -59,13 +59,6 @@ export default function Rulet4GameConfig({ gameName, settings, onChange }: GameC
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Configurar ruleta {gameName}</h3>
-        <p className="text-sm text-gray-400">
-          Configura los tipos de paneles y sus cantidades (pesos/probabilidades)
-        </p>
-      </div>
-
       <div className="space-y-4">
         {panels.map((panel, index) => (
           <div

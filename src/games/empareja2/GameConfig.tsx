@@ -104,7 +104,7 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-400">
-        Los premios y el máximo de validaciones están en Ajustes → Premios y límites.
+        Los premios y el máximo de validaciones están en Ajustes → Premios.
       </p>
 
       <div className="space-y-4">

@@ -20,7 +20,6 @@ type Props = {
   gameDefinition: GameDefinition
   settings: Record<string, unknown> | null
   plan: Plan | null | undefined
-  onClose: () => void
   onPersist: (patch: Record<string, unknown>) => void
 }
 
@@ -162,7 +161,6 @@ export default function OperatorPrizeSettings({
   gameDefinition,
   settings,
   plan,
-  onClose,
   onPersist,
 }: Props) {
   const features = getFeaturesByPlan(plan)
@@ -357,23 +355,14 @@ export default function OperatorPrizeSettings({
         </div>
       )}
 
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors font-medium"
-        >
-          Cerrar
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saveStatus === 'saving' || noSlots}
-          className="flex-1 p-3 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {saveStatus === 'saving' ? 'Guardando...' : 'Guardar'}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={saveStatus === 'saving' || noSlots}
+        className="w-full p-3 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {saveStatus === 'saving' ? 'Guardando...' : 'Guardar'}
+      </button>
     </div>
   )
 }
