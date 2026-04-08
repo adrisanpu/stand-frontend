@@ -1,12 +1,5 @@
-export type GameAction =
-  | 'up'
-  | 'down'
-  | 'left'
-  | 'right'
-  | 'select'
-  | 'back'
-  | 'pause'
-  | 'click'
+/** Entradas que los juegos pueden suscribir vía `useGameInput` (LG Swing: PageUp / PageDown / click). */
+export type GameAction = 'up' | 'down' | 'click'
 
 export type InputContextId = string
 

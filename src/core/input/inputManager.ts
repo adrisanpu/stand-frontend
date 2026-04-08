@@ -2,55 +2,27 @@ import type { ActionHandler, GameAction, InputContextId, InputEventEnvelope } fr
 
 type InputSource = InputEventEnvelope['source']
 
-type KeyMap = Partial<Record<string, GameAction>>
-type CodeMap = Partial<Record<string, GameAction>>
-type KeyCodeMap = Partial<Record<number, GameAction>>
-
-/** Mandos LG Swing / SRS23CW: solo PageUp·PageDown + clic; el resto de teclas no generan acciones de juego. */
-const DEFAULT_KEY_MAP: KeyMap = {
-  PageUp: 'up',
-  PageDown: 'down',
-}
-
-const DEFAULT_CODE_MAP: CodeMap = {
-  PageUp: 'up',
-  PageDown: 'down',
-  BrowserBack: 'back',
-  GoBack: 'back',
-}
-
-const DEFAULT_KEY_CODE_MAP: KeyCodeMap = {
-  33: 'up',
-  34: 'down',
-  461: 'back',
-  10009: 'back',
-}
-
-function mapKeyboardEventToAction(
-  event: KeyboardEvent,
-  opts?: { keyMap?: KeyMap; codeMap?: CodeMap; keyCodeMap?: KeyCodeMap }
-): GameAction | null {
-  const keyMap = { ...DEFAULT_KEY_MAP, ...opts?.keyMap }
-  const codeMap = { ...DEFAULT_CODE_MAP, ...opts?.codeMap }
-  const keyCodeMap = { ...DEFAULT_KEY_CODE_MAP, ...opts?.keyCodeMap }
-
-  const fromKeyCode = keyCodeMap[event.keyCode]
-  if (fromKeyCode) return fromKeyCode
-  if (event.key in keyMap) return keyMap[event.key] || null
-  if (event.code && event.code in codeMap) return codeMap[event.code] || null
-  return null
-}
-
 function isWebOSUA(): boolean {
   return typeof navigator !== 'undefined' && /web0s|webos|smarttv/i.test(navigator.userAgent || '')
+}
+
+/** Tecla atrás del SO / mando (no es acción de juego; solo dispara interceptores). */
+function isSystemBackKeyboardEvent(event: KeyboardEvent): boolean {
+  if (event.code === 'BrowserBack' || event.code === 'GoBack') return true
+  return event.keyCode === 461 || event.keyCode === 10009
+}
+
+function mapPageKeyToGameAction(event: KeyboardEvent): 'up' | 'down' | null {
+  if (event.keyCode === 33 || event.key === 'PageUp') return 'up'
+  if (event.keyCode === 34 || event.key === 'PageDown') return 'down'
+  if (event.code === 'PageUp') return 'up'
+  if (event.code === 'PageDown') return 'down'
+  return null
 }
 
 export type InputManagerOptions = {
   disableBackHistoryAPI?: boolean
   enablePointerEvents?: boolean
-  keyMap?: KeyMap
-  codeMap?: CodeMap
-  keyCodeMap?: KeyCodeMap
 }
 
 type BackInterceptor = (event: KeyboardEvent) => boolean
@@ -61,13 +33,9 @@ class InputManager {
   private started = false
   private enabled = true
   private contextId: InputContextId | null = null
-  private options: Required<Pick<InputManagerOptions, 'disableBackHistoryAPI' | 'enablePointerEvents'>> &
-    Pick<InputManagerOptions, 'keyMap' | 'codeMap' | 'keyCodeMap'> = {
+  private options: Required<Pick<InputManagerOptions, 'disableBackHistoryAPI' | 'enablePointerEvents'>> = {
     disableBackHistoryAPI: false,
     enablePointerEvents: true,
-    keyMap: undefined,
-    codeMap: undefined,
-    keyCodeMap: undefined,
   }
   private lastEmittedClickAt = 0
   private lastEmittedClickKey = ''
@@ -80,9 +48,6 @@ class InputManager {
     if (this.options.enablePointerEvents) {
       window.addEventListener('click', this.onClick, { capture: true })
     }
-    if (!this.options.disableBackHistoryAPI) {
-      window.addEventListener('popstate', this.onPopState)
-    }
   }
 
   stop() {
@@ -90,7 +55,6 @@ class InputManager {
     this.started = false
     window.removeEventListener('keydown', this.onKeyDown, { capture: true } as EventListenerOptions)
     window.removeEventListener('click', this.onClick, { capture: true } as EventListenerOptions)
-    window.removeEventListener('popstate', this.onPopState)
   }
 
   registerBackInterceptor(handler: BackInterceptor): () => void {
@@ -143,12 +107,6 @@ class InputManager {
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
-    const action = mapKeyboardEventToAction(event, {
-      keyMap: this.options.keyMap,
-      codeMap: this.options.codeMap,
-      keyCodeMap: this.options.keyCodeMap,
-    })
-    if (!action) return
     const target = event.target as HTMLElement | null
     const isEditableTarget =
       !!target &&
@@ -157,9 +115,8 @@ class InputManager {
         target.tagName === 'SELECT' ||
         target.isContentEditable)
 
-    if (isEditableTarget && action !== 'back') return
-
-    if (action === 'back') {
+    if (isSystemBackKeyboardEvent(event)) {
+      if (isEditableTarget) return
       for (let i = this.backInterceptors.length - 1; i >= 0; i--) {
         if (this.backInterceptors[i](event)) {
           event.preventDefault()
@@ -169,10 +126,14 @@ class InputManager {
       if (this.options.disableBackHistoryAPI && event.keyCode === 461) {
         event.preventDefault()
       }
-    } else if (action === 'up' || action === 'down') {
-      event.preventDefault()
+      return
     }
 
+    const action = mapPageKeyToGameAction(event)
+    if (!action) return
+    if (isEditableTarget) return
+
+    event.preventDefault()
     this.emit(action, this.keyboardSource(), event, {
       key: event.key,
       code: event.code,
@@ -194,10 +155,6 @@ class InputManager {
     this.lastEmittedClickKey = key
     const pointerType = event.detail === 0 ? 'touch-synthetic' : 'mouse'
     this.emit('click', 'pointer', event, { pointerType })
-  }
-
-  private onPopState = (event: PopStateEvent) => {
-    this.emit('back', 'system', event)
   }
 }
 
