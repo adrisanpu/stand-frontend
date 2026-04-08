@@ -15,6 +15,8 @@ const LG_WEBOS_REMOTE_KEYCODE_HINTS: Record<number, string> = {
   40: 'Abajo (DOM ArrowDown)',
   461: 'Atrás (webOS, muy habitual en apps)',
   10009: 'Atrás (Tizen / otro TV)',
+  33: 'PageUp → acción juego: arriba',
+  34: 'PageDown → acción juego: abajo',
   19: 'Pausa (webOS / media)',
   // Cruceta y OK remoto LG físico (keyCode propio webOS)
   103: 'Arriba (LG)',

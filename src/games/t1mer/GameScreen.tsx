@@ -5,6 +5,7 @@ import BackButton from '../../core/widgets/BackButton'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
 import { useGameInput } from '../../core/input/useGameInput'
+import type { InputEventEnvelope } from '../../core/input/types'
 import { isWebOSBrowser, shouldHijackOkPointerToPrimary, webosOkHijackEnabled } from './webosOkHijack'
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
@@ -124,18 +125,6 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
     }
   }
 
-  const inputHandlers = useMemo(() => ({
-    select: () => {
-      if (gameState === 'preparing') {
-        handleStart()
-      } else if (gameState === 'playing' || gameState === 'hidden') {
-        handleStop()
-      }
-    },
-  }), [gameState])
-
-  useGameInput(`t1mer:${gameId}`, inputHandlers)
-
   const submitScore = async (time: number, difference: number) => {
     if (!playerId || !gameId) {
       console.error('Missing playerId or gameId')
@@ -178,6 +167,36 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   handleStopRef.current = handleStop
   handleValidateRef.current = handleValidate
   handleResetFnRef.current = handleReset
+
+  const gameStateRef = useRef(gameState)
+  gameStateRef.current = gameState
+
+  /** Solo acción `click` del inputManager: empezar / detener / volver a validación; no duplicar botones enlaces o campos. */
+  const inputHandlers = useMemo(
+    () => ({
+      click: (ev: InputEventEnvelope) => {
+        const t = ev.nativeEvent.target
+        if (t instanceof Element && t.closest('button, a[href], [role="button"], input, textarea, select')) {
+          return
+        }
+        const st = gameStateRef.current
+        if (st === 'idle') {
+          void handleValidateRef.current()
+          return
+        }
+        if (st === 'preparing') {
+          handleStartRef.current()
+        } else if (st === 'playing' || st === 'hidden') {
+          handleStopRef.current()
+        } else if (st === 'finished') {
+          handleResetFnRef.current()
+        }
+      },
+    }),
+    []
+  )
+
+  useGameInput(`t1mer:${gameId}`, inputHandlers)
 
   // webOS: OK en modo puntero → pointerdown:mouse donde está el cursor (no se puede mover por JS).
   // Si el clic no cae en otro botón/enlace/input, ejecutamos la acción del CTA del estado actual.
@@ -271,7 +290,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
               </div>
               <div className="max-w-md mx-auto w-full space-y-2">
                 <div className="flex gap-3">
-                  <input id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder="Ingresa tu código" className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }} />
+                  <input id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder="Ingresa tu código" className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" />
                   <button ref={validateButtonRef} type="button" onClick={handleValidate} disabled={!playerCode.trim() || isValidating} className="px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0">{isValidating ? 'Validando...' : 'Validar'}</button>
                 </div>
               </div>
@@ -415,7 +434,6 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
                       onChange={(e) => setPlayerCode(String(e.target.value))}
                       placeholder="Ingresa tu código"
                       className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
-                      onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }}
                     />
                     <button
                       ref={validateButtonRef}

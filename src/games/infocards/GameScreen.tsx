@@ -89,14 +89,17 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
   const goToNext = () => setCurrentIndex(i => (i < displayCards.length - 1 ? i + 1 : 0))
 
   useGameInput(`infocards:${gameId}`, {
-    left: () => {
+    up: () => {
       if (displayCards.length > 0) goToPrev()
     },
-    right: () => {
+    down: () => {
       if (displayCards.length > 0) goToNext()
     },
-    select: () => {
-      if (displayCards.length > 0) goToNext()
+    click: (ev) => {
+      if (displayCards.length === 0) return
+      const t = ev.nativeEvent.target
+      if (t instanceof Element && t.closest('button, a[href], [role="button"], input, textarea, select')) return
+      goToNext()
     },
   })
 

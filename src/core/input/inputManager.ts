@@ -6,32 +6,24 @@ type KeyMap = Partial<Record<string, GameAction>>
 type CodeMap = Partial<Record<string, GameAction>>
 type KeyCodeMap = Partial<Record<number, GameAction>>
 
+/** Mandos LG Swing / SRS23CW: solo PageUp·PageDown + clic; el resto de teclas no generan acciones de juego. */
 const DEFAULT_KEY_MAP: KeyMap = {
-  ArrowUp: 'up',
-  ArrowDown: 'down',
-  ArrowLeft: 'left',
-  ArrowRight: 'right',
-  Enter: 'select',
-  NumpadEnter: 'select',
-  Escape: 'back',
+  PageUp: 'up',
+  PageDown: 'down',
 }
 
 const DEFAULT_CODE_MAP: CodeMap = {
-  ArrowUp: 'up',
-  ArrowDown: 'down',
-  ArrowLeft: 'left',
-  ArrowRight: 'right',
+  PageUp: 'up',
+  PageDown: 'down',
   BrowserBack: 'back',
   GoBack: 'back',
 }
 
 const DEFAULT_KEY_CODE_MAP: KeyCodeMap = {
+  33: 'up',
+  34: 'down',
   461: 'back',
-  19: 'pause',
-  37: 'left',
-  38: 'up',
-  39: 'right',
-  40: 'down',
+  10009: 'back',
 }
 
 function mapKeyboardEventToAction(
@@ -46,7 +38,6 @@ function mapKeyboardEventToAction(
   if (fromKeyCode) return fromKeyCode
   if (event.key in keyMap) return keyMap[event.key] || null
   if (event.code && event.code in codeMap) return codeMap[event.code] || null
-  if (event.keyCode === 13) return 'select'
   return null
 }
 
@@ -178,16 +169,8 @@ class InputManager {
       if (this.options.disableBackHistoryAPI && event.keyCode === 461) {
         event.preventDefault()
       }
-    } else if (action === 'up' || action === 'down' || action === 'left' || action === 'right') {
+    } else if (action === 'up' || action === 'down') {
       event.preventDefault()
-    } else if (action === 'select') {
-      const active = document.activeElement
-      const allowNativeActivate =
-        active instanceof HTMLButtonElement ||
-        (active instanceof HTMLAnchorElement && active.hasAttribute('href'))
-      if (!allowNativeActivate) {
-        event.preventDefault()
-      }
     }
 
     this.emit(action, this.keyboardSource(), event, {
