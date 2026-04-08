@@ -43,9 +43,11 @@ const saveAutoRaffleConfig = (gameId: string | undefined, config: AutoRaffleConf
   }
 }
 
+type EligibilityMode = 'all' | 'quiz' | 'validated'
+
 export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
   const [numberOfWinners, setNumberOfWinners] = useState<number>(1)
-  const [applicableOnlyValidated, setApplicableOnlyValidated] = useState<boolean>(false)
+  const [eligibilityMode, setEligibilityMode] = useState<EligibilityMode>('all')
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [winners, setWinners] = useState<string[] | null>(null)
@@ -63,8 +65,12 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
     let cancelled = false
     const load = async () => {
       try {
-        const data = await api.get<{ ok: boolean; raffleRequiredFollows?: string[] }>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
-        if (!cancelled && data?.raffleRequiredFollows && Array.isArray(data.raffleRequiredFollows)) {
+        const data = await api.get<{
+          ok: boolean
+          raffleRequiredFollows?: string[]
+        }>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
+        if (cancelled) return
+        if (data?.raffleRequiredFollows && Array.isArray(data.raffleRequiredFollows)) {
           setRequiredFollows(data.raffleRequiredFollows)
         }
       } catch (_) {
@@ -75,12 +81,30 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
     return () => { cancelled = true }
   }, [gameId])
 
-  // Load auto raffle config on mount
+  const applicableOnlyValidated = eligibilityMode !== 'all'
+
+  // Load auto raffle config + last manual eligibility on mount
   useEffect(() => {
     const config = loadAutoRaffleConfig(gameId)
     if (config) {
       setAutoRaffleEnabled(config.enabled)
       setAutoRaffleInterval(config.intervalMinutes || 30)
+    }
+    if (gameId) {
+      try {
+        const raw = localStorage.getItem(`raffle_last_manual_${gameId}`)
+        if (raw) {
+          const parsed = JSON.parse(raw) as {
+            eligibilityMode?: EligibilityMode
+            applicableOnlyValidated?: boolean
+          }
+          if (parsed.eligibilityMode === 'all' || parsed.eligibilityMode === 'quiz' || parsed.eligibilityMode === 'validated') {
+            setEligibilityMode(parsed.eligibilityMode)
+          } else if (typeof parsed.applicableOnlyValidated === 'boolean' && parsed.applicableOnlyValidated) {
+            setEligibilityMode('validated')
+          }
+        }
+      } catch (_) {}
     }
   }, [gameId])
 
@@ -114,34 +138,38 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
     }
   }
 
-  const addRequiredFollow = () => {
-    const h = newHandle.trim().toLowerCase().replace(/^@/, '')
-    if (!h) return
-    if (requiredFollows.includes(h)) {
-      setNewHandle('')
-      return
-    }
-    setRequiredFollows([...requiredFollows, h])
-    setNewHandle('')
-  }
-
-  const removeRequiredFollow = (handle: string) => {
-    setRequiredFollows(requiredFollows.filter((x) => x !== handle))
-  }
-
-  const saveRequiredFollows = async () => {
+  const saveRequiredFollowsList = async (list: string[]) => {
     if (!gameId) return
     setSavingFollows(true)
     try {
       await api.put('/v1/game', {
         gameId,
-        settings: { raffle: { requiredFollows: requiredFollows } },
+        settings: { raffle: { requiredFollows: list } },
       })
     } catch (err: any) {
       setError(err.message || 'Error al guardar las cuentas')
     } finally {
       setSavingFollows(false)
     }
+  }
+
+  const addRequiredFollow = async () => {
+    const h = newHandle.trim().toLowerCase().replace(/^@/, '')
+    if (!h) return
+    if (requiredFollows.includes(h)) {
+      setNewHandle('')
+      return
+    }
+    const next = [...requiredFollows, h]
+    setRequiredFollows(next)
+    setNewHandle('')
+    await saveRequiredFollowsList(next)
+  }
+
+  const removeRequiredFollow = async (handle: string) => {
+    const next = requiredFollows.filter((x) => x !== handle)
+    setRequiredFollows(next)
+    await saveRequiredFollowsList(next)
   }
 
   const runRaffle = async () => {
@@ -171,7 +199,10 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
         // Guardar parámetros usados para que los sorteos automáticos los reutilicen
         if (gameId) {
           try {
-            localStorage.setItem(`raffle_last_manual_${gameId}`, JSON.stringify({ numberOfWinners, applicableOnlyValidated }))
+            localStorage.setItem(
+              `raffle_last_manual_${gameId}`,
+              JSON.stringify({ numberOfWinners, applicableOnlyValidated, eligibilityMode })
+            )
           } catch (_) {}
         }
 
@@ -195,7 +226,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
 
   const resetRaffle = () => {
     setNumberOfWinners(1)
-    setApplicableOnlyValidated(false)
+    setEligibilityMode('all')
     setWinners(null)
     setError(null)
   }
@@ -299,115 +330,140 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
 
           {!winners ? (
             <>
-              {/* Number of Winners Input */}
-              <div className="mb-4">
-                <label htmlFor="number-of-winners" className="block text-sm font-medium text-gray-300 mb-2">
-                  Número de ganadores
-                </label>
-                <input
-                  id="number-of-winners"
-                  type="number"
-                  min="1"
-                  value={numberOfWinners}
-                  onChange={(e) => handleNumberChange(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-white/20 focus:outline-none"
-                />
-              </div>
-
-              {/* Applicable To Selection */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-3">
-                  Aplicable a
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors">
-                    <input
-                      type="radio"
-                      name="applicableOnlyValidated"
-                      checked={!applicableOnlyValidated}
-                      onChange={() => setApplicableOnlyValidated(false)}
-                      className="w-4 h-4 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">Todos los jugadores</div>
-                      <div className="text-xs text-gray-400">Incluye todos los participantes del juego</div>
-                    </div>
+              {/* Ganadores + elegibilidad (misma fila) */}
+              <div className="mb-5 grid grid-cols-1 min-[400px]:grid-cols-[1fr_minmax(8.5rem,10rem)] gap-3 items-end">
+                <div className="min-w-0">
+                  <label htmlFor="number-of-winners" className="block text-sm font-medium text-gray-300 mb-1.5">
+                    Número de ganadores
                   </label>
-                  <label className="flex items-center gap-3 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 cursor-pointer hover:bg-[rgba(255,255,255,0.1)] transition-colors">
-                    <input
-                      type="radio"
-                      name="applicableOnlyValidated"
-                      checked={applicableOnlyValidated}
-                      onChange={() => setApplicableOnlyValidated(true)}
-                      className="w-4 h-4 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">Parejas validadas</div>
-                      <div className="text-xs text-gray-400">Solo jugadores que han validado su pareja</div>
-                    </div>
+                  <input
+                    id="number-of-winners"
+                    type="number"
+                    min="1"
+                    value={numberOfWinners}
+                    onChange={(e) => handleNumberChange(e.target.value)}
+                    className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-base font-mono focus:border-white/20 focus:outline-none"
+                  />
+                </div>
+                <div className="min-w-0 w-full">
+                  <label htmlFor="raffle-eligibility" className="block text-sm font-medium text-gray-300 mb-1.5">
+                    Aplicable a
                   </label>
+                  <select
+                    id="raffle-eligibility"
+                    value={eligibilityMode}
+                    onChange={(e) => setEligibilityMode(e.target.value as EligibilityMode)}
+                    className="w-full h-11 px-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm text-textMain focus:border-white/20 focus:outline-none"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="quiz">Quiz completado</option>
+                    <option value="validated">Validados</option>
+                  </select>
                 </div>
               </div>
 
-              {/* Requisitos para ganar: cuentas de Instagram a seguir */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Requisitos para ganar (cuentas a seguir)
+              {/* Requisitos para ganar */}
+              <div className="mb-5">
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Requisitos para ganar
                 </label>
-                <p className="text-xs text-gray-400 mb-3">
-                  Para participar en el sorteo deben seguir estas cuentas. Comprobamos automáticamente que sigan a @stand_official; el resto se notifica por DM.
+                <p className="text-[11px] text-gray-500 mb-2 leading-snug">
+                  Cuentas de Instagram que deben seguir (además de la comprobación estándar del sorteo).
                 </p>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {requiredFollows.map((handle) => (
-                    <span
-                      key={handle}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.08)] border border-white/10 text-sm"
-                    >
-                      @{handle}
-                      <button
-                        type="button"
-                        onClick={() => removeRequiredFollow(handle)}
-                        className="ml-1 p-0.5 rounded hover:bg-white/20 text-gray-400 hover:text-white"
-                        aria-label={`Quitar @${handle}`}
+                <div className="flex flex-wrap gap-2 mb-2 min-h-[2rem]">
+                  {requiredFollows.length === 0 ? (
+                    <span className="text-xs text-gray-500 italic">Ninguna cuenta extra configurada</span>
+                  ) : (
+                    requiredFollows.map((handle) => (
+                      <span
+                        key={handle}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[rgba(255,255,255,0.08)] border border-white/10 text-xs"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </span>
-                  ))}
+                        @{handle}
+                        <button
+                          type="button"
+                          onClick={() => void removeRequiredFollow(handle)}
+                          disabled={savingFollows}
+                          className="ml-0.5 p-0.5 rounded hover:bg-white/20 text-gray-400 hover:text-white disabled:opacity-40 disabled:pointer-events-none"
+                          aria-label={`Quitar @${handle}`}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </span>
+                    ))
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Añadir @usuario (sin @)"
+                    placeholder="usuario (sin @)"
                     value={newHandle}
                     onChange={(e) => setNewHandle(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addRequiredFollow())}
-                    className="flex-1 h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm placeholder-gray-500 focus:border-white/20 focus:outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        void addRequiredFollow()
+                      }
+                    }}
+                    className="flex-1 min-w-0 h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm placeholder-gray-500 focus:border-white/20 focus:outline-none"
                   />
                   <button
                     type="button"
-                    onClick={addRequiredFollow}
-                    className="px-4 h-10 rounded-lg bg-[rgba(255,255,255,0.1)] border border-white/10 hover:bg-white/15 text-sm font-medium"
+                    onClick={() => void addRequiredFollow()}
+                    disabled={savingFollows || !gameId}
+                    className="px-3 h-10 rounded-lg bg-[rgba(255,255,255,0.1)] border border-white/10 hover:bg-white/15 text-sm font-medium flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Añadir
+                    {savingFollows ? 'Guardando…' : 'Añadir'}
                   </button>
                 </div>
-                {requiredFollows.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={saveRequiredFollows}
-                    disabled={savingFollows}
-                    className="mt-2 text-xs text-purple-400 hover:text-purple-300 disabled:opacity-50"
-                  >
-                    {savingFollows ? 'Guardando...' : 'Guardar lista'}
-                  </button>
+              </div>
+
+              {/* Sorteos automáticos (antes del botón manual) */}
+              <div className="mb-5 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <h3 className="text-sm font-medium text-gray-300">Sorteo automático</h3>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={autoRaffleEnabled}
+                      onChange={(e) => {
+                        setAutoRaffleEnabled(e.target.checked)
+                        if (e.target.checked && gameId) {
+                          const config = loadAutoRaffleConfig(gameId)
+                          if (config) {
+                            config.lastAutoRaffleTime = Date.now()
+                            saveAutoRaffleConfig(gameId, config)
+                          }
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500" />
+                  </label>
+                </div>
+                <p className="text-[11px] text-gray-500 mb-3">
+                  Usa el mismo número de ganadores y filtro de elegibles que arriba.
+                </p>
+                {autoRaffleEnabled && (
+                  <div>
+                    <label htmlFor="auto-interval" className="block text-xs font-medium text-gray-300 mb-1.5">
+                      Cada cuántos minutos
+                    </label>
+                    <input
+                      id="auto-interval"
+                      type="number"
+                      min="1"
+                      value={autoRaffleInterval}
+                      onChange={(e) => handleAutoIntervalChange(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-white/20 focus:outline-none"
+                    />
+                  </div>
                 )}
               </div>
 
-              {/* Run Raffle Button */}
-              <div className="mb-6">
+              <div className="mb-1">
                 <button
                   onClick={runRaffle}
                   disabled={isRunning || numberOfWinners < 1}
@@ -423,57 +479,9 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                       </svg>
                     )}
-                    {isRunning ? 'Ejecutando sorteo...' : 'Ejecutar Sorteo'}
+                    {isRunning ? 'Ejecutando sorteo...' : 'Ejecutar sorteo'}
                   </div>
                 </button>
-              </div>
-
-              {/* Automatic Raffles Configuration */}
-              <div className="mb-4 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-300 mb-1">Sorteos Automáticos</h3>
-                    <p className="text-xs text-gray-400">Ejecutar sorteos automáticamente cada cierto tiempo</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoRaffleEnabled}
-                      onChange={(e) => {
-                        setAutoRaffleEnabled(e.target.checked)
-                        if (e.target.checked && gameId) {
-                          // Set initial last raffle time when enabling
-                          const config = loadAutoRaffleConfig(gameId)
-                          if (config) {
-                            config.lastAutoRaffleTime = Date.now()
-                            saveAutoRaffleConfig(gameId, config)
-                          }
-                        }
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
-                  </label>
-                </div>
-
-                {autoRaffleEnabled && (
-                  <div className="mt-4">
-                    <label htmlFor="auto-interval" className="block text-xs font-medium text-gray-300 mb-2">
-                      Intervalo (minutos)
-                    </label>
-                    <input
-                      id="auto-interval"
-                      type="number"
-                      min="1"
-                      value={autoRaffleInterval}
-                      onChange={(e) => handleAutoIntervalChange(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-white/20 focus:outline-none"
-                    />
-                    <p className="text-[10px] text-gray-500 mt-1">
-                      Número de ganadores y «aplicable a» = los del sorteo manual arriba.
-                    </p>
-                  </div>
-                )}
               </div>
             </>
           ) : (

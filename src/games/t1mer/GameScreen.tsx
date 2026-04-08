@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
+import GameLandscapeInfoColumn from '../../core/widgets/GameLandscapeInfoColumn'
 import BackButton from '../../core/widgets/BackButton'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
@@ -171,7 +172,11 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   const gameStateRef = useRef(gameState)
   gameStateRef.current = gameState
 
-  /** Solo acción `click` del inputManager: empezar / detener / volver a validación; no duplicar botones enlaces o campos. */
+  /**
+   * Clic en zona vacía (inputManager): validar / empezar / detener.
+   * En `finished` no hacemos nada aquí: hace falta un clic explícito en «Volver a validar» (evita que el mismo gesto
+   * que detiene salte al reset).
+   */
   const inputHandlers = useMemo(
     () => ({
       click: (ev: InputEventEnvelope) => {
@@ -180,6 +185,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
           return
         }
         const st = gameStateRef.current
+        if (st === 'finished') return
         if (st === 'idle') {
           void handleValidateRef.current()
           return
@@ -188,8 +194,6 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
           handleStartRef.current()
         } else if (st === 'playing' || st === 'hidden') {
           handleStopRef.current()
-        } else if (st === 'finished') {
-          handleResetFnRef.current()
         }
       },
     }),
@@ -208,8 +212,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
         if (!stopButtonRef.current) return null
         return { primary: stopButtonRef.current, activate: () => handleStopRef.current() }
       case 'finished':
-        if (!resetBackRef.current) return null
-        return { primary: resetBackRef.current, activate: () => handleResetFnRef.current() }
+        return null
       case 'idle': {
         const v = validateButtonRef.current
         if (!v || v.disabled) return null
@@ -222,38 +225,31 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
 
+  /** Altura fija del contador: no crece ni se mueve entre estados. */
+  const t1merTimerSlotClassPortrait =
+    'text-center h-[140px] sm:h-[160px] flex items-center justify-center shrink-0 w-full'
+  const t1merTimerSlotClass =
+    'text-center h-[160px] flex items-center justify-center shrink-0 w-full'
+  const t1merActionSlotClass = 'w-full min-w-0 shrink-0 min-h-[7.5rem] flex flex-col justify-center py-2'
+  const t1merPrimaryButtonClass =
+    'w-full p-8 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors flex items-center justify-center'
+  const t1merPrimaryButtonLabelClass = 'text-2xl sm:text-3xl lg:text-4xl font-bold'
+  /** Altura fija del bloque de usuario + instrucción: al jugar sigue ocupando sitio para que EMPEZAR y DETENER coincidan. */
+  /** Misma caja que “preparing”: aquí va resultado (posición/premio) al terminar para no empujar el contador. */
+  const t1merPreparingHeaderSlotLandscape =
+    'shrink-0 h-[9rem] flex flex-col justify-center text-center py-3 min-h-0 px-2 sm:px-3'
+  const t1merPreparingHeaderSlotPortrait =
+    'shrink-0 h-[12.5rem] sm:h-[13rem] flex flex-col justify-center text-center py-4 min-h-0 px-3 sm:px-4'
+
   if (isLandscape) {
     return (
       <div className="grid grid-cols-[25%_40%_25%] gap-4 items-stretch h-full min-h-0">
-        <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0 min-w-0">
-          <div className="flex-shrink-0 flex justify-center items-center w-full min-h-0 min-w-0">
-            {logoElement}
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col justify-center">
-            <div className="flex-shrink-0 w-full min-w-0">
-              <h3 className="text-xs font-semibold text-textMain mb-1">Instrucciones</h3>
-              <ol className="flex flex-col gap-1.5 text-xs text-gray-300">
-                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">1</span><span className="pt-0.5">📸 Escanea el QR y pulsa JUGAR.</span></li>
-                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">2</span><span className="pt-0.5">✅ Ingresa tu código y valida.</span></li>
-                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">3</span><span className="pt-0.5">⏱️ El temporizador se oculta a los 5 s.</span></li>
-                <li className="flex gap-2 items-start"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">4</span><span className="pt-0.5">🎯 Detén en 10 segundos.</span></li>
-              </ol>
-            </div>
-          </div>
-          <div className="flex-shrink-0 grid grid-cols-2 w-full min-h-0 gap-2 pt-1 pb-2 items-center">
-            <div aria-hidden className="min-h-0 min-w-0" />
-            <div className="flex justify-center items-center min-h-0 min-w-0">
-              <QRCode
-                data={getInstagramDmUrl(gameId)}
-                size={320}
-                margin={6}
-                containerClassName="h-[clamp(92px,16vh,156px)] w-[clamp(92px,11vw,156px)]"
-                alt="QR Code para Instagram DM"
-                className="!border-0 !bg-transparent !p-0"
-              />
-            </div>
-          </div>
-        </div>
+        <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
+          <p>📸 Escanea el QR y pulsa JUGAR.</p>
+          <p>✅ Ingresa tu código y valida.</p>
+          <p>⏱️ El temporizador se oculta a los 5 s.</p>
+          <p>🎯 Detén en 10 segundos.</p>
+        </GameLandscapeInfoColumn>
         <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 min-w-0 space-y-6 items-center">
           {/* Idle: temporizador + código + Validar (validación a escondidas, mismo formulario) */}
           {gameState === 'idle' && (
@@ -261,73 +257,86 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
               <div className="text-center py-6">
                 <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-gray-600 font-digital opacity-50">00:00.0</div>
               </div>
-              <div className="max-w-md mx-auto w-full space-y-2">
+              <div className="max-w-md mx-auto w-full space-y-4">
                 <div className="flex gap-3">
                   <input id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder="Ingresa tu código" className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" />
                   <button ref={validateButtonRef} type="button" onClick={handleValidate} disabled={!playerCode.trim() || isValidating} className="px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0">{isValidating ? 'Validando...' : 'Validar'}</button>
                 </div>
+                {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
               </div>
-              {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
             </div>
           )}
-          {/* Preparando: username + instrucción + contador + EMPEZAR */}
-          {gameState === 'preparing' && (
-            <>
-              <div className="text-center py-4 space-y-2">
-                {username && <p className="text-3xl font-bold text-red-500">{username.startsWith('@') ? username : `@${username}`}</p>}
-                <p className="text-xl sm:text-2xl text-gray-300">
-                  Detén el contador cuando llegue a <span className="font-digital text-red-500 text-2xl sm:text-3xl">10:00.0</span>
-                </p>
+          {(gameState === 'preparing' ||
+            gameState === 'playing' ||
+            gameState === 'hidden' ||
+            (gameState === 'finished' && result)) && (
+            <div className="flex flex-col gap-5 sm:gap-6 flex-1 min-h-0 w-full min-w-0 justify-start px-1 sm:px-2">
+              <div className={t1merPreparingHeaderSlotLandscape}>
+                <div className="space-y-2 sm:space-y-3 overflow-y-auto min-h-0 max-h-full overscroll-contain">
+                  {gameState === 'preparing' && (
+                    <>
+                      {username && <p className="text-3xl font-bold text-red-500 leading-tight">{username.startsWith('@') ? username : `@${username}`}</p>}
+                      <p className="text-xl sm:text-2xl text-gray-300 leading-snug">
+                        Detén el contador cuando llegue a <span className="font-digital text-red-500 text-2xl sm:text-3xl">10:00.0</span>
+                      </p>
+                    </>
+                  )}
+                  {gameState === 'finished' && result && (
+                    <>
+                      {resultRank != null && (
+                        <div className="text-xl sm:text-2xl font-semibold text-textMain leading-tight">Posición: {resultRank}</div>
+                      )}
+                      {topX != null && resultRank != null && resultRank <= topX && (
+                        <div className="text-base sm:text-lg font-semibold text-green-400 leading-snug">
+                          ¡Premio por entrar en el top {topX}!{prizeLabel ? ` ${prizeLabel}` : ''}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="space-y-6 min-w-0 flex-1 flex flex-col justify-center">
-                <div className="text-center py-6 min-h-[120px] flex items-center justify-center">
-                  <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-gray-600 font-digital opacity-50">00:00.0</div>
+              <div className="flex flex-col gap-5 sm:gap-6 min-w-0 shrink-0 w-full">
+                <div className={t1merTimerSlotClass}>
+                  {gameState === 'preparing' && (
+                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-gray-600 font-digital opacity-50">00:00.0</div>
+                  )}
+                  {gameState === 'playing' && (
+                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-red-500 font-digital">{formatTimer(timer)}</div>
+                  )}
+                  {gameState === 'hidden' && (
+                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-gray-600 font-digital">???</div>
+                  )}
+                  {gameState === 'finished' && result && (
+                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-red-500 font-digital">{formatTimer(result.time)}</div>
+                  )}
                 </div>
-                <div className="w-full min-w-0">
-                  <button
-                    ref={startButtonRef}
-                    type="button"
-                    onClick={handleStart}
-                    className="w-full p-8 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
-                  >
-                    <span className="text-2xl sm:text-3xl font-bold">EMPEZAR</span>
-                  </button>
+                <div className={t1merActionSlotClass}>
+                  {gameState === 'preparing' && (
+                    <button
+                      ref={startButtonRef}
+                      type="button"
+                      onClick={handleStart}
+                      className={t1merPrimaryButtonClass}
+                    >
+                      <span className={t1merPrimaryButtonLabelClass}>EMPEZAR</span>
+                    </button>
+                  )}
+                  {(gameState === 'playing' || gameState === 'hidden') && (
+                    <button
+                      ref={stopButtonRef}
+                      type="button"
+                      onClick={handleStop}
+                      className={t1merPrimaryButtonClass}
+                    >
+                      <span className={t1merPrimaryButtonLabelClass}>DETENER</span>
+                    </button>
+                  )}
+                  {gameState === 'finished' && result && (
+                    <div className="flex justify-center items-center min-h-[7.5rem] py-2">
+                      <BackButton ref={resetBackRef} onClick={handleReset} aria-label="Volver a validar" />
+                    </div>
+                  )}
                 </div>
-              </div>
-            </>
-          )}
-          {/* Jugando / oculto / terminado: temporizador + DETENER (o resultado) */}
-          {(gameState === 'playing' || gameState === 'hidden' || gameState === 'finished') && (
-            <div className="space-y-6 min-w-0 flex-1 flex flex-col justify-center">
-              <div className="text-center py-10 min-h-[160px] flex items-center justify-center">
-                {gameState === 'playing' && <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-red-500 font-digital">{formatTimer(timer)}</div>}
-                {gameState === 'hidden' && <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-gray-600 font-digital">???</div>}
-                {gameState === 'finished' && result && <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-red-500 font-digital">{formatTimer(result.time)}</div>}
-              </div>
-              {gameState !== 'finished' && (
-                <div className="w-full min-w-0">
-                  <button
-                    ref={stopButtonRef}
-                    type="button"
-                    onClick={handleStop}
-                    className="w-full p-8 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
-                  >
-                    <span className="text-2xl sm:text-3xl font-bold">DETENER</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          {gameState === 'finished' && result && (
-            <div className="text-center space-y-4">
-              {resultRank != null && <div className="text-2xl font-semibold text-textMain">Posición: {resultRank}</div>}
-              {topX != null && resultRank != null && resultRank <= topX && (
-                <div className="text-xl font-semibold text-green-400">
-                  ¡Premio por entrar en el top {topX}!{prizeLabel ? ` ${prizeLabel}` : ''}
-                </div>
-              )}
-              <div className="flex justify-center">
-                <BackButton ref={resetBackRef} onClick={handleReset} aria-label="Volver a validar" />
               </div>
             </div>
           )}
@@ -387,113 +396,124 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
         </div>
 
       {/* Contenedor central: idle = timer + código + Validar (validación a escondidas); preparando = username + instrucción + EMPEZAR; jugando/oculto/terminado = timer + DETENER o resultado */}
-      <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden min-w-0">
-        <div className="space-y-6 flex flex-col flex-1 min-h-0 justify-center">
+      <div className="flex-1 min-h-0 flex flex-col justify-start overflow-hidden min-w-0">
+        <div className="space-y-6 flex flex-col flex-1 min-h-0 justify-start">
           {gameState === 'idle' && (
             <div className="flex-1 flex flex-col justify-center min-h-0">
               <div className="text-center py-6">
                 <div className="font-normal text-gray-600 font-digital opacity-50 text-6xl sm:text-7xl lg:text-8xl">00:00.0</div>
               </div>
               <div className="flex-shrink-0 space-y-4">
-                <div className="space-y-2">
-                  <div className="flex gap-3">
-                    <input
-                      id="player-code"
-                      type="number"
-                      inputMode="numeric"
-                      min={1000}
-                      max={9999}
-                      value={playerCode}
-                      onChange={(e) => setPlayerCode(String(e.target.value))}
-                      placeholder="Ingresa tu código"
-                      className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
-                    />
-                    <button
-                      ref={validateButtonRef}
-                      type="button"
-                      onClick={handleValidate}
-                      disabled={!playerCode.trim() || isValidating}
-                      className="px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0"
-                    >
-                      {isValidating ? 'Validando...' : 'Validar'}
-                    </button>
-                  </div>
+                <div className="flex gap-3">
+                  <input
+                    id="player-code"
+                    type="number"
+                    inputMode="numeric"
+                    min={1000}
+                    max={9999}
+                    value={playerCode}
+                    onChange={(e) => setPlayerCode(String(e.target.value))}
+                    placeholder="Ingresa tu código"
+                    className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
+                  />
+                  <button
+                    ref={validateButtonRef}
+                    type="button"
+                    onClick={handleValidate}
+                    disabled={!playerCode.trim() || isValidating}
+                    className="px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0"
+                  >
+                    {isValidating ? 'Validando...' : 'Validar'}
+                  </button>
                 </div>
                 {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">{error}</div>}
               </div>
             </div>
           )}
-          {gameState === 'preparing' && (
-            <>
-              <div className="flex-shrink-0 text-center py-6 space-y-2">
-                {username && <p className="text-4xl lg:text-5xl font-bold text-red-500">{username.startsWith('@') ? username : `@${username}`}</p>}
-                <p className="text-lg sm:text-xl lg:text-2xl text-gray-300">
-                  Detén el contador cuando llegue a <span className="font-digital text-red-500 text-2xl sm:text-3xl lg:text-4xl">10:00.0</span>
-                </p>
-              </div>
-              <div className="text-center flex items-center justify-center flex-1 min-h-0 py-6">
-                <div className="font-normal text-gray-600 font-digital opacity-50 text-6xl sm:text-7xl lg:text-8xl">00:00.0</div>
-              </div>
-              <div className="w-full min-w-0 flex-shrink-0">
-                <button
-                  ref={startButtonRef}
-                  type="button"
-                  onClick={handleStart}
-                  className="w-full rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors p-8"
-                >
-                  <span className="text-2xl sm:text-3xl lg:text-4xl font-bold">EMPEZAR</span>
-                </button>
-              </div>
-            </>
-          )}
-          {(gameState === 'playing' || gameState === 'hidden' || gameState === 'finished') && (
-            <>
-              <div className={`text-center flex items-center justify-center flex-1 min-h-0 ${showJoinBlock ? 'py-10 min-h-[120px]' : 'py-6'}`}>
-                {gameState === 'playing' && <div className="font-normal text-red-500 font-digital text-6xl sm:text-7xl lg:text-8xl">{formatTimer(timer)}</div>}
-                {gameState === 'hidden' && <div className="font-normal text-gray-600 font-digital text-6xl sm:text-7xl lg:text-8xl">???</div>}
-                {gameState === 'finished' && result && <div className="font-normal text-red-500 font-digital text-6xl sm:text-7xl lg:text-8xl">{formatTimer(result.time)}</div>}
-              </div>
-              {gameState !== 'finished' && (
-                <div className="w-full min-w-0 flex-shrink-0">
-                  <button
-                    ref={stopButtonRef}
-                    type="button"
-                    onClick={handleStop}
-                    className="w-full rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors p-8"
-                  >
-                    <span className="text-2xl sm:text-3xl lg:text-4xl font-bold">DETENER</span>
-                  </button>
+          {(gameState === 'preparing' ||
+            gameState === 'playing' ||
+            gameState === 'hidden' ||
+            (gameState === 'finished' && result)) && (
+            <div className="flex flex-col gap-5 sm:gap-6 flex-1 min-h-0 w-full min-w-0 justify-start px-2 sm:px-3">
+              <div className={t1merPreparingHeaderSlotPortrait}>
+                <div className="space-y-2 sm:space-y-3 overflow-y-auto min-h-0 max-h-full overscroll-contain">
+                  {gameState === 'preparing' && (
+                    <>
+                      {username && <p className="text-4xl lg:text-5xl font-bold text-red-500 leading-tight">{username.startsWith('@') ? username : `@${username}`}</p>}
+                      <p className="text-lg sm:text-xl lg:text-2xl text-gray-300 leading-snug">
+                        Detén el contador cuando llegue a <span className="font-digital text-red-500 text-2xl sm:text-3xl lg:text-4xl">10:00.0</span>
+                      </p>
+                    </>
+                  )}
+                  {gameState === 'finished' && result && (
+                    <>
+                      {resultRank != null && (
+                        <div
+                          className={`font-semibold text-textMain leading-tight ${showJoinBlock ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'}`}
+                        >
+                          Posición: {resultRank}
+                        </div>
+                      )}
+                      {topX != null && resultRank != null && resultRank <= topX && (
+                        <div className="text-base sm:text-lg lg:text-xl font-semibold text-green-400 leading-snug">
+                          ¡Premio por entrar en el top {topX}!{prizeLabel ? ` ${prizeLabel}` : ''}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-              )}
-            </>
+              </div>
+              <div className="flex flex-col gap-5 sm:gap-6 shrink-0 w-full">
+                <div className={t1merTimerSlotClassPortrait}>
+                  {gameState === 'preparing' && (
+                    <div className="font-normal text-gray-600 font-digital opacity-50 text-6xl sm:text-7xl lg:text-8xl">00:00.0</div>
+                  )}
+                  {gameState === 'playing' && (
+                    <div className="font-normal text-red-500 font-digital text-6xl sm:text-7xl lg:text-8xl">{formatTimer(timer)}</div>
+                  )}
+                  {gameState === 'hidden' && (
+                    <div className="font-normal text-gray-600 font-digital text-6xl sm:text-7xl lg:text-8xl">???</div>
+                  )}
+                  {gameState === 'finished' && result && (
+                    <div className="font-normal text-red-500 font-digital text-6xl sm:text-7xl lg:text-8xl">{formatTimer(result.time)}</div>
+                  )}
+                </div>
+                <div className={t1merActionSlotClass}>
+                  {gameState === 'preparing' && (
+                    <button
+                      ref={startButtonRef}
+                      type="button"
+                      onClick={handleStart}
+                      className={t1merPrimaryButtonClass}
+                    >
+                      <span className={t1merPrimaryButtonLabelClass}>EMPEZAR</span>
+                    </button>
+                  )}
+                  {(gameState === 'playing' || gameState === 'hidden') && (
+                    <button
+                      ref={stopButtonRef}
+                      type="button"
+                      onClick={handleStop}
+                      className={t1merPrimaryButtonClass}
+                    >
+                      <span className={t1merPrimaryButtonLabelClass}>DETENER</span>
+                    </button>
+                  )}
+                  {gameState === 'finished' && result && (
+                    <div className="flex justify-center items-center min-h-[7.5rem] py-2">
+                      <BackButton ref={resetBackRef} onClick={handleReset} aria-label="Volver a validar" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Result Display - Solo posición, premio si aplica y botón volver */}
-      {gameState === 'finished' && result && (
+      {gameState === 'finished' && result && error && (
         <div className="flex-shrink-0 space-y-4">
-          <div className="text-center space-y-4">
-            {resultRank != null && (
-              <div className={showJoinBlock ? 'text-xl font-semibold text-textMain' : 'text-2xl font-semibold text-textMain'}>
-                Posición: {resultRank}
-              </div>
-            )}
-            {topX != null && resultRank != null && resultRank <= topX && (
-              <div className="text-xl sm:text-2xl font-semibold text-green-400">
-                ¡Premio por entrar en el top {topX}!{prizeLabel ? ` ${prizeLabel}` : ''}
-              </div>
-            )}
-            <div className="flex justify-center">
-              <BackButton ref={resetBackRef} onClick={handleReset} aria-label="Volver a validar" />
-            </div>
-          </div>
-
-          {error && (
-            <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-              {error}
-            </div>
-          )}
+          <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>
         </div>
       )}
     </div>

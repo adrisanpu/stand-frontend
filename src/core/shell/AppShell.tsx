@@ -17,11 +17,8 @@ import { STORAGE_KEY_LOGO } from '../storageKeys'
 
 // Logo size on game screens (portrait and landscape) — larger across breakpoints
 const GAME_SCREEN_LOGO_CLASS = 'h-32 sm:h-36 lg:h-40 xl:h-44 2xl:h-52 w-auto object-contain'
-// Letras overlapping bottom half of logo, larger than logo
-const GAME_SCREEN_LETRAS_CLASS = 'h-40 sm:h-44 lg:h-48 xl:h-52 2xl:h-60 w-auto object-contain -mt-24 sm:-mt-28 lg:-mt-32 xl:-mt-36 2xl:-mt-40'
-// Landscape: slightly smaller logo/letras so left column fits without scroll
-const GAME_SCREEN_LOGO_CLASS_LANDSCAPE = 'h-28 sm:h-32 lg:h-36 xl:h-40 2xl:h-44 w-auto object-contain'
-const GAME_SCREEN_LETRAS_CLASS_LANDSCAPE = 'h-32 sm:h-36 lg:h-40 xl:h-44 2xl:h-48 w-auto object-contain -mt-24 sm:-mt-28 lg:-mt-32 xl:-mt-36 2xl:-mt-40'
+// Landscape: slightly smaller so left column fits
+const GAME_SCREEN_LOGO_CLASS_LANDSCAPE = 'h-28 sm:h-32 lg:h-36 xl:h-40 2xl:h-44 w-auto object-contain max-w-full'
 
 export default function AppShell() {
   const { loading: userLoading, plan } = useCurrentUser()
@@ -300,22 +297,12 @@ export default function AppShell() {
                 >
                   {/* Header: logo */}
                   {(customLogo || currentGame.assets?.logo) && (
-                    <div className="flex-shrink-0 flex flex-col items-center -mt-1">
+                    <div className="flex-shrink-0 flex justify-center items-center w-full min-w-0">
                       <img
                         src={customLogo ?? currentGame.assets!.logo}
                         alt={customLogo ? 'Logo del cliente' : currentGame.name}
                         className={GAME_SCREEN_LOGO_CLASS}
                       />
-                      {customLogo && currentGame && (
-                        <img
-                          src={`/images/${currentGame.id}-letras.png`}
-                          alt=""
-                          className={GAME_SCREEN_LETRAS_CLASS}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none'
-                          }}
-                        />
-                      )}
                     </div>
                   )}
                   {/* Main: con ranking, repartimos altura (juego : panel inferior) para que el ranking use el hueco */}
@@ -398,22 +385,12 @@ export default function AppShell() {
                         onCounterActiveChange={setCounterActive}
                         logoElement={
                           (customLogo || currentGame.assets?.logo) ? (
-                            <div className="flex flex-col items-center -mt-2">
+                            <div className="flex justify-center items-center w-full min-w-0">
                               <img
                                 src={customLogo ?? currentGame.assets!.logo}
                                 alt={customLogo ? 'Logo del cliente' : currentGame.name}
                                 className={GAME_SCREEN_LOGO_CLASS_LANDSCAPE}
                               />
-                              {customLogo && currentGame && (
-                                <img
-                                  src={`/images/${currentGame.id}-letras.png`}
-                                  alt=""
-                                  className={GAME_SCREEN_LETRAS_CLASS_LANDSCAPE}
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none'
-                                  }}
-                                />
-                              )}
                             </div>
                           ) : null
                         }
