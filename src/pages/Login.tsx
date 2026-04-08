@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { ThemeProvider } from '../core/theme'
-import { useStandLogo } from '../core/logoUtils'
-
-const STORAGE_KEY_LOGO = 'app_custom_logo'
+import { ThemeProvider, useStandLogo } from '../core/theme'
+import { STORAGE_KEY_LOGO } from '../core/storageKeys'
 
 export default function Login() {
   const [searchParams] = useSearchParams()

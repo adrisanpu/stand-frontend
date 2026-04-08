@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
-import QRCode from '../../core/QRCode'
-import BackButton from '../../core/BackButton'
-import { getInstagramDmUrl } from '../../core/instagram'
+import QRCode from '../../core/widgets/QRCode'
+import BackButton from '../../core/widgets/BackButton'
+import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'

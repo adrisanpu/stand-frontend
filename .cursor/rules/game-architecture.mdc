@@ -32,12 +32,12 @@ interface GameDefinition {
 | semaforo | SEMAFORO | #22C55E |
 | infocards | INFOCARDS | #6366F1 |
 
-## AppShell state (src/core/AppShell.tsx)
+## AppShell state (src/core/shell/AppShell.tsx)
 - Reads gameId, gameName, gameType from localStorage
-- `mapGameTypeToId()` converts lowercase id → UPPERCASE type for API calls
+- `mapGameTypeToId()` in `src/core/gameTypeMap.ts` normalizes type strings to canonical frontend game ids
 - All game routing goes through AppShell — don't create standalone game routes
 
-## ThemeProvider (src/core/theme.tsx)
+## ThemeProvider (src/core/theme/ — barrel `index.ts`, implementation `theme.tsx`)
 - Wraps game screens with CSS variables from GameDefinition.colors
 - Use `var(--game-primary)` and `var(--game-accent)` in game component styles
 - Don't hardcode colors inside game components — use CSS vars

@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import Raffle from './Raffle'
-import Quiz from './Quiz'
-import AppearanceSettings from './AppearanceSettings'
-import OperatorPrizeSettings from './OperatorPrizeSettings'
-import type { GameDefinition } from './types'
-import { api } from '../api/api'
-import { useCurrentUser } from '../auth/useCurrentUser'
-import { getFeaturesByPlan } from '../auth/featureFlags'
-import { inputManager } from './input/inputManager'
+import Raffle from '../widgets/Raffle'
+import Quiz from '../widgets/Quiz'
+import AppearanceSettings from '../settings/AppearanceSettings'
+import OperatorPrizeSettings from '../settings/OperatorPrizeSettings'
+import type { GameDefinition } from '../types'
+import { api } from '../../api/api'
+import { useCurrentUser } from '../../auth/useCurrentUser'
+import { getFeaturesByPlan } from '../../auth/featureFlags'
+import { inputManager } from '../input/inputManager'
 
 type SettingsMenuProps = {
   onClose: () => void

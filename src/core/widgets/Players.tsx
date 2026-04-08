@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { api } from '../api/api'
-import { useCurrentUser } from '../auth/useCurrentUser'
-import { getFeaturesByPlan } from '../auth/featureFlags'
-import { usePolling } from '../hooks/usePolling'
+import { api } from '../../api/api'
+import { useCurrentUser } from '../../auth/useCurrentUser'
+import { getFeaturesByPlan } from '../../auth/featureFlags'
+import { usePolling } from '../../hooks/usePolling'
 
 interface GameDataResponse {
   ok: boolean

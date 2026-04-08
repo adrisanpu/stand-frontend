@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import type { GameDefinition } from './types'
-import type { Plan } from '../auth/featureFlags'
-import { getFeaturesByPlan } from '../auth/featureFlags'
-import { api } from '../api/api'
+import type { GameDefinition } from '../types'
+import type { Plan } from '../../auth/featureFlags'
+import { getFeaturesByPlan } from '../../auth/featureFlags'
+import { api } from '../../api/api'
 import {
   getOperatorPrizeSlotVisibility,
   readMaxPrizeValidation,

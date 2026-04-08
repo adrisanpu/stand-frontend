@@ -11,7 +11,6 @@ type DebugState = {
   t: number
 }
 
-/** Por defecto activo (incl. GameScreen). Desactivar: VITE_INPUT_DEBUG=false o ?inputDebug=0 */
 function inputDebugEnabled(): boolean {
   if (typeof window !== 'undefined') {
     if (/\binputDebug=0\b/.test(window.location.search)) return false
@@ -25,10 +24,6 @@ function inputDebugEnabled(): boolean {
 
 const OVERLAY_Z = 2147483000
 
-/**
- * Overlay para validar en TV (SRS23CW): última tecla, code, keyCode y flags click/touch.
- * Activo por defecto; portal a document.body para que no quede detrás de juegos/modales.
- */
 export default function InputDebugOverlay() {
   const [s, setS] = useState<DebugState | null>(null)
   const enabled = inputDebugEnabled()
@@ -59,21 +54,10 @@ export default function InputDebugOverlay() {
       })
     }
 
-    const onClick = () => {
-      patch({ type: 'click', click: true })
-    }
-
-    const onTouchStart = () => {
-      patch({ type: 'touchstart', touch: true })
-    }
-
-    const onTouchEnd = () => {
-      patch({ type: 'touchend', touch: true })
-    }
-
-    const onPointerDown = (e: PointerEvent) => {
-      patch({ type: `pointerdown:${e.pointerType}`, click: true })
-    }
+    const onClick = () => patch({ type: 'click', click: true })
+    const onTouchStart = () => patch({ type: 'touchstart', touch: true })
+    const onTouchEnd = () => patch({ type: 'touchend', touch: true })
+    const onPointerDown = (e: PointerEvent) => patch({ type: `pointerdown:${e.pointerType}`, click: true })
 
     window.addEventListener('keydown', onKeyDown, true)
     window.addEventListener('click', onClick, true)

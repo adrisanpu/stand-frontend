@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { api } from '../api/api'
-import { usePolling } from '../hooks/usePolling'
+import { api } from '../../api/api'
+import { usePolling } from '../../hooks/usePolling'
 
 export interface RankingEntry {
   rank?: number

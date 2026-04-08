@@ -1,19 +1,19 @@
 import { useEffect, useState, useRef } from 'react'
-import { ThemeProvider } from './theme'
+import { ThemeProvider } from '../theme'
 import GameGate from './GameGate'
 import SettingsMenu from './SettingsMenu'
-import Ranking from './Ranking'
-import Players from './Players'
-import RaffleData from './RaffleData'
-import { getGameById } from '../games'
-import type { GameDefinition } from './types'
-import { useCurrentUser } from '../auth/useCurrentUser'
-import { getFeaturesByPlan } from '../auth/featureFlags'
-import { useOrientation } from '../hooks/useOrientation'
-import { readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle } from './operatorPrizeSlots'
-import { inputManager } from './input/inputManager'
-
-const STORAGE_KEY_LOGO = 'app_custom_logo'
+import Ranking from '../widgets/Ranking'
+import Players from '../widgets/Players'
+import RaffleData from '../widgets/RaffleData'
+import { getGameById } from '../../games'
+import type { GameDefinition } from '../types'
+import { useCurrentUser } from '../../auth/useCurrentUser'
+import { getFeaturesByPlan } from '../../auth/featureFlags'
+import { useOrientation } from '../../hooks/useOrientation'
+import { readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle } from '../settings/operatorPrizeSlots'
+import { inputManager } from '../input/inputManager'
+import { mapGameTypeToId } from '../gameTypeMap'
+import { STORAGE_KEY_LOGO } from '../storageKeys'
 
 // Logo size on game screens (portrait and landscape) — larger across breakpoints
 const GAME_SCREEN_LOGO_CLASS = 'h-32 sm:h-36 lg:h-40 xl:h-44 2xl:h-52 w-auto object-contain'
@@ -126,20 +126,6 @@ export default function AppShell() {
       setGameSettings(null)
     }
   }, [gameId, gameDefinition?.id, gameConfigVersion])
-
-  // Map game type names to game IDs
-  const mapGameTypeToId = (type: string | undefined): string => {
-    if (!type) return 'empareja2'
-    const normalized = type.toLowerCase()
-    // Map common variations
-    if (normalized === 't1mer' || normalized === 'timer') return 't1mer'
-    if (normalized === 'empareja2' || normalized === 'empareja') return 'empareja2'
-    if (normalized === 'rulet4' || normalized === 'ruleta') return 'rulet4'
-    if (normalized === 'cupido') return 'cupido'
-    if (normalized === 'semaforo' || normalized === 'semáforo') return 'semaforo'
-    if (normalized === 'infocards') return 'infocards'
-    return normalized
-  }
 
   const handleGameCreated = (name: string, id: string, type?: string) => {
     setGameName(name)

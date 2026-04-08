@@ -1,16 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import type { ThemeColors, GameDefinition } from './types'
-import { useCurrentUser } from '../auth/useCurrentUser'
-import { getFeaturesByPlan } from '../auth/featureFlags'
+import type { ThemeColors, GameDefinition } from '../types'
+import { useCurrentUser } from '../../auth/useCurrentUser'
+import { getFeaturesByPlan } from '../../auth/featureFlags'
+import { STORAGE_KEY_COLORS, STORAGE_KEY_LOGO, STORAGE_KEY_THEME_MODE } from '../storageKeys'
 
 type AppearanceSettingsProps = {
   onClose: () => void
   gameDefinition?: GameDefinition
 }
-
-const STORAGE_KEY_COLORS = 'app_custom_color_palette'
-const STORAGE_KEY_LOGO = 'app_custom_logo'
-const STORAGE_KEY_THEME_MODE = 'app_theme_mode' // 'dark' | 'light'
 
 const STORED_LOGOS = [
   { id: 'zoco_salamandra', label: 'Zoco Salamandra', path: '/images/zoco_salamandra.png' },

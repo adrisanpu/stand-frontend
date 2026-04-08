@@ -17,7 +17,7 @@ Auth uses Cognito PKCE OAuth2. All API calls go through the central api.ts clien
 **Env vars:** `VITE_COGNITO_DOMAIN` | `VITE_COGNITO_CLIENT_ID` | `VITE_COGNITO_REDIRECT_URI` | `VITE_API_BASE_URL`
 
 **Game IDs (lowercase):** empareja2, t1mer, rulet4, l3tras, semaforo, infocards, cupido
-Mapped to UPPERCASE for backend via `mapGameTypeToId()` in `src/core/AppShell.tsx`
+Canonical game id strings: `mapGameTypeToId()` in `src/core/gameTypeMap.ts` (used by `src/core/shell/AppShell.tsx`)
 
 **Game module structure** (`src/games/<id>/`):
 - `index.ts` — exports GameDefinition (id, name, type, colors, components)
@@ -25,7 +25,7 @@ Mapped to UPPERCASE for backend via `mapGameTypeToId()` in `src/core/AppShell.ts
 - `GameConfig.tsx` — operator configuration panel
 
 ## HOW
-- Register new game: add GameDefinition to `src/games/index.ts`, add route in AppShell.tsx
+- Register new game: add GameDefinition to `src/games/index.ts`, wire routing in `src/core/shell/AppShell.tsx`
 - Feature gates: `getFeaturesByPlan(plan)` from `src/auth/featureFlags.ts`
 - Plans: `'free'` (1 game, 25 players) | `'event'` | `'enterprise'` (unlimited)
 - Storage rule: auth tokens → sessionStorage; gameId/gameName/gameType → localStorage
