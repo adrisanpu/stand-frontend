@@ -7,7 +7,7 @@ import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { useGameInput } from '../../core/input/useGameInput'
 
 const INFOCARDS_SETTINGS_KEY_PREFIX = 'infocards_settings_'
-const CARD_CONTAINER_HEIGHT_CLASS = 'h-[340px] sm:h-[380px] lg:h-[410px]'
+const CARD_CONTAINER_HEIGHT_CLASS = 'h-[min(72vh,620px)] min-h-[420px] sm:min-h-[460px]'
 const INFOCARDS_JOIN_CARD_ID = '__infocards_join__'
 
 type InfoCard = {
@@ -203,36 +203,52 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
   const renderJoinCard = () => (
     <div key={INFOCARDS_JOIN_CARD_ID} className={baseClass} style={cardStyle}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 flex-1 min-h-0 overflow-hidden">
-        <div className="flex justify-center items-start">
+        <div className="flex justify-center items-center min-h-0">
           <QRCode
             data={getInstagramDmUrl(gameId)}
-            size={380}
+            size={320}
             margin={12}
+            containerClassName="w-full h-full max-w-[320px] max-h-[320px] sm:max-w-[360px] sm:max-h-[360px]"
             alt="QR Code para Instagram DM"
           />
         </div>
-        <div className="space-y-4">
+        <div className="space-y-4 min-h-0 overflow-y-auto pr-1">
           <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
-          <ol className="space-y-4 text-base text-gray-300">
+          <ul className="space-y-4 text-base text-gray-300">
             <li className="flex gap-4">
-              <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-sm">1</span>
+              <span className="flex-shrink-0 text-2xl leading-none" role="img" aria-label="escanear">📷</span>
               <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.</span>
             </li>
             <li className="flex gap-4">
-              <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-sm">2</span>
+              <span className="flex-shrink-0 text-2xl leading-none" role="img" aria-label="quiz">🧠</span>
               <span className="pt-0.5">En el chat podrás hacer un pequeño quiz y demostrar lo aprendido.</span>
             </li>
             <li className="flex gap-4">
-              <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.4)] flex items-center justify-center font-semibold text-[#6366F1] text-sm">3</span>
+              <span className="flex-shrink-0 text-2xl leading-none" role="img" aria-label="premio">🎁</span>
               <span className="pt-0.5">Participa en los sorteos.</span>
             </li>
-          </ol>
+          </ul>
         </div>
       </div>
     </div>
   )
 
   const rowClassGrid = 'w-full h-full min-h-0 rounded-2xl p-5 sm:p-6 grid grid-cols-2 gap-4 sm:gap-5 overflow-hidden'
+  const renderNavigation = () => (
+    <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4">
+      <button onClick={goToPrev} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label="Tarjeta anterior">
+        <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+      </button>
+      <div className="flex gap-2">
+        {displayCards.map((_, idx) => (
+          <button key={idx} onClick={() => setCurrentIndex(idx)} className="rounded-full transition-all duration-200" style={{ width: idx === currentIndex ? '20px' : '8px', height: '8px', background: idx === currentIndex ? 'var(--color-primary, #6366F1)' : 'rgba(255,255,255,0.2)' }} aria-label={`Ir a tarjeta ${idx + 1}`} />
+        ))}
+      </div>
+      <button onClick={goToNext} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label="Tarjeta siguiente">
+        <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+      </button>
+    </div>
+  )
 
   const renderCard = () => {
     if (layout === 'top') {
@@ -280,23 +296,11 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
   if (isLandscape) {
     return (
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-5 items-stretch h-full min-h-0 w-full">
-        <div className="card flex flex-col p-4 sm:p-5 overflow-hidden min-h-0 items-center justify-between gap-3">
-          <div className={`w-full flex-shrink-0 ${CARD_CONTAINER_HEIGHT_CLASS}`}>
+        <div className="card relative flex flex-col p-4 sm:p-5 overflow-hidden min-h-0 items-center">
+          <div className={`w-full flex-shrink-0 ${CARD_CONTAINER_HEIGHT_CLASS} mb-14 sm:mb-16`}>
             {isJoinCard ? renderJoinCard() : renderCard()}
           </div>
-          <div className="flex items-center gap-4">
-            <button onClick={goToPrev} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label="Tarjeta anterior">
-              <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            </button>
-            <div className="flex gap-2">
-              {displayCards.map((_, idx) => (
-                <button key={idx} onClick={() => setCurrentIndex(idx)} className="rounded-full transition-all duration-200" style={{ width: idx === currentIndex ? '20px' : '8px', height: '8px', background: idx === currentIndex ? 'var(--color-primary, #6366F1)' : 'rgba(255,255,255,0.2)' }} aria-label={`Ir a tarjeta ${idx + 1}`} />
-              ))}
-            </div>
-            <button onClick={goToNext} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label="Tarjeta siguiente">
-              <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            </button>
-          </div>
+          {renderNavigation()}
         </div>
         <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
           <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
@@ -308,54 +312,12 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 w-full">
+    <div className="relative flex flex-col items-center w-full overflow-hidden">
       {/* Card */}
-      <div className={`w-full flex-shrink-0 ${CARD_CONTAINER_HEIGHT_CLASS}`}>
+      <div className={`w-full flex-shrink-0 ${CARD_CONTAINER_HEIGHT_CLASS} mb-14 sm:mb-16`}>
         {isJoinCard ? renderJoinCard() : renderCard()}
       </div>
-
-      {/* Navigation */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={goToPrev}
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-          aria-label="Tarjeta anterior"
-        >
-          <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-
-        {/* Dot indicators */}
-        <div className="flex gap-2">
-          {displayCards.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => setCurrentIndex(idx)}
-              className="rounded-full transition-all duration-200"
-              style={{
-                width: idx === currentIndex ? '20px' : '8px',
-                height: '8px',
-                background: idx === currentIndex ? 'var(--color-primary, #6366F1)' : 'rgba(255,255,255,0.2)',
-              }}
-              aria-label={`Ir a tarjeta ${idx + 1}`}
-            />
-          ))}
-        </div>
-
-        <button
-          onClick={goToNext}
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-          aria-label="Tarjeta siguiente"
-        >
-          <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-
+      {renderNavigation()}
     </div>
   )
 }
