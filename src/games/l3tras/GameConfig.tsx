@@ -4,20 +4,46 @@ import { api } from '../../api/api'
 
 interface GameDataResponse {
   ok: boolean
-  settings?: { l3tras?: { objectiveWord?: string } }
+  settings?: { l3tras?: { objectiveWord?: string; validationTimeLimitSeconds?: number } }
 }
 
 export type L3trasSettings = {
   objectiveWord: string
+  /** Seconds to complete the word after the first successful code validation (default 60). */
+  validationTimeLimitSeconds?: number
+}
+
+export const DEFAULT_VALIDATION_TIME_LIMIT_SECONDS = 60
+export const MIN_VALIDATION_TIME_LIMIT_SECONDS = 15
+export const MAX_VALIDATION_TIME_LIMIT_SECONDS = 3600
+
+export function normalizeValidationTimeLimitSeconds(raw: unknown): number {
+  const n =
+    typeof raw === 'number' && Number.isFinite(raw)
+      ? raw
+      : typeof raw === 'string' && raw.trim() !== ''
+        ? Number.parseInt(raw, 10)
+        : Number.NaN
+  if (!Number.isFinite(n)) return DEFAULT_VALIDATION_TIME_LIMIT_SECONDS
+  return Math.min(
+    MAX_VALIDATION_TIME_LIMIT_SECONDS,
+    Math.max(MIN_VALIDATION_TIME_LIMIT_SECONDS, Math.floor(n)),
+  )
 }
 
 const DEFAULT_SETTINGS: L3trasSettings = {
   objectiveWord: 'STAND',
+  validationTimeLimitSeconds: DEFAULT_VALIDATION_TIME_LIMIT_SECONDS,
 }
 
-export default function L3trasGameConfig({ gameId, gameName, settings, onChange }: GameConfigProps) {
+export default function L3trasGameConfig({ gameId, settings, onChange }: GameConfigProps) {
   const [objectiveWord, setObjectiveWord] = useState<string>(
     (settings as L3trasSettings | null)?.objectiveWord || DEFAULT_SETTINGS.objectiveWord
+  )
+  const [validationTimeLimitSeconds, setValidationTimeLimitSeconds] = useState<number>(() =>
+    normalizeValidationTimeLimitSeconds(
+      (settings as L3trasSettings | null)?.validationTimeLimitSeconds,
+    ),
   )
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string>('')
@@ -26,6 +52,7 @@ export default function L3trasGameConfig({ gameId, gameName, settings, onChange 
     if (settings) {
       const s = settings as L3trasSettings
       setObjectiveWord((s.objectiveWord || DEFAULT_SETTINGS.objectiveWord).toUpperCase())
+      setValidationTimeLimitSeconds(normalizeValidationTimeLimitSeconds(s.validationTimeLimitSeconds))
     }
   }, [settings])
 
@@ -39,6 +66,9 @@ export default function L3trasGameConfig({ gameId, gameName, settings, onChange 
         const backend = data.settings?.l3tras
         if (backend?.objectiveWord) {
           setObjectiveWord(backend.objectiveWord.toUpperCase())
+        }
+        if (backend?.validationTimeLimitSeconds != null) {
+          setValidationTimeLimitSeconds(normalizeValidationTimeLimitSeconds(backend.validationTimeLimitSeconds))
         }
       } catch {
         // ignore
@@ -60,6 +90,7 @@ export default function L3trasGameConfig({ gameId, gameName, settings, onChange 
 
     const newSettings: L3trasSettings = {
       objectiveWord: objectiveWord.toUpperCase(),
+      validationTimeLimitSeconds: normalizeValidationTimeLimitSeconds(validationTimeLimitSeconds),
     }
     onChange(newSettings)
     setSaveStatus('idle')
@@ -74,6 +105,7 @@ export default function L3trasGameConfig({ gameId, gameName, settings, onChange 
           settings: {
             l3tras: {
               objectiveWord: newSettings.objectiveWord,
+              validationTimeLimitSeconds: newSettings.validationTimeLimitSeconds,
             },
           },
         })
@@ -97,22 +129,27 @@ export default function L3trasGameConfig({ gameId, gameName, settings, onChange 
     }
   }
 
-  const letterCount = objectiveWord.length
-
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Configurar {gameName}</h3>
-        <p className="text-sm text-gray-400">
-          Define la palabra objetivo que los jugadores deben formar con sus letras (siempre en mayúsculas)
-        </p>
-      </div>
-
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Palabra objetivo
-          </label>
+          <div className="mb-2 flex items-center gap-2">
+            <label className="block text-sm font-medium text-gray-300">
+              Palabra objetivo
+            </label>
+            <span className="group relative inline-flex">
+              <button
+                type="button"
+                aria-label="Información sobre palabra objetivo"
+                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25 text-[10px] font-semibold text-gray-300/90"
+              >
+                i
+              </button>
+              <span className="pointer-events-none absolute left-1/2 top-0 z-20 hidden w-64 -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-lg border border-white/15 bg-[rgba(17,24,39,0.98)] p-2 text-xs text-gray-200 shadow-lg group-hover:block">
+                Solo letras A-Z; se guardan en mayusculas.
+              </span>
+            </span>
+          </div>
           <input
             type="text"
             value={objectiveWord}
@@ -120,19 +157,39 @@ export default function L3trasGameConfig({ gameId, gameName, settings, onChange 
             placeholder="STAND"
             className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none uppercase"
           />
-          <p className="text-xs text-gray-400 mt-1">
-            Solo letras A–Z; se guardan en mayúsculas.
-          </p>
         </div>
 
-        <div className="p-4 rounded-xl bg-[rgba(16,185,129,0.1)] border border-[rgba(16,185,129,0.2)]">
-          <p className="text-sm text-gray-300 mb-2">Vista previa:</p>
-          <p className="text-lg font-semibold text-[#10B981] mb-1">
-            Palabra objetivo: {objectiveWord.split('').join(' ')} ({letterCount} letras)
-          </p>
-          <p className="text-xs text-gray-400">
-            Se requerirán {letterCount} código{letterCount !== 1 ? 's' : ''} de validación
-          </p>
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            <label className="block text-sm font-medium text-gray-300">
+              Tiempo para completar la palabra (segundos)
+            </label>
+            <span className="group relative inline-flex">
+              <button
+                type="button"
+                aria-label="Información sobre tiempo de validación"
+                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25 text-[10px] font-semibold text-gray-300/90"
+              >
+                i
+              </button>
+              <span className="pointer-events-none absolute left-1/2 top-0 z-20 hidden w-72 -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-lg border border-white/15 bg-[rgba(17,24,39,0.98)] p-2 text-xs text-gray-200 shadow-lg group-hover:block">
+                Cuenta desde el primer codigo valido. Por defecto 60 s; entre {MIN_VALIDATION_TIME_LIMIT_SECONDS} y {MAX_VALIDATION_TIME_LIMIT_SECONDS} s. Si se agota, el grupo vuelve a empezar.
+              </span>
+            </span>
+          </div>
+          <input
+            type="number"
+            min={MIN_VALIDATION_TIME_LIMIT_SECONDS}
+            max={MAX_VALIDATION_TIME_LIMIT_SECONDS}
+            step={1}
+            value={validationTimeLimitSeconds}
+            onChange={(e) =>
+              setValidationTimeLimitSeconds(
+                normalizeValidationTimeLimitSeconds(e.target.value === '' ? NaN : Number(e.target.value)),
+              )
+            }
+            className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
+          />
         </div>
       </div>
 

@@ -22,12 +22,9 @@ type SettingsMenuProps = {
 export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition, onLeaveGame, onExitApp, onConfigSaved }: SettingsMenuProps) {
   const [showRaffle, setShowRaffle] = useState(false)
   const [showQuiz, setShowQuiz] = useState(false)
-  const [showRemovePlayer, setShowRemovePlayer] = useState(false)
-  const [usernameToDelete, setUsernameToDelete] = useState('')
-  const [isRemoving, setIsRemoving] = useState(false)
-  const [removeError, setRemoveError] = useState<string | null>(null)
-  const [removeSuccess, setRemoveSuccess] = useState(false)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
+  /** tras 1er clic en «Terminar el juego» mostramos el aviso irreversible; 2º clic continúa */
+  const [terminateIrreversibleAck, setTerminateIrreversibleAck] = useState(false)
   const [isTerminating, setIsTerminating] = useState(false)
   const [terminateError, setTerminateError] = useState<string | null>(null)
   const [showExportQuiz, setShowExportQuiz] = useState(false)
@@ -52,7 +49,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const modalSnapRef = useRef({
     showRaffle: false,
     showQuiz: false,
-    showRemovePlayer: false,
     showExitConfirm: false,
     showExportQuiz: false,
     showExportShareOptions: false,
@@ -64,7 +60,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   modalSnapRef.current = {
     showRaffle,
     showQuiz,
-    showRemovePlayer,
     showExitConfirm,
     showExportQuiz,
     showExportShareOptions,
@@ -90,10 +85,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       }
       if (s.showExitConfirm) {
         setShowExitConfirm(false)
-        return true
-      }
-      if (s.showRemovePlayer) {
-        setShowRemovePlayer(false)
+        setTerminateIrreversibleAck(false)
         return true
       }
       if (s.showOperatorPrizes) {
@@ -201,36 +193,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     }
   }
 
-  const handleRemovePlayer = async () => {
-    const username = usernameToDelete.trim()
-    
-    if (!username) {
-      setRemoveError('Por favor ingresa un nombre de usuario')
-      return
-    }
-
-    setIsRemoving(true)
-    setRemoveError(null)
-    setRemoveSuccess(false)
-
-    try {
-      const cleanUsername = username.startsWith('@') ? username.substring(1) : username
-      
-      await api.delete<{ ok?: boolean }>('', { username: cleanUsername, gameId })
-
-      setRemoveSuccess(true)
-      setTimeout(() => {
-        setShowRemovePlayer(false)
-        setUsernameToDelete('')
-        onClose()
-      }, 2000)
-    } catch (error: any) {
-      setRemoveError(error.message || 'Error al eliminar el jugador')
-    } finally {
-      setIsRemoving(false)
-    }
-  }
-
   const handleExportQuizBeforeTerminate = async () => {
     if (!gameId) {
       setExportQuizError('No hay gameId disponible')
@@ -317,6 +279,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       // Close the popup and settings menu, then leave the game
       setShowExportQuiz(false)
       setShowExitConfirm(false)
+      setTerminateIrreversibleAck(false)
       onClose()
       if (onLeaveGame) {
         onLeaveGame()
@@ -342,7 +305,13 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   }
 
   if (showAppearanceSettings) {
-    return <AppearanceSettings onClose={() => setShowAppearanceSettings(false)} gameDefinition={gameDefinition} />
+    return (
+      <AppearanceSettings
+        onBack={() => setShowAppearanceSettings(false)}
+        onCloseMenu={onClose}
+        gameDefinition={gameDefinition}
+      />
+    )
   }
 
   if (showUserInfo) {
@@ -421,12 +390,27 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       >
         <div className="absolute inset-0 bg-black/70" onClick={() => setShowUserInfo(false)} aria-hidden="true" />
         <div className="relative card w-full max-w-md p-6 max-h-[90vh] flex flex-col">
-          <div className="flex items-center justify-between mb-6 flex-shrink-0">
-            <h2 id="user-info-title" className="text-xl font-semibold">Información del Usuario</h2>
+          <div className="flex items-center justify-between mb-6 flex-shrink-0 gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => setShowUserInfo(false)}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors shrink-0"
+                aria-label="Volver"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h2 id="user-info-title" className="text-xl font-semibold truncate">
+                Información del Usuario
+              </h2>
+            </div>
             <button
-              onClick={() => setShowUserInfo(false)}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
-              aria-label="Cerrar"
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors shrink-0"
+              aria-label="Cerrar configuración"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -510,15 +494,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               </div>
             )}
           </div>
-
-          <div className="flex-shrink-0 mt-6">
-            <button
-              onClick={() => setShowUserInfo(false)}
-              className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-            >
-              Cerrar
-            </button>
-          </div>
         </div>
       </div>
     )
@@ -532,14 +507,26 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         aria-labelledby="operator-prizes-title"
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
-        <div className="absolute inset-0 bg-black/70" onClick={() => setShowOperatorPrizes(false)} aria-hidden="true" />
+        <div className="absolute inset-0 bg-black/70" onClick={onClose} aria-hidden="true" />
         <div className="relative card w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
-            <h2 id="operator-prizes-title" className="text-xl font-semibold">Premios y límites</h2>
+          <div className="flex items-center justify-between gap-3 p-6 pb-4 flex-shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => setShowOperatorPrizes(false)}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
+                aria-label="Volver"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h2 id="operator-prizes-title" className="text-xl font-semibold truncate">Premios</h2>
+            </div>
             <button
               type="button"
-              onClick={() => setShowOperatorPrizes(false)}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
               aria-label="Cerrar"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -553,7 +540,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               gameDefinition={gameDefinition}
               settings={gameSettings}
               plan={plan}
-              onClose={() => setShowOperatorPrizes(false)}
               onPersist={handleOperatorPrizePersist}
             />
           </div>
@@ -574,11 +560,24 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         <div className="absolute inset-0 bg-black/70" onClick={() => setShowGameConfig(false)} aria-hidden="true" />
         <div className="relative card w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
-            <h2 id="game-config-title" className="text-xl font-semibold">Configurar juego</h2>
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => setShowGameConfig(false)}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
+                aria-label="Volver al juego"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h2 id="game-config-title" className="text-xl font-semibold truncate">Configurar juego</h2>
+            </div>
             <button
+              type="button"
               onClick={() => setShowGameConfig(false)}
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
-              aria-label="Cerrar"
+              aria-label="Cerrar y volver al juego"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -752,15 +751,40 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         aria-labelledby="exit-confirm-title"
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
-        <div className="absolute inset-0 bg-black/70" onClick={() => setShowExitConfirm(false)} aria-hidden="true" />
+        <div
+          className="absolute inset-0 bg-black/70"
+          onClick={() => {
+            setShowExitConfirm(false)
+            setTerminateError(null)
+            setTerminateIrreversibleAck(false)
+          }}
+          aria-hidden="true"
+        />
         <div className="relative card w-full max-w-sm p-6 max-h-[90vh] flex flex-col">
-          <div className="flex items-center justify-between mb-6 flex-shrink-0">
-            <h2 id="exit-confirm-title" className="text-xl font-semibold">
-              {(gameType?.toLowerCase() === 'empareja2' || gameType?.toLowerCase() === 'cupido' || gameType?.toLowerCase() === 'semaforo') ? 'Salir de la partida' : 'Terminar el juego'}
-            </h2>
+          <div className="flex items-center justify-between gap-3 mb-6 flex-shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExitConfirm(false)
+                  setTerminateError(null)
+                  setTerminateIrreversibleAck(false)
+                }}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
+                aria-label="Volver"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h2 id="exit-confirm-title" className="text-xl font-semibold truncate">
+                {(gameType?.toLowerCase() === 'empareja2' || gameType?.toLowerCase() === 'cupido' || gameType?.toLowerCase() === 'semaforo') ? 'Salir de la partida' : 'Terminar el juego'}
+              </h2>
+            </div>
             <button
-              onClick={() => setShowExitConfirm(false)}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
               aria-label="Cerrar"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -770,18 +794,21 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="mb-6 space-y-4">
+            <div className="space-y-4 flex flex-col">
               <button
+                type="button"
                 onClick={() => {
                   setShowExitConfirm(false)
+                  setTerminateError(null)
+                  setTerminateIrreversibleAck(false)
                   if (onLeaveGame) {
                     onLeaveGame()
                   }
                 }}
                 className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
               >
-                <div className="p-2 rounded-lg bg-yellow-500/20">
-                  <svg className="w-5 h-5 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="p-2 rounded-lg bg-red-500/20">
+                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" />
                   </svg>
                 </div>
@@ -791,9 +818,16 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </div>
               </button>
 
-              <div className="relative">
+              <div className="flex flex-col gap-2">
                 <button
-                  onClick={handleTerminateGame}
+                  type="button"
+                  onClick={() => {
+                    if (!terminateIrreversibleAck) {
+                      setTerminateIrreversibleAck(true)
+                      return
+                    }
+                    void handleTerminateGame()
+                  }}
                   disabled={isTerminating}
                   className="w-full flex items-center gap-3 p-4 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50"
                 >
@@ -813,11 +847,13 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     <div className="text-sm text-gray-400">Desactivar la partida permanentemente</div>
                   </div>
                 </button>
-                <div className="mt-2 p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
-                  <p className="text-yellow-300 text-sm">
-                    ⚠️ Esta acción no se puede deshacer.
-                  </p>
-                </div>
+                {terminateIrreversibleAck && (
+                  <div className="p-3 rounded-lg bg-red-500/15 border border-red-500/30">
+                    <p className="text-red-300/90 text-sm">
+                      Esta acción no se puede deshacer. Pulsa otra vez «Terminar el juego» para continuar.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {terminateError && (
@@ -827,143 +863,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               )}
             </div>
           </div>
-
-          <div className="flex-shrink-0 mt-4">
-            <button
-              onClick={() => {
-                setShowExitConfirm(false)
-                setTerminateError(null)
-              }}
-              className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (showRemovePlayer) {
-    return (
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="remove-player-title"
-        className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      >
-        <div className="absolute inset-0 bg-black/70" onClick={() => setShowRemovePlayer(false)} aria-hidden="true" />
-        <div className="relative card w-full max-w-sm p-6 max-h-[90vh] flex flex-col">
-          <div className="flex items-center justify-between mb-6 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowRemovePlayer(false)}
-                className="p-2 rounded-full hover:bg-white/10 transition-colors"
-                aria-label="Volver"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <h2 id="remove-player-title" className="text-xl font-semibold">Eliminar Jugador</h2>
-            </div>
-            <button
-              onClick={() => setShowRemovePlayer(false)}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
-              aria-label="Cerrar"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            {removeSuccess ? (
-              <div className="text-center">
-                <div className="p-4 rounded-xl bg-green-500/20 border border-green-500/30 mb-4">
-                  <div className="flex items-center justify-center gap-2 text-green-300 mb-2">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="font-medium">Jugador Eliminado</span>
-                  </div>
-                  <p className="text-sm text-green-400">
-                    El jugador @{usernameToDelete.replace(/^@/, '')} ha sido eliminado del juego.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="mb-6 space-y-4">
-                  <div>
-                    <label htmlFor="delete-username" className="block text-sm text-gray-300 mb-2">
-                      Nombre de usuario a eliminar
-                    </label>
-                    <input
-                      id="delete-username"
-                      type="text"
-                      value={usernameToDelete}
-                      onChange={(e) => setUsernameToDelete(e.target.value)}
-                      placeholder="ej. usuario123"
-                      className="w-full h-11 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 outline-none focus:border-white/20"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      Ingresa el nombre de usuario (con o sin @)
-                    </p>
-                  </div>
-                  
-                  <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
-                    <p className="text-yellow-300 text-sm">
-                      ⚠️ Esta acción no se puede deshacer.
-                    </p>
-                  </div>
-                </div>
-                
-                {removeError && (
-                  <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-                    {removeError}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {!removeSuccess && (
-            <div className="flex gap-3 flex-shrink-0 mt-4">
-              <button
-                onClick={() => {
-                  setShowRemovePlayer(false)
-                  setUsernameToDelete('')
-                  setRemoveError(null)
-                }}
-                className="flex-1 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleRemovePlayer}
-                disabled={isRemoving || !usernameToDelete.trim()}
-                className="flex-1 p-3 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isRemoving ? (
-                  <>
-                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Eliminando...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Eliminar
-                  </>
-                )}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     )
@@ -1005,7 +904,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               </div>
               <div className="text-left">
                 <div className="font-medium">Información del Usuario</div>
-                <div className="text-sm text-gray-400">Ver detalles de tu cuenta</div>
               </div>
               <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1025,11 +923,16 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                   </svg>
                 </div>
-                <div className="text-left">
+                <div className="text-left flex-1 min-w-0">
                   <div className="font-medium">Configurar aspecto</div>
-                  <div className="text-sm text-gray-400">Personalizar colores y logo</div>
                 </div>
-                <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-4 h-4 text-gray-400 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
@@ -1049,7 +952,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </div>
                 <div className="text-left">
                   <div className="font-medium">Salir de la aplicación</div>
-                  <div className="text-sm text-gray-400">Cerrar la aplicación</div>
                 </div>
               </button>
             </>
@@ -1058,21 +960,20 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
           {/* Game-specific options */}
           {gameType && (
             <>
-              {/* Premios y límites — todos los juegos con partida */}
-              {gameId && gameDefinition && (
+              {/* Game Config - Only show if game has GameConfigComponent */}
+              {gameDefinition?.GameConfigComponent && (
                 <button
-                  type="button"
-                  onClick={() => setShowOperatorPrizes(true)}
+                  onClick={() => setShowGameConfig(true)}
                   className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
                 >
-                  <div className="p-2 rounded-lg bg-amber-500/20">
-                    <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112-2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                  <div className="p-2 rounded-lg bg-blue-500/20">
+                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   </div>
                   <div className="text-left">
-                    <div className="font-medium">Premios y límites</div>
-                    <div className="text-sm text-gray-400">Textos de premio y máximo de validaciones</div>
+                    <div className="font-medium">Configurar juego</div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1102,41 +1003,12 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </div>
                   <div className="text-left">
                     <div className="font-medium">Quiz</div>
-                    <div className="text-sm text-gray-400">
-                      {plan !== 'free'
-                        ? 'Crear y configurar un quiz'
-                        : 'Disponible en el plan Event 24h'}
-                    </div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
               </div>
-
-              {/* Game Config - Only show if game has GameConfigComponent */}
-              {gameDefinition?.GameConfigComponent && (
-                <button
-                  onClick={() => setShowGameConfig(true)}
-                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-                >
-                  <div className="p-2 rounded-lg bg-blue-500/20">
-                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium">Configurar juego</div>
-                    <div className="text-sm text-gray-400">
-                      Configurar opciones del juego
-                    </div>
-                  </div>
-                  <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              )}
 
               {/* Raffle - Always shown, disabled for FREE plan */}
               <div className="relative">
@@ -1160,11 +1032,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </div>
                   <div className="text-left">
                     <div className="font-medium">Sorteo</div>
-                    <div className="text-sm text-gray-400">
-                      {features.raffles 
-                        ? 'Realizar un sorteo entre jugadores'
-                        : 'Disponible en el plan Event 24h'}
-                    </div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1172,43 +1039,43 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </button>
               </div>
 
-              {/* Delete Player - For all games */}
+              {/* Premios — todos los juegos con partida */}
+              {gameId && gameDefinition && (
+                <button
+                  type="button"
+                  onClick={() => setShowOperatorPrizes(true)}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+                >
+                  <div className="p-2 rounded-lg bg-amber-500/20">
+                    <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112-2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">Premios</div>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Exit Game - Different text for different games */}
               <button
-                onClick={() => setShowRemovePlayer(true)}
+                onClick={() => {
+                  setTerminateIrreversibleAck(false)
+                  setShowExitConfirm(true)
+                }}
                 className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
               >
                 <div className="p-2 rounded-lg bg-red-500/20">
                   <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <div className="font-medium">Eliminar Jugador</div>
-                  <div className="text-sm text-gray-400">
-                    Eliminar un jugador del juego
-                  </div>
-                </div>
-                <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-
-              {/* Exit Game - Different text for different games */}
-              <button
-                onClick={() => setShowExitConfirm(true)}
-                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-              >
-                <div className="p-2 rounded-lg bg-yellow-500/20">
-                  <svg className="w-5 h-5 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" />
                   </svg>
                 </div>
                 <div className="text-left">
                   <div className="font-medium">
                     {(gameType.toLowerCase() === 'empareja2' || gameType.toLowerCase() === 'cupido' || gameType.toLowerCase() === 'semaforo') ? 'Salir de la partida' : 'Terminar el juego'}
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    {(gameType.toLowerCase() === 'empareja2' || gameType.toLowerCase() === 'cupido' || gameType.toLowerCase() === 'semaforo') ? 'Volver a la selección de partida' : 'Finalizar y salir del juego'}
                   </div>
                 </div>
                 <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
