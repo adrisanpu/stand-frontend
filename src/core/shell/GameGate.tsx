@@ -359,6 +359,14 @@ export default function GameGate({ onGameCreated }: GameGateProps){
     )
   }
 
+  const selectedGameDescription = selectedGame.descriptionLong ?? selectedGame.description ?? ''
+  const selectedGameHasTags =
+    !!selectedGame.tags &&
+    (selectedGame.tags.playerMode != null ||
+      selectedGame.tags.social !== undefined ||
+      selectedGame.tags.competitive !== undefined ||
+      (selectedGame.tags.idealFor?.length ?? 0) > 0)
+
   // Create/Join Game View - Direct action buttons
   return (
     <div className="w-full space-y-4">
@@ -373,60 +381,74 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         Volver al catálogo
       </button>
 
-      {/* Selected Game Info: big logo + extended description + tags */}
-      <div className="p-5 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-4">
-        <div className="flex flex-col items-center text-center">
-          {selectedGame.assets?.logo && (
-            <img 
-              src={selectedGame.assets.logo} 
-              alt={selectedGame.name} 
-              className="h-36 w-auto max-w-[280px] object-contain mb-3"
-            />
-          )}
-          <p className="text-sm text-textSub max-w-md">
-            {selectedGame.descriptionLong ?? selectedGame.description ?? ''}
-          </p>
-        </div>
-        {/* Game tags: player mode, social, competitive, idealFor */}
-        {selectedGame.tags && ((selectedGame.tags.playerMode ?? selectedGame.tags.social ?? selectedGame.tags.competitive !== undefined) || ((selectedGame.tags.idealFor?.length ?? 0) > 0)) && (
-          <div className="flex flex-wrap justify-center gap-4 pt-2 border-t border-white/10">
-            {selectedGame.tags.playerMode && (
-              <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.playerMode === 'multi' ? 'Multijugador' : 'Individual'}>
-                {selectedGame.tags.playerMode === 'multi' ? (
-                  <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                ) : (
-                  <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                )}
-                {selectedGame.tags.playerMode === 'multi' ? 'Multijugador' : 'Individual'}
-              </span>
-            )}
-            {selectedGame.tags.social !== undefined && (
-              <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.social ? 'Implica socializar' : 'No implica socializar'}>
-                <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                {selectedGame.tags.social ? 'Social' : 'No social'}
-              </span>
-            )}
-            {selectedGame.tags.competitive !== undefined && (
-              <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.competitive ? 'Competitivo' : 'Casual'}>
-                <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                {selectedGame.tags.competitive ? 'Competitivo' : 'Casual'}
-              </span>
-            )}
-            {selectedGame.tags.idealFor && selectedGame.tags.idealFor.length > 0 && (
-              <span className="flex flex-wrap items-center gap-1.5 text-xs text-textSub">
-                {selectedGame.tags.idealFor.map((key) => (
-                  <span
-                    key={key}
-                    className="px-2 py-0.5 rounded bg-white/10 text-textSub"
-                    title="Ideal para"
-                  >
-                    {IDEAL_FOR_LABELS[key]}
-                  </span>
-                ))}
-              </span>
+      {/* Selected Game Info: [logo] | [description + tags] */}
+      <div className="p-5 sm:p-6 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 items-stretch">
+          <div className="flex items-center justify-center min-h-[160px] md:min-h-[220px] px-2">
+            {selectedGame.assets?.logo ? (
+              <img
+                src={selectedGame.assets.logo}
+                alt={selectedGame.name}
+                className="max-h-44 sm:max-h-52 md:max-h-60 w-auto max-w-full object-contain"
+              />
+            ) : (
+              <div
+                className="flex h-36 w-36 sm:h-40 sm:w-40 md:h-44 md:w-44 rounded-2xl bg-[rgba(255,255,255,0.08)] border border-white/10 items-center justify-center"
+                aria-hidden
+              >
+                <span className="text-2xl sm:text-3xl font-semibold text-textMain">
+                  {selectedGame.name.slice(0, 2).toUpperCase()}
+                </span>
+              </div>
             )}
           </div>
-        )}
+          <div className="flex flex-col gap-4 min-w-0 min-h-full">
+            <div className="flex-1 min-h-0">
+              <p className="text-sm sm:text-base text-textSub leading-relaxed text-center md:text-left">
+                {selectedGameDescription}
+              </p>
+            </div>
+            {selectedGameHasTags && selectedGame.tags && (
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 pt-3 border-t border-white/10 md:mt-auto">
+                {selectedGame.tags.playerMode && (
+                  <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.playerMode === 'multi' ? 'Multijugador' : 'Individual'}>
+                    {selectedGame.tags.playerMode === 'multi' ? (
+                      <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                    )}
+                    {selectedGame.tags.playerMode === 'multi' ? 'Multijugador' : 'Individual'}
+                  </span>
+                )}
+                {selectedGame.tags.social !== undefined && (
+                  <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.social ? 'Implica socializar' : 'No implica socializar'}>
+                    <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                    {selectedGame.tags.social ? 'Social' : 'No social'}
+                  </span>
+                )}
+                {selectedGame.tags.competitive !== undefined && (
+                  <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.competitive ? 'Competitivo' : 'Casual'}>
+                    <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                    {selectedGame.tags.competitive ? 'Competitivo' : 'Casual'}
+                  </span>
+                )}
+                {selectedGame.tags.idealFor && selectedGame.tags.idealFor.length > 0 && (
+                  <span className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 text-xs text-textSub">
+                    {selectedGame.tags.idealFor.map((key) => (
+                      <span
+                        key={key}
+                        className="px-2 py-0.5 rounded bg-white/10 text-textSub"
+                        title="Ideal para"
+                      >
+                        {IDEAL_FOR_LABELS[key]}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Game ID Input with Dropdown */}

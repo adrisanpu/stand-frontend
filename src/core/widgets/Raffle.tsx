@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../../api/api'
+import { INSTAGRAM_HANDLE } from '../lib/instagram'
 
 type RaffleProps = {
   onBack: () => void
@@ -71,7 +72,12 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
         }>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
         if (cancelled) return
         if (data?.raffleRequiredFollows && Array.isArray(data.raffleRequiredFollows)) {
-          setRequiredFollows(data.raffleRequiredFollows)
+          const pinned = INSTAGRAM_HANDLE.toLowerCase()
+          setRequiredFollows(
+            data.raffleRequiredFollows
+              .map((h) => String(h).trim().toLowerCase().replace(/^@/, ''))
+              .filter((h) => h && h !== pinned),
+          )
         }
       } catch (_) {
         // may 401 if not owner; ignore
@@ -156,6 +162,10 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
   const addRequiredFollow = async () => {
     const h = newHandle.trim().toLowerCase().replace(/^@/, '')
     if (!h) return
+    if (h === INSTAGRAM_HANDLE.toLowerCase()) {
+      setNewHandle('')
+      return
+    }
     if (requiredFollows.includes(h)) {
       setNewHandle('')
       return
@@ -330,6 +340,46 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
 
           {!winners ? (
             <>
+              {/* Sorteo automático */}
+              <div className="mb-5">
+                <h3 className="mb-3 text-sm font-medium text-gray-300">Sorteo automático</h3>
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      checked={autoRaffleEnabled}
+                      onChange={(e) => {
+                        setAutoRaffleEnabled(e.target.checked)
+                        if (e.target.checked && gameId) {
+                          const config = loadAutoRaffleConfig(gameId)
+                          if (config) {
+                            config.lastAutoRaffleTime = Date.now()
+                            saveAutoRaffleConfig(gameId, config)
+                          }
+                        }
+                      }}
+                      className="peer sr-only"
+                      aria-label="Activar sorteo automático"
+                    />
+                    <div className="relative h-6 w-11 shrink-0 rounded-full bg-gray-600 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-purple-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500" />
+                  </label>
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                    <span className="text-sm text-gray-300 whitespace-nowrap">Cada:</span>
+                    <input
+                      id="auto-interval"
+                      type="number"
+                      min={1}
+                      value={autoRaffleInterval}
+                      onChange={(e) => handleAutoIntervalChange(e.target.value)}
+                      disabled={!autoRaffleEnabled}
+                      aria-label="Intervalo en minutos"
+                      className="h-10 w-16 shrink-0 rounded-lg border border-white/10 bg-[rgba(255,255,255,0.05)] px-2 text-center text-sm font-mono focus:border-white/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-45"
+                    />
+                    <span className="text-sm text-gray-400">minutos</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Ganadores + elegibilidad (misma fila) */}
               <div className="mb-5 grid grid-cols-1 min-[400px]:grid-cols-[1fr_minmax(8.5rem,10rem)] gap-3 items-end">
                 <div className="min-w-0">
@@ -367,33 +417,30 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">
                   Requisitos para ganar
                 </label>
-                <p className="text-[11px] text-gray-500 mb-2 leading-snug">
-                  Cuentas de Instagram que deben seguir (además de la comprobación estándar del sorteo).
-                </p>
+                <p className="text-sm font-medium text-gray-300 mb-2">Seguir a:</p>
                 <div className="flex flex-wrap gap-2 mb-2 min-h-[2rem]">
-                  {requiredFollows.length === 0 ? (
-                    <span className="text-xs text-gray-500 italic">Ninguna cuenta extra configurada</span>
-                  ) : (
-                    requiredFollows.map((handle) => (
-                      <span
-                        key={handle}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[rgba(255,255,255,0.08)] border border-white/10 text-xs"
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-[rgba(255,255,255,0.08)] border border-white/10 text-xs">
+                    @{INSTAGRAM_HANDLE}
+                  </span>
+                  {requiredFollows.map((handle) => (
+                    <span
+                      key={handle}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[rgba(255,255,255,0.08)] border border-white/10 text-xs"
+                    >
+                      @{handle}
+                      <button
+                        type="button"
+                        onClick={() => void removeRequiredFollow(handle)}
+                        disabled={savingFollows}
+                        className="ml-0.5 p-0.5 rounded hover:bg-white/20 text-gray-400 hover:text-white disabled:opacity-40 disabled:pointer-events-none"
+                        aria-label={`Quitar @${handle}`}
                       >
-                        @{handle}
-                        <button
-                          type="button"
-                          onClick={() => void removeRequiredFollow(handle)}
-                          disabled={savingFollows}
-                          className="ml-0.5 p-0.5 rounded hover:bg-white/20 text-gray-400 hover:text-white disabled:opacity-40 disabled:pointer-events-none"
-                          aria-label={`Quitar @${handle}`}
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </span>
-                    ))
-                  )}
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -418,49 +465,6 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                     {savingFollows ? 'Guardando…' : 'Añadir'}
                   </button>
                 </div>
-              </div>
-
-              {/* Sorteos automáticos (antes del botón manual) */}
-              <div className="mb-5 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
-                <div className="flex items-center justify-between gap-3 mb-1">
-                  <h3 className="text-sm font-medium text-gray-300">Sorteo automático</h3>
-                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={autoRaffleEnabled}
-                      onChange={(e) => {
-                        setAutoRaffleEnabled(e.target.checked)
-                        if (e.target.checked && gameId) {
-                          const config = loadAutoRaffleConfig(gameId)
-                          if (config) {
-                            config.lastAutoRaffleTime = Date.now()
-                            saveAutoRaffleConfig(gameId, config)
-                          }
-                        }
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500" />
-                  </label>
-                </div>
-                <p className="text-[11px] text-gray-500 mb-3">
-                  Usa el mismo número de ganadores y filtro de elegibles que arriba.
-                </p>
-                {autoRaffleEnabled && (
-                  <div>
-                    <label htmlFor="auto-interval" className="block text-xs font-medium text-gray-300 mb-1.5">
-                      Cada cuántos minutos
-                    </label>
-                    <input
-                      id="auto-interval"
-                      type="number"
-                      min="1"
-                      value={autoRaffleInterval}
-                      onChange={(e) => handleAutoIntervalChange(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-sm font-mono focus:border-white/20 focus:outline-none"
-                    />
-                  </div>
-                )}
               </div>
 
               <div className="mb-1">

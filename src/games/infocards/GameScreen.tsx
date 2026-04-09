@@ -5,6 +5,7 @@ import { api } from '../../api/api'
 import QRCode from '../../core/widgets/QRCode'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { useGameInput } from '../../core/input/useGameInput'
+import { GAME_LANDSCAPE_TWO_COL_GRID } from '../../core/ui/gameScreenLayout'
 
 const INFOCARDS_SETTINGS_KEY_PREFIX = 'infocards_settings_'
 const CARD_CONTAINER_HEIGHT_CLASS = 'h-[min(72vh,620px)] min-h-[420px] sm:min-h-[460px]'
@@ -202,7 +203,7 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
 
   const renderJoinCard = () => (
     <div key={INFOCARDS_JOIN_CARD_ID} className={baseClass} style={cardStyle}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 flex-1 min-h-0 overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-hidden">
         <div className="flex justify-center items-center min-h-0">
           <QRCode
             data={getInstagramDmUrl(gameId)}
@@ -233,7 +234,7 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
     </div>
   )
 
-  const rowClassGrid = 'w-full h-full min-h-0 rounded-2xl p-5 sm:p-6 grid grid-cols-2 gap-4 sm:gap-5 overflow-hidden'
+  const rowClassGrid = 'w-full h-full min-h-0 rounded-2xl p-5 sm:p-6 grid grid-cols-2 gap-4 overflow-hidden'
   const renderNavigation = () => (
     <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4">
       <button onClick={goToPrev} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label="Tarjeta anterior">
@@ -295,8 +296,8 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
   const isLandscape = orientation === 'landscape' && sidebarElement != null
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-5 items-stretch h-full min-h-0 w-full">
-        <div className="card relative flex flex-col p-4 sm:p-5 overflow-hidden min-h-0 items-center">
+      <div className={GAME_LANDSCAPE_TWO_COL_GRID}>
+        <div className="card relative flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 items-center">
           <div className={`w-full flex-shrink-0 ${CARD_CONTAINER_HEIGHT_CLASS} mb-14 sm:mb-16`}>
             {isJoinCard ? renderJoinCard() : renderCard()}
           </div>

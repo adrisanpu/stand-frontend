@@ -778,7 +778,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </svg>
               </button>
               <h2 id="exit-confirm-title" className="text-xl font-semibold truncate">
-                {(gameType?.toLowerCase() === 'empareja2' || gameType?.toLowerCase() === 'cupido' || gameType?.toLowerCase() === 'semaforo') ? 'Salir de la partida' : 'Terminar el juego'}
+                Salir
               </h2>
             </div>
             <button
@@ -1060,7 +1060,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </button>
               )}
 
-              {/* Exit Game - Different text for different games */}
+              {/* Salir: mismo texto en todos los juegos */}
               <button
                 onClick={() => {
                   setTerminateIrreversibleAck(false)
@@ -1074,9 +1074,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </svg>
                 </div>
                 <div className="text-left">
-                  <div className="font-medium">
-                    {(gameType.toLowerCase() === 'empareja2' || gameType.toLowerCase() === 'cupido' || gameType.toLowerCase() === 'semaforo') ? 'Salir de la partida' : 'Terminar el juego'}
-                  </div>
+                  <div className="font-medium">Salir</div>
                 </div>
                 <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

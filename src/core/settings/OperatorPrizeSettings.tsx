@@ -42,12 +42,14 @@ const inputLimitClass =
   'w-full h-11 px-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none sm:text-center'
 const colHeaderClass = 'text-xs font-medium text-gray-400'
 
+const PRIZE_NAME_PLACEHOLDER = '🎁 Nombre del premio'
+
 function PrizeLimitRow({
   textValue,
   onTextChange,
   limitValue,
   onLimitChange,
-  textPlaceholder = '🎁 Nombre o descripción del premio',
+  textPlaceholder = PRIZE_NAME_PLACEHOLDER,
   limitPlaceholder = '∞',
   showColumnHeaders = false,
 }: {
@@ -117,7 +119,7 @@ function RankingPrizeRow({
           type="text"
           value={nameValue}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="🎁 Nombre del premio"
+          placeholder={PRIZE_NAME_PLACEHOLDER}
           className={inputClass}
         />
       </div>
@@ -281,10 +283,6 @@ export default function OperatorPrizeSettings({
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-400">
-        Los textos y límites se muestran en el panel del operador (jugadores, ranking, sorteo).
-      </p>
-
       {noSlots && (
         <p className="text-sm text-amber-200/90 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
           No hay premios configurables para este juego con tu plan actual (p. ej. el sorteo requiere plan Event 24h).
@@ -303,9 +301,6 @@ export default function OperatorPrizeSettings({
               onLimitChange={setMaxPrizeValidationInput}
               limitPlaceholder="∞"
             />
-            {gameDefinition.id === 'empareja2' && (
-              <p className="text-xs text-gray-500">El límite en Empareja2 también se guarda en el servidor.</p>
-            )}
           </div>
         )}
 

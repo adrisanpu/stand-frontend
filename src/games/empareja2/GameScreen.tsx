@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import BackButton from '../../core/widgets/BackButton'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
+import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
+import {
+  GAME_LANDSCAPE_CENTER_CARD,
+  GAME_LANDSCAPE_THREE_COL_GRID,
+  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
+} from '../../core/ui/gameScreenLayout'
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
 
@@ -23,6 +29,79 @@ type ValidationResponse = {
   notified?: boolean
 }
 
+type PanelVariant = 'landscape' | 'portrait'
+
+const SLOT_DIM: Record<PanelVariant, string> = {
+  landscape: 'h-40 w-40 sm:h-44 sm:w-44',
+  portrait: 'h-36 w-36 sm:h-40 sm:w-40',
+}
+
+const INPUT_ROW_CLASS: Record<PanelVariant, string> = {
+  landscape: 'h-14 px-4 text-lg',
+  portrait: 'h-12 px-4 text-lg',
+}
+
+const VALIDATE_BTN_PADDING: Record<PanelVariant, string> = {
+  landscape: 'p-5 text-sm',
+  portrait: 'p-4 text-base',
+}
+
+function formatIgHandle(username: string) {
+  return username.startsWith('@') ? username : `@${username}`
+}
+
+function ValidateCodesIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )
+}
+
+function PairCharacterSlot({
+  variant,
+  player,
+  filled,
+  slotLabel,
+}: {
+  variant: PanelVariant
+  player?: ValidationResponse['players'][0]
+  filled: boolean
+  slotLabel: string
+}) {
+  const dim = SLOT_DIM[variant]
+  const imgUrl = player?.characterImageUrl || null
+  const handle =
+    player?.instagramUsername != null && player.instagramUsername !== ''
+      ? formatIgHandle(player.instagramUsername)
+      : null
+
+  return (
+    <div
+      className={`relative ${dim} shrink-0 mx-auto rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg`}
+    >
+      {filled && imgUrl ? (
+        <img
+          src={imgUrl}
+          alt={player?.characterName || slotLabel}
+          className="max-w-full max-h-full w-auto h-auto object-contain"
+        />
+      ) : filled ? (
+        <span className="text-xs text-gray-500 px-2 text-center">{slotLabel}</span>
+      ) : (
+        <span className="text-2xl text-gray-600 select-none" aria-hidden>
+          ?
+        </span>
+      )}
+      {filled && handle ? (
+        <span className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/70 text-white text-xs sm:text-sm font-semibold max-w-[90%] truncate">
+          {handle}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
 export default function Empareja2GameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
@@ -31,7 +110,6 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
   const [error, setError] = useState<string | null>(null)
   const [showInvalidMessage, setShowInvalidMessage] = useState(false)
 
-  // Ocultar mensaje de error/inválido tras 3 segundos
   useEffect(() => {
     if (gameState !== 'invalid') {
       setShowInvalidMessage(false)
@@ -43,7 +121,6 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
   }, [gameState])
 
   const handleCodeChange = (value: string, setter: (value: string) => void) => {
-    // Only allow numeric input and limit to 4 digits
     const numericValue = value.replace(/\D/g, '').slice(0, 4)
     setter(numericValue)
   }
@@ -66,23 +143,22 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
     try {
       const result = await api.post<ValidationResponse>('/v1/game/validate', {
         gameId: gameId,
-        codes: [code1, code2]
+        codes: [code1, code2],
       })
       setValidationResult(result)
-      
+
       if (result.valid) {
         setGameState('valid')
       } else {
         setGameState('invalid')
       }
-    } catch (err: any) {
-      setError(err.message || 'Error al validar los códigos')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al validar los códigos')
       setGameState('invalid')
     }
   }
 
   const handleReset = () => {
-    // Reset everything for next validation
     setGameState('idle')
     setCode1('')
     setCode2('')
@@ -92,43 +168,151 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
 
   const showJoinBlock = gameState !== 'valid'
 
+  const renderCentralPairPanel = (variant: PanelVariant) => {
+    const ic = INPUT_ROW_CLASS[variant]
+    const bp = VALIDATE_BTN_PADDING[variant]
+    const playersOk =
+      gameState === 'valid' &&
+      validationResult?.valid &&
+      validationResult.players &&
+      validationResult.players.length === 2
+    const p0 = playersOk ? validationResult!.players[0] : undefined
+    const p1 = playersOk ? validationResult!.players[1] : undefined
+
+    if (playersOk) {
+      return (
+        <div className="animate-fade-in grid grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 items-center">
+          <div className="flex flex-col items-center justify-center animate-scale-in min-w-0">
+            <PairCharacterSlot variant={variant} player={p0} filled slotLabel="Jugador 1" />
+          </div>
+          <div className="flex flex-col items-center justify-center space-y-3 sm:space-y-4 text-center px-1">
+            <span
+              className={
+                variant === 'portrait'
+                  ? 'text-xl font-semibold text-green-400'
+                  : 'text-2xl font-semibold text-green-400'
+              }
+            >
+              ¡Pareja Válida!
+            </span>
+            <BackButton onClick={handleReset} aria-label="Validar otra pareja" />
+          </div>
+          <div className="flex flex-col items-center justify-center animate-scale-in min-w-0" style={{ animationDelay: '0.2s' }}>
+            <PairCharacterSlot variant={variant} player={p1} filled slotLabel="Jugador 2" />
+          </div>
+        </div>
+      )
+    }
+
+    const showFormBlock = gameState === 'idle' || gameState === 'invalid' || gameState === 'validating'
+    if (!showFormBlock) return null
+
+    const validating = gameState === 'validating'
+    const hideSubmit = gameState === 'invalid' && showInvalidMessage
+    const inputDisabled = validating
+
+    return (
+      <div className="space-y-4">
+        {error && gameState === 'invalid' && showInvalidMessage && (
+          <div className="p-3 sm:p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 justify-items-center">
+          <PairCharacterSlot variant={variant} filled={false} slotLabel="Jugador 1" />
+          <PairCharacterSlot variant={variant} filled={false} slotLabel="Jugador 2" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <input
+            id="code1"
+            type="number"
+            inputMode="numeric"
+            min={1000}
+            max={9999}
+            value={code1}
+            disabled={inputDisabled}
+            aria-label="Código del jugador 1"
+            placeholder={CODE_INPUT_PLACEHOLDER}
+            onChange={(e) => handleCodeChange(e.target.value, setCode1)}
+            className={`w-full rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center font-mono focus:border-white/20 focus:outline-none disabled:opacity-60 ${ic}`}
+          />
+          <input
+            id="code2"
+            type="number"
+            inputMode="numeric"
+            min={1000}
+            max={9999}
+            value={code2}
+            disabled={inputDisabled}
+            aria-label="Código del jugador 2"
+            placeholder={CODE_INPUT_PLACEHOLDER}
+            onChange={(e) => handleCodeChange(e.target.value, setCode2)}
+            className={`w-full rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center font-mono focus:border-white/20 focus:outline-none disabled:opacity-60 ${ic}`}
+          />
+        </div>
+
+        {!hideSubmit && (
+          <button
+            type="button"
+            onClick={() => void validateCodes()}
+            disabled={validating || code1.length !== 4 || code2.length !== 4}
+            className={`w-full rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold ${bp}`}
+          >
+            <div className="flex items-center justify-center gap-3">
+              {validating ? (
+                <svg className="w-6 h-6 shrink-0 animate-spin text-neonMagenta" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+              ) : (
+                <ValidateCodesIcon className="w-6 h-6 shrink-0" />
+              )}
+              {validating ? 'Validando…' : VALIDATE_LABEL}
+            </div>
+          </button>
+        )}
+      </div>
+    )
+  }
+
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
-        {/* Left: QR + logo + instructions */}
+      <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <p>📸 Escanea el QR y pulsa JUGAR en el chat.</p>
-          <p>🎟️ Recibe tu pareja asignada y tu código de validación.</p>
-          <p>👥 Encuentra a tu pareja físicamente.</p>
-          <p>🏆 Cuando os encontréis, validad juntos vuestros códigos.</p>
+          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+            Escanea el QR y pulsa JUGAR en el chat.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="🎟️" emojiLabel="Código y pareja">
+            Recibe tu pareja asignada y tu código de validación.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="👥" emojiLabel="Encontrar pareja">
+            Encuentra a tu pareja físicamente.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="🏆" emojiLabel="Validar">
+            Cuando os encontréis, validad juntos vuestros códigos.
+          </LandscapeInfoInstruction>
         </GameLandscapeInfoColumn>
-        {/* Center: validation + animations (large) */}
-        <div className="card flex flex-col justify-center p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
-          {(gameState === 'idle' || gameState === 'invalid') && (
-            <div className="space-y-4">
-              <h3 className="text-base font-semibold text-textMain">Validador de Parejas</h3>
-              {error && gameState === 'invalid' && showInvalidMessage && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
-              <div className="grid grid-cols-2 gap-5">
-                <div><label htmlFor="code1" className="block text-sm font-medium text-gray-300 mb-2">Código del Jugador 1</label><input id="code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
-                <div><label htmlFor="code2" className="block text-sm font-medium text-gray-300 mb-2">Código del Jugador 2</label><input id="code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+        <div className={`${GAME_LANDSCAPE_CENTER_CARD} justify-center`}>
+          {renderCentralPairPanel('landscape')}
+          {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && (
+            <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span className="text-xl font-semibold text-red-400">Pareja Inválida</span>
               </div>
-              {!(gameState === 'invalid' && showInvalidMessage) && (
-              <button onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"><div className="flex items-center justify-center gap-3"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Validar Códigos</div></button>
+              {(validationResult.message || error) && (
+                <p className="text-base text-red-300">{validationResult.message || error}</p>
               )}
             </div>
           )}
-          {gameState === 'validating' && <div className="text-center py-10"><div className="flex items-center justify-center gap-4"><svg className="w-8 h-8 animate-spin text-neonMagenta" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><p className="text-2xl font-semibold text-neonMagenta">Validando códigos...</p></div></div>}
-          {gameState === 'valid' && validationResult?.valid && validationResult.players && validationResult.players.length === 2 && (
-            <div className="animate-fade-in grid grid-cols-[1.5fr_1fr_1.5fr] gap-4 items-center">
-              <div className="flex flex-col items-center space-y-3 animate-scale-in min-w-0">{(() => { const player = validationResult.players[0]; const imgUrl = player.characterImageUrl || null; const handle = player.instagramUsername ? (player.instagramUsername.startsWith('@') ? player.instagramUsername : `@${player.instagramUsername}`) : null; return (<><div className="relative aspect-square w-full max-w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || 'Jugador 1'} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">Imagen jugador 1</div>}{handle && <span className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/70 text-white text-sm font-semibold">{handle}</span>}</div></>); })()}</div>
-              <div className="flex flex-col items-center justify-center space-y-4 text-center"><span className="text-2xl font-semibold text-green-400">¡Pareja Válida!</span><BackButton onClick={handleReset} aria-label="Validar otra pareja" /></div>
-              <div className="flex flex-col items-center space-y-3 animate-scale-in min-w-0" style={{ animationDelay: '0.2s' }}>{(() => { const player = validationResult.players[1]; const imgUrl = player.characterImageUrl || null; const handle = player.instagramUsername ? (player.instagramUsername.startsWith('@') ? player.instagramUsername : `@${player.instagramUsername}`) : null; return (<><div className="relative aspect-square w-full max-w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || 'Jugador 2'} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">Imagen jugador 2</div>}{handle && <span className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/70 text-white text-sm font-semibold">{handle}</span>}</div></>); })()}</div>
-            </div>
-          )}
-          {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in"><div className="flex items-center justify-center gap-3 mb-2"><svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg><span className="text-xl font-semibold text-red-400">Pareja Inválida</span></div>{(validationResult.message || error) && <p className="text-base text-red-300">{validationResult.message || error}</p>}</div>}
         </div>
-        {/* Right: sidebar only (logo is next to QR in left column) */}
         <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
           <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
             {sidebarElement}
@@ -140,9 +324,12 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
 
   return (
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
-      <div className={`flex flex-col overflow-hidden min-h-0 ${showJoinBlock ? 'flex-1' : 'flex-1 flex'} ${orientation === 'portrait' ? 'justify-center gap-8' : 'gap-3'}`}>
-      {/* QR and instructions first (no game code block) */}
-      <div className={`flex-shrink-0 overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-4`}>
+      <div
+        className={`flex flex-col overflow-hidden min-h-0 ${showJoinBlock ? 'flex-1' : 'flex-1 flex'} ${
+          orientation === 'portrait' ? 'justify-center gap-8' : 'gap-3'
+        }`}
+      >
+        <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
           <div className="flex justify-center items-start min-w-0">
             <QRCode
               data={getInstagramDmUrl(gameId)}
@@ -155,193 +342,53 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
 
           <div className="space-y-1.5 min-w-0 overflow-hidden">
             <h3 className="text-sm font-semibold text-textMain mb-1">Instrucciones</h3>
-              <ol className="space-y-1.5 text-xs text-gray-300">
-                <li className="flex gap-2 items-start">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">1</span>
-                  <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.</span>
-                </li>
-                <li className="flex gap-2 items-start">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">2</span>
-                  <span className="pt-0.5">🎟️ Recibe tu pareja asignada y tu código de validación.</span>
-                </li>
-                <li className="flex gap-2 items-start">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">3</span>
-                  <span className="pt-0.5">👥 Encuentra a tu pareja físicamente.</span>
-                </li>
-                <li className="flex gap-2 items-start">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">4</span>
-                  <span className="pt-0.5">🏆 Cuando os encontréis, validad juntos vuestros códigos.</span>
-                </li>
-              </ol>
-            </div>
+            <ol className="space-y-1.5 text-xs text-gray-300">
+              <li className="flex gap-2 items-start">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">
+                  1
+                </span>
+                <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.</span>
+              </li>
+              <li className="flex gap-2 items-start">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">
+                  2
+                </span>
+                <span className="pt-0.5">🎟️ Recibe tu pareja asignada y tu código de validación.</span>
+              </li>
+              <li className="flex gap-2 items-start">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">
+                  3
+                </span>
+                <span className="pt-0.5">👥 Encuentra a tu pareja físicamente.</span>
+              </li>
+              <li className="flex gap-2 items-start">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">
+                  4
+                </span>
+                <span className="pt-0.5">🏆 Cuando os encontréis, validad juntos vuestros códigos.</span>
+              </li>
+            </ol>
+          </div>
         </div>
 
-      {/* Validator - Only show when idle or invalid */}
-      {(gameState === 'idle' || gameState === 'invalid') && (
         <div className={`flex-shrink-0 ${orientation === 'portrait' ? 'space-y-4' : 'space-y-3'}`}>
-          <h3 className="text-lg font-semibold text-textMain">Validador de Parejas</h3>
-          
-          {error && gameState === 'invalid' && showInvalidMessage && (
-            <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-              {error}
-            </div>
-          )}
+          {renderCentralPairPanel('portrait')}
+        </div>
 
-          {/* Code Input Fields - Side by side */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="code1" className="block text-sm font-medium text-gray-300 mb-1">
-                Código del Jugador 1
-              </label>
-              <input
-                id="code1"
-                type="number"
-                inputMode="numeric"
-                min={1000}
-                max={9999}
-                value={code1}
-                onChange={(e) => handleCodeChange(e.target.value, setCode1)}
-                className="w-full h-12 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="code2" className="block text-sm font-medium text-gray-300 mb-1">
-                Código del Jugador 2
-              </label>
-              <input
-                id="code2"
-                type="number"
-                inputMode="numeric"
-                min={1000}
-                max={9999}
-                value={code2}
-                onChange={(e) => handleCodeChange(e.target.value, setCode2)}
-                className="w-full h-12 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Validation Button - hidden while the temporary error message is shown */}
-          {!(gameState === 'invalid' && showInvalidMessage) && (
-          <button
-            onClick={validateCodes}
-            disabled={code1.length !== 4 || code2.length !== 4}
-            className="w-full p-4 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
-          >
-            <div className="flex items-center justify-center gap-3">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && (
+          <div className="p-4 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in flex-shrink-0">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-              Validar Códigos
+              <span className="text-lg font-semibold text-red-400">Pareja Inválida</span>
             </div>
-          </button>
-          )}
-        </div>
-      )}
-
-      {/* Validating State */}
-      {gameState === 'validating' && (
-        <div className="text-center py-6 flex-shrink-0">
-          <div className="flex items-center justify-center gap-4">
-            <svg className="w-8 h-8 animate-spin text-neonMagenta" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <p className="text-xl font-semibold text-neonMagenta">Validando códigos...</p>
+            {(validationResult.message || error) && (
+              <p className="text-sm text-red-300">{validationResult.message || error}</p>
+            )}
           </div>
-        </div>
-      )}
-
-      {/* Winning Animation - Show when validated successfully */}
-      {gameState === 'valid' && validationResult?.valid && validationResult.players && validationResult.players.length === 2 && (
-        <div className={`animate-fade-in flex-1 flex flex-col min-h-0 justify-center overflow-hidden`}>
-          {/* Player 1 | Success Message | Player 2 - All in one row */}
-          <div className={`grid items-center min-h-0 ${orientation === 'portrait' ? 'grid-cols-[1.5fr_1fr_1.5fr] gap-4' : 'grid-cols-[1.5fr_1fr_1.5fr] gap-3 sm:gap-4'}`}>
-            {/* Player 1 */}
-            <div className="flex flex-col items-center space-y-2 animate-scale-in min-w-0">
-              {(() => {
-                const player = validationResult.players[0]
-                const imgUrl = player.characterImageUrl || null
-                const handle = player.instagramUsername ? (player.instagramUsername.startsWith('@') ? player.instagramUsername : `@${player.instagramUsername}`) : null
-                return (
-                  <>
-                    <div className={`relative aspect-square w-full max-w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg ${orientation === 'portrait' ? 'min-w-0' : ''}`}>
-                      {imgUrl ? (
-                        <img
-                          src={imgUrl}
-                          alt={player.characterName || 'Jugador 1'}
-                          className="max-w-full max-h-full w-auto h-auto object-contain"
-                        />
-                      ) : (
-                        <div className="text-xs text-gray-500">Imagen jugador 1</div>
-                      )}
-                      {handle && (
-                        <span className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/70 text-white text-sm font-semibold">
-                          {handle}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )
-              })()}
-            </div>
-
-            {/* Success Message - Middle: only "¡Pareja Válida!" and back button below */}
-            <div className="flex flex-col items-center justify-center space-y-3 text-center">
-              <span className={orientation === 'portrait' ? 'text-xl font-semibold text-green-400' : showJoinBlock ? 'text-2xl font-semibold text-green-400' : 'text-3xl font-semibold text-green-400'}>¡Pareja Válida!</span>
-              {!showJoinBlock && (
-                <BackButton onClick={handleReset} aria-label="Validar otra pareja" />
-              )}
-            </div>
-
-            {/* Player 2 */}
-            <div className="flex flex-col items-center space-y-2 animate-scale-in min-w-0" style={{ animationDelay: '0.2s' }}>
-              {(() => {
-                const player = validationResult.players[1]
-                const imgUrl = player.characterImageUrl || null
-                const handle = player.instagramUsername ? (player.instagramUsername.startsWith('@') ? player.instagramUsername : `@${player.instagramUsername}`) : null
-                return (
-                  <>
-                    <div className={`relative aspect-square w-full max-w-full rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(176,38,255,0.4)] flex items-center justify-center shadow-lg ${orientation === 'portrait' ? 'min-w-0' : ''}`}>
-                      {imgUrl ? (
-                        <img
-                          src={imgUrl}
-                          alt={player.characterName || 'Jugador 2'}
-                          className="max-w-full max-h-full w-auto h-auto object-contain"
-                        />
-                      ) : (
-                        <div className="text-xs text-gray-500">Imagen jugador 2</div>
-                      )}
-                      {handle && (
-                        <span className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/70 text-white text-sm font-semibold">
-                          {handle}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Invalid Result - Show error message only for 3 seconds */}
-      {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && (
-        <div className="p-4 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in flex-shrink-0">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            <span className="text-lg font-semibold text-red-400">Pareja Inválida</span>
-          </div>
-          {(validationResult.message || error) && (
-            <p className="text-sm text-red-300">{validationResult.message || error}</p>
-          )}
-        </div>
-      )}
-    </div>
+        )}
+      </div>
     </div>
   )
 }
-

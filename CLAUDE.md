@@ -24,6 +24,8 @@ Canonical game id strings: `mapGameTypeToId()` in `src/core/gameTypeMap.ts` (use
 - `GameScreen.tsx` — main player-facing game component
 - `GameConfig.tsx` — operator configuration panel
 
+**Operator game UI** (margins, layout tokens, validation): [`docs/operator-game-ui.md`](docs/operator-game-ui.md)
+
 ## HOW
 - Register new game: add GameDefinition to `src/games/index.ts`, wire routing in `src/core/shell/AppShell.tsx`
 - Feature gates: `getFeaturesByPlan(plan)` from `src/auth/featureFlags.ts`
