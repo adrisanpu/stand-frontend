@@ -1,10 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import BackButton from '../../core/widgets/BackButton'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
+import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
+import {
+  GAME_LANDSCAPE_CENTER_CARD,
+  GAME_LANDSCAPE_THREE_COL_GRID,
+  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
+} from '../../core/ui/gameScreenLayout'
 
 const CROSS_QUIZ_QUESTION_COUNT = 3
 const CROSS_QUIZ_TIME_SEC = 5
@@ -298,20 +304,20 @@ export default function SemaforoGameScreen({ gameId, orientation, logoElement, s
           {error && gameState === 'invalid' && (
             <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">{error}</div>
           )}
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="semaforo-code1" className="block text-base font-medium text-gray-300 mb-2">Código Jugador 1</label>
-              <input id="semaforo-code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" />
+              <input id="semaforo-code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} placeholder={CODE_INPUT_PLACEHOLDER} aria-label="Código del jugador 1" onChange={(e) => handleCodeChange(e.target.value, setCode1)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" />
             </div>
             <div>
               <label htmlFor="semaforo-code2" className="block text-base font-medium text-gray-300 mb-2">Código Jugador 2</label>
-              <input id="semaforo-code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" />
+              <input id="semaforo-code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} placeholder={CODE_INPUT_PLACEHOLDER} aria-label="Código del jugador 2" onChange={(e) => handleCodeChange(e.target.value, setCode2)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" />
             </div>
           </div>
-          <button onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.3)] hover:bg-[rgba(34,197,94,0.3)] transition-colors font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+          <button type="button" onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.3)] hover:bg-[rgba(34,197,94,0.3)] transition-colors font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed">
             <div className="flex items-center justify-center gap-3">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Validar Códigos
+              <svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              {VALIDATE_LABEL}
             </div>
           </button>
         </div>
@@ -397,14 +403,22 @@ export default function SemaforoGameScreen({ gameId, orientation, logoElement, s
 
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
+      <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <p>📸 Escanea el QR y pulsa JUGAR. Responde al quiz.</p>
-          <p>🔴🟡🟢 Te asignamos un grupo (Casado / Puede ser / Soltero).</p>
-          <p>👥 Aquí ves cuánta gente hay en cada grupo.</p>
-          <p>✅ Validad juntos vuestros códigos aquí.</p>
+          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+            Escanea el QR y pulsa JUGAR. Responde al quiz.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="🔴🟡🟢" emojiLabel="Grupos">
+            Te asignamos un grupo (Casado / Puede ser / Soltero).
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="👥" emojiLabel="Jugadores por grupo">
+            Aquí ves cuánta gente hay en cada grupo.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validar">
+            Validad juntos vuestros códigos aquí.
+          </LandscapeInfoInstruction>
         </GameLandscapeInfoColumn>
-        <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
+        <div className={GAME_LANDSCAPE_CENTER_CARD}>
           {semaforoMainContent}
         </div>
         <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
@@ -425,7 +439,7 @@ export default function SemaforoGameScreen({ gameId, orientation, logoElement, s
       )}
       <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
       {/* QR and instructions first (no game code block) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
           <div className="flex justify-center items-start">
             <QRCode data={getInstagramDmUrl(gameId)} size={380} margin={12} alt="QR Code para Instagram DM" />
           </div>

@@ -1,10 +1,16 @@
 import { useState } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import BackButton from '../../core/widgets/BackButton'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
+import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
+import {
+  GAME_LANDSCAPE_CENTER_CARD,
+  GAME_LANDSCAPE_THREE_COL_GRID,
+  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
+} from '../../core/ui/gameScreenLayout'
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
 
@@ -90,13 +96,19 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
+      <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <p>📸 Escanea el QR y pulsa JUGAR. Responde al quiz.</p>
-          <p>❤️ Cupido te empareja con alguien afín.</p>
-          <p>✅ Encuentra a tu pareja y validad códigos aquí.</p>
+          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+            Escanea el QR y pulsa JUGAR. Responde al quiz.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="❤️" emojiLabel="Emparejamiento">
+            Cupido te empareja con alguien afín.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validar">
+            Encuentra a tu pareja y validad códigos aquí.
+          </LandscapeInfoInstruction>
         </GameLandscapeInfoColumn>
-        <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
+        <div className={GAME_LANDSCAPE_CENTER_CARD}>
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.08)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)` }}>
             {statsLoading ? <span className="text-base text-gray-500">Cargando…</span> : (<><div className="flex items-center gap-2"><span className="text-xl" aria-hidden>👨</span><span className="text-base text-gray-400">Chicos</span><span className="text-lg font-semibold text-textMain">{maleCount}</span></div><div className="flex items-center gap-2"><span className="text-xl" aria-hidden>👩</span><span className="text-base text-gray-400">Chicas</span><span className="text-lg font-semibold text-textMain">{femaleCount}</span></div></>)}
             <div className="flex items-center gap-2"><span className="text-base text-gray-400">Parejas emparejadas</span><span className="text-lg font-semibold" style={{ color: CUPIDO_PRIMARY }}>{statsLoading ? '—' : matchedCouples} ❤️</span></div>
@@ -105,11 +117,11 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
             <div className="space-y-4">
               <h3 className="text-base font-semibold text-textMain">Validador de Parejas</h3>
               {error && gameState === 'invalid' && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
-              <div className="grid grid-cols-2 gap-5">
-                <div><label htmlFor="cupido-code1" className="block text-sm font-medium text-gray-300 mb-2">Código Jugador 1</label><input id="cupido-code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} onChange={(e) => handleCodeChange(e.target.value, setCode1)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
-                <div><label htmlFor="cupido-code2" className="block text-sm font-medium text-gray-300 mb-2">Código Jugador 2</label><input id="cupido-code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} onChange={(e) => handleCodeChange(e.target.value, setCode2)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label htmlFor="cupido-code1" className="block text-sm font-medium text-gray-300 mb-2">Código Jugador 1</label><input id="cupido-code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} placeholder={CODE_INPUT_PLACEHOLDER} aria-label="Código del jugador 1" onChange={(e) => handleCodeChange(e.target.value, setCode1)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+                <div><label htmlFor="cupido-code2" className="block text-sm font-medium text-gray-300 mb-2">Código Jugador 2</label><input id="cupido-code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} placeholder={CODE_INPUT_PLACEHOLDER} aria-label="Código del jugador 2" onChange={(e) => handleCodeChange(e.target.value, setCode2)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
               </div>
-              <button onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl border font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)` }}><div className="flex items-center justify-center gap-3"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Validar Códigos</div></button>
+              <button type="button" onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl border font-semibold text-sm transition-colors hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)` }}><div className="flex items-center justify-center gap-3"><svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>{VALIDATE_LABEL}</div></button>
             </div>
           )}
           {gameState === 'validating' && <div className="text-center py-10"><div className="flex items-center justify-center gap-4"><svg className="w-8 h-8 animate-spin" style={{ color: CUPIDO_PRIMARY }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><p className="text-2xl font-semibold" style={{ color: CUPIDO_PRIMARY }}>Validando códigos...</p></div></div>}
@@ -140,7 +152,7 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
       )}
       <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
       {/* QR and instructions first (no game code block) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
           <div className="flex justify-center items-start">
             <QRCode
               data={getInstagramDmUrl(gameId)}
@@ -235,7 +247,7 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
               {error}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="cupido-code1" className="block text-base font-medium text-gray-300 mb-2">
                 Código Jugador 1
@@ -247,6 +259,8 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
                 min={1000}
                 max={9999}
                 value={code1}
+                placeholder={CODE_INPUT_PLACEHOLDER}
+                aria-label="Código del jugador 1"
                 onChange={(e) => handleCodeChange(e.target.value, setCode1)}
                 className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
@@ -262,15 +276,18 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
                 min={1000}
                 max={9999}
                 value={code2}
+                placeholder={CODE_INPUT_PLACEHOLDER}
+                aria-label="Código del jugador 2"
                 onChange={(e) => handleCodeChange(e.target.value, setCode2)}
                 className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
             </div>
           </div>
           <button
+            type="button"
             onClick={validateCodes}
             disabled={code1.length !== 4 || code2.length !== 4}
-            className="w-full p-5 rounded-xl border font-semibold text-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full p-5 rounded-xl border font-semibold text-lg transition-colors hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`,
               borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)`,
@@ -285,10 +302,10 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
             }}
           >
             <div className="flex items-center justify-center gap-3">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Validar Códigos
+              {VALIDATE_LABEL}
             </div>
           </button>
         </div>

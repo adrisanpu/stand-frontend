@@ -1,10 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import BackButton from '../../core/widgets/BackButton'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
+import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
+import {
+  GAME_LANDSCAPE_CENTER_CARD,
+  GAME_LANDSCAPE_THREE_COL_GRID,
+  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
+} from '../../core/ui/gameScreenLayout'
 import { useGameInput } from '../../core/input/useGameInput'
 import type { InputEventEnvelope } from '../../core/input/types'
 import { useWebOsPointerPrimary } from '../../core/input/useWebOsPointerPrimary'
@@ -243,14 +249,22 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
 
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[25%_40%_25%] gap-4 items-stretch h-full min-h-0">
+      <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <p>📸 Escanea el QR y pulsa JUGAR.</p>
-          <p>✅ Ingresa tu código y valida.</p>
-          <p>⏱️ El temporizador se oculta a los 5 s.</p>
-          <p>🎯 Detén en 10 segundos.</p>
+          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+            Escanea el QR y pulsa JUGAR.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validar código">
+            Ingresa tu código y valida.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="⏱️" emojiLabel="Temporizador">
+            El temporizador se oculta a los 5 s.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="🎯" emojiLabel="Objetivo">
+            Detén en 10 segundos.
+          </LandscapeInfoInstruction>
         </GameLandscapeInfoColumn>
-        <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 min-w-0 space-y-6 items-center">
+        <div className={`${GAME_LANDSCAPE_CENTER_CARD} items-center`}>
           {/* Idle: temporizador + código + Validar (validación a escondidas, mismo formulario) */}
           {gameState === 'idle' && (
             <div className="flex-1 flex flex-col justify-center items-center w-full min-h-0">
@@ -259,8 +273,19 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
               </div>
               <div className="max-w-md mx-auto w-full space-y-4">
                 <div className="flex gap-3">
-                  <input id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder="Ingresa tu código" className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" />
-                  <button ref={validateButtonRef} type="button" onClick={handleValidate} disabled={!playerCode.trim() || isValidating} className="px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0">{isValidating ? 'Validando...' : 'Validar'}</button>
+                  <input id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder={CODE_INPUT_PLACEHOLDER} className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" />
+                  <button ref={validateButtonRef} type="button" onClick={handleValidate} disabled={!playerCode.trim() || isValidating} className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0">
+                    {isValidating ? (
+                      <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                    {isValidating ? 'Validando…' : VALIDATE_LABEL}
+                  </button>
                 </div>
                 {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
               </div>
@@ -359,7 +384,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
       )}
       <div className={`flex flex-col overflow-hidden min-h-0 flex-1 ${orientation === 'portrait' ? 'justify-center gap-8' : 'gap-3'}`}>
       {/* QR and instructions first (no game code block) */}
-      <div className="flex-shrink-0 overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
           {/* QR Code - Left column */}
           <div className="flex justify-center items-start min-w-0">
             <QRCode
@@ -413,7 +438,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
                     max={9999}
                     value={playerCode}
                     onChange={(e) => setPlayerCode(String(e.target.value))}
-                    placeholder="Ingresa tu código"
+                    placeholder={CODE_INPUT_PLACEHOLDER}
                     className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
                   />
                   <button
@@ -421,9 +446,18 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
                     type="button"
                     onClick={handleValidate}
                     disabled={!playerCode.trim() || isValidating}
-                    className="px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0"
+                    className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0"
                   >
-                    {isValidating ? 'Validando...' : 'Validar'}
+                    {isValidating ? (
+                      <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                    {isValidating ? 'Validando…' : VALIDATE_LABEL}
                   </button>
                 </div>
                 {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">{error}</div>}

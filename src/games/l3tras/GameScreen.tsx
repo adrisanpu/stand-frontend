@@ -1,12 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import BackButton from '../../core/widgets/BackButton'
 import type { L3trasSettings } from './GameConfig'
 import { normalizeValidationTimeLimitSeconds } from './GameConfig'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
+import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
+import {
+  GAME_LANDSCAPE_CENTER_CARD,
+  GAME_LANDSCAPE_THREE_COL_GRID,
+  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
+} from '../../core/ui/gameScreenLayout'
 
 type GameState = 'idle' | 'checking' | 'success'
 
@@ -458,15 +464,18 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, sid
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void validateOneCode()
                 }}
-                placeholder="Código"
+                placeholder={CODE_INPUT_PLACEHOLDER}
                 className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg text-center font-mono outline-none focus:border-[rgba(16,185,129,0.5)]"
               />
               <button
                 type="button"
                 onClick={() => void validateOneCode()}
-                className="h-14 shrink-0 rounded-xl bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.3)] px-8 text-lg font-semibold hover:bg-[rgba(16,185,129,0.3)] transition-colors disabled:opacity-50 whitespace-nowrap"
+                className="inline-flex items-center justify-center gap-2 h-14 shrink-0 rounded-xl bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.3)] px-8 text-lg font-semibold hover:bg-[rgba(16,185,129,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               >
-                Validar
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {VALIDATE_LABEL}
               </button>
             </div>
             )}
@@ -520,14 +529,22 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, sid
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
+      <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <p>📸 Escanea el QR y pulsa JUGAR.</p>
-          <p>🔤 Cada jugador recibe un código (letra).</p>
-          <p>👥 Reuníos; cada uno tendrá su código.</p>
-          <p>✅ Introducid los códigos de uno en uno en el validador.</p>
+          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+            Escanea el QR y pulsa JUGAR.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="🔤" emojiLabel="Códigos">
+            Cada jugador recibe un código (letra).
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="👥" emojiLabel="Reunirse">
+            Reuníos; cada uno tendrá su código.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validador">
+            Introducid los códigos de uno en uno en el validador.
+          </LandscapeInfoInstruction>
         </GameLandscapeInfoColumn>
-        <div className="card flex flex-col flex-1 min-h-0 p-6 sm:p-8 overflow-hidden gap-6">
+        <div className={`${GAME_LANDSCAPE_CENTER_CARD} flex-1 gap-6 space-y-0`}>
           {renderCentralPanel(true)}
         </div>
         <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
@@ -547,7 +564,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, sid
         </div>
       )}
       <div className={showJoinBlock ? 'space-y-8' : 'flex flex-col flex-1 min-h-0 space-y-6'}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
           <div className="flex justify-center items-start">
             <QRCode
               data={getInstagramDmUrl(gameId)}

@@ -1,11 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import BackButton from '../../core/widgets/BackButton'
 import type { Rulet4Settings, Rulet4PanelConfig } from './GameConfig'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
+import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
+import {
+  GAME_LANDSCAPE_CENTER_CARD,
+  GAME_LANDSCAPE_THREE_COL_GRID,
+  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
+} from '../../core/ui/gameScreenLayout'
 
 type GameState =
   | 'idle'       // player code input
@@ -211,14 +217,22 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
 
   if (isLandscape) {
     return (
-      <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)] gap-3 sm:gap-4 lg:gap-6 items-stretch h-full min-h-0">
+      <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <p>📸 Escanea el QR y pulsa JUGAR.</p>
-          <p>🎟️ Recibe tu código por DM.</p>
-          <p>✅ Ingresa y valida tu código.</p>
-          <p>🎡 Tienes una tirada de la ruleta.</p>
+          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+            Escanea el QR y pulsa JUGAR.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="🎟️" emojiLabel="Código">
+            Recibe tu código por DM.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validar">
+            Ingresa y valida tu código.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction emoji="🎡" emojiLabel="Ruleta">
+            Tienes una tirada de la ruleta.
+          </LandscapeInfoInstruction>
         </GameLandscapeInfoColumn>
-        <div className="card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 space-y-6">
+        <div className={GAME_LANDSCAPE_CENTER_CARD}>
           {/* Validation + messages + wheel - same as portrait flow */}
           <div className="space-y-4 min-h-[140px]">
             {gameState === 'idle' && (
@@ -234,16 +248,26 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
                       max={9999}
                       value={playerCode}
                       onChange={(e) => setPlayerCode(String(e.target.value))}
-                      placeholder="Ingresa tu código"
-                      className="flex-1 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
+                      placeholder={CODE_INPUT_PLACEHOLDER}
+                      className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
                       onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }}
                     />
                     <button
+                      type="button"
                       onClick={handleValidate}
                       disabled={!playerCode.trim() || isValidating}
-                      className="px-8 h-14 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
+                      className="inline-flex items-center justify-center gap-2 px-8 h-14 shrink-0 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
                     >
-                      {isValidating ? 'Validando...' : 'Validar'}
+                      {isValidating ? (
+                        <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      )}
+                      {isValidating ? 'Validando…' : VALIDATE_LABEL}
                     </button>
                   </div>
                 </div>
@@ -349,7 +373,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
       )}
       <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
       {/* QR and instructions first (no game code block) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
           {/* QR Code - Left column */}
           <div className="flex justify-center items-start">
             <QRCode 
@@ -399,8 +423,8 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
                   max={9999}
                   value={playerCode}
                   onChange={(e) => setPlayerCode(String(e.target.value))}
-                  placeholder="Ingresa tu código"
-                  className="flex-1 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
+                  placeholder={CODE_INPUT_PLACEHOLDER}
+                  className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       handleValidate()
@@ -408,11 +432,21 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
                   }}
                 />
                 <button
+                  type="button"
                   onClick={handleValidate}
                   disabled={!playerCode.trim() || isValidating}
-                  className="px-8 h-14 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
+                  className="inline-flex items-center justify-center gap-2 px-8 h-14 shrink-0 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
                 >
-                  {isValidating ? 'Validando...' : 'Validar'}
+                  {isValidating ? (
+                    <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                  {isValidating ? 'Validando…' : VALIDATE_LABEL}
                 </button>
               </div>
             </div>
