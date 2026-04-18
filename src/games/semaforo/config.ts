@@ -18,7 +18,7 @@ export const semaforoDefinition: GameDefinition = {
   assets: {
     logo: '/images/semaforo-logo.png',
     clientLogo: '/client-logo.png',
-    standLogo: '/images/stand-logo.png',
+    standLogo: '/images/logo-stand-footer.png',
   },
   GameScreen: SemaforoGameScreen,
   showRanking: false,

@@ -19,7 +19,7 @@ export const rulet4Definition: GameDefinition = {
   assets: {
     logo: '/images/ruleta-logo.png',
     clientLogo: '/client-logo.png', // can reuse an existing one if needed
-    standLogo: '/images/stand-logo.png',
+    standLogo: '/images/logo-stand-footer.png',
   },
   GameScreen: Rulet4GameScreen,
   showRanking: false,

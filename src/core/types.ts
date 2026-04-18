@@ -14,6 +14,8 @@ export interface GameScreenProps {
   prizeLabel?: string
   /** When the in-game counter/timer is running, call with true to pause API polling (score, ranking, game) and avoid lag */
   onCounterActiveChange?: (active: boolean) => void
+  /** Optional: report current avatar state so shell widgets can render synced animations */
+  onAvatarStateChange?: (state: string) => void
 }
 
 export interface ThemeColors {

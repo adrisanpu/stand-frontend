@@ -89,7 +89,7 @@ function buildCrossQuizRounds(res: ValidationResponse): CrossQuizRound[] {
   return shuffleArray(rounds)
 }
 
-export default function SemaforoGameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
+export default function SemaforoGameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [stats] = useState<SemaforoStats>({ redCount: 0, yellowCount: 0, greenCount: 0 })
   const [statsLoading] = useState(false)
   const [gameState, setGameState] = useState<GameState>('idle')
@@ -264,6 +264,22 @@ export default function SemaforoGameScreen({ gameId, orientation, logoElement, s
   const greenCount = stats.greenCount ?? 0
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
+  const avatarState =
+    gameState === 'cross_quiz'
+      ? 'playing'
+      : gameState === 'cross_quiz_result'
+        ? 'result'
+        : gameState === 'cross_quiz_win' || gameState === 'cross_quiz_lose'
+          ? 'finished'
+          : gameState === 'valid'
+            ? 'ready'
+            : gameState === 'invalid'
+              ? 'lose'
+              : gameState
+
+  useEffect(() => {
+    onAvatarStateChange?.(avatarState)
+  }, [avatarState, onAvatarStateChange])
 
   const showJoinBlock = !([
     'valid',

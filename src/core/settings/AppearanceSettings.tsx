@@ -1,8 +1,20 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import type { ThemeColors, GameDefinition } from '../types'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
-import { STORAGE_KEY_COLORS, STORAGE_KEY_LOGO, STORAGE_KEY_THEME_MODE } from '../storageKeys'
+import { STORAGE_KEY_COLORS, STORAGE_KEY_THEME_MODE } from '../storageKeys'
+import {
+  deleteUserMedia,
+  fetchUserMedia,
+  selectAvatar,
+  selectLogo,
+  uploadAvatar,
+  uploadLogo,
+  resolveLogoDisplayUrl,
+  type AvatarState,
+  type UserMediaItem,
+  type UserMediaResponse,
+} from '../../api/userMedia'
 
 type AppearanceSettingsProps = {
   /** Vuelve a la lista del menú Configuración */
@@ -11,12 +23,6 @@ type AppearanceSettingsProps = {
   onCloseMenu: () => void
   gameDefinition?: GameDefinition
 }
-
-type StoredLogo = { id: string; label: string; path: string }
-
-const STORED_LOGOS: StoredLogo[] = [
-  { id: 'zoco_salamandra', label: 'Zoco Salamandra', path: '/images/zoco_salamandra.png' },
-]
 
 // Default Stand palette (used when no game is selected)
 const DEFAULT_STAND_PALETTE: ThemeColors = {
@@ -44,16 +50,29 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
   const [customAccent, setCustomAccent] = useState('#22D3EE')
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
   const [logoError, setLogoError] = useState<string | null>(null)
   const [logoPickerOpen, setLogoPickerOpen] = useState(false)
+  const [logoHistory, setLogoHistory] = useState<UserMediaItem[]>([])
+  const [selectedLogoId, setSelectedLogoId] = useState<string | null>(null)
+  const [avatarHistory, setAvatarHistory] = useState<UserMediaItem[]>([])
+  const [avatarState, setAvatarState] = useState<AvatarState>('idle')
+  const [selectedAvatars, setSelectedAvatars] = useState<Record<AvatarState, string | null>>({
+    idle: null,
+    win: null,
+    lose: null,
+  })
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const logoDropdownRef = useRef<HTMLDivElement>(null)
+  const avatarDropdownRef = useRef<HTMLDivElement>(null)
   const paletteCustomBackupRef = useRef<{ primary: string; accent: string } | null>(null)
 
   // Load saved settings on mount
   useEffect(() => {
     const savedColors = localStorage.getItem(STORAGE_KEY_COLORS)
-    const savedLogo = localStorage.getItem(STORAGE_KEY_LOGO)
     const savedThemeMode = localStorage.getItem(STORAGE_KEY_THEME_MODE)
     
     if (savedColors) {
@@ -77,10 +96,37 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
       setIsDarkMode(true)
     }
 
-    if (savedLogo) {
-      setLogoPreview(savedLogo)
+    const loadMedia = async () => {
+      try {
+        const media = await fetchUserMedia()
+        setUserMedia(media)
+        setLogoHistory(media.logo.items)
+        setSelectedLogoId(media.logo.selectedId)
+        setAvatarHistory(media.avatar.items)
+        setSelectedAvatars({
+          idle: media.avatar.selectedByState.idle ?? null,
+          win: media.avatar.selectedByState.win ?? null,
+          lose: media.avatar.selectedByState.lose ?? null,
+        })
+      } catch {
+        // Fallback to local-only mode when API is not available.
+      }
     }
+    void loadMedia()
   }, [])
+
+  // Logo preview: user selection, or default white/black letters from API by aspecto (oscuro/claro).
+  useEffect(() => {
+    if (!userMedia) return
+    if (userMedia.logo.selectedId) {
+      const url =
+        userMedia.logo.selected?.url ??
+        userMedia.logo.items.find((it) => it.id === userMedia.logo.selectedId)?.url
+      if (url) setLogoPreview(url)
+      return
+    }
+    setLogoPreview(resolveLogoDisplayUrl(userMedia, isDarkMode))
+  }, [isDarkMode, userMedia])
 
   useEffect(() => {
     if (!logoPickerOpen) return
@@ -94,7 +140,33 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
     return () => document.removeEventListener('mousedown', onDoc)
   }, [logoPickerOpen])
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    if (!avatarPickerOpen) return
+    const onDoc = (e: MouseEvent) => {
+      const el = avatarDropdownRef.current
+      if (el && !el.contains(e.target as Node)) {
+        setAvatarPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [avatarPickerOpen])
+
+  const refreshMedia = async () => {
+    const media = await fetchUserMedia()
+    setUserMedia(media)
+    setLogoHistory(media.logo.items)
+    setSelectedLogoId(media.logo.selectedId)
+    setAvatarHistory(media.avatar.items)
+    setSelectedAvatars({
+      idle: media.avatar.selectedByState.idle ?? null,
+      win: media.avatar.selectedByState.win ?? null,
+      lose: media.avatar.selectedByState.lose ?? null,
+    })
+    window.dispatchEvent(new Event('user-media-updated'))
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -111,31 +183,60 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
     }
 
     setLogoError(null)
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const result = event.target?.result as string
-      setLogoPreview(result)
-    }
-    reader.onerror = () => {
-      setLogoError('Error al leer el archivo')
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const handleRemoveLogo = () => {
-    setLogoPreview(null)
-    localStorage.removeItem(STORAGE_KEY_LOGO)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+    try {
+      await uploadLogo(file)
+      await refreshMedia()
+    } catch {
+      setLogoError('Error al subir el logo')
     }
   }
 
-  const handleSelectStoredLogo = (path: string) => {
-    setLogoPreview(path)
+  const handleRemoveLogo = async () => {
+    if (!selectedLogoId) {
+      if (userMedia) setLogoPreview(resolveLogoDisplayUrl(userMedia, isDarkMode))
+      return
+    }
+    await deleteUserMedia('logo', selectedLogoId)
+    setSelectedLogoId(null)
+    await refreshMedia()
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleSelectStoredLogo = async (item: UserMediaItem) => {
+    await selectLogo(item.id)
+    setSelectedLogoId(item.id)
+    setLogoPreview(item.url ?? null)
     setLogoError(null)
+    await refreshMedia()
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+  }
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!(file.type === 'video/mp4' || file.type === 'video/webm')) {
+      setAvatarError('Solo se permiten vídeos mp4 o webm')
+      return
+    }
+    if (file.size > 30 * 1024 * 1024) {
+      setAvatarError('El vídeo es demasiado grande. Máximo 30MB')
+      return
+    }
+    setAvatarError(null)
+    try {
+      await uploadAvatar(file, avatarState)
+      await refreshMedia()
+    } catch {
+      setAvatarError('Error al subir el avatar')
+    }
+  }
+
+  const handleSelectAvatar = async (item: UserMediaItem) => {
+    if (!item.state) return
+    await selectAvatar(item.id, item.state)
+    await refreshMedia()
   }
 
   const getDefaultColors = (): ThemeColors => {
@@ -186,25 +287,12 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
     // Save theme mode (always available)
     localStorage.setItem(STORAGE_KEY_THEME_MODE, isDarkMode ? 'dark' : 'light')
 
-    // Save logo (only if advanced customization is available)
-    if (features.advancedCustomization) {
-      if (logoPreview) {
-        localStorage.setItem(STORAGE_KEY_LOGO, logoPreview)
-      } else {
-        localStorage.removeItem(STORAGE_KEY_LOGO)
-      }
-    } else {
-      // For free plan, always remove custom logo
-      localStorage.removeItem(STORAGE_KEY_LOGO)
-    }
-
     // Trigger a page reload to apply changes
     window.location.reload()
   }
 
   const handleReset = () => {
     localStorage.removeItem(STORAGE_KEY_COLORS)
-    localStorage.removeItem(STORAGE_KEY_LOGO)
     localStorage.removeItem(STORAGE_KEY_THEME_MODE)
     setUseDefaultPalette(true)
     setCustomPrimary('#B026FF')
@@ -220,6 +308,12 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
   const defaultColors = getDefaultColors()
   const previewPrimary = useDefaultPalette ? defaultColors.primary : customPrimary
   const previewAccent = useDefaultPalette ? defaultColors.accent : customAccent
+
+  const avatarPreviewUrl = useMemo(() => {
+    const id = selectedAvatars[avatarState]
+    if (!id) return null
+    return avatarHistory.find((it) => it.id === id)?.url ?? null
+  }, [avatarHistory, selectedAvatars, avatarState])
 
   return (
     <div
@@ -267,57 +361,21 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
           className="hidden"
           id="logo-upload"
         />
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="video/mp4,video/webm"
+          onChange={handleAvatarUpload}
+          disabled={!features.advancedCustomization}
+          className="hidden"
+          id="avatar-upload"
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0 lg:min-h-[26rem] lg:items-stretch">
-          {/* Columna 1: modo fondo + logo (mitad anchura, un solo marco) */}
+          {/* Columna 1: logo y avatares */}
           <div className="flex flex-col min-h-0 min-w-0 rounded-xl border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 h-full lg:min-h-0">
-            <div className="shrink-0 pb-4 border-b border-white/10">
-              <h3 className="text-sm font-semibold text-gray-300 mb-3">Modo de fondo</h3>
-              <div className="flex items-center justify-center gap-3">
-                <span
-                  className={`flex items-center justify-center w-10 h-10 rounded-full border transition-colors ${
-                    isDarkMode ? 'border-primary/60 bg-primary/15 text-primary' : 'border-white/10 text-gray-500'
-                  }`}
-                  aria-hidden
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-                    />
-                  </svg>
-                </span>
-                <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={!isDarkMode}
-                    onChange={(e) => setIsDarkMode(!e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
-                </label>
-                <span
-                  className={`flex items-center justify-center w-10 h-10 rounded-full border transition-colors ${
-                    !isDarkMode ? 'border-primary/60 bg-primary/15 text-primary' : 'border-white/10 text-gray-500'
-                  }`}
-                  aria-hidden
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-                    />
-                  </svg>
-                </span>
-              </div>
-            </div>
-
             <div
-              className={`flex flex-col flex-1 min-h-0 pt-4 ${
+              className={`flex flex-col flex-1 min-h-0 ${
                 !features.advancedCustomization ? 'opacity-50' : ''
               }`}
             >
@@ -372,10 +430,10 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                   <div className="relative">
                     <button
                       type="button"
-                      disabled={!features.advancedCustomization || STORED_LOGOS.length === 0}
+                      disabled={!features.advancedCustomization || logoHistory.length === 0}
                       onClick={() => features.advancedCustomization && setLogoPickerOpen((o) => !o)}
                       className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors text-sm w-full ${
-                        features.advancedCustomization && STORED_LOGOS.length > 0
+                        features.advancedCustomization && logoHistory.length > 0
                           ? 'hover:bg-[rgba(255,255,255,0.1)]'
                           : 'opacity-50 cursor-not-allowed'
                       }`}
@@ -392,32 +450,32 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
-                    {logoPickerOpen && features.advancedCustomization && STORED_LOGOS.length > 0 && (
+                    {logoPickerOpen && features.advancedCustomization && logoHistory.length > 0 && (
                       <div
                         className="absolute z-50 bottom-full mb-2 left-0 right-0 w-full min-w-[12rem] rounded-xl border border-white/10 bg-[#14141f] shadow-xl p-3 max-h-[min(240px,50vh)] overflow-y-auto"
                         role="listbox"
                       >
                         <p className="text-xs text-gray-500 mb-2 px-1">Logos almacenados</p>
                         <div className="grid grid-cols-3 gap-2">
-                          {STORED_LOGOS.map((preset) => (
+                          {logoHistory.map((preset) => (
                             <button
                               key={preset.id}
                               type="button"
                               role="option"
-                              aria-selected={logoPreview === preset.path}
-                              onClick={() => {
-                                handleSelectStoredLogo(preset.path)
+                              aria-selected={selectedLogoId === preset.id}
+                              onClick={async () => {
+                                await handleSelectStoredLogo(preset)
                                 setLogoPickerOpen(false)
                               }}
                               className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-all ${
-                                logoPreview === preset.path
+                                selectedLogoId === preset.id
                                   ? 'border-primary bg-primary/10'
                                   : 'border-white/10 bg-[rgba(255,255,255,0.04)] hover:border-white/25'
                               }`}
                             >
-                              <img src={preset.path} alt="" className="h-10 w-10 object-contain rounded" />
+                              <img src={preset.url ?? ''} alt="" className="h-10 w-10 object-contain rounded" />
                               <span className="text-[10px] font-medium text-gray-300 text-center leading-tight line-clamp-2">
-                                {preset.label}
+                                {preset.name}
                               </span>
                             </button>
                           ))}
@@ -425,27 +483,224 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                       </div>
                     )}
                   </div>
+                  <p className="text-[11px] text-gray-400 shrink-0">
+                    {features.advancedCustomization ? 'Máx. 5MB.' : 'Disponible en el plan Event 24h'}
+                  </p>
                 </div>
               </div>
-              <p className="text-[11px] text-gray-400 mt-3 shrink-0">
-                {features.advancedCustomization
-                  ? 'Inicio y juegos. Máx. 5MB.'
-                  : 'Disponible en el plan Event 24h'}
-              </p>
               {logoError && features.advancedCustomization && (
                 <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-xs mt-2 shrink-0">
                   {logoError}
                 </div>
               )}
+              <div className={`mt-4 pt-4 border-t border-white/10 ${!features.advancedCustomization ? 'opacity-50' : ''}`}>
+                <h3 className="text-sm font-semibold text-gray-300 mb-3">Avatares por estado</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                  {/* Columna 1: vista previa del vídeo del estado seleccionado */}
+                  <div className="flex justify-center sm:justify-start min-w-0">
+                    {avatarPreviewUrl ? (
+                      <video
+                        key={avatarPreviewUrl}
+                        src={avatarPreviewUrl}
+                        className="w-full max-w-[min(100%,18rem)] max-h-52 rounded-xl border border-white/10 bg-black object-contain"
+                        controls
+                        muted
+                        playsInline
+                        loop
+                        aria-label={`Vista previa avatar ${avatarState}`}
+                      />
+                    ) : (
+                      <div className="w-full max-w-[min(100%,18rem)] aspect-video max-h-52 rounded-xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center gap-2 text-gray-500 bg-[rgba(0,0,0,0.2)]">
+                        <svg className="w-10 h-10 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          />
+                        </svg>
+                        <span className="text-xs px-2 text-center">Sin vídeo para este estado</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Columna 2: estado + subir, historial, resumen */}
+                  <div className="flex flex-col gap-3 min-w-0">
+                    <div className="flex items-stretch gap-2">
+                      <select
+                        value={avatarState}
+                        onChange={(e) => setAvatarState(e.target.value as AvatarState)}
+                        className="flex-1 min-w-0 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 py-2.5 text-sm"
+                        disabled={!features.advancedCustomization}
+                        aria-label="Estado del avatar"
+                      >
+                        <option value="idle">idle</option>
+                        <option value="win">win</option>
+                        <option value="lose">lose</option>
+                      </select>
+                      <label
+                        htmlFor={features.advancedCustomization ? 'avatar-upload' : undefined}
+                        className={`inline-flex items-center justify-center shrink-0 w-11 rounded-xl border border-white/10 bg-[rgba(255,255,255,0.05)] transition-colors ${
+                          features.advancedCustomization
+                            ? 'hover:bg-[rgba(255,255,255,0.1)] cursor-pointer'
+                            : 'cursor-not-allowed pointer-events-none opacity-50'
+                        }`}
+                        title="Subir vídeo"
+                        aria-label="Subir vídeo para este estado"
+                        onClick={(e) => {
+                          if (!features.advancedCustomization) e.preventDefault()
+                        }}
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                          />
+                        </svg>
+                      </label>
+                    </div>
+
+                    <div className="relative" ref={avatarDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setAvatarPickerOpen((o) => !o)}
+                        disabled={!features.advancedCustomization || avatarHistory.length === 0}
+                        className={`inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors text-sm w-full ${
+                          features.advancedCustomization && avatarHistory.length > 0
+                            ? 'hover:bg-[rgba(255,255,255,0.1)]'
+                            : 'opacity-50 cursor-not-allowed'
+                        }`}
+                        aria-expanded={avatarPickerOpen}
+                        aria-haspopup="listbox"
+                      >
+                        Historial
+                        <svg
+                          className={`w-4 h-4 shrink-0 transition-transform ${avatarPickerOpen ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-hidden
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {avatarPickerOpen && features.advancedCustomization && avatarHistory.length > 0 && (
+                        <div
+                          className="absolute z-40 top-full mt-2 left-0 right-0 rounded-xl border border-white/10 bg-[#14141f] shadow-xl p-2 max-h-40 overflow-y-auto"
+                          role="listbox"
+                        >
+                          {avatarHistory.filter((it) => it.state === avatarState).length === 0 ? (
+                            <p className="text-xs text-gray-500 px-2 py-2">No hay vídeos guardados para este estado.</p>
+                          ) : (
+                            avatarHistory
+                              .filter((it) => it.state === avatarState)
+                              .map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={selectedAvatars[avatarState] === item.id}
+                                  onClick={async () => {
+                                    await handleSelectAvatar(item)
+                                    setAvatarPickerOpen(false)
+                                  }}
+                                  className={`w-full text-left text-xs px-2 py-2 rounded ${
+                                    selectedAvatars[avatarState] === item.id
+                                      ? 'bg-primary/20 border border-primary/40'
+                                      : 'hover:bg-white/10'
+                                  }`}
+                                >
+                                  {item.name} ({item.state})
+                                </button>
+                              ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-400 pt-1 border-t border-white/10">
+                      <span className="text-gray-500 shrink-0">Configurados:</span>
+                      {(['idle', 'win', 'lose'] as const).map((state) => {
+                        const ok = Boolean(selectedAvatars[state])
+                        return (
+                          <span key={state} className="inline-flex items-center gap-1 font-medium text-gray-300">
+                            {state}
+                            {ok ? (
+                              <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="configurado">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : (
+                              <span className="inline-flex items-center justify-center w-4 h-4 text-gray-500" aria-label="pendiente">
+                                −
+                              </span>
+                            )}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+                {avatarError && (
+                  <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-xs mt-3">{avatarError}</div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Columna 2: paleta (mitad anchura, mismo marco y altura) */}
-          <div
-            className={`rounded-xl border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 flex flex-col min-h-0 min-w-0 h-full lg:min-h-0 overflow-y-auto ${
-              !features.advancedCustomization ? 'opacity-50' : ''
-            }`}
-          >
+          {/* Columna 2: modo de fondo + paleta */}
+          <div className="rounded-xl border border-white/10 bg-[rgba(255,255,255,0.05)] p-4 flex flex-col min-h-0 min-w-0 h-full lg:min-h-0 overflow-y-auto">
+            <div className="shrink-0 pb-4 border-b border-white/10 mb-4">
+              <h3 className="text-sm font-semibold text-gray-300 mb-3">Modo de fondo</h3>
+              <div className="flex items-center justify-center gap-3">
+                <span
+                  className={`flex items-center justify-center w-10 h-10 rounded-full border transition-colors ${
+                    isDarkMode ? 'border-primary/60 bg-primary/15 text-primary' : 'border-white/10 text-gray-500'
+                  }`}
+                  aria-hidden
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                    />
+                  </svg>
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={!isDarkMode}
+                    onChange={(e) => setIsDarkMode(!e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+                </label>
+                <span
+                  className={`flex items-center justify-center w-10 h-10 rounded-full border transition-colors ${
+                    !isDarkMode ? 'border-primary/60 bg-primary/15 text-primary' : 'border-white/10 text-gray-500'
+                  }`}
+                  aria-hidden
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+
+            <div
+              className={`flex flex-col flex-1 min-h-0 min-w-0 ${
+                !features.advancedCustomization ? 'opacity-50' : ''
+              }`}
+            >
             <h3 className="text-sm font-semibold text-gray-300 mb-3 shrink-0">Paleta de colores</h3>
             <div
               className="mx-auto w-[4.5rem] h-[4.5rem] rounded-xl border-2 border-white/20 overflow-hidden shrink-0 mb-2"
@@ -555,6 +810,7 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
               {!features.advancedCustomization && (
                 <p className="text-xs text-gray-500 pt-1">Personalización de color en el plan Event 24h.</p>
               )}
+            </div>
             </div>
           </div>
         </div>

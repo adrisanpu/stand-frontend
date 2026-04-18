@@ -19,7 +19,7 @@ export const cupidoDefinition: GameDefinition = {
   assets: {
     logo: '/images/cupido-logo.png',
     clientLogo: '/client-logo.png',
-    standLogo: '/images/stand-logo.png',
+    standLogo: '/images/logo-stand-footer.png',
   },
   GameScreen: CupidoGameScreen,
   showRanking: false,

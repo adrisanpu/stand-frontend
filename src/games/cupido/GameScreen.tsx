@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
 import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
@@ -38,7 +38,7 @@ type ValidationResponse = {
 const CUPIDO_PRIMARY = '#E11D48'
 const CUPIDO_PRIMARY_RGB = '225, 29, 72'
 
-export default function CupidoGameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
+export default function CupidoGameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
@@ -94,6 +94,11 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
   const showJoinBlock = gameState !== 'valid'
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
+  const avatarState = gameState === 'valid' ? 'win' : gameState === 'invalid' ? 'lose' : gameState
+
+  useEffect(() => {
+    onAvatarStateChange?.(avatarState)
+  }, [avatarState, onAvatarStateChange])
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>

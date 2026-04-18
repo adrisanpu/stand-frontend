@@ -71,7 +71,7 @@ function L3trasPieTimer({ remainingMs, totalMs }: { remainingMs: number; totalMs
   )
 }
 
-export default function L3trasGameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
+export default function L3trasGameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [settings, setSettings] = useState<L3trasSettings | null>(null)
   const [slots, setSlots] = useState<(string | null)[]>([])
@@ -527,6 +527,12 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, sid
   }
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
+  const avatarState =
+    gameState === 'checking' ? 'validating' : gameState === 'success' ? 'finished' : gameState
+
+  useEffect(() => {
+    onAvatarStateChange?.(avatarState)
+  }, [avatarState, onAvatarStateChange])
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>

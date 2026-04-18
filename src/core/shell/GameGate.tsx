@@ -5,8 +5,8 @@ import { IDEAL_FOR_LABELS } from '../types'
 import { api } from '../../api/api'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
-import { useStandLogo } from '../theme'
-import { STORAGE_KEY_LOGO } from '../storageKeys'
+import { useStandLogo, useAppThemeIsDark } from '../theme'
+import { fetchUserMedia, resolveLogoDisplayUrl, type UserMediaResponse } from '../../api/userMedia'
 
 const GAME_RE = /^[A-Za-z0-9._-]{1,40}$/
 
@@ -26,12 +26,14 @@ export default function GameGate({ onGameCreated }: GameGateProps){
   const { plan, user } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const standLogo = useStandLogo()
+  const themeIsDark = useAppThemeIsDark()
   const [selectedGame, setSelectedGame] = useState<GameDefinition | null>(null)
   const [gameId, setGameId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [joining, setJoining] = useState(false)
-  const [customLogo, setCustomLogo] = useState<string | null>(null)
+  const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
+  const customLogo = userMedia ? resolveLogoDisplayUrl(userMedia, themeIsDark) : null
   const [userGames, setUserGames] = useState<UserGame[]>([])
   const [loadingGames, setLoadingGames] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -47,12 +49,20 @@ export default function GameGate({ onGameCreated }: GameGateProps){
   const hasExistingGame = !!existingGameId
   const canCreateGame = features.maxGames === Infinity || !hasExistingGame || (hasExistingGame && features.maxGames > 1)
 
-  // Load custom logo from localStorage
+  // Load custom logo from backend media selection
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_LOGO)
-    if (saved) {
-      setCustomLogo(saved)
+    const load = async () => {
+      try {
+        const media = await fetchUserMedia()
+        setUserMedia(media)
+      } catch {
+        setUserMedia(null)
+      }
     }
+    void load()
+    const onMediaUpdate = () => void load()
+    window.addEventListener('user-media-updated', onMediaUpdate)
+    return () => window.removeEventListener('user-media-updated', onMediaUpdate)
   }, [])
 
   // Fetch user games when a game is selected (API expects gameType = game id, e.g. SEMAFORO)
@@ -250,10 +260,10 @@ export default function GameGate({ onGameCreated }: GameGateProps){
               alt="Stand" 
               className="h-28 w-auto object-contain"
               onError={(e) => {
-                // Fallback to stand-logo.png if logo doesn't exist
+                  // Fallback to white letters logo if missing
                 const target = e.target as HTMLImageElement
-                if (target.src !== `${window.location.origin}/images/stand-logo.png`) {
-                  target.src = '/images/stand-logo.png'
+                  if (target.src !== `${window.location.origin}/images/logo_stand_letters_white.png`) {
+                    target.src = '/images/logo_stand_letters_white.png'
                 }
               }}
             />
@@ -262,7 +272,6 @@ export default function GameGate({ onGameCreated }: GameGateProps){
 
         {/* Games Grid */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-textMain text-center mb-4">Selecciona un juego</h2>
           {/* Filter dropdowns: each defaults to "Todos", filters accumulate (AND) */}
           <div className="flex flex-wrap gap-3 mb-4">
             <label className="flex flex-col gap-1">
@@ -316,7 +325,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
             </label>
           </div>
           {/* List with fixed min-height so layout does not jump when filtering */}
-          <div className="min-h-[360px] md:min-h-[420px] overflow-y-auto rounded-xl">
+          <div className="min-h-[360px] md:min-h-[420px] overflow-y-auto rounded-xl pt-5 sm:pt-6 pb-3">
             {hasNoGames ? (
               <p className="text-center text-textSub text-sm py-6">
                 Ningún juego con los filtros seleccionados.

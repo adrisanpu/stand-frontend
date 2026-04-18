@@ -18,7 +18,7 @@ export const empareja2Definition: GameDefinition = {
   },
   assets: {
     logo: '/images/empareja2-logo.png',
-    standLogo: '/images/stand-logo.png',
+    standLogo: '/images/logo-stand-footer.png',
   },
   GameScreen: Empareja2GameScreen,
   showRanking: false,

@@ -21,7 +21,7 @@ type GameState =
   | 'result'     // showing selected panel
   | 'finished'   // optional; auto-reset logic
 
-export default function Rulet4GameScreen({ gameId, orientation, logoElement, sidebarElement }: GameScreenProps) {
+export default function Rulet4GameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [playerCode, setPlayerCode] = useState('')
   const [playerId, setPlayerId] = useState<string | null>(null)
@@ -214,6 +214,12 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
   const showJoinBlock = !(['ready', 'spinning', 'result'] as GameState[]).includes(gameState)
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
+  const avatarState =
+    gameState === 'spinning' ? 'playing' : gameState === 'ready' ? 'ready' : gameState
+
+  useEffect(() => {
+    onAvatarStateChange?.(avatarState)
+  }, [avatarState, onAvatarStateChange])
 
   if (isLandscape) {
     return (
@@ -238,10 +244,10 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
             {gameState === 'idle' && (
               <>
                 <div className="space-y-2">
-                  <label htmlFor="player-code-landscape" className="text-sm text-gray-300">Tu código de jugador</label>
                   <div className="flex gap-3">
                     <input
                       id="player-code-landscape"
+                      aria-label={CODE_INPUT_PLACEHOLDER}
                       type="number"
                       inputMode="numeric"
                       min={1000}
@@ -348,9 +354,12 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
                   </svg>
                 </div>
               </div>
-              <div className="text-center">
-                <button onClick={handleSpin} disabled={gameState !== 'ready' || hasSpunRef.current} className="px-10 py-5 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-2xl">GIRAR RULETA</button>
-                {gameState === 'idle' && <p className="text-base text-gray-400 mt-2">Valida tu código para activar la ruleta</p>}
+              <div className="text-center flex justify-center items-center min-h-[76px]">
+                {gameState === 'result' ? (
+                  <BackButton onClick={handleReset} aria-label="Volver a introducir código" className="scale-125" />
+                ) : (
+                  <button type="button" onClick={handleSpin} disabled={gameState !== 'ready' || hasSpunRef.current} className="px-10 py-5 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-2xl">GIRAR RULETA</button>
+                )}
               </div>
             </div>
           )}
@@ -366,7 +375,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
 
   return (
     <div className={`w-full flex flex-col ${!showJoinBlock ? 'min-h-[70vh]' : ''}`}>
-      {!showJoinBlock && (
+      {!showJoinBlock && gameState !== 'result' && (
         <div className="flex justify-end mb-2">
           <BackButton onClick={handleReset} aria-label="Volver" />
         </div>
@@ -413,10 +422,10 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
         {gameState === 'idle' && (
           <>
             <div className="space-y-2">
-              <label htmlFor="player-code" className="text-base text-gray-300">Tu código de jugador</label>
               <div className="flex gap-3">
                 <input
                   id="player-code"
+                  aria-label={CODE_INPUT_PLACEHOLDER}
                   type="number"
                   inputMode="numeric"
                   min={1000}
@@ -596,17 +605,19 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
             </div>
           </div>
 
-          {/* Spin Button - Always visible, but only enabled when validated */}
-          <div className="text-center">
-            <button
-              onClick={handleSpin}
-              disabled={gameState !== 'ready' || hasSpunRef.current}
-              className="px-10 py-5 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-2xl"
-            >
-              GIRAR RULETA
-            </button>
-            {gameState === 'idle' && (
-              <p className="text-base text-gray-400 mt-2">Valida tu código para activar la ruleta</p>
+          {/* Spin / volver: mismo hueco bajo la ruleta */}
+          <div className="text-center flex justify-center items-center min-h-[76px]">
+            {gameState === 'result' ? (
+              <BackButton onClick={handleReset} aria-label="Volver a introducir código" className="scale-125" />
+            ) : (
+              <button
+                type="button"
+                onClick={handleSpin}
+                disabled={gameState !== 'ready' || hasSpunRef.current}
+                className="px-10 py-5 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-2xl"
+              >
+                GIRAR RULETA
+              </button>
             )}
           </div>
         </div>
