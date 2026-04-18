@@ -19,7 +19,7 @@ export const infocardsDefinition: GameDefinition = {
   },
   assets: {
     logo: '/images/infocards-logo.png',
-    standLogo: '/images/stand-logo.png',
+    standLogo: '/images/logo-stand-footer.png',
   },
   GameScreen: InfocardsGameScreen,
   showRanking: false,

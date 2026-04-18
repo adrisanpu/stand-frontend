@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
-import { ThemeProvider } from '../theme'
+import { ThemeProvider, useAppThemeIsDark } from '../theme'
 import GameGate from './GameGate'
 import SettingsMenu from './SettingsMenu'
 import Ranking from '../widgets/Ranking'
 import Players from '../widgets/Players'
 import RaffleData from '../widgets/RaffleData'
+import GameStateAvatar from '../widgets/GameStateAvatar'
 import { getGameById } from '../../games'
 import type { GameDefinition } from '../types'
 import { useCurrentUser } from '../../auth/useCurrentUser'
@@ -13,8 +14,7 @@ import { useOrientation } from '../../hooks/useOrientation'
 import { readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle } from '../settings/operatorPrizeSlots'
 import { inputManager } from '../input/inputManager'
 import { mapGameTypeToId } from '../gameTypeMap'
-import { STORAGE_KEY_LOGO } from '../storageKeys'
-
+import { fetchUserMedia, resolveLogoDisplayUrl, type UserMediaResponse } from '../../api/userMedia'
 // Logo size on game screens (portrait and landscape) — larger across breakpoints
 const GAME_SCREEN_LOGO_CLASS = 'h-32 sm:h-36 lg:h-40 xl:h-44 2xl:h-52 w-auto object-contain'
 // Landscape: slightly smaller so left column fits
@@ -28,10 +28,14 @@ export default function AppShell() {
   const [gameName, setGameName] = useState<string | null>(null)
   const [gameType, setGameType] = useState<string | null>(null)
   const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
-  const [customLogo, setCustomLogo] = useState<string | null>(null)
+  const themeIsDark = useAppThemeIsDark()
+  const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
+  const customLogo = userMedia ? resolveLogoDisplayUrl(userMedia, themeIsDark) : null
+  const [avatarMediaUrls, setAvatarMediaUrls] = useState<Partial<Record<'idle' | 'win' | 'lose', string | null>>>({})
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
   const [gameSettings, setGameSettings] = useState<Record<string, unknown> | null>(null)
   const [counterActive, setCounterActive] = useState(false)
+  const [avatarState, setAvatarState] = useState('idle')
   const portraitContentRef = useRef<HTMLDivElement>(null)
   const landscapeContentRef = useRef<HTMLDivElement>(null)
   const [portraitPaddingTopDvh, setPortraitPaddingTopDvh] = useState(5)
@@ -39,12 +43,26 @@ export default function AppShell() {
   const [landscapeScale, setLandscapeScale] = useState(1)
   const [landscapeContentSize, setLandscapeContentSize] = useState<{ width: number; height: number } | null>(null)
 
-  // Load custom logo from localStorage
+  // Load custom logo and avatar media from backend.
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_LOGO)
-    if (saved) {
-      setCustomLogo(saved)
+    const load = async () => {
+      try {
+        const media = await fetchUserMedia()
+        setUserMedia(media)
+        setAvatarMediaUrls({
+          idle: media.avatar.selected?.idle?.url ?? null,
+          win: media.avatar.selected?.win?.url ?? null,
+          lose: media.avatar.selected?.lose?.url ?? null,
+        })
+      } catch {
+        setUserMedia(null)
+      }
     }
+    void load()
+
+    const onMediaUpdate = () => void load()
+    window.addEventListener('user-media-updated', onMediaUpdate)
+    return () => window.removeEventListener('user-media-updated', onMediaUpdate)
   }, [])
 
   // Load gameId, gameName, and gameType from localStorage on mount
@@ -124,6 +142,10 @@ export default function AppShell() {
     }
   }, [gameId, gameDefinition?.id, gameConfigVersion])
 
+  useEffect(() => {
+    setAvatarState('idle')
+  }, [gameId, gameConfigVersion])
+
   const handleGameCreated = (name: string, id: string, type?: string) => {
     setGameName(name)
     setGameId(id)
@@ -137,6 +159,7 @@ export default function AppShell() {
     setGameType(null)
     setGameDefinition(null)
     setShowSettings(false)
+    setAvatarState('idle')
   }
 
   const backShellRef = useRef({ showSettings: false, inGame: false })
@@ -316,6 +339,7 @@ export default function AppShell() {
                           topX={rankingTopX}
                           prizeLabel={rankingPrizeLabel}
                           onCounterActiveChange={setCounterActive}
+                          onAvatarStateChange={setAvatarState}
                         />
                       </div>
                       <div className="grow-[2] basis-0 shrink min-h-0 flex flex-col gap-3 min-w-0 overflow-hidden">
@@ -342,6 +366,7 @@ export default function AppShell() {
                           topX={rankingTopX}
                           prizeLabel={rankingPrizeLabel}
                           onCounterActiveChange={setCounterActive}
+                          onAvatarStateChange={setAvatarState}
                         />
                       </div>
                       <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
@@ -383,6 +408,7 @@ export default function AppShell() {
                         topX={rankingTopX}
                         prizeLabel={rankingPrizeLabel}
                         onCounterActiveChange={setCounterActive}
+                        onAvatarStateChange={setAvatarState}
                         logoElement={
                           (customLogo || currentGame.assets?.logo) ? (
                             <div className="flex justify-center items-center w-full min-w-0">
@@ -395,7 +421,7 @@ export default function AppShell() {
                           ) : null
                         }
                         sidebarElement={
-                          <div className="flex flex-col gap-2 w-full min-w-0 min-h-0 flex-1 h-full overflow-hidden self-stretch">
+                          <div className="flex flex-col gap-2 w-full min-w-0 min-h-0 flex-1 h-full overflow-y-auto self-stretch pr-1">
                             <div className="flex-shrink-0 w-full">
                               <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                             </div>
@@ -407,6 +433,15 @@ export default function AppShell() {
                             {features.raffles && (
                               <div className="flex-shrink-0 w-full">
                                 <RaffleData gameId={gameId} gameName={gameName} compact prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                              </div>
+                            )}
+                            {!currentGame.showRanking && (
+                              <div className="min-h-[180px] flex-[1_1_180px] w-full overflow-hidden">
+                                <GameStateAvatar
+                                  state={avatarState}
+                                  mediaUrls={avatarMediaUrls}
+                                  className="card rounded-xl sm:rounded-2xl shadow-neon w-full h-full min-w-0 overflow-hidden p-2 sm:p-3"
+                                />
                               </div>
                             )}
                           </div>
@@ -441,10 +476,10 @@ export default function AppShell() {
           />
         )}
 
-        {/* Logo fijo - always stand logo in bottom right corner */}
+        {/* Logo fijo de footer (inmutable) en esquina inferior derecha */}
         <div className={`fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity z-10 ${isPortrait ? 'w-14 h-14 lg:w-16 lg:h-16 2xl:w-20 2xl:h-20' : 'w-10 h-10 lg:w-12 lg:h-12'}`}>
           <img 
-            src="/images/stand-logo.png" 
+            src="/images/logo-stand-footer.png" 
             alt="Stand" 
             className="w-full h-full object-contain" 
           />

@@ -44,3 +44,23 @@ export function useStandLogo(): string {
 
   return logo
 }
+
+/** True when aspecto is oscuro (dark), false for claro (light). Updates when `STORAGE_KEY_THEME_MODE` changes. */
+export function useAppThemeIsDark(): boolean {
+  const [isDark, setIsDark] = useState(() => localStorage.getItem(STORAGE_KEY_THEME_MODE) !== 'light')
+
+  useEffect(() => {
+    const update = () => setIsDark(localStorage.getItem(STORAGE_KEY_THEME_MODE) !== 'light')
+    const interval = setInterval(update, 500)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY_THEME_MODE) update()
+    }
+    window.addEventListener('storage', handleStorageChange)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [])
+
+  return isDark
+}

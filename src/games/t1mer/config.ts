@@ -18,7 +18,7 @@ export const t1merDefinition: GameDefinition = {
   assets: {
     logo: '/images/t1mer-logo.png',
     clientLogo: '/client-logo.png',
-    standLogo: '/images/stand-logo.png',
+    standLogo: '/images/logo-stand-footer.png',
   },
   GameScreen: T1merGameScreen,
   showRanking: true,

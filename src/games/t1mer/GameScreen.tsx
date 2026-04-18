@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import QRCode from '../../core/widgets/QRCode'
 import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import GameStateAvatar from '../../core/widgets/GameStateAvatar'
 import BackButton from '../../core/widgets/BackButton'
 import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
@@ -17,7 +18,7 @@ import { useWebOsPointerPrimary } from '../../core/input/useWebOsPointerPrimary'
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
 
-export default function T1merGameScreen({ gameId, orientation, logoElement, sidebarElement, topX, prizeLabel, onCounterActiveChange }: GameScreenProps) {
+export default function T1merGameScreen({ gameId, orientation, logoElement, sidebarElement, topX, prizeLabel, onCounterActiveChange, onAvatarStateChange }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [timer, setTimer] = useState(0)
   const [playerCode, setPlayerCode] = useState('')
@@ -230,6 +231,16 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   })
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
+  const avatarState: string =
+    gameState === 'preparing'
+      ? 'ready'
+      : gameState === 'hidden'
+        ? 'playing'
+        : gameState
+
+  useEffect(() => {
+    onAvatarStateChange?.(avatarState)
+  }, [avatarState, onAvatarStateChange])
 
   /** Altura fija del contador: no crece ni se mueve entre estados. */
   const t1merTimerSlotClassPortrait =
@@ -250,7 +261,11 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
-        <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
+        <GameLandscapeInfoColumn
+          gameId={gameId}
+          logoElement={logoElement}
+          avatarElement={<GameStateAvatar state={avatarState} />}
+        >
           <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
             Escanea el QR y pulsa JUGAR.
           </LandscapeInfoInstruction>

@@ -6,6 +6,7 @@ type GameLandscapeInfoColumnProps = {
   gameId: string
   logoElement: ReactNode
   children: ReactNode
+  avatarElement?: ReactNode
 }
 
 /** Una fila de instrucciones para la columna izquierda en landscape: emoji como viñeta, texto alineado al lado (como la tarjeta virtual de infocards). */
@@ -32,15 +33,25 @@ export function LandscapeInfoInstruction({
   )
 }
 
-export default function GameLandscapeInfoColumn({ gameId, logoElement, children }: GameLandscapeInfoColumnProps) {
+export default function GameLandscapeInfoColumn({ gameId, logoElement, children, avatarElement }: GameLandscapeInfoColumnProps) {
   return (
     <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0 h-full">
       <div className="flex-shrink-0 flex justify-center items-start w-full min-w-0 px-0.5">
         {logoElement}
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center">
-        <ul className="m-0 list-none space-y-2.5 sm:space-y-3.5 p-0 min-h-0">{children}</ul>
-      </div>
+      {avatarElement ? (
+        <div className="card rounded-xl sm:rounded-2xl shadow-neon flex-1 min-h-0 relative overflow-hidden">
+          <div className="absolute inset-0">{avatarElement}</div>
+          <div className="absolute inset-0 bg-gradient-to-b from-[rgba(0,0,0,0.75)] via-[rgba(0,0,0,0.45)] to-[rgba(0,0,0,0.8)]" />
+          <div className="relative z-10 h-full overflow-y-auto p-3">
+            <ul className="m-0 list-none space-y-2.5 sm:space-y-3.5 p-0">{children}</ul>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col justify-center">
+          <ul className="m-0 list-none space-y-2.5 sm:space-y-3.5 p-0 min-h-0">{children}</ul>
+        </div>
+      )}
       <div className="flex-shrink-0 flex flex-row justify-between items-end gap-2 pt-1 w-full min-w-0">
         <div className="flex min-w-0 max-w-[55%] items-end gap-1 self-end">
           <span

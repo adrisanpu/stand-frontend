@@ -53,7 +53,7 @@ function getCardLayouts(gameId: string): Record<string, CardLayoutPosition> {
   return {}
 }
 
-export default function InfocardsGameScreen({ gameId, orientation, sidebarElement }: GameScreenProps) {
+export default function InfocardsGameScreen({ gameId, orientation, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [cards, setCards] = useState<InfoCard[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -78,6 +78,10 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
   useEffect(() => {
     fetchCards()
   }, [fetchCards])
+
+  useEffect(() => {
+    onAvatarStateChange?.('idle')
+  }, [onAvatarStateChange])
 
   const joinCardVirtual: InfoCard = {
     id: INFOCARDS_JOIN_CARD_ID,

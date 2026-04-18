@@ -50,7 +50,7 @@ vi.mock('../../auth/featureFlags', () => ({
 }))
 
 vi.mock('../theme', () => ({
-  useStandLogo: () => '/stand-logo.png',
+  useStandLogo: () => '/images/logo_stand_letters_white.png',
 }))
 
 // ---------------------------------------------------------------------------
