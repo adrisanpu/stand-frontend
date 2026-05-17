@@ -45,3 +45,11 @@ interface GameDefinition {
 ## Orientation layout
 - Games can specify landscape/portrait preference
 - AppShell handles orientation prompts — don't add your own rotation logic
+
+## Mandatory GameScreen layout reuse
+- For new games, always reuse `src/core/ui/gameScreenLayout.ts` tokens.
+- Landscape must use `GAME_LANDSCAPE_THREE_COL_GRID` and `GAME_LANDSCAPE_CENTER_CARD`.
+- Landscape left column must use `GameLandscapeInfoColumn` (logo + instructions + QR/context).
+- Landscape right column must render `sidebarElement` from `GameScreenProps`; do not reimplement shell widgets.
+- Portrait must include `GAME_PORTRAIT_QR_INSTRUCTIONS_GRID` for QR + instructions.
+- Avoid ad-hoc/custom layout grids when shared layout components/tokens already exist.
