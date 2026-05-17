@@ -45,7 +45,7 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, s
   const [code, setCode] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
   const [state, setState] = useState<ImpostorStateResponse | null>(null)
-  const [loadingState, setLoadingState] = useState(false)
+  const [, setLoadingState] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [voterPlayerId, setVoterPlayerId] = useState<number | null>(null)
   const [targetPlayerId, setTargetPlayerId] = useState<number | null>(null)

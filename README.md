@@ -130,6 +130,15 @@ Start here for the full end-to-end checklist:
 - **Branches:** `main`, `dev` (tracked with `origin`).
 - **Backend:** Separate repo [stand-backend](https://github.com/adrisanpu/stand-backend); deploy and config there.
 
+### Branch flow and merge
+
+| Target | Merge method | Deploy |
+|--------|--------------|--------|
+| PR → `dev` | **Squash merge** (ruleset) | Amplify app for `dev.playstand.app` (branch `dev`) |
+| `main` | Your choice | Amplify prod (`playstand.app`) |
+
+CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `npm run build` on PRs to `dev` and `main`. Squash ruleset: [`docs/github-ruleset-dev-squash.json`](docs/github-ruleset-dev-squash.json) — apply via GitHub Settings → Rules or `stand-backend/scripts/apply-github-rulesets.ps1` (all 3 repos).
+
 ---
 
 ## Author & license
