@@ -10,7 +10,7 @@ This repo is the **frontend only**. Backend lives in a separate repo: [stand-bac
 
 ```bash
 npm install
-# Create a .env file with the variables listed in "Environment variables" below
+# Dev: copy .env.example → .env.development and fill dev API + Cognito client (see below)
 npm run dev
 ```
 
@@ -35,18 +35,45 @@ npm run dev
 
 ## Environment variables
 
-Create `.env` in the project root:
+Vite loads env files by mode:
+
+| File | When used |
+|------|-----------|
+| [`.env.development`](.env.development) | `npm run dev` (dev API + localhost Cognito redirects) |
+| `.env` | Optional overrides (gitignored) |
+| [`.env.example`](.env.example) | Template for prod and dev values |
+
+Required variables: `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_REDIRECT_URI`, `VITE_COGNITO_LOGOUT_URI`, `VITE_API_BASE_URL`.
+
+### Environments (prod vs dev)
+
+| | **Prod** | **Dev** |
+|---|----------|---------|
+| API host | prod API Gateway id | dev API Gateway id (different `execute-api` URL) |
+| URL path | `/prod` | `/prod` (same stage name; isolation is by API id + `stand-dev-*` data) |
+| Backend stack | `stand-backend-prod` | `stand-backend-dev` |
+| Cognito | Same User Pool; **prod** App Client | Same pool; **dev** App Client |
+| Local UI | `.env` or prod build vars | `.env.development` |
+| Hosted UI | playstand.app (Amplify env vars) | dev.playstand.app (separate Amplify app) |
+
+Backend one-time setup and deploy: [stand-backend/docs/DEV_ENVIRONMENT.md](../stand-backend/docs/DEV_ENVIRONMENT.md).
+
+### Amplify (dev.playstand.app)
+
+1. Create a new Amplify app connected to this repo (branch e.g. `dev` or `main`).
+2. Use [`amplify.yml`](amplify.yml) (same build as prod).
+3. Add custom domain `dev.playstand.app`.
+4. Set **environment variables** in Amplify (build time; override `.env.development`):
 
 ```env
-# Cognito
-VITE_COGNITO_DOMAIN=your-domain.auth.region.amazoncognito.com
-VITE_COGNITO_CLIENT_ID=your-client-id
-VITE_COGNITO_REDIRECT_URI=http://localhost:5173/auth/callback
-VITE_COGNITO_LOGOUT_URI=http://localhost:5173/logout
-
-# Backend API (Stand backend)
-VITE_API_BASE_URL=https://your-api-gateway-url.amazonaws.com/prod
+VITE_API_BASE_URL=https://<dev-game-api-id>.execute-api.us-east-1.amazonaws.com/prod
+VITE_COGNITO_DOMAIN=us-east-154exbunq1.auth.us-east-1.amazoncognito.com
+VITE_COGNITO_CLIENT_ID=<DEV_CLIENT_ID>
+VITE_COGNITO_REDIRECT_URI=https://dev.playstand.app/auth/callback
+VITE_COGNITO_LOGOUT_URI=https://dev.playstand.app/logout
 ```
+
+Prod hosting (playstand.app) uses the same `amplify.yml` with prod `VITE_*` values configured in that Amplify app’s console.
 
 ---
 
@@ -98,6 +125,10 @@ Backend APIs used by games (e.g. validate, score, stats) are implemented in [sta
 ---
 
 ## Adding a new game
+
+Start here for the full end-to-end checklist:
+
+- [`docs/new-game-playbook.md`](docs/new-game-playbook.md)
 
 1. **Add folder** `src/games/your-game/` with:
    - `config.ts` — `GameDefinition` (id, name, colors, assets, `GameScreen`, optional `showRanking`, optional `GameConfigComponent`).
