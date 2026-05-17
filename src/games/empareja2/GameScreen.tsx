@@ -24,6 +24,7 @@ type ValidationResponse = {
     characterId: number
     characterName: string
     characterImageUrl?: string | null
+    profilePicUrl?: string | null
   }>
   message: string
   notified?: boolean
@@ -71,6 +72,10 @@ function PairCharacterSlot({
 }) {
   const dim = SLOT_DIM[variant]
   const imgUrl = player?.characterImageUrl || null
+  const profilePic =
+    typeof player?.profilePicUrl === 'string' && player.profilePicUrl.trim() !== ''
+      ? player.profilePicUrl.trim()
+      : null
   const handle =
     player?.instagramUsername != null && player.instagramUsername !== ''
       ? formatIgHandle(player.instagramUsername)
@@ -94,9 +99,19 @@ function PairCharacterSlot({
         </span>
       )}
       {filled && handle ? (
-        <span className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/70 text-white text-xs sm:text-sm font-semibold max-w-[90%] truncate">
-          {handle}
-        </span>
+        <div className="absolute top-2 left-2 z-10 flex max-w-[calc(100%-0.5rem)] items-center gap-1.5">
+          {profilePic ? (
+            <img
+              src={profilePic}
+              alt={handle ? `Foto de perfil de ${handle}` : 'Foto de perfil'}
+              referrerPolicy="no-referrer"
+              className="h-8 w-8 shrink-0 rounded-full border-2 border-[rgba(176,38,255,0.5)] object-cover shadow-md sm:h-9 sm:w-9"
+            />
+          ) : null}
+          <span className="min-w-0 truncate rounded-md bg-black/70 px-2 py-1 text-xs font-semibold text-white sm:text-sm">
+            {handle}
+          </span>
+        </div>
       ) : null}
     </div>
   )

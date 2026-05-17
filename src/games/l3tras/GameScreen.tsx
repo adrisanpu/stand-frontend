@@ -16,6 +16,12 @@ import {
 
 type GameState = 'idle' | 'checking' | 'success'
 
+type L3trasSlotCell = {
+  letter: string
+  instagramUsername?: string
+  profilePicUrl?: string | null
+} | null
+
 type ValidationResponse = {
   valid: boolean
   gameId: string
@@ -23,6 +29,7 @@ type ValidationResponse = {
     playerId: number
     instagramUsername?: string
     letter?: string
+    profilePicUrl?: string
     [key: string]: unknown
   }>
   results?: Array<{
@@ -44,6 +51,12 @@ function pickLetter(result: ValidationResponse): string | null {
   const r = result.results?.[0]?.letter
   if (typeof r === 'string' && r.length === 1) return r.toUpperCase()
   return null
+}
+
+function formatIgHandle(username: string) {
+  const u = username.trim()
+  if (!u) return ''
+  return u.startsWith('@') ? u : `@${u}`
 }
 
 function L3trasPieTimer({ remainingMs, totalMs }: { remainingMs: number; totalMs: number }) {
@@ -74,7 +87,7 @@ function L3trasPieTimer({ remainingMs, totalMs }: { remainingMs: number; totalMs
 export default function L3trasGameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [settings, setSettings] = useState<L3trasSettings | null>(null)
-  const [slots, setSlots] = useState<(string | null)[]>([])
+  const [slots, setSlots] = useState<L3trasSlotCell[]>([])
   const [codeInput, setCodeInput] = useState('')
   const [usedCodes, setUsedCodes] = useState<string[]>([])
   const [, setCodesUsedOrder] = useState<string[]>([])
@@ -82,7 +95,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, sid
   const [message, setMessage] = useState<string | null>(null)
   const [timerSession, setTimerSession] = useState(0)
   const [timerTick, setTimerTick] = useState(0)
-  const slotsRef = useRef<(string | null)[]>([])
+  const slotsRef = useRef<L3trasSlotCell[]>([])
   const roundEndTimeRef = useRef<number | null>(null)
   const roundDurationMsRef = useRef(0)
   const gameIdRef = useRef(gameId)
@@ -293,6 +306,14 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, sid
         setTimerSession((s) => s + 1)
       }
 
+      const p0 = result.players?.[0]
+      const picRaw = typeof p0?.profilePicUrl === 'string' ? p0.profilePicUrl.trim() : ''
+      const cellMeta = {
+        letter,
+        instagramUsername: typeof p0?.instagramUsername === 'string' ? p0.instagramUsername : undefined,
+        profilePicUrl: picRaw || null,
+      }
+
       const prevSlots = slotsRef.current
       const nextSlots =
         prevSlots.length === word.length
@@ -301,7 +322,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, sid
       let filledAny = false
       for (let i = 0; i < word.length; i++) {
         if (word[i] === letter && nextSlots[i] === null) {
-          nextSlots[i] = letter
+          nextSlots[i] = { ...cellMeta, letter }
           filledAny = true
         }
       }
@@ -352,29 +373,68 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, sid
 
   const renderHangmanRow = (compact: boolean) => (
     <div
-      className={`flex flex-wrap justify-center ${compact ? 'gap-2 sm:gap-3' : 'gap-4 sm:gap-5'}`}
+      className={`flex flex-wrap justify-center ${compact ? 'gap-5 sm:gap-6' : 'gap-6 sm:gap-8'}`}
       aria-label="Letras descubiertas"
     >
-      {slots.map((ch, i) => (
-        <div
-          key={`${i}-${ch ?? '_'}`}
-          className={`flex flex-col items-center justify-end border-b-2 border-white/25 ${
-            compact ? 'min-w-[2rem] sm:min-w-[2.25rem] pb-1' : 'min-w-[3rem] sm:min-w-[3.25rem] pb-1.5'
-          }`}
-        >
-          <span
-            className={`font-bold text-[#10B981] font-mono tabular-nums ${
-              ch ? 'animate-scale-in' : ''
-            } ${
-              compact
-                ? 'text-4xl sm:text-5xl lg:text-6xl min-h-[2.75rem] sm:min-h-[3.25rem]'
-                : 'text-6xl sm:text-7xl lg:text-8xl min-h-[4.5rem] sm:min-h-[5rem] lg:min-h-[5.5rem]'
-            }`}
-          >
-            {ch ?? ''}
-          </span>
-        </div>
-      ))}
+      {slots.map((cell, i) => {
+        const ch = cell?.letter ?? ''
+        const handle =
+          cell?.instagramUsername != null && String(cell.instagramUsername).trim() !== ''
+            ? formatIgHandle(String(cell.instagramUsername))
+            : ''
+        const pic =
+          typeof cell?.profilePicUrl === 'string' && cell.profilePicUrl.trim() !== '' ? cell.profilePicUrl.trim() : ''
+        const showContributor = Boolean(cell && (pic || handle))
+
+        return (
+          <div key={`${i}-${ch || '_'}`} className="flex flex-col items-center">
+            <div
+              className={`flex flex-col items-center border-b-2 border-white/25 ${
+                compact ? 'min-w-[2.75rem] sm:min-w-[3.25rem] pb-1' : 'min-w-[3.25rem] sm:min-w-[4rem] pb-1.5'
+              }`}
+            >
+              <span
+                className={`font-bold text-[#10B981] font-mono tabular-nums ${
+                  ch ? 'animate-scale-in' : ''
+                } ${
+                  compact
+                    ? 'text-4xl sm:text-5xl lg:text-6xl min-h-[2.75rem] sm:min-h-[3.25rem]'
+                    : 'text-6xl sm:text-7xl lg:text-8xl min-h-[4.5rem] sm:min-h-[5rem] lg:min-h-[5.5rem]'
+                }`}
+              >
+                {ch}
+              </span>
+            </div>
+            {showContributor ? (
+              <div
+                className={`flex max-w-full flex-col items-center gap-1 ${
+                  compact ? 'mt-2' : 'mt-2.5'
+                }`}
+              >
+                {pic ? (
+                  <img
+                    src={pic}
+                    alt={handle ? `Foto de perfil de ${handle}` : 'Foto de perfil'}
+                    referrerPolicy="no-referrer"
+                    className={`shrink-0 rounded-full border-2 border-[rgba(16,185,129,0.45)] object-cover shadow-sm ${
+                      compact ? 'h-9 w-9' : 'h-11 w-11'
+                    }`}
+                  />
+                ) : null}
+                {handle ? (
+                  <span
+                    className={`max-w-full truncate text-center font-medium text-gray-400 leading-tight ${
+                      compact ? 'text-xs max-w-[5.5rem]' : 'text-sm max-w-[7rem]'
+                    }`}
+                  >
+                    {handle}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        )
+      })}
     </div>
   )
 
