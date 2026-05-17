@@ -10,7 +10,7 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment variables
+# Environment variables (committed: .env.example, .env.development)
 .env
 .env.local
 .env.development.local

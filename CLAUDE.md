@@ -14,7 +14,7 @@ Auth uses Cognito PKCE OAuth2. All API calls go through the central api.ts clien
 
 **API client** (`src/api/api.ts`): `api.get(path)` | `api.post(path, body)` | `api.put(path, body)` | `api.delete(path)`
 
-**Env vars:** `VITE_COGNITO_DOMAIN` | `VITE_COGNITO_CLIENT_ID` | `VITE_COGNITO_REDIRECT_URI` | `VITE_API_BASE_URL`
+**Env:** `VITE_*` — see `.env.example`; dev setup in [stand-backend/docs/DEV_ENVIRONMENT.md](../stand-backend/docs/DEV_ENVIRONMENT.md)
 
 **Game IDs (lowercase):** empareja2, t1mer, rulet4, l3tras, semaforo, infocards, cupido
 Canonical game id strings: `mapGameTypeToId()` in `src/core/gameTypeMap.ts` (used by `src/core/shell/AppShell.tsx`)
