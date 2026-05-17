@@ -56,24 +56,10 @@ Required variables: `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNI
 | Local UI | `.env` or prod build vars | `.env.development` |
 | Hosted UI | playstand.app (Amplify env vars) | dev.playstand.app (separate Amplify app) |
 
-Backend one-time setup and deploy: [stand-backend/docs/DEV_ENVIRONMENT.md](../stand-backend/docs/DEV_ENVIRONMENT.md).
+Full setup (AWS, Cognito, Amplify, deploy): **[stand-backend/docs/DEV_ENVIRONMENT.md](../stand-backend/docs/DEV_ENVIRONMENT.md)**.
 
-### Amplify (dev.playstand.app)
-
-1. Create a new Amplify app connected to this repo (branch e.g. `dev` or `main`).
-2. Use [`amplify.yml`](amplify.yml) (same build as prod).
-3. Add custom domain `dev.playstand.app`.
-4. Set **environment variables** in Amplify (build time; override `.env.development`):
-
-```env
-VITE_API_BASE_URL=https://<dev-game-api-id>.execute-api.us-east-1.amazonaws.com/prod
-VITE_COGNITO_DOMAIN=us-east-154exbunq1.auth.us-east-1.amazoncognito.com
-VITE_COGNITO_CLIENT_ID=<DEV_CLIENT_ID>
-VITE_COGNITO_REDIRECT_URI=https://dev.playstand.app/auth/callback
-VITE_COGNITO_LOGOUT_URI=https://dev.playstand.app/logout
-```
-
-Prod hosting (playstand.app) uses the same `amplify.yml` with prod `VITE_*` values configured in that Amplify app’s console.
+- **Local:** copy [`.env.example`](.env.example) → `.env.development` or `.env.development.local` (gitignored).
+- **Hosted:** [`amplify.yml`](amplify.yml) + `VITE_*` in the Amplify console (see backend guide §5).
 
 ---
 
