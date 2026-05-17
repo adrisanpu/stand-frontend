@@ -24,6 +24,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   const [playerCode, setPlayerCode] = useState('')
   const [playerId, setPlayerId] = useState<string | null>(null)
   const [username, setUsername] = useState<string | null>(null)
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
   const [isValidating, setIsValidating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{ time: number; difference: number } | null>(null)
@@ -88,7 +89,14 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
     setError(null)
 
     try {
-      const data = await api.post<{ valid: boolean; playerId?: string; username?: string; message?: string; error?: string }>('/v1/game/validate', {
+      const data = await api.post<{
+        valid: boolean
+        playerId?: string
+        username?: string
+        profilePicUrl?: string
+        message?: string
+        error?: string
+      }>('/v1/game/validate', {
         gameId: gameId,
         codes: [String(playerCode).trim()]
       })
@@ -96,6 +104,8 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
       if (data.valid && data.playerId) {
         setPlayerId(data.playerId)
         setUsername(data.username || null)
+        const pic = typeof data.profilePicUrl === 'string' ? data.profilePicUrl.trim() : ''
+        setProfilePicUrl(pic || null)
         setError(null)
         setGameState('preparing')
       } else {
@@ -165,6 +175,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
     setPlayerCode('')
     setPlayerId(null)
     setUsername(null)
+    setProfilePicUrl(null)
   }
 
   const handleStartRef = useRef(handleStart)
@@ -314,12 +325,31 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
               <div className={t1merPreparingHeaderSlotLandscape}>
                 <div className="space-y-2 sm:space-y-3 overflow-y-auto min-h-0 max-h-full overscroll-contain">
                   {gameState === 'preparing' && (
-                    <>
-                      {username && <p className="text-3xl font-bold text-red-500 leading-tight">{username.startsWith('@') ? username : `@${username}`}</p>}
-                      <p className="text-xl sm:text-2xl text-gray-300 leading-snug">
-                        Detén el contador cuando llegue a <span className="font-digital text-red-500 text-2xl sm:text-3xl">10:00.0</span>
-                      </p>
-                    </>
+                    <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:items-start sm:justify-center sm:gap-4">
+                      {profilePicUrl ? (
+                        <img
+                          src={profilePicUrl}
+                          alt={
+                            username
+                              ? `Foto de perfil de ${username.startsWith('@') ? username : `@${username}`}`
+                              : 'Foto de perfil'
+                          }
+                          referrerPolicy="no-referrer"
+                          className="h-14 w-14 shrink-0 rounded-full border-2 border-red-500/40 object-cover shadow-md sm:h-16 sm:w-16"
+                        />
+                      ) : null}
+                      <div className="min-w-0 max-w-full space-y-2 text-center sm:space-y-3 sm:text-left">
+                        {username && (
+                          <p className="text-3xl font-bold leading-tight text-red-500">
+                            {username.startsWith('@') ? username : `@${username}`}
+                          </p>
+                        )}
+                        <p className="text-xl leading-snug text-gray-300 sm:text-2xl">
+                          Detén el contador cuando llegue a{' '}
+                          <span className="font-digital text-2xl text-red-500 sm:text-3xl">10:00.0</span>
+                        </p>
+                      </div>
+                    </div>
                   )}
                   {gameState === 'finished' && result && (
                     <>
@@ -487,12 +517,31 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
               <div className={t1merPreparingHeaderSlotPortrait}>
                 <div className="space-y-2 sm:space-y-3 overflow-y-auto min-h-0 max-h-full overscroll-contain">
                   {gameState === 'preparing' && (
-                    <>
-                      {username && <p className="text-4xl lg:text-5xl font-bold text-red-500 leading-tight">{username.startsWith('@') ? username : `@${username}`}</p>}
-                      <p className="text-lg sm:text-xl lg:text-2xl text-gray-300 leading-snug">
-                        Detén el contador cuando llegue a <span className="font-digital text-red-500 text-2xl sm:text-3xl lg:text-4xl">10:00.0</span>
-                      </p>
-                    </>
+                    <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:items-start sm:justify-center sm:gap-4">
+                      {profilePicUrl ? (
+                        <img
+                          src={profilePicUrl}
+                          alt={
+                            username
+                              ? `Foto de perfil de ${username.startsWith('@') ? username : `@${username}`}`
+                              : 'Foto de perfil'
+                          }
+                          referrerPolicy="no-referrer"
+                          className="h-16 w-16 shrink-0 rounded-full border-2 border-red-500/40 object-cover shadow-md sm:h-[4.5rem] sm:w-[4.5rem]"
+                        />
+                      ) : null}
+                      <div className="min-w-0 max-w-full space-y-2 text-center sm:space-y-3 sm:text-left">
+                        {username && (
+                          <p className="text-4xl font-bold leading-tight text-red-500 lg:text-5xl">
+                            {username.startsWith('@') ? username : `@${username}`}
+                          </p>
+                        )}
+                        <p className="text-lg leading-snug text-gray-300 sm:text-xl lg:text-2xl">
+                          Detén el contador cuando llegue a{' '}
+                          <span className="font-digital text-2xl text-red-500 sm:text-3xl lg:text-4xl">10:00.0</span>
+                        </p>
+                      </div>
+                    </div>
                   )}
                   {gameState === 'finished' && result && (
                     <>
