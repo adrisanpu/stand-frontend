@@ -134,10 +134,10 @@ Start here for the full end-to-end checklist:
 
 | Target | Merge method | Deploy |
 |--------|--------------|--------|
-| PR → `dev` | **Squash merge** (ruleset) | Amplify app for `dev.playstand.app` (branch `dev`) |
-| `main` | Your choice | Amplify prod (`playstand.app`) |
+| PR → `dev` | **Squash merge** (only method enabled) | Amplify app for `dev.playstand.app` (branch `dev`) |
+| `main` | **Squash merge** (same repo setting) | Amplify prod (`playstand.app`) |
 
-CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `npm run build` on PRs to `dev` and `main`. Squash ruleset: [`docs/github-ruleset-dev-squash.json`](docs/github-ruleset-dev-squash.json) — apply via GitHub Settings → Rules or `stand-backend/scripts/apply-github-rulesets.ps1` (all 3 repos).
+CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `npm run build` on PRs to `dev` and `main`. Squash-only merge: `stand-backend/scripts/apply-squash-merge-settings.ps1` (all 3 repos).
 
 ---
 
