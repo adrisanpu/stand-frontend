@@ -8,5 +8,6 @@ export function mapGameTypeToId(type: string | undefined): string {
   if (normalized === 'cupido') return 'cupido'
   if (normalized === 'semaforo' || normalized === 'semáforo') return 'semaforo'
   if (normalized === 'infocards') return 'infocards'
+  if (normalized === 'impostor') return 'impostor'
   return normalized
 }
