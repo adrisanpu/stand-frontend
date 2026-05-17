@@ -8,6 +8,7 @@ Use this playbook when adding a new game to Stand. It is optimized for:
 
 This document complements:
 
+- [stand-backend/docs/DEVELOPMENT_WORKFLOW.md](https://github.com/adrisanpu/stand-backend/blob/dev/docs/DEVELOPMENT_WORKFLOW.md) — branches, CI/CD, agents
 - `stand-frontend/CLAUDE.md`
 - `stand-frontend/docs/operator-game-ui.md`
 - `stand-backend/README.md`
