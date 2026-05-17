@@ -26,6 +26,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
   const [playerCode, setPlayerCode] = useState('')
   const [playerId, setPlayerId] = useState<string | null>(null)
   const [username, setUsername] = useState<string | null>(null)
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isValidating, setIsValidating] = useState(false)
   const [rotation, setRotation] = useState(0)
@@ -73,7 +74,14 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
     setError(null)
 
     try {
-      const data = await api.post<{ valid: boolean; playerId?: string; username?: string; message?: string; error?: string }>('/v1/game/validate', {
+      const data = await api.post<{
+        valid: boolean
+        playerId?: string
+        username?: string
+        profilePicUrl?: string
+        message?: string
+        error?: string
+      }>('/v1/game/validate', {
         gameId: gameId,
         codes: [String(playerCode).trim()]
       })
@@ -81,6 +89,8 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
       if (data.valid && data.playerId) {
         setPlayerId(data.playerId)
         setUsername(data.username || null)
+        const pic = typeof data.profilePicUrl === 'string' ? data.profilePicUrl.trim() : ''
+        setProfilePicUrl(pic || null)
         setError(null)
         hasSpunRef.current = false
         setGameState('ready')
@@ -165,6 +175,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
     setPlayerCode('')
     setPlayerId(null)
     setUsername(null)
+    setProfilePicUrl(null)
     setError(null)
     setRotation(0)
     setWinningPanel(null)
@@ -221,6 +232,120 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
     onAvatarStateChange?.(avatarState)
   }, [avatarState, onAvatarStateChange])
 
+  const hasProfilePic = profilePicUrl != null && profilePicUrl !== ''
+
+  const profileAvatarColumn = hasProfilePic ? (
+    <div className="flex w-20 shrink-0 flex-col items-center justify-center sm:w-24">
+      <img
+        src={profilePicUrl}
+        alt={username ? `Foto de perfil de ${username}` : 'Foto de perfil'}
+        className="h-20 w-20 rounded-full border-2 border-[rgba(250,204,21,0.4)] object-cover shadow-md sm:h-24 sm:w-24"
+      />
+    </div>
+  ) : null
+
+  /** Fila superior: avatar + contenido (idle/validating cuando ya hay foto, p. ej. flujos futuros). */
+  const wrapTopWithProfilePic = (align: 'start' | 'center', children: React.ReactNode) => {
+    if (!hasProfilePic) return <>{children}</>
+    const rowAlign = align === 'start' ? 'items-start' : 'items-center'
+    return (
+      <div className={`flex flex-row gap-5 sm:gap-6 ${rowAlign}`}>
+        {profileAvatarColumn}
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    )
+  }
+
+  const renderWelcomeBanner = (layout: 'landscape' | 'portrait', spinning: boolean) => {
+    const outerPad =
+      layout === 'landscape'
+        ? 'p-8'
+        : showJoinBlock
+          ? 'p-8'
+          : 'p-6 flex-1 flex flex-col justify-center'
+    const titleClass =
+      layout === 'landscape'
+        ? 'text-3xl font-bold text-[#FACC15] mb-2'
+        : showJoinBlock
+          ? 'text-3xl font-bold text-[#FACC15] mb-2'
+          : 'text-4xl font-bold text-[#FACC15] mb-2'
+    const subBase =
+      layout === 'landscape'
+        ? 'text-xl text-gray-300'
+        : showJoinBlock
+          ? 'text-xl text-gray-300'
+          : 'text-2xl text-gray-300'
+    const subClass = `${subBase}${spinning ? ' animate-pulse' : ''}`
+
+    const innerMsg = (
+      <div className={hasProfilePic ? 'min-w-0 flex-1 text-left' : 'text-center'}>
+        <div className={titleClass}>¡Bienvenido{username ? `, ${username}` : ''}!</div>
+        <div className={subClass}>
+          {spinning ? 'Girando...' : 'Estás listo para girar la ruleta'}
+        </div>
+      </div>
+    )
+
+    return (
+      <div
+        className={`${outerPad} rounded-xl bg-[rgba(250,204,21,0.15)] border border-[rgba(250,204,21,0.3)]`}
+      >
+        {hasProfilePic ? (
+          <div className="flex flex-row items-center gap-5 sm:gap-6">
+            {profileAvatarColumn}
+            {innerMsg}
+          </div>
+        ) : (
+          innerMsg
+        )}
+      </div>
+    )
+  }
+
+  const renderResultBanner = (layout: 'landscape' | 'portrait') => {
+    if (!winningPanel) return null
+    const outerPad =
+      layout === 'landscape'
+        ? 'p-8'
+        : showJoinBlock
+          ? 'p-8'
+          : 'p-8 flex-1 flex flex-col justify-center'
+    const titleClass =
+      layout === 'landscape'
+        ? 'text-3xl font-bold text-[#FACC15] mb-2'
+        : showJoinBlock
+          ? 'text-3xl font-bold text-[#FACC15] mb-2'
+          : 'text-4xl font-bold text-[#FACC15] mb-2'
+    const prizeClass =
+      layout === 'landscape'
+        ? 'text-4xl font-bold text-white'
+        : showJoinBlock
+          ? 'text-4xl font-bold text-white'
+          : 'text-5xl font-bold text-white'
+
+    const inner = (
+      <div className={hasProfilePic ? 'min-w-0 flex-1 text-left' : 'text-center'}>
+        <div className={titleClass}>{username ? `${username}, ` : ''}¡Has ganado!</div>
+        <div className={prizeClass}>{winningPanel.label}</div>
+      </div>
+    )
+
+    return (
+      <div
+        className={`${outerPad} rounded-xl bg-[rgba(250,204,21,0.15)] border border-[rgba(250,204,21,0.3)]`}
+      >
+        {hasProfilePic ? (
+          <div className="flex flex-row items-center gap-5 sm:gap-6">
+            {profileAvatarColumn}
+            {inner}
+          </div>
+        ) : (
+          inner
+        )}
+      </div>
+    )
+  }
+
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
@@ -241,73 +366,62 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
         <div className={GAME_LANDSCAPE_CENTER_CARD}>
           {/* Validation + messages + wheel - same as portrait flow */}
           <div className="space-y-4 min-h-[140px]">
-            {gameState === 'idle' && (
-              <>
-                <div className="space-y-2">
-                  <div className="flex gap-3">
-                    <input
-                      id="player-code-landscape"
-                      aria-label={CODE_INPUT_PLACEHOLDER}
-                      type="number"
-                      inputMode="numeric"
-                      min={1000}
-                      max={9999}
-                      value={playerCode}
-                      onChange={(e) => setPlayerCode(String(e.target.value))}
-                      placeholder={CODE_INPUT_PLACEHOLDER}
-                      className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
-                      onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleValidate}
-                      disabled={!playerCode.trim() || isValidating}
-                      className="inline-flex items-center justify-center gap-2 px-8 h-14 shrink-0 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
-                    >
-                      {isValidating ? (
-                        <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      )}
-                      {isValidating ? 'Validando…' : VALIDATE_LABEL}
-                    </button>
+            {gameState === 'idle' &&
+              wrapTopWithProfilePic(
+                'start',
+                <>
+                  <div className="space-y-2">
+                    <div className="flex gap-3">
+                      <input
+                        id="player-code-landscape"
+                        aria-label={CODE_INPUT_PLACEHOLDER}
+                        type="number"
+                        inputMode="numeric"
+                        min={1000}
+                        max={9999}
+                        value={playerCode}
+                        onChange={(e) => setPlayerCode(String(e.target.value))}
+                        placeholder={CODE_INPUT_PLACEHOLDER}
+                        className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
+                        onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleValidate}
+                        disabled={!playerCode.trim() || isValidating}
+                        className="inline-flex items-center justify-center gap-2 px-8 h-14 shrink-0 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
+                      >
+                        {isValidating ? (
+                          <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        )}
+                        {isValidating ? 'Validando…' : VALIDATE_LABEL}
+                      </button>
+                    </div>
+                  </div>
+                  {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
+                </>
+              )}
+            {gameState === 'validating' &&
+              wrapTopWithProfilePic(
+                'center',
+                <div className="flex items-center justify-center py-10">
+                  <div className="flex items-center justify-center gap-4">
+                    <svg className="w-8 h-8 animate-spin text-[#FACC15]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <p className="text-2xl font-semibold text-[#FACC15]">Validando código...</p>
                   </div>
                 </div>
-                {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
-              </>
-            )}
-            {gameState === 'validating' && (
-              <div className="flex items-center justify-center py-10">
-                <div className="flex items-center justify-center gap-4">
-                  <svg className="w-8 h-8 animate-spin text-[#FACC15]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <p className="text-2xl font-semibold text-[#FACC15]">Validando código...</p>
-                </div>
-              </div>
-            )}
-            {gameState === 'ready' && (
-              <div className="p-8 rounded-xl bg-[rgba(250,204,21,0.15)] border border-[rgba(250,204,21,0.3)] text-center">
-                <div className="text-3xl font-bold text-[#FACC15] mb-2">¡Bienvenido{username ? `, ${username}` : ''}!</div>
-                <div className="text-xl text-gray-300">Estás listo para girar la ruleta</div>
-              </div>
-            )}
-            {gameState === 'spinning' && (
-              <div className="p-8 rounded-xl bg-[rgba(250,204,21,0.15)] border border-[rgba(250,204,21,0.3)] text-center">
-                <div className="text-3xl font-bold text-[#FACC15] mb-2">¡Bienvenido{username ? `, ${username}` : ''}!</div>
-                <div className="text-xl text-gray-300 animate-pulse">Girando...</div>
-              </div>
-            )}
-            {gameState === 'result' && winningPanel && (
-              <div className="p-8 rounded-xl bg-[rgba(250,204,21,0.15)] border border-[rgba(250,204,21,0.3)] text-center">
-                <div className="text-3xl font-bold text-[#FACC15] mb-2">{username ? `${username}, ` : ''}¡Has ganado!</div>
-                <div className="text-4xl font-bold text-white">{winningPanel.label}</div>
-              </div>
-            )}
+              )}
+            {gameState === 'ready' && renderWelcomeBanner('landscape', false)}
+            {gameState === 'spinning' && renderWelcomeBanner('landscape', true)}
+            {gameState === 'result' && renderResultBanner('landscape')}
           </div>
           {segments.length > 0 && (
             <div className="space-y-6">
@@ -419,102 +533,79 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
 
       {/* Player Code Input / Welcome Message / Prize - Same space, consistent height */}
       <div className={showJoinBlock ? 'space-y-4 min-h-[140px]' : 'flex-1 flex flex-col min-h-0 space-y-4'}>
-        {gameState === 'idle' && (
-          <>
-            <div className="space-y-2">
-              <div className="flex gap-3">
-                <input
-                  id="player-code"
-                  aria-label={CODE_INPUT_PLACEHOLDER}
-                  type="number"
-                  inputMode="numeric"
-                  min={1000}
-                  max={9999}
-                  value={playerCode}
-                  onChange={(e) => setPlayerCode(String(e.target.value))}
-                  placeholder={CODE_INPUT_PLACEHOLDER}
-                  className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      handleValidate()
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleValidate}
-                  disabled={!playerCode.trim() || isValidating}
-                  className="inline-flex items-center justify-center gap-2 px-8 h-14 shrink-0 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
-                >
-                  {isValidating ? (
-                    <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  )}
-                  {isValidating ? 'Validando…' : VALIDATE_LABEL}
-                </button>
+        {gameState === 'idle' &&
+          wrapTopWithProfilePic(
+            'start',
+            <>
+              <div className="space-y-2">
+                <div className="flex gap-3">
+                  <input
+                    id="player-code"
+                    aria-label={CODE_INPUT_PLACEHOLDER}
+                    type="number"
+                    inputMode="numeric"
+                    min={1000}
+                    max={9999}
+                    value={playerCode}
+                    onChange={(e) => setPlayerCode(String(e.target.value))}
+                    placeholder={CODE_INPUT_PLACEHOLDER}
+                    className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleValidate()
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleValidate}
+                    disabled={!playerCode.trim() || isValidating}
+                    className="inline-flex items-center justify-center gap-2 px-8 h-14 shrink-0 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
+                  >
+                    {isValidating ? (
+                      <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                    {isValidating ? 'Validando…' : VALIDATE_LABEL}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {error && (
-              <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">
-                {error}
-              </div>
-            )}
-          </>
-        )}
+              {error && (
+                <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">
+                  {error}
+                </div>
+              )}
+            </>
+          )}
 
         {/* Validating State */}
-        {gameState === 'validating' && (
-          <div className="flex items-center justify-center py-10">
-            <div className="flex items-center justify-center gap-4">
-              <svg className="w-8 h-8 animate-spin text-[#FACC15]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <p className="text-2xl font-semibold text-[#FACC15]">Validando código...</p>
+        {gameState === 'validating' &&
+          wrapTopWithProfilePic(
+            'center',
+            <div className="flex items-center justify-center py-10">
+              <div className="flex items-center justify-center gap-4">
+                <svg className="w-8 h-8 animate-spin text-[#FACC15]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <p className="text-2xl font-semibold text-[#FACC15]">Validando código...</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Welcome Message - After validation */}
-        {gameState === 'ready' && (
-          <div className={`rounded-xl bg-[rgba(250,204,21,0.15)] border border-[rgba(250,204,21,0.3)] text-center ${showJoinBlock ? 'p-8' : 'p-6 flex-1 flex flex-col justify-center'}`}>
-            <div className={showJoinBlock ? 'text-3xl font-bold text-[#FACC15] mb-2' : 'text-4xl font-bold text-[#FACC15] mb-2'}>
-              ¡Bienvenido{username ? `, ${username}` : ''}!
-            </div>
-            <div className={showJoinBlock ? 'text-xl text-gray-300' : 'text-2xl text-gray-300'}>
-              Estás listo para girar la ruleta
-            </div>
-          </div>
-        )}
+        {gameState === 'ready' && renderWelcomeBanner('portrait', false)}
 
         {/* Spinning State - Show in welcome message box */}
-        {gameState === 'spinning' && (
-          <div className={`rounded-xl bg-[rgba(250,204,21,0.15)] border border-[rgba(250,204,21,0.3)] text-center ${showJoinBlock ? 'p-8' : 'p-6 flex-1 flex flex-col justify-center'}`}>
-            <div className={showJoinBlock ? 'text-3xl font-bold text-[#FACC15] mb-2' : 'text-4xl font-bold text-[#FACC15] mb-2'}>
-              ¡Bienvenido{username ? `, ${username}` : ''}!
-            </div>
-            <div className={showJoinBlock ? 'text-xl text-gray-300 animate-pulse' : 'text-2xl text-gray-300 animate-pulse'}>
-              Girando...
-            </div>
-          </div>
-        )}
+        {gameState === 'spinning' && renderWelcomeBanner('portrait', true)}
 
         {/* Prize Display - After spin result */}
-        {gameState === 'result' && winningPanel && (
-          <div className={`rounded-xl bg-[rgba(250,204,21,0.15)] border border-[rgba(250,204,21,0.3)] text-center ${showJoinBlock ? 'p-8' : 'p-8 flex-1 flex flex-col justify-center'}`}>
-            <div className={showJoinBlock ? 'text-3xl font-bold text-[#FACC15] mb-2' : 'text-4xl font-bold text-[#FACC15] mb-2'}>
-              {username ? `${username}, ` : ''}¡Has ganado!
-            </div>
-            <div className={showJoinBlock ? 'text-4xl font-bold text-white' : 'text-5xl font-bold text-white'}>
-              {winningPanel.label}
-            </div>
-          </div>
-        )}
+        {gameState === 'result' && renderResultBanner('portrait')}
       </div>
 
       {/* Roulette Wheel - Always visible */}
