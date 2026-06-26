@@ -309,7 +309,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
 
   if (loading) {
     return (
-      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
+      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden h-full' : 'p-3 sm:p-4 lg:p-6'}`}>
         <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>Sorteo</h2>
         <p className="text-textSub text-xs sm:text-sm">Cargando...</p>
       </div>
@@ -318,7 +318,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
 
   return (
     <div
-      className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col relative ${compact ? 'p-2 sm:p-3 min-w-0' : 'p-3 sm:p-4 lg:p-6 min-h-0 flex-1'} ${winnersDropdownOpen ? 'overflow-visible' : 'overflow-hidden'}`}
+      className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col relative h-full min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0' : 'p-3 sm:p-4 lg:p-6 flex-1'} ${winnersDropdownOpen ? 'overflow-visible' : 'overflow-hidden'}`}
       ref={winnersDropdownRef}
     >
       <h2 className={`font-bold text-textMain mb-1 sm:mb-2 flex items-center gap-2 flex-shrink-0 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>

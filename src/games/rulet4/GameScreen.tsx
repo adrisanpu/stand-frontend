@@ -1,16 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
-import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
+import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
 import type { Rulet4Settings, Rulet4PanelConfig } from './GameConfig'
-import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
-  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
 } from '../../core/ui/gameScreenLayout'
 
 type GameState =
@@ -21,7 +20,7 @@ type GameState =
   | 'result'     // showing selected panel
   | 'finished'   // optional; auto-reset logic
 
-export default function Rulet4GameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function Rulet4GameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [playerCode, setPlayerCode] = useState('')
   const [playerId, setPlayerId] = useState<string | null>(null)
@@ -349,20 +348,20 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
-        <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+        <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
+          <LandscapeInfoInstruction>
             Escanea el QR y pulsa JUGAR.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="🎟️" emojiLabel="Código">
+          <LandscapeInfoInstruction>
             Recibe tu código por DM.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validar">
+          <LandscapeInfoInstruction>
             Ingresa y valida tu código.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="🎡" emojiLabel="Ruleta">
+          <LandscapeInfoInstruction>
             Tienes una tirada de la ruleta.
           </LandscapeInfoInstruction>
-        </GameLandscapeInfoColumn>
+        </GameLandscapeLeftColumn>
         <div className={GAME_LANDSCAPE_CENTER_CARD}>
           {/* Validation + messages + wheel - same as portrait flow */}
           <div className="space-y-4 min-h-[140px]">
@@ -496,40 +495,12 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, sid
       )}
       <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
       {/* QR and instructions first (no game code block) */}
-      <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
-          {/* QR Code - Left column */}
-          <div className="flex justify-center items-start">
-            <QRCode 
-              data={getInstagramDmUrl(gameId)}
-              size={380}
-              margin={12}
-              alt="QR Code para Instagram DM"
-            />
-          </div>
-
-          {/* Instructions - Right column */}
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
-            <ol className="space-y-4 text-base text-gray-300">
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.4)] flex items-center justify-center font-semibold text-[#FACC15] text-sm">1</span>
-                <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram.</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.4)] flex items-center justify-center font-semibold text-[#FACC15] text-sm">2</span>
-                <span className="pt-0.5">Recibe tu código de jugador por DM.</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.4)] flex items-center justify-center font-semibold text-[#FACC15] text-sm">3</span>
-                <span className="pt-0.5">Ingresa y valida tu código.</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.4)] flex items-center justify-center font-semibold text-[#FACC15] text-sm">4</span>
-                <span className="pt-0.5">Tienes una tirada de la ruleta.</span>
-              </li>
-            </ol>
-          </div>
-        </div>
+      <GamePortraitJoinPanel gameId={gameId} qrSize={380} qrMargin={12}>
+        <LandscapeInfoInstruction>Escanea el QR y pulsa JUGAR en el chat de Instagram.</LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>Recibe tu código de jugador por DM.</LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>Ingresa y valida tu código.</LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>Tienes una tirada de la ruleta.</LandscapeInfoInstruction>
+      </GamePortraitJoinPanel>
 
       {/* Player Code Input / Welcome Message / Prize - Same space, consistent height */}
       <div className={showJoinBlock ? 'space-y-4 min-h-[140px]' : 'flex-1 flex flex-col min-h-0 space-y-4'}>

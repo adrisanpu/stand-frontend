@@ -19,7 +19,7 @@ export default function QRCode({
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=${margin}&data=${encodeURIComponent(data)}`
 
   const content = (
-    <div className={`p-4 rounded-xl bg-white/5 border border-white/10 ${className} ${containerClassName ? 'min-h-0 max-h-full w-full flex justify-center items-center' : ''}`}>
+    <div className={`p-4 rounded-xl bg-white/5 border border-white/10 ${containerClassName ? 'min-h-0 max-h-full w-full flex justify-center items-center' : 'mx-auto w-fit'} ${className}`}>
       <img
         src={qrCodeUrl}
         alt={alt}

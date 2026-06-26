@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
-import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
+import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
 import type { L3trasSettings } from './GameConfig'
 import { normalizeValidationTimeLimitSeconds } from './GameConfig'
-import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
-  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
 } from '../../core/ui/gameScreenLayout'
 
 type GameState = 'idle' | 'checking' | 'success'
@@ -84,7 +83,7 @@ function L3trasPieTimer({ remainingMs, totalMs }: { remainingMs: number; totalMs
   )
 }
 
-export default function L3trasGameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function L3trasGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [settings, setSettings] = useState<L3trasSettings | null>(null)
   const [slots, setSlots] = useState<L3trasSlotCell[]>([])
@@ -596,20 +595,20 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, sid
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
-        <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+        <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
+          <LandscapeInfoInstruction>
             Escanea el QR y pulsa JUGAR.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="🔤" emojiLabel="Códigos">
+          <LandscapeInfoInstruction>
             Cada jugador recibe un código (letra).
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="👥" emojiLabel="Reunirse">
+          <LandscapeInfoInstruction>
             Reuníos; cada uno tendrá su código.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validador">
+          <LandscapeInfoInstruction>
             Introducid los códigos de uno en uno en el validador.
           </LandscapeInfoInstruction>
-        </GameLandscapeInfoColumn>
+        </GameLandscapeLeftColumn>
         <div className={`${GAME_LANDSCAPE_CENTER_CARD} flex-1 gap-6 space-y-0`}>
           {renderCentralPanel(true)}
         </div>
@@ -630,38 +629,14 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, sid
         </div>
       )}
       <div className={showJoinBlock ? 'space-y-8' : 'flex flex-col flex-1 min-h-0 space-y-6'}>
-        <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
-          <div className="flex justify-center items-start">
-            <QRCode
-              data={getInstagramDmUrl(gameId)}
-              size={380}
-              margin={12}
-              alt="QR Code para Instagram DM"
-            />
-          </div>
-
-          <div className="space-y-5">
-            <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
-            <ol className="space-y-5 text-base text-gray-300">
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-sm">1</span>
-                <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram.</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-sm">2</span>
-                <span className="pt-0.5">Cada jugador recibirá un código de validación asociado a una letra.</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-sm">3</span>
-                <span className="pt-0.5">Reuníos; cada participante tendrá su propio código.</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.4)] flex items-center justify-center font-semibold text-[#10B981] text-sm">4</span>
-                <span className="pt-0.5">Introducid los códigos de uno en uno en el validador para descubrir la palabra.</span>
-              </li>
-            </ol>
-          </div>
-        </div>
+        <GamePortraitJoinPanel gameId={gameId} qrSize={380} qrMargin={12}>
+          <LandscapeInfoInstruction>Escanea el QR y pulsa JUGAR en el chat de Instagram.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Cada jugador recibirá un código de validación asociado a una letra.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Reuníos; cada participante tendrá su propio código.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>
+            Introducid los códigos de uno en uno en el validador para descubrir la palabra.
+          </LandscapeInfoInstruction>
+        </GamePortraitJoinPanel>
 
         {renderCentralPanel(false)}
       </div>

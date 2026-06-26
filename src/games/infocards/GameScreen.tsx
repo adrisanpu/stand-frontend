@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import type { CardLayoutPosition } from './GameConfig'
 import { api } from '../../api/api'
-import QRCode from '../../core/widgets/QRCode'
-import { getInstagramDmUrl } from '../../core/lib/instagram'
+import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
+import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import { useGameInput } from '../../core/input/useGameInput'
 import { GAME_LANDSCAPE_TWO_COL_GRID } from '../../core/ui/gameScreenLayout'
 
@@ -53,7 +53,7 @@ function getCardLayouts(gameId: string): Record<string, CardLayoutPosition> {
   return {}
 }
 
-export default function InfocardsGameScreen({ gameId, orientation, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function InfocardsGameScreen({ gameId, orientation, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [cards, setCards] = useState<InfoCard[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -207,33 +207,21 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
 
   const renderJoinCard = () => (
     <div key={INFOCARDS_JOIN_CARD_ID} className={baseClass} style={cardStyle}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-hidden">
-        <div className="flex justify-center items-center min-h-0">
-          <QRCode
-            data={getInstagramDmUrl(gameId)}
-            size={320}
-            margin={12}
-            containerClassName="w-full h-full max-w-[320px] max-h-[320px] sm:max-w-[360px] sm:max-h-[360px]"
-            alt="QR Code para Instagram DM"
-          />
-        </div>
-        <div className="space-y-4 min-h-0 overflow-y-auto pr-1">
-          <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
-          <ul className="space-y-4 text-base text-gray-300">
-            <li className="flex gap-4">
-              <span className="flex-shrink-0 text-2xl leading-none" role="img" aria-label="escanear">📷</span>
-              <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.</span>
-            </li>
-            <li className="flex gap-4">
-              <span className="flex-shrink-0 text-2xl leading-none" role="img" aria-label="quiz">🧠</span>
-              <span className="pt-0.5">En el chat podrás hacer un pequeño quiz y demostrar lo aprendido.</span>
-            </li>
-            <li className="flex gap-4">
-              <span className="flex-shrink-0 text-2xl leading-none" role="img" aria-label="premio">🎁</span>
-              <span className="pt-0.5">Participa en los sorteos.</span>
-            </li>
-          </ul>
-        </div>
+      <div className="flex flex-col items-center justify-center flex-1 min-h-0 overflow-hidden">
+        <GamePortraitJoinPanel
+          gameId={gameId}
+          qrSize={320}
+          qrMargin={12}
+          containerClassName="w-full h-full max-w-[320px] max-h-[320px] sm:max-w-[360px] sm:max-h-[360px]"
+        >
+          <LandscapeInfoInstruction>
+            Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>
+            En el chat podrás hacer un pequeño quiz y demostrar lo aprendido.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Participa en los sorteos.</LandscapeInfoInstruction>
+        </GamePortraitJoinPanel>
       </div>
     </div>
   )
@@ -309,6 +297,7 @@ export default function InfocardsGameScreen({ gameId, orientation, sidebarElemen
         </div>
         <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
           <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
+            {playersElement ? <div className="flex-shrink-0 w-full">{playersElement}</div> : null}
             {sidebarElement}
           </div>
         </div>

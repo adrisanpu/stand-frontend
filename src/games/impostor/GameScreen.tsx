@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { api } from '../../api/api'
-import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
+import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
-import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
-  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
 } from '../../core/ui/gameScreenLayout'
 
 type Phase = 'lobby' | 'word_round' | 'voting' | 'result' | 'finished'
@@ -41,7 +40,7 @@ type ValidateResponse = {
   message?: string
 }
 
-export default function ImpostorGameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function ImpostorGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [code, setCode] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
   const [state, setState] = useState<ImpostorStateResponse | null>(null)
@@ -244,20 +243,20 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, s
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
-        <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+        <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
+          <LandscapeInfoInstruction>
             Escanea el QR y escribe al bot.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validar código">
+          <LandscapeInfoInstruction>
             Introduce el código y valida.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="🕵️" emojiLabel="Ronda de palabras">
+          <LandscapeInfoInstruction>
             Cada jugador dice una palabra.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="🗳️" emojiLabel="Votación">
+          <LandscapeInfoInstruction>
             Votad al posible impostor.
           </LandscapeInfoInstruction>
-        </GameLandscapeInfoColumn>
+        </GameLandscapeLeftColumn>
 
         <div className={`${GAME_LANDSCAPE_CENTER_CARD} justify-center`}>
           <div className="space-y-4">
@@ -299,20 +298,12 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, s
         </div>
       )}
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden justify-center gap-8">
-        <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
-          <div className="flex justify-center items-start min-w-0">
-            <QRCode data={getInstagramDmUrl(gameId)} size={340} margin={10} alt="QR para unirse al juego" />
-          </div>
-          <div className="space-y-4 min-w-0">
-            <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
-            <ol className="space-y-4 text-base text-gray-300">
-              <li className="flex gap-4"><span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(114,47,55,0.25)] border border-[rgba(114,47,55,0.5)] flex items-center justify-center font-semibold text-sm">1</span><span className="pt-0.5">Escanea el QR y entra en la partida desde Instagram.</span></li>
-              <li className="flex gap-4"><span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(114,47,55,0.25)] border border-[rgba(114,47,55,0.5)] flex items-center justify-center font-semibold text-sm">2</span><span className="pt-0.5">Valida tu código para aparecer en la lista de jugadores.</span></li>
-              <li className="flex gap-4"><span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(114,47,55,0.25)] border border-[rgba(114,47,55,0.5)] flex items-center justify-center font-semibold text-sm">3</span><span className="pt-0.5">Di una palabra en voz alta cuando llegue tu turno.</span></li>
-              <li className="flex gap-4"><span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(114,47,55,0.25)] border border-[rgba(114,47,55,0.5)] flex items-center justify-center font-semibold text-sm">4</span><span className="pt-0.5">Vota quién crees que es el impostor.</span></li>
-            </ol>
-          </div>
-        </div>
+        <GamePortraitJoinPanel gameId={gameId} qrSize={340} qrMargin={10}>
+          <LandscapeInfoInstruction>Escanea el QR y entra en la partida desde Instagram.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Valida tu código para aparecer en la lista de jugadores.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Di una palabra en voz alta cuando llegue tu turno.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Vota quién crees que es el impostor.</LandscapeInfoInstruction>
+        </GamePortraitJoinPanel>
 
           <div className="flex-1 min-h-0 overflow-auto space-y-5 flex flex-col justify-center">
           <div className="flex gap-3">

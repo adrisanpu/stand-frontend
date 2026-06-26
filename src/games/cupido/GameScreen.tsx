@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { GameScreenProps } from '../../core/types'
-import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
+import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
-import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
-  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
 } from '../../core/ui/gameScreenLayout'
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
@@ -38,7 +37,7 @@ type ValidationResponse = {
 const CUPIDO_PRIMARY = '#E11D48'
 const CUPIDO_PRIMARY_RGB = '225, 29, 72'
 
-export default function CupidoGameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function CupidoGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
@@ -102,17 +101,17 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
-        <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+        <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
+          <LandscapeInfoInstruction>
             Escanea el QR y pulsa JUGAR. Responde al quiz.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="❤️" emojiLabel="Emparejamiento">
+          <LandscapeInfoInstruction>
             Cupido te empareja con alguien afín.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validar">
+          <LandscapeInfoInstruction>
             Encuentra a tu pareja y validad códigos aquí.
           </LandscapeInfoInstruction>
-        </GameLandscapeInfoColumn>
+        </GameLandscapeLeftColumn>
         <div className={GAME_LANDSCAPE_CENTER_CARD}>
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.08)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)` }}>
             {statsLoading ? <span className="text-base text-gray-500">Cargando…</span> : (<><div className="flex items-center gap-2"><span className="text-xl" aria-hidden>👨</span><span className="text-base text-gray-400">Chicos</span><span className="text-lg font-semibold text-textMain">{maleCount}</span></div><div className="flex items-center gap-2"><span className="text-xl" aria-hidden>👩</span><span className="text-base text-gray-400">Chicas</span><span className="text-lg font-semibold text-textMain">{femaleCount}</span></div></>)}
@@ -157,57 +156,13 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, sid
       )}
       <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
       {/* QR and instructions first (no game code block) */}
-      <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
-          <div className="flex justify-center items-start">
-            <QRCode
-              data={getInstagramDmUrl(gameId)}
-              size={380}
-              margin={12}
-              alt="QR Code para Instagram DM"
-            />
-          </div>
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
-            <ol className="space-y-4 text-base text-gray-300">
-              <li className="flex gap-4">
-                <span
-                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm text-white"
-                  style={{
-                    backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`,
-                    border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)`,
-                  }}
-                >
-                  1
-                </span>
-                <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram. Luego responde al quiz (gustos, aficiones…).</span>
-              </li>
-              <li className="flex gap-4">
-                <span
-                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm text-white"
-                  style={{
-                    backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`,
-                    border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)`,
-                  }}
-                >
-                  2
-                </span>
-                <span className="pt-0.5">Cupido te empareja con alguien de gustos afines (pareja o amigos).</span>
-              </li>
-              <li className="flex gap-4">
-                <span
-                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm text-white"
-                  style={{
-                    backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`,
-                    border: `1px solid rgba(${CUPIDO_PRIMARY_RGB}, 0.4)`,
-                  }}
-                >
-                  3
-                </span>
-                <span className="pt-0.5">Encuentra a tu pareja y validad juntos vuestros códigos aquí.</span>
-              </li>
-            </ol>
-          </div>
-        </div>
+      <GamePortraitJoinPanel gameId={gameId} qrSize={380} qrMargin={12}>
+        <LandscapeInfoInstruction>
+          Escanea el QR y pulsa JUGAR en el chat de Instagram. Luego responde al quiz (gustos, aficiones…).
+        </LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>Cupido te empareja con alguien de gustos afines (pareja o amigos).</LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>Encuentra a tu pareja y validad juntos vuestros códigos aquí.</LandscapeInfoInstruction>
+      </GamePortraitJoinPanel>
 
       {/* Bottom: chicos, chicas, parejas emparejadas */}
       <div
