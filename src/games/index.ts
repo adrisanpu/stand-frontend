@@ -11,6 +11,7 @@ import { impostorDefinition } from './impostor/config'
 export const games: GameDefinition[] = [empareja2Definition, t1merDefinition, rulet4Definition, l3trasDefinition, cupidoDefinition, semaforoDefinition, infocardsDefinition, impostorDefinition]
 
 export function getGameById(id: string): GameDefinition | undefined {
-  return games.find(g => g.id === id)
+  const upper = id.toUpperCase()
+  return games.find((g) => g.id === upper)
 }
 

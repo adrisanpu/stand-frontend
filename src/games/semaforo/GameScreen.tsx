@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
-import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
@@ -446,28 +445,15 @@ export default function SemaforoGameScreen({ gameId, orientation, logoElement, p
   }
 
   return (
-    <div className={`w-full flex flex-col ${!showJoinBlock ? 'min-h-[70vh]' : ''}`}>
+    <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
       {!showJoinBlock && (
-        <div className="flex justify-end mb-2">
+        <div className="flex justify-end mb-2 flex-shrink-0">
           <BackButton onClick={handleReset} aria-label="Volver" />
         </div>
       )}
-      <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
-      {/* QR and instructions first (no game code block) */}
-      <GamePortraitJoinPanel gameId={gameId} qrSize={380} qrMargin={12}>
-        <LandscapeInfoInstruction>
-          Escanea el QR y pulsa JUGAR en el chat de Instagram. Luego responde al quiz (estado sentimental / interés social).
-        </LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>Te asignamos a un grupo: Casado, Puede ser o Soltero.</LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>Aquí ves cuánta gente hay en cada grupo.</LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>Cuando os encontréis, validad juntos vuestros códigos aquí.</LandscapeInfoInstruction>
-      </GamePortraitJoinPanel>
-
-      {/* Main content - flex-1 when expanded for more space */}
-      <div className={showJoinBlock ? '' : 'flex-1 flex flex-col min-h-0'}>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {semaforoMainContent}
       </div>
-    </div>
     </div>
   )
 }

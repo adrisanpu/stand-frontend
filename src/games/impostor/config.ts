@@ -3,8 +3,8 @@ import ImpostorGameScreen from './GameScreen'
 import ImpostorGameConfig from './GameConfig'
 
 export const impostorDefinition: GameDefinition = {
-  id: 'impostor',
-  name: 'Impostor',
+  id: 'IMPOSTOR',
+  name: 'IMPOSTOR',
   description: 'Adivina quién no conoce la palabra.',
   descriptionLong:
     'Todos reciben una palabra secreta excepto el impostor. Cada jugador dice una palabra relacionada, después se vota y la mayoría decide quién era el impostor.',

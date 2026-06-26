@@ -10,7 +10,7 @@ const { mockGames } = vi.hoisted(() => ({
   mockGames: [
     {
       id: 'T1MER',
-      name: 'T1mer',
+      name: 'T1MER',
       description: 'Reacciona a tiempo',
       descriptionLong: 'Pulsa al ritmo correcto',
       underDevelopment: false,
@@ -19,7 +19,7 @@ const { mockGames } = vi.hoisted(() => ({
     },
     {
       id: 'RULET4',
-      name: 'Rulet4',
+      name: 'RULET4',
       description: 'Gira la ruleta',
       underDevelopment: true,
       assets: {},
@@ -74,13 +74,13 @@ describe('GameGate – catalog view', () => {
 
   it('renders the game catalog', () => {
     renderGate()
-    expect(screen.getByText('T1mer')).toBeInTheDocument()
-    expect(screen.getByText('Rulet4')).toBeInTheDocument()
+    expect(screen.getByText('T1MER')).toBeInTheDocument()
+    expect(screen.getByText('RULET4')).toBeInTheDocument()
   })
 
   it('navigates to create/join view when a game is selected', () => {
     renderGate()
-    fireEvent.click(screen.getByText('T1mer'))
+    fireEvent.click(screen.getByText('T1MER'))
     expect(screen.getByText('Crear')).toBeInTheDocument()
     expect(screen.getByText('Unirse')).toBeInTheDocument()
   })
@@ -163,7 +163,7 @@ describe('GameGate – create/join view', () => {
   it('back button returns to catalog', () => {
     renderAndSelect('event')
     fireEvent.click(screen.getByText(/Volver al catálogo/i))
-    expect(screen.getByText('T1mer')).toBeInTheDocument()
+    expect(screen.getByText('T1MER')).toBeInTheDocument()
   })
 
   it('calls onGameCreated after successful Crear', async () => {
@@ -176,7 +176,7 @@ describe('GameGate – create/join view', () => {
     const onCreated = vi.fn()
     mockUseCurrentUser.mockReturnValue({ plan: 'event', user: { sub: 'u1' } })
     render(<GameGate onGameCreated={onCreated} />)
-    fireEvent.click(screen.getByText('T1mer'))
+    fireEvent.click(screen.getByText('T1MER'))
     fireEvent.change(screen.getByLabelText(/Nombre de la partida/i), {
       target: { value: 'TORNEOTEST' },
     })

@@ -3,8 +3,8 @@ import Rulet4GameScreen from './GameScreen'
 import Rulet4GameConfig from './GameConfig'
 
 export const rulet4Definition: GameDefinition = {
-  id: 'rulet4',
-  name: 'Rulet4',
+  id: 'RULET4',
+  name: 'RULET4',
   description: 'Ruleta personalizable.',
   descriptionLong: 'Ruleta de premios o acciones personalizable para el evento. El organizador configura opciones y la ruleta decide quién gana o qué reto toca. Puede usarse para sorteos, dinámicas o simplemente animar el público. Multijugador en formato sala.',
   tags: { playerMode: 'multi', social: false, competitive: false, idealFor: ['fiesta', 'stand_feria', 'evento_corporativo'] },

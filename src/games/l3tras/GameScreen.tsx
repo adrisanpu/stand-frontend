@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
-import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
 import type { L3trasSettings } from './GameConfig'
 import { normalizeValidationTimeLimitSeconds } from './GameConfig'
@@ -173,7 +172,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
   useEffect(() => {
     if (!gameId) return
 
-    const storageKey = `l3tras_settings_${gameId}`
+    const storageKey = `L3TRAS_settings_${gameId}`
     const saved = localStorage.getItem(storageKey)
     let savedParsed: Partial<L3trasSettings> = {}
     if (saved) {
@@ -622,22 +621,13 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
   }
 
   return (
-    <div className={`w-full flex flex-col ${!showJoinBlock ? 'min-h-[70vh]' : ''}`}>
+    <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
       {!showJoinBlock && (
-        <div className="flex justify-end mb-2">
+        <div className="flex justify-end mb-2 flex-shrink-0">
           <BackButton onClick={handleReset} aria-label="Volver" />
         </div>
       )}
-      <div className={showJoinBlock ? 'space-y-8' : 'flex flex-col flex-1 min-h-0 space-y-6'}>
-        <GamePortraitJoinPanel gameId={gameId} qrSize={380} qrMargin={12}>
-          <LandscapeInfoInstruction>Escanea el QR y pulsa JUGAR en el chat de Instagram.</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Cada jugador recibirá un código de validación asociado a una letra.</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Reuníos; cada participante tendrá su propio código.</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>
-            Introducid los códigos de uno en uno en el validador para descubrir la palabra.
-          </LandscapeInfoInstruction>
-        </GamePortraitJoinPanel>
-
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         {renderCentralPanel(false)}
       </div>
     </div>

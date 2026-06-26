@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
-import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
@@ -148,23 +147,13 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
   }
 
   return (
-    <div className={`w-full flex flex-col ${!showJoinBlock ? 'min-h-[70vh]' : ''}`}>
+    <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
       {!showJoinBlock && (
-        <div className="flex justify-end mb-2">
+        <div className="flex justify-end mb-2 flex-shrink-0">
           <BackButton onClick={handleReset} aria-label="Validar otra pareja" />
         </div>
       )}
-      <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
-      {/* QR and instructions first (no game code block) */}
-      <GamePortraitJoinPanel gameId={gameId} qrSize={380} qrMargin={12}>
-        <LandscapeInfoInstruction>
-          Escanea el QR y pulsa JUGAR en el chat de Instagram. Luego responde al quiz (gustos, aficiones…).
-        </LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>Cupido te empareja con alguien de gustos afines (pareja o amigos).</LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>Encuentra a tu pareja y validad juntos vuestros códigos aquí.</LandscapeInfoInstruction>
-      </GamePortraitJoinPanel>
-
-      {/* Bottom: chicos, chicas, parejas emparejadas */}
+      <div className="flex flex-col flex-1 min-h-0 space-y-4 overflow-hidden">
       <div
         className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border"
         style={{

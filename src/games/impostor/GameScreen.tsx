@@ -3,7 +3,6 @@ import type { GameScreenProps } from '../../core/types'
 import { api } from '../../api/api'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
-import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import {
@@ -297,14 +296,7 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
           <BackButton onClick={() => setFeedback(null)} aria-label="Volver" />
         </div>
       )}
-      <div className="flex flex-col flex-1 min-h-0 overflow-hidden justify-center gap-8">
-        <GamePortraitJoinPanel gameId={gameId} qrSize={340} qrMargin={10}>
-          <LandscapeInfoInstruction>Escanea el QR y entra en la partida desde Instagram.</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Valida tu código para aparecer en la lista de jugadores.</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Di una palabra en voz alta cuando llegue tu turno.</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Vota quién crees que es el impostor.</LandscapeInfoInstruction>
-        </GamePortraitJoinPanel>
-
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden gap-4">
           <div className="flex-1 min-h-0 overflow-auto space-y-5 flex flex-col justify-center">
           <div className="flex gap-3">
             <input

@@ -11,7 +11,11 @@ export const GAME_LANDSCAPE_THREE_COL_GRID =
 export const GAME_LANDSCAPE_CENTER_CARD =
   'card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 min-w-0 space-y-6'
 
-/** Portrait: QR + manual footer (instrucciones en modal). */
+/** Portrait: logo + QR row above main game card (AppShell). */
+export const GAME_PORTRAIT_HEADER_JOIN =
+  'flex flex-col gap-1.5 w-full min-w-0'
+
+/** Portrait: QR + manual footer (instrucciones en modal). @deprecated Use GAME_PORTRAIT_HEADER_JOIN in AppShell */
 export const GAME_PORTRAIT_JOIN_PANEL =
   'flex-shrink-0 overflow-hidden flex flex-col items-center gap-2 w-full min-w-0'
 

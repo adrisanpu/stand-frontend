@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../../api/api'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
+import { normalizeGameType } from '../gameTypeMap'
 import { usePolling } from '../../hooks/usePolling'
 
 interface GameDataResponse {
@@ -26,7 +27,7 @@ interface PlayersProps {
   maxPrizeValidationLimit?: number
 }
 
-const EMPAREJA2_SETTINGS_KEY = 'empareja2_settings_'
+const EMPAREJA2_SETTINGS_KEY = 'EMPAREJA2_settings_'
 
 function getEmpareja2MaxValidations(gameId: string | undefined): number | undefined {
   if (!gameId) return undefined
@@ -77,7 +78,7 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
   const [maxValidationsFromApi, setMaxValidationsFromApi] = useState<number | undefined>(undefined)
 
   const maxPlayers = features.maxPlayers === Infinity ? null : features.maxPlayers
-  const isEmpareja2 = gameType?.toLowerCase() === 'empareja2'
+  const isEmpareja2 = normalizeGameType(gameType) === 'EMPAREJA2'
   const effectiveMax = isEmpareja2
     ? (maxValidationsFromApi ?? maxPrizeValidationLimit ?? getEmpareja2MaxValidations(gameId))
     : maxPrizeValidationLimit

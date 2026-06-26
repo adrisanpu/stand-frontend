@@ -1,13 +1,17 @@
-/** Map backend / human game type strings to canonical frontend game ids */
-export function mapGameTypeToId(type: string | undefined): string {
-  if (!type) return 'empareja2'
-  const normalized = type.toLowerCase()
-  if (normalized === 't1mer' || normalized === 'timer') return 't1mer'
-  if (normalized === 'empareja2' || normalized === 'empareja') return 'empareja2'
-  if (normalized === 'rulet4' || normalized === 'ruleta') return 'rulet4'
-  if (normalized === 'cupido') return 'cupido'
-  if (normalized === 'semaforo' || normalized === 'semáforo') return 'semaforo'
-  if (normalized === 'infocards') return 'infocards'
-  if (normalized === 'impostor') return 'impostor'
-  return normalized
+const ALIASES: Record<string, string> = {
+  TIMER: 'T1MER',
+  RULETA: 'RULET4',
+  EMPAREJA: 'EMPAREJA2',
+  SEMAFORO: 'SEMAFORO',
+  'SEMÁFORO': 'SEMAFORO',
 }
+
+/** Map backend / human game type strings to canonical uppercase game ids */
+export function normalizeGameType(type: string | undefined): string {
+  if (!type) return 'EMPAREJA2'
+  const upper = type.trim().toUpperCase()
+  return ALIASES[upper] ?? upper
+}
+
+/** @deprecated Use normalizeGameType */
+export const mapGameTypeToId = normalizeGameType

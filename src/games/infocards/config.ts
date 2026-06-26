@@ -3,8 +3,8 @@ import InfocardsGameScreen from './GameScreen'
 import InfocardsGameConfig from './GameConfig'
 
 export const infocardsDefinition: GameDefinition = {
-  id: 'infocards',
-  name: 'Info Cards',
+  id: 'INFOCARDS',
+  name: 'INFOCARDS',
   description: 'Presenta tu producto o servicio en tarjetas informativas.',
   descriptionLong:
     'Muestra información sobre tu producto, servicio o marca en una secuencia de tarjetas visuales. Sube un PDF, texto o imágenes y la IA genera las tarjetas automáticamente. Ideal para ferias y eventos.',

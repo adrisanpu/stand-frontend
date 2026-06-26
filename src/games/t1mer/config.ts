@@ -2,8 +2,8 @@ import type { GameDefinition } from '../../core/types'
 import T1merGameScreen from './GameScreen'
 
 export const t1merDefinition: GameDefinition = {
-  id: 't1mer',
-  name: 'T1mer',
+  id: 'T1MER',
+  name: 'T1MER',
   description: 'Juego de precisión temporal.',
   descriptionLong: 'Los jugadores deben pulsar o actuar en el momento exacto que indica el temporizador. Prueba de reflejos y precisión. Puede ser individual o en sala compitiendo por el mejor tiempo. Competitivo y con ranking.',
   tags: { playerMode: 'multi', social: false, competitive: true, idealFor: ['fiesta', 'stand_feria'] },

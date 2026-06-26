@@ -5,8 +5,8 @@ import { IDEAL_FOR_LABELS } from '../types'
 import { api } from '../../api/api'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
-import { useStandLogo, useAppThemeIsDark } from '../theme'
-import { fetchUserMedia, resolveLogoDisplayUrl, type UserMediaResponse } from '../../api/userMedia'
+import { useStandLogo } from '../theme'
+import { fetchUserMedia, resolveUserSelectedLogoUrl, type UserMediaResponse } from '../../api/userMedia'
 
 const GAME_RE = /^[A-Za-z0-9._-]{1,40}$/
 
@@ -26,14 +26,15 @@ export default function GameGate({ onGameCreated }: GameGateProps){
   const { plan, user } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const standLogo = useStandLogo()
-  const themeIsDark = useAppThemeIsDark()
   const [selectedGame, setSelectedGame] = useState<GameDefinition | null>(null)
   const [gameId, setGameId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [joining, setJoining] = useState(false)
   const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
-  const customLogo = userMedia ? resolveLogoDisplayUrl(userMedia, themeIsDark) : null
+  const [userMediaLoaded, setUserMediaLoaded] = useState(false)
+  const customLogo = userMedia ? resolveUserSelectedLogoUrl(userMedia) : null
+  const headerLogoSrc = userMediaLoaded ? (customLogo ?? standLogo) : null
   const [userGames, setUserGames] = useState<UserGame[]>([])
   const [loadingGames, setLoadingGames] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -57,6 +58,8 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         setUserMedia(media)
       } catch {
         setUserMedia(null)
+      } finally {
+        setUserMediaLoaded(true)
       }
     }
     void load()
@@ -182,7 +185,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         }
       }>('/v1/game', { 
         gameName: gameId.toUpperCase(),
-        gameType: selectedGame.id.toUpperCase()
+        gameType: selectedGame.id
       })
       
       // API returns { message, game: { gameId, gameName, gameType, ... } }
@@ -247,27 +250,22 @@ export default function GameGate({ onGameCreated }: GameGateProps){
       <div className="w-full space-y-6">
         {/* Header with Logo */}
         <div className="flex flex-col items-center mb-6">
-          {/* Custom logo or Stand Letters Logo */}
-          {customLogo ? (
-            <img 
-              src={customLogo} 
-              alt="Logo personalizado" 
-              className="h-28 w-auto object-contain"
-            />
-          ) : (
-            <img 
-              src={standLogo} 
-              alt="Stand" 
-              className="h-28 w-auto object-contain"
-              onError={(e) => {
-                  // Fallback to white letters logo if missing
-                const target = e.target as HTMLImageElement
+          <div className="h-28 flex items-center justify-center">
+            {headerLogoSrc ? (
+              <img
+                src={headerLogoSrc}
+                alt={customLogo ? 'Logo personalizado' : 'Stand'}
+                className="h-28 w-auto object-contain"
+                onError={(e) => {
+                  if (customLogo) return
+                  const target = e.target as HTMLImageElement
                   if (target.src !== `${window.location.origin}/images/logo_stand_letters_white.png`) {
                     target.src = '/images/logo_stand_letters_white.png'
-                }
-              }}
-            />
-          )}
+                  }
+                }}
+              />
+            ) : null}
+          </div>
         </div>
 
         {/* Games Grid */}

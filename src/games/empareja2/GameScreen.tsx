@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
-import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
@@ -180,8 +179,6 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
     setError(null)
   }
 
-  const showJoinBlock = gameState !== 'valid'
-
   const renderCentralPairPanel = (variant: PanelVariant) => {
     const ic = INPUT_ROW_CLASS[variant]
     const bp = VALIDATE_BTN_PADDING[variant]
@@ -343,26 +340,8 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
 
   return (
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
-      <div
-        className={`flex flex-col overflow-hidden min-h-0 ${showJoinBlock ? 'flex-1' : 'flex-1 flex'} ${
-          orientation === 'portrait' ? 'justify-center gap-8' : 'gap-3'
-        }`}
-      >
-        <GamePortraitJoinPanel
-          gameId={gameId}
-          qrSize={orientation === 'portrait' ? 180 : 380}
-          qrMargin={orientation === 'portrait' ? 6 : 12}
-          qrClassName="!border-0 !bg-transparent"
-        >
-          <LandscapeInfoInstruction>
-            Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.
-          </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Recibe tu pareja asignada y tu código de validación.</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Encuentra a tu pareja físicamente.</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Cuando os encontréis, validad juntos vuestros códigos.</LandscapeInfoInstruction>
-        </GamePortraitJoinPanel>
-
-        <div className={`flex-shrink-0 ${orientation === 'portrait' ? 'space-y-4' : 'space-y-3'}`}>
+      <div className="flex flex-col overflow-hidden min-h-0 flex-1 gap-3">
+        <div className="flex-shrink-0 space-y-3">
           {renderCentralPairPanel('portrait')}
         </div>
 

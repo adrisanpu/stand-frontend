@@ -78,14 +78,18 @@ export async function fetchUserMedia(): Promise<UserMediaResponse> {
   return api.get<UserMediaResponse>('/v1/user/media')
 }
 
+/** User-selected logo only (excludes platform default fallback). */
+export function resolveUserSelectedLogoUrl(media: UserMediaResponse): string | null {
+  if (!media.logo.selectedId) return null
+  const fromSelected = media.logo.selected?.url
+  if (fromSelected) return fromSelected
+  return media.logo.items.find((it) => it.id === media.logo.selectedId)?.url ?? null
+}
+
 /** Logo shown when no user logo is selected: white letters on dark UI, black on light. */
 export function resolveLogoDisplayUrl(media: UserMediaResponse, isDarkMode: boolean): string | null {
-  if (media.logo.selectedId) {
-    const fromSelected = media.logo.selected?.url
-    if (fromSelected) return fromSelected
-    const fromItems = media.logo.items.find((it) => it.id === media.logo.selectedId)
-    return fromItems?.url ?? null
-  }
+  const selected = resolveUserSelectedLogoUrl(media)
+  if (selected) return selected
   const def = isDarkMode ? media.logo.defaults?.dark : media.logo.defaults?.light
   return def?.url ?? null
 }

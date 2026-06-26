@@ -2,12 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import type { CardLayoutPosition } from './GameConfig'
 import { api } from '../../api/api'
-import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
-import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import { useGameInput } from '../../core/input/useGameInput'
 import { GAME_LANDSCAPE_TWO_COL_GRID } from '../../core/ui/gameScreenLayout'
 
-const INFOCARDS_SETTINGS_KEY_PREFIX = 'infocards_settings_'
+const INFOCARDS_SETTINGS_KEY_PREFIX = 'INFOCARDS_settings_'
 const CARD_CONTAINER_HEIGHT_CLASS = 'h-[min(72vh,620px)] min-h-[420px] sm:min-h-[460px]'
 const INFOCARDS_JOIN_CARD_ID = '__infocards_join__'
 
@@ -207,21 +205,10 @@ export default function InfocardsGameScreen({ gameId, orientation, playersElemen
 
   const renderJoinCard = () => (
     <div key={INFOCARDS_JOIN_CARD_ID} className={baseClass} style={cardStyle}>
-      <div className="flex flex-col items-center justify-center flex-1 min-h-0 overflow-hidden">
-        <GamePortraitJoinPanel
-          gameId={gameId}
-          qrSize={320}
-          qrMargin={12}
-          containerClassName="w-full h-full max-w-[320px] max-h-[320px] sm:max-w-[360px] sm:max-h-[360px]"
-        >
-          <LandscapeInfoInstruction>
-            Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.
-          </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>
-            En el chat podrás hacer un pequeño quiz y demostrar lo aprendido.
-          </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Participa en los sorteos.</LandscapeInfoInstruction>
-        </GamePortraitJoinPanel>
+      <div className="flex flex-col items-center justify-center flex-1 min-h-0 overflow-hidden px-4 text-center">
+        <p className="text-base sm:text-lg text-textSub leading-relaxed">
+          Escanea el QR de arriba y pulsa JUGAR en el chat de Instagram para unirte.
+        </p>
       </div>
     </div>
   )

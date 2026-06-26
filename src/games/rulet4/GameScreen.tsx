@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
-import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
 import type { Rulet4Settings, Rulet4PanelConfig } from './GameConfig'
 import { api } from '../../api/api'
@@ -38,7 +37,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
   // Load settings from localStorage
   useEffect(() => {
     if (gameId) {
-      const storageKey = `rulet4_settings_${gameId}`
+      const storageKey = `RULET4_settings_${gameId}`
       const saved = localStorage.getItem(storageKey)
       if (saved) {
         try {
@@ -487,23 +486,13 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
   }
 
   return (
-    <div className={`w-full flex flex-col ${!showJoinBlock ? 'min-h-[70vh]' : ''}`}>
+    <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
       {!showJoinBlock && gameState !== 'result' && (
-        <div className="flex justify-end mb-2">
+        <div className="flex justify-end mb-2 flex-shrink-0">
           <BackButton onClick={handleReset} aria-label="Volver" />
         </div>
       )}
-      <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
-      {/* QR and instructions first (no game code block) */}
-      <GamePortraitJoinPanel gameId={gameId} qrSize={380} qrMargin={12}>
-        <LandscapeInfoInstruction>Escanea el QR y pulsa JUGAR en el chat de Instagram.</LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>Recibe tu código de jugador por DM.</LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>Ingresa y valida tu código.</LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>Tienes una tirada de la ruleta.</LandscapeInfoInstruction>
-      </GamePortraitJoinPanel>
-
-      {/* Player Code Input / Welcome Message / Prize - Same space, consistent height */}
-      <div className={showJoinBlock ? 'space-y-4 min-h-[140px]' : 'flex-1 flex flex-col min-h-0 space-y-4'}>
+      <div className="flex flex-col flex-1 min-h-0 space-y-4 overflow-hidden">
         {gameState === 'idle' &&
           wrapTopWithProfilePic(
             'start',
@@ -684,7 +673,6 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
           </div>
         </div>
       )}
-    </div>
     </div>
   )
 }
