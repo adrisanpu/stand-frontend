@@ -13,7 +13,8 @@ Do not reimplement outer page padding inside `GameScreen`; the shell already ins
 | Mode | Where | Classes / behavior |
 |------|--------|-------------------|
 | Portrait | Main column | `px-4 sm:px-6` on the scroll column; vertical insets via `paddingTop` / `paddingBottom` in `dvh` (see `AppShell.tsx`). |
-| Portrait | Game card wrapper | `p-5 sm:p-6 lg:p-8` on the `.card` that wraps `GameScreen`. |
+| Portrait | Header join (above card) | `GamePortraitHeaderJoin` in `AppShell.tsx` — logo left, QR + “Escanea para jugar” + game code right; instructions modal via `getJoinInstructions()`. |
+| Portrait | Game card wrapper | `p-4 sm:p-5` on the `.card` that wraps `GameScreen` (game UI only; no logo/QR inside). |
 | Landscape | Full-bleed stage | `py-[10dvh] pl-[3dvw] pr-[1.5dvw]` on the landscape container (tighter right gutter). |
 
 Settings control is `fixed top-4 left-4` (not part of game panels).
@@ -45,15 +46,15 @@ Do not use the older `minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)` + `g
 - Main area: prefer `p-6 sm:p-8` on the outer `card` for parity with the center column of other games.
 - Right sidebar: `playersElement` on top, then `sidebarElement` (ranking, raffle, avatar) — no left info column.
 
-## Portrait: join panel (QR + manual)
+## Portrait: header join + game card
 
-- Import `GamePortraitJoinPanel` from [`src/core/widgets/GamePortraitJoinPanel.tsx`](../src/core/widgets/GamePortraitJoinPanel.tsx).
-- Layout token: `GAME_PORTRAIT_JOIN_PANEL` in [`gameScreenLayout.ts`](../src/core/ui/gameScreenLayout.ts) — centered column (`flex flex-col items-center gap-2`).
-- Props: `gameId`, `qrSize`, optional `qrMargin` / `qrClassName` / `containerClassName`.
-- Pass game instructions as `children` (`LandscapeInfoInstruction`); same modal/footer as landscape (`GamePanelFooter`).
-- Do **not** render an instructions column beside the QR.
+Portrait join UI lives in **AppShell**, not inside each `GameScreen`:
 
-Below that, the main stack typically uses `justify-center gap-8` when `orientation === 'portrait'` (see t1mer).
+- [`GamePortraitHeaderJoin`](../src/core/widgets/GamePortraitHeaderJoin.tsx) — row: logo (`max-h-20`–`max-h-24`) | QR (~128px) + “Escanea para jugar” + [`GameIdHint`](../src/core/widgets/GameJoinHints.tsx).
+- Layout token: `GAME_PORTRAIT_HEADER_JOIN` in [`gameScreenLayout.ts`](../src/core/ui/gameScreenLayout.ts).
+- Instructions: [`getJoinInstructions(gameId)`](../src/core/ui/gameJoinInstructions.tsx) passed as `footerChildren` (same modal/footer as landscape via `GamePanelFooter`).
+- **Avatar:** disabled in portrait for now (landscape only).
+- Inside `.card`, `GameScreen` renders **only** game interaction/animations — mirror landscape center column (`GAME_LANDSCAPE_CENTER_CARD` utilities where applicable). Do **not** import `GamePortraitJoinPanel` in new work (`GamePortraitJoinPanel` is deprecated).
 
 ## Join panel footer, instructions modal, and legal notice
 
@@ -107,5 +108,6 @@ Two fixed-size cells above the code inputs; on success, same cells show `charact
 
 - `src/games/<gameId>/GameScreen.tsx`
 - `src/core/ui/gameScreenLayout.ts`, `gameValidationCopy.ts`, `gameLegalCopy.ts`
-- `src/core/widgets/GameLandscapeLeftColumn.tsx`, `GameLandscapeInfoColumn.tsx`, `GamePortraitJoinPanel.tsx`, `GamePanelFooter.tsx`
+- `src/core/widgets/GameLandscapeLeftColumn.tsx`, `GameLandscapeInfoColumn.tsx`, `GamePortraitHeaderJoin.tsx`, `GameJoinHints.tsx`, `GamePanelFooter.tsx`
+- `src/core/ui/gameJoinInstructions.tsx`
 - `src/core/shell/AppShell.tsx` (only if global insets change)

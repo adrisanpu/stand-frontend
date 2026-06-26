@@ -18,8 +18,8 @@ Auth uses Cognito PKCE OAuth2. All API calls go through the central api.ts clien
 
 **CI / workflow:** PR to `dev` → `npm run build` in Actions; Amplify deploys `dev` branch. Agent + human process: [stand-backend DEVELOPMENT_WORKFLOW.md](https://github.com/adrisanpu/stand-backend/blob/dev/docs/DEVELOPMENT_WORKFLOW.md).
 
-**Game IDs (lowercase):** empareja2, t1mer, rulet4, l3tras, semaforo, infocards, cupido
-Canonical game id strings: `mapGameTypeToId()` in `src/core/gameTypeMap.ts` (used by `src/core/shell/AppShell.tsx`)
+**Game IDs (UPPERCASE):** T1MER, RULET4, L3TRAS, EMPAREJA2, CUPIDO, SEMAFORO, INFOCARDS, IMPOSTOR
+Canonical game id strings: `normalizeGameType()` in `src/core/gameTypeMap.ts` (used by `src/core/shell/AppShell.tsx`)
 
 **Game module structure** (`src/games/<id>/`):
 - `index.ts` — exports GameDefinition (id, name, type, colors, components)

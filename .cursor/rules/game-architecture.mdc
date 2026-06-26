@@ -9,9 +9,8 @@ alwaysApply: false
 ## GameDefinition interface (src/core/types.ts)
 ```typescript
 interface GameDefinition {
-  id: string;          // lowercase: 'empareja2', 't1mer', etc.
-  name: string;        // display name: 'Empareja2', 'T1mer', etc.
-  type: string;        // UPPERCASE: 'EMPAREJA2', 'T1MER', etc.
+  id: string;          // UPPERCASE: 'EMPAREJA2', 'T1MER', etc. (same as backend gameType)
+  name: string;        // display name: 'T1MER', 'EMPAREJA2', etc.
   colors: {
     primary: string;   // hex color for game theme
     accent: string;    // hex accent color
@@ -21,20 +20,21 @@ interface GameDefinition {
 }
 ```
 
-## Game IDs and their types
-| id (frontend) | type (DB) | primary color |
-|--------------|-----------|---------------|
-| empareja2 | EMPAREJA2 | #B026FF |
-| t1mer | T1MER | #EF4444 |
-| rulet4 | RULET4 | #FACC15 |
-| l3tras | L3TRAS | #10B981 |
-| cupido | CUPIDO | #E11D48 |
-| semaforo | SEMAFORO | #22C55E |
-| infocards | INFOCARDS | #6366F1 |
+## Game IDs
+| id / gameType | primary color |
+|--------------|---------------|
+| EMPAREJA2 | #B026FF |
+| T1MER | #EF4444 |
+| RULET4 | #FACC15 |
+| L3TRAS | #10B981 |
+| CUPIDO | #E11D48 |
+| SEMAFORO | #22C55E |
+| INFOCARDS | #6366F1 |
+| IMPOSTOR | (see config) |
 
 ## AppShell state (src/core/shell/AppShell.tsx)
 - Reads gameId, gameName, gameType from localStorage
-- `mapGameTypeToId()` in `src/core/gameTypeMap.ts` normalizes type strings to canonical frontend game ids
+- `normalizeGameType()` in `src/core/gameTypeMap.ts` normalizes type strings to canonical uppercase game ids
 - All game routing goes through AppShell — don't create standalone game routes
 
 ## ThemeProvider (src/core/theme/ — barrel `index.ts`, implementation `theme.tsx`)

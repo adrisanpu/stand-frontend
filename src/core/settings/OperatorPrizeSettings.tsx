@@ -201,7 +201,7 @@ export default function OperatorPrizeSettings({
   }, [settings])
 
   useEffect(() => {
-    if (gameDefinition.id !== 'empareja2' || !gameId) return
+    if (gameDefinition.id !== 'EMPAREJA2' || !gameId) return
     let cancelled = false
     ;(async () => {
       try {
@@ -257,7 +257,7 @@ export default function OperatorPrizeSettings({
       }, 2500)
     }
 
-    if (gameDefinition.id === 'empareja2' && gameId && slots.validation) {
+    if (gameDefinition.id === 'EMPAREJA2' && gameId && slots.validation) {
       setSaveStatus('saving')
       setSaveMessage('Guardando...')
       try {

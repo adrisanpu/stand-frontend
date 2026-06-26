@@ -44,7 +44,7 @@ if (!features.canRaffle) { /* show upgrade prompt */ }
 2. Create `src/games/<id>/GameScreen.tsx` (GameScreenProps)
 3. Create `src/games/<id>/GameConfig.tsx` (GameConfigProps)
 4. Add to `src/games/index.ts` registry array
-5. Add lowercase→UPPERCASE mapping in AppShell.tsx `mapGameTypeToId()`
+5. Add aliases in `src/core/gameTypeMap.ts` (`normalizeGameType`) if the backend type needs normalization
 
 ## Storage rule
 - Auth tokens → `sessionStorage` (via authStorage.ts, key: `stand_tokens`)

@@ -1,3 +1,4 @@
+/** @deprecated Portrait join moved to AppShell (`GamePortraitHeaderJoin`). Kept until infocards carousel migration is confirmed unused. */
 import type { ReactNode } from 'react'
 import QRCode from './QRCode'
 import { getInstagramDmUrl } from '../lib/instagram'

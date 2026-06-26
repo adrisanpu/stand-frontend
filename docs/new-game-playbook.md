@@ -16,7 +16,7 @@ This document complements:
 
 ## 1) Canonical naming contract (must follow)
 
-- Frontend game `id` is lowercase (`mygame1`)
+- Frontend game `id` and `name` are UPPERCASE (`T1MER`); module folder stays lowercase (`src/games/t1mer/`)
 - Backend game `type` is uppercase (`MYGAME1`)
 - Keep both values aligned semantically and map correctly in frontend
 
@@ -52,7 +52,7 @@ Use existing games as source templates instead of creating brand-new patterns.
 
 ## 3.3 Add type-to-id normalization
 
-- Update `src/core/gameTypeMap.ts` so backend `GAME_TYPE` resolves to your frontend `id`
+- Update `src/core/gameTypeMap.ts` so backend `GAME_TYPE` and legacy aliases resolve to your uppercase `id`
 - Validate restore flow from `localStorage` in `AppShell`
 
 ## 3.4 Follow shared UI/layout tokens
@@ -108,9 +108,8 @@ import { GameScreen } from './GameScreen';
 import { GameConfig } from './GameConfig';
 
 export const mygame1: GameDefinition = {
-  id: 'mygame1',
-  name: 'MyGame1',
-  type: 'MYGAME1',
+  id: 'MYGAME1',
+  name: 'MYGAME1',
   colors: {
     primary: '#6366F1',
     accent: '#A78BFA',
@@ -159,7 +158,7 @@ export function GameConfig({ config, onChange }: GameConfigProps) {
 ## 6) QA checklist (minimum)
 
 - Naming and mapping:
-  - `id` lowercase, `type` uppercase, `gameTypeMap` updated
+  - `id` and `name` UPPERCASE (same string), module folder lowercase, `gameTypeMap` updated
 - Visual consistency:
   - Portrait and landscape both render correctly
   - Shared spacing/grid tokens are used

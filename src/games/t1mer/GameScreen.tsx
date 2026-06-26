@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
-import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import GameStateAvatar from '../../core/widgets/GameStateAvatar'
 import BackButton from '../../core/widgets/BackButton'
 import { api } from '../../api/api'
@@ -260,7 +259,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
     'text-center h-[160px] flex items-center justify-center shrink-0 w-full'
   const t1merActionSlotClass = 'w-full min-w-0 shrink-0 min-h-[7.5rem] flex flex-col justify-center py-2'
   const t1merPrimaryButtonClass =
-    'w-full p-8 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors flex items-center justify-center'
+    'w-full p-8 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors flex items-center justify-center'
   const t1merPrimaryButtonLabelClass = 'text-2xl sm:text-3xl lg:text-4xl font-bold'
   /** Altura fija del bloque de usuario + instrucción: al jugar sigue ocupando sitio para que EMPEZAR y DETENER coincidan. */
   /** Misma caja que “preparing”: aquí va resultado (posición/premio) al terminar para no empujar el contador. */
@@ -300,12 +299,12 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
           {gameState === 'idle' && (
             <div className="flex-1 flex flex-col justify-center items-center w-full min-h-0">
               <div className="text-center py-6">
-                <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-gray-600 font-digital opacity-50">00:00.0</div>
+                <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-textSub/40 font-digital opacity-50">00:00.0</div>
               </div>
               <div className="max-w-md mx-auto w-full space-y-4">
                 <div className="flex gap-3">
                   <input id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder={CODE_INPUT_PLACEHOLDER} className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" />
-                  <button ref={validateButtonRef} type="button" onClick={handleValidate} disabled={!playerCode.trim() || isValidating} className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0">
+                  <button ref={validateButtonRef} type="button" onClick={handleValidate} disabled={!playerCode.trim() || isValidating} className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0">
                     {isValidating ? (
                       <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -340,18 +339,18 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
                               : 'Foto de perfil'
                           }
                           referrerPolicy="no-referrer"
-                          className="h-14 w-14 shrink-0 rounded-full border-2 border-red-500/40 object-cover shadow-md sm:h-16 sm:w-16"
+                          className="h-14 w-14 shrink-0 rounded-full border-2 border-primary/40 object-cover shadow-md sm:h-16 sm:w-16"
                         />
                       ) : null}
                       <div className="min-w-0 max-w-full space-y-2 text-center sm:space-y-3 sm:text-left">
                         {username && (
-                          <p className="text-3xl font-bold leading-tight text-red-500">
+                          <p className="text-3xl font-bold leading-tight text-primary">
                             {username.startsWith('@') ? username : `@${username}`}
                           </p>
                         )}
-                        <p className="text-xl leading-snug text-gray-300 sm:text-2xl">
+                        <p className="text-xl leading-snug text-textSub sm:text-2xl">
                           Detén el contador cuando llegue a{' '}
-                          <span className="font-digital text-2xl text-red-500 sm:text-3xl">10:00.0</span>
+                          <span className="font-digital text-2xl text-primary sm:text-3xl">10:00.0</span>
                         </p>
                       </div>
                     </div>
@@ -373,16 +372,16 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
               <div className="flex flex-col gap-5 sm:gap-6 min-w-0 shrink-0 w-full">
                 <div className={t1merTimerSlotClass}>
                   {gameState === 'preparing' && (
-                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-gray-600 font-digital opacity-50">00:00.0</div>
+                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-textSub/40 font-digital opacity-50">00:00.0</div>
                   )}
                   {gameState === 'playing' && (
-                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-red-500 font-digital">{formatTimer(timer)}</div>
+                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-primary font-digital">{formatTimer(timer)}</div>
                   )}
                   {gameState === 'hidden' && (
-                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-gray-600 font-digital">???</div>
+                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-textSub/40 font-digital">???</div>
                   )}
                   {gameState === 'finished' && result && (
-                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-red-500 font-digital">{formatTimer(result.time)}</div>
+                    <div className="text-6xl sm:text-7xl lg:text-8xl font-normal text-primary font-digital">{formatTimer(result.time)}</div>
                   )}
                 </div>
                 <div className={t1merActionSlotClass}>
@@ -426,34 +425,19 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
   }
 
   return (
-    <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden min-w-0 w-full items-center">
       {!showJoinBlock && (
-        <div className="flex-shrink-0 flex justify-end mb-2">
+        <div className="flex-shrink-0 flex justify-end w-full mb-2">
           <BackButton onClick={handleReset} aria-label="Volver" />
         </div>
       )}
-      <div className={`flex flex-col overflow-hidden min-h-0 flex-1 ${orientation === 'portrait' ? 'justify-center gap-8' : 'gap-3'}`}>
-      {/* QR and instructions first (no game code block) */}
-      <GamePortraitJoinPanel
-        gameId={gameId}
-        qrSize={orientation === 'portrait' ? 180 : 380}
-        qrMargin={orientation === 'portrait' ? 6 : 12}
-      >
-        <LandscapeInfoInstruction>
-          Escanea el QR y pulsa JUGAR en el chat de Instagram para obtener tu código de jugador.
-        </LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>Ingresa tu código y valida.</LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>El temporizador se ocultará a los 5 segundos.</LandscapeInfoInstruction>
-        <LandscapeInfoInstruction>Intenta detenerlo exactamente en 10 segundos.</LandscapeInfoInstruction>
-      </GamePortraitJoinPanel>
-
-      {/* Contenedor central: idle = timer + código + Validar (validación a escondidas); preparando = username + instrucción + EMPEZAR; jugando/oculto/terminado = timer + DETENER o resultado */}
-      <div className="flex-1 min-h-0 flex flex-col justify-start overflow-hidden min-w-0">
+      <div className="flex flex-col overflow-hidden min-h-0 flex-1 w-full gap-3">
+      <div className="flex-1 min-h-0 flex flex-col justify-start overflow-hidden min-w-0 w-full">
         <div className="space-y-6 flex flex-col flex-1 min-h-0 justify-start">
           {gameState === 'idle' && (
             <div className="flex-1 flex flex-col justify-center min-h-0">
               <div className="text-center py-6">
-                <div className="font-normal text-gray-600 font-digital opacity-50 text-6xl sm:text-7xl lg:text-8xl">00:00.0</div>
+                <div className="font-normal text-textSub/40 font-digital opacity-50 text-6xl sm:text-7xl lg:text-8xl">00:00.0</div>
               </div>
               <div className="flex-shrink-0 space-y-4">
                 <div className="flex gap-3">
@@ -473,7 +457,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
                     type="button"
                     onClick={handleValidate}
                     disabled={!playerCode.trim() || isValidating}
-                    className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0"
+                    className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0"
                   >
                     {isValidating ? (
                       <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -509,18 +493,18 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
                               : 'Foto de perfil'
                           }
                           referrerPolicy="no-referrer"
-                          className="h-16 w-16 shrink-0 rounded-full border-2 border-red-500/40 object-cover shadow-md sm:h-[4.5rem] sm:w-[4.5rem]"
+                          className="h-16 w-16 shrink-0 rounded-full border-2 border-primary/40 object-cover shadow-md sm:h-[4.5rem] sm:w-[4.5rem]"
                         />
                       ) : null}
                       <div className="min-w-0 max-w-full space-y-2 text-center sm:space-y-3 sm:text-left">
                         {username && (
-                          <p className="text-4xl font-bold leading-tight text-red-500 lg:text-5xl">
+                          <p className="text-4xl font-bold leading-tight text-primary lg:text-5xl">
                             {username.startsWith('@') ? username : `@${username}`}
                           </p>
                         )}
-                        <p className="text-lg leading-snug text-gray-300 sm:text-xl lg:text-2xl">
+                        <p className="text-lg leading-snug text-textSub sm:text-xl lg:text-2xl">
                           Detén el contador cuando llegue a{' '}
-                          <span className="font-digital text-2xl text-red-500 sm:text-3xl lg:text-4xl">10:00.0</span>
+                          <span className="font-digital text-2xl text-primary sm:text-3xl lg:text-4xl">10:00.0</span>
                         </p>
                       </div>
                     </div>
@@ -529,7 +513,7 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
                     <>
                       {resultRank != null && (
                         <div
-                          className={`font-semibold text-textMain leading-tight ${showJoinBlock ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'}`}
+                          className="text-xl sm:text-2xl font-semibold text-textMain leading-tight"
                         >
                           Posición: {resultRank}
                         </div>
@@ -546,16 +530,16 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
               <div className="flex flex-col gap-5 sm:gap-6 shrink-0 w-full">
                 <div className={t1merTimerSlotClassPortrait}>
                   {gameState === 'preparing' && (
-                    <div className="font-normal text-gray-600 font-digital opacity-50 text-6xl sm:text-7xl lg:text-8xl">00:00.0</div>
+                    <div className="font-normal text-textSub/40 font-digital opacity-50 text-6xl sm:text-7xl lg:text-8xl">00:00.0</div>
                   )}
                   {gameState === 'playing' && (
-                    <div className="font-normal text-red-500 font-digital text-6xl sm:text-7xl lg:text-8xl">{formatTimer(timer)}</div>
+                    <div className="font-normal text-primary font-digital text-6xl sm:text-7xl lg:text-8xl">{formatTimer(timer)}</div>
                   )}
                   {gameState === 'hidden' && (
-                    <div className="font-normal text-gray-600 font-digital text-6xl sm:text-7xl lg:text-8xl">???</div>
+                    <div className="font-normal text-textSub/40 font-digital text-6xl sm:text-7xl lg:text-8xl">???</div>
                   )}
                   {gameState === 'finished' && result && (
-                    <div className="font-normal text-red-500 font-digital text-6xl sm:text-7xl lg:text-8xl">{formatTimer(result.time)}</div>
+                    <div className="font-normal text-primary font-digital text-6xl sm:text-7xl lg:text-8xl">{formatTimer(result.time)}</div>
                   )}
                 </div>
                 <div className={t1merActionSlotClass}>
@@ -590,13 +574,13 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
           )}
         </div>
       </div>
+      </div>
 
       {gameState === 'finished' && result && error && (
         <div className="flex-shrink-0 space-y-4">
           <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>
         </div>
       )}
-    </div>
     </div>
   )
 }

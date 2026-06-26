@@ -13,10 +13,11 @@ import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { useOrientation } from '../../hooks/useOrientation'
 import { readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle } from '../settings/operatorPrizeSlots'
 import { inputManager } from '../input/inputManager'
-import { mapGameTypeToId } from '../gameTypeMap'
+import { normalizeGameType } from '../gameTypeMap'
+import GamePortraitHeaderJoin from '../widgets/GamePortraitHeaderJoin'
+import { getJoinInstructions } from '../ui/gameJoinInstructions'
 import { fetchUserMedia, resolveLogoDisplayUrl, type UserMediaResponse } from '../../api/userMedia'
 // Logo size on game screens (portrait and landscape) — larger across breakpoints
-const GAME_SCREEN_LOGO_CLASS = 'h-32 sm:h-36 lg:h-40 xl:h-44 2xl:h-52 w-auto object-contain'
 // Landscape: slightly smaller so left column fits
 const GAME_SCREEN_LOGO_CLASS_LANDSCAPE = 'h-28 sm:h-32 lg:h-36 xl:h-40 2xl:h-44 w-auto object-contain max-w-full'
 
@@ -81,7 +82,7 @@ export default function AppShell() {
       setGameName(savedGameName)
       
       // Try to load game definition using saved gameType or extract from gameId
-      const gameIdToUse = savedGameType || savedGameId.split('_')[0]?.toLowerCase()
+      const gameIdToUse = normalizeGameType(savedGameType || savedGameId.split('_')[0])
       if (gameIdToUse) {
         const game = getGameById(gameIdToUse)
         if (game) {
@@ -154,7 +155,7 @@ export default function AppShell() {
   const handleGameCreated = (name: string, id: string, type?: string) => {
     setGameName(name)
     setGameId(id)
-    const gameIdToUse = mapGameTypeToId(type)
+    const gameIdToUse = normalizeGameType(type)
     setGameType(gameIdToUse)
   }
 
@@ -323,20 +324,23 @@ export default function AppShell() {
                     paddingBottom: `${portraitPaddingBottomDvh}dvh`,
                   }}
                 >
-                  {/* Header: logo */}
-                  {(customLogo || currentGame.assets?.logo) && (
-                    <div className="flex-shrink-0 flex justify-center items-center w-full min-w-0">
-                      <img
-                        src={customLogo ?? currentGame.assets!.logo}
-                        alt={customLogo ? 'Logo del cliente' : currentGame.name}
-                        className={GAME_SCREEN_LOGO_CLASS}
-                      />
-                    </div>
-                  )}
+                  <GamePortraitHeaderJoin
+                    gameId={gameId}
+                    logoElement={
+                      customLogo || currentGame.assets?.logo ? (
+                        <img
+                          src={customLogo ?? currentGame.assets!.logo}
+                          alt={customLogo ? 'Logo del cliente' : currentGame.name}
+                          className="max-h-20 sm:max-h-24 w-auto object-contain"
+                        />
+                      ) : null
+                    }
+                    footerChildren={getJoinInstructions(currentGame.id)}
+                  />
                   {/* Main: con ranking, repartimos altura (juego : panel inferior) para que el ranking use el hueco */}
                   {currentGame.showRanking ? (
                     <div className="flex-1 min-h-0 flex flex-col gap-2 min-w-0 overflow-hidden">
-                      <div className="card grow-[3] basis-0 shrink min-h-0 w-full overflow-hidden flex flex-col p-5 sm:p-6 lg:p-8">
+                      <div className="card grow-[3] basis-0 shrink min-h-0 w-full overflow-hidden flex flex-col p-4 sm:p-5">
                         <currentGame.GameScreen
                           key={`game-${gameId}-${gameConfigVersion}`}
                           gameId={gameId}
@@ -350,7 +354,7 @@ export default function AppShell() {
                       </div>
                       <div className="grow-[2] basis-0 shrink min-h-0 flex flex-col gap-3 min-w-0 overflow-hidden">
                         <div className="flex-shrink-0 w-full">
-                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         </div>
                         <div className="min-h-0 flex-1 flex flex-col min-w-0">
                           <Ranking gameId={gameId} gameType={gameType ?? undefined} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
@@ -364,7 +368,7 @@ export default function AppShell() {
                     </div>
                   ) : (
                     <>
-                      <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-5 sm:p-6 lg:p-8">
+                      <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-4 sm:p-5">
                         <currentGame.GameScreen
                           key={`game-${gameId}-${gameConfigVersion}`}
                           gameId={gameId}
@@ -378,7 +382,7 @@ export default function AppShell() {
                       </div>
                       <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
                         <div className="flex-1 min-w-[200px]">
-                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         </div>
                         {features.raffles && (
                           <div className="flex-1 min-w-[200px]">
@@ -429,7 +433,7 @@ export default function AppShell() {
                           ) : null
                         }
                         playersElement={
-                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         }
                         sidebarElement={
                           <div className="flex flex-col gap-2 w-full min-w-0 min-h-0 flex-1 h-full overflow-y-auto self-stretch">
