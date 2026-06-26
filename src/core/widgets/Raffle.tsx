@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { api } from '../../api/api'
-import { INSTAGRAM_HANDLE } from '../lib/instagram'
 
 type RaffleProps = {
   onBack: () => void
@@ -72,11 +71,10 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
         }>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
         if (cancelled) return
         if (data?.raffleRequiredFollows && Array.isArray(data.raffleRequiredFollows)) {
-          const pinned = INSTAGRAM_HANDLE.toLowerCase()
           setRequiredFollows(
             data.raffleRequiredFollows
               .map((h) => String(h).trim().toLowerCase().replace(/^@/, ''))
-              .filter((h) => h && h !== pinned),
+              .filter((h) => h),
           )
         }
       } catch (_) {
@@ -162,10 +160,6 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
   const addRequiredFollow = async () => {
     const h = newHandle.trim().toLowerCase().replace(/^@/, '')
     if (!h) return
-    if (h === INSTAGRAM_HANDLE.toLowerCase()) {
-      setNewHandle('')
-      return
-    }
     if (requiredFollows.includes(h)) {
       setNewHandle('')
       return
@@ -419,9 +413,9 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                 </label>
                 <p className="text-sm font-medium text-gray-300 mb-2">Seguir a:</p>
                 <div className="flex flex-wrap gap-2 mb-2 min-h-[2rem]">
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-[rgba(255,255,255,0.08)] border border-white/10 text-xs">
-                    @{INSTAGRAM_HANDLE}
-                  </span>
+                  {requiredFollows.length === 0 && (
+                    <span className="text-xs text-gray-500">Ninguna cuenta configurada</span>
+                  )}
                   {requiredFollows.map((handle) => (
                     <span
                       key={handle}
