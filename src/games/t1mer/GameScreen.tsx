@@ -1,24 +1,25 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { GameScreenProps } from '../../core/types'
-import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
+import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import GameStateAvatar from '../../core/widgets/GameStateAvatar'
 import BackButton from '../../core/widgets/BackButton'
-import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
-  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
 } from '../../core/ui/gameScreenLayout'
 import { useGameInput } from '../../core/input/useGameInput'
 import type { InputEventEnvelope } from '../../core/input/types'
+import { useAvatarsEnabled } from '../../core/theme'
 import { useWebOsPointerPrimary } from '../../core/input/useWebOsPointerPrimary'
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
 
-export default function T1merGameScreen({ gameId, orientation, logoElement, sidebarElement, topX, prizeLabel, onCounterActiveChange, onAvatarStateChange }: GameScreenProps) {
+export default function T1merGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, topX, prizeLabel, onCounterActiveChange, onAvatarStateChange, avatarMediaUrls }: GameScreenProps) {
+  const avatarsEnabled = useAvatarsEnabled()
   const [gameState, setGameState] = useState<GameState>('idle')
   const [timer, setTimer] = useState(0)
   const [playerCode, setPlayerCode] = useState('')
@@ -81,7 +82,6 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
 
   const handleValidate = async () => {
     if (!playerCode.trim() || !gameId) {
-      setError('Por favor ingresa tu código de jugador')
       return
     }
 
@@ -272,24 +272,29 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
-        <GameLandscapeInfoColumn
+        <GameLandscapeLeftColumn
           gameId={gameId}
           logoElement={logoElement}
-          avatarElement={<GameStateAvatar state={avatarState} />}
+          playersElement={playersElement}
+          avatarElement={
+            avatarsEnabled ? (
+              <GameStateAvatar state={avatarState} mediaUrls={avatarMediaUrls} />
+            ) : undefined
+          }
         >
-          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+          <LandscapeInfoInstruction>
             Escanea el QR y pulsa JUGAR.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validar código">
+          <LandscapeInfoInstruction>
             Ingresa tu código y valida.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="⏱️" emojiLabel="Temporizador">
+          <LandscapeInfoInstruction>
             El temporizador se oculta a los 5 s.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="🎯" emojiLabel="Objetivo">
+          <LandscapeInfoInstruction>
             Detén en 10 segundos.
           </LandscapeInfoInstruction>
-        </GameLandscapeInfoColumn>
+        </GameLandscapeLeftColumn>
         <div className={`${GAME_LANDSCAPE_CENTER_CARD} items-center`}>
           {/* Idle: temporizador + código + Validar (validación a escondidas, mismo formulario) */}
           {gameState === 'idle' && (
@@ -429,41 +434,18 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, side
       )}
       <div className={`flex flex-col overflow-hidden min-h-0 flex-1 ${orientation === 'portrait' ? 'justify-center gap-8' : 'gap-3'}`}>
       {/* QR and instructions first (no game code block) */}
-      <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
-          {/* QR Code - Left column */}
-          <div className="flex justify-center items-start min-w-0">
-            <QRCode
-              data={getInstagramDmUrl(gameId)}
-              size={orientation === 'portrait' ? 180 : 380}
-              margin={orientation === 'portrait' ? 6 : 12}
-              alt="QR Code para Instagram DM"
-              className="!border-0 !bg-transparent"
-            />
-          </div>
-
-          {/* Instructions - Right column */}
-          <div className="space-y-1.5 min-w-0 overflow-hidden">
-            <h3 className="text-sm font-semibold text-textMain mb-1">Instrucciones</h3>
-            <ol className="space-y-1.5 text-xs text-gray-300">
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">1</span>
-                <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram para obtener tu código de jugador.</span>
-              </li>
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">2</span>
-                <span className="pt-0.5">Ingresa tu código y valida.</span>
-              </li>
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">3</span>
-                <span className="pt-0.5">El temporizador se ocultará a los 5 segundos.</span>
-              </li>
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(240,34,48,0.2)] border border-[rgba(240,34,48,0.4)] flex items-center justify-center font-semibold text-red-500 text-[10px]">4</span>
-                <span className="pt-0.5">Intenta detenerlo exactamente en 10 segundos.</span>
-              </li>
-            </ol>
-          </div>
-        </div>
+      <GamePortraitJoinPanel
+        gameId={gameId}
+        qrSize={orientation === 'portrait' ? 180 : 380}
+        qrMargin={orientation === 'portrait' ? 6 : 12}
+      >
+        <LandscapeInfoInstruction>
+          Escanea el QR y pulsa JUGAR en el chat de Instagram para obtener tu código de jugador.
+        </LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>Ingresa tu código y valida.</LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>El temporizador se ocultará a los 5 segundos.</LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>Intenta detenerlo exactamente en 10 segundos.</LandscapeInfoInstruction>
+      </GamePortraitJoinPanel>
 
       {/* Contenedor central: idle = timer + código + Validar (validación a escondidas); preparando = username + instrucción + EMPEZAR; jugando/oculto/terminado = timer + DETENER o resultado */}
       <div className="flex-1 min-h-0 flex flex-col justify-start overflow-hidden min-w-0">

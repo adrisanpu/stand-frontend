@@ -16,6 +16,8 @@ Auth uses Cognito PKCE OAuth2. All API calls go through the central api.ts clien
 
 **Env:** `VITE_*` — see `.env.example`; dev setup in [stand-backend/docs/DEV_ENVIRONMENT.md](../stand-backend/docs/DEV_ENVIRONMENT.md)
 
+**CI / workflow:** PR to `dev` → `npm run build` in Actions; Amplify deploys `dev` branch. Agent + human process: [stand-backend DEVELOPMENT_WORKFLOW.md](https://github.com/adrisanpu/stand-backend/blob/dev/docs/DEVELOPMENT_WORKFLOW.md).
+
 **Game IDs (lowercase):** empareja2, t1mer, rulet4, l3tras, semaforo, infocards, cupido
 Canonical game id strings: `mapGameTypeToId()` in `src/core/gameTypeMap.ts` (used by `src/core/shell/AppShell.tsx`)
 
@@ -27,6 +29,7 @@ Canonical game id strings: `mapGameTypeToId()` in `src/core/gameTypeMap.ts` (use
 **Operator game UI** (margins, layout tokens, validation): [`docs/operator-game-ui.md`](docs/operator-game-ui.md)
 
 ## HOW
+- **Agent rules:** workspace [software-rule.md](../software-rule.md) + [infrastructure-rule.md](../infrastructure-rule.md)
 - Register new game: add GameDefinition to `src/games/index.ts`, wire routing in `src/core/shell/AppShell.tsx`
 - Feature gates: `getFeaturesByPlan(plan)` from `src/auth/featureFlags.ts`
 - Plans: `'free'` (1 game, 25 players) | `'event'` | `'enterprise'` (unlimited)

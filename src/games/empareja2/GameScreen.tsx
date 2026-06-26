@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
-import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
+import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
-import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
-  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
 } from '../../core/ui/gameScreenLayout'
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
@@ -117,7 +116,7 @@ function PairCharacterSlot({
   )
 }
 
-export default function Empareja2GameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function Empareja2GameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
@@ -303,20 +302,20 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
-        <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+        <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
+          <LandscapeInfoInstruction>
             Escanea el QR y pulsa JUGAR en el chat.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="🎟️" emojiLabel="Código y pareja">
+          <LandscapeInfoInstruction>
             Recibe tu pareja asignada y tu código de validación.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="👥" emojiLabel="Encontrar pareja">
+          <LandscapeInfoInstruction>
             Encuentra a tu pareja físicamente.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="🏆" emojiLabel="Validar">
+          <LandscapeInfoInstruction>
             Cuando os encontréis, validad juntos vuestros códigos.
           </LandscapeInfoInstruction>
-        </GameLandscapeInfoColumn>
+        </GameLandscapeLeftColumn>
         <div className={`${GAME_LANDSCAPE_CENTER_CARD} justify-center`}>
           {renderCentralPairPanel('landscape')}
           {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && (
@@ -349,47 +348,19 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
           orientation === 'portrait' ? 'justify-center gap-8' : 'gap-3'
         }`}
       >
-        <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
-          <div className="flex justify-center items-start min-w-0">
-            <QRCode
-              data={getInstagramDmUrl(gameId)}
-              size={orientation === 'portrait' ? 180 : 380}
-              margin={orientation === 'portrait' ? 6 : 12}
-              alt="QR Code para Instagram DM"
-              className="!border-0 !bg-transparent"
-            />
-          </div>
-
-          <div className="space-y-1.5 min-w-0 overflow-hidden">
-            <h3 className="text-sm font-semibold text-textMain mb-1">Instrucciones</h3>
-            <ol className="space-y-1.5 text-xs text-gray-300">
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">
-                  1
-                </span>
-                <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.</span>
-              </li>
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">
-                  2
-                </span>
-                <span className="pt-0.5">🎟️ Recibe tu pareja asignada y tu código de validación.</span>
-              </li>
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">
-                  3
-                </span>
-                <span className="pt-0.5">👥 Encuentra a tu pareja físicamente.</span>
-              </li>
-              <li className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.4)] flex items-center justify-center font-semibold text-neonMagenta text-[10px]">
-                  4
-                </span>
-                <span className="pt-0.5">🏆 Cuando os encontréis, validad juntos vuestros códigos.</span>
-              </li>
-            </ol>
-          </div>
-        </div>
+        <GamePortraitJoinPanel
+          gameId={gameId}
+          qrSize={orientation === 'portrait' ? 180 : 380}
+          qrMargin={orientation === 'portrait' ? 6 : 12}
+          qrClassName="!border-0 !bg-transparent"
+        >
+          <LandscapeInfoInstruction>
+            Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Recibe tu pareja asignada y tu código de validación.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Encuentra a tu pareja físicamente.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Cuando os encontréis, validad juntos vuestros códigos.</LandscapeInfoInstruction>
+        </GamePortraitJoinPanel>
 
         <div className={`flex-shrink-0 ${orientation === 'portrait' ? 'space-y-4' : 'space-y-3'}`}>
           {renderCentralPairPanel('portrait')}

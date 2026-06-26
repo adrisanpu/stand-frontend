@@ -134,6 +134,13 @@ export default function AuthCallback() {
               `Verifica que el redirect_uri coincida exactamente: ${redirectUri}`
             )
           }
+
+          if (errorData?.error === 'invalid_client' || errorMessage.includes('invalid_client_secret')) {
+            throw new Error(
+              `invalid_client_secret: El App Client de Cognito tiene secret pero el frontend usa PKCE público. ` +
+              `Crea un client dev sin "Generate client secret" y actualiza VITE_COGNITO_CLIENT_ID (ver DEV_ENVIRONMENT.md).`
+            )
+          }
           
           throw new Error(`Token exchange failed (${tokenResponse.status}): ${errorMessage}`)
         }

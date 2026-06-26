@@ -6,7 +6,9 @@ export interface GameScreenProps {
   orientation?: 'portrait' | 'landscape'
   /** For landscape: node to place in column 1 (e.g. logo) */
   logoElement?: React.ReactNode
-  /** For landscape: node to place in column 3 (e.g. Players, Ranking, RaffleData) */
+  /** For landscape: node to place in column 1 below the info panel (e.g. Players) */
+  playersElement?: React.ReactNode
+  /** For landscape: node to place in column 3 (Ranking, RaffleData, avatar fallback) */
   sidebarElement?: React.ReactNode
   /** Optional: top X positions that get a prize (e.g. 3); used to show "Premio por top X" in result screen */
   topX?: number
@@ -16,6 +18,8 @@ export interface GameScreenProps {
   onCounterActiveChange?: (active: boolean) => void
   /** Optional: report current avatar state so shell widgets can render synced animations */
   onAvatarStateChange?: (state: string) => void
+  /** Optional: presigned avatar video URLs per state (used by games that embed GameStateAvatar) */
+  avatarMediaUrls?: Partial<Record<'idle' | 'win' | 'lose', string | null>>
 }
 
 export interface ThemeColors {

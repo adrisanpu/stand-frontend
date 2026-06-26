@@ -14,7 +14,7 @@ Do not reimplement outer page padding inside `GameScreen`; the shell already ins
 |------|--------|-------------------|
 | Portrait | Main column | `px-4 sm:px-6` on the scroll column; vertical insets via `paddingTop` / `paddingBottom` in `dvh` (see `AppShell.tsx`). |
 | Portrait | Game card wrapper | `p-5 sm:p-6 lg:p-8` on the `.card` that wraps `GameScreen`. |
-| Landscape | Full-bleed stage | `py-[10dvh] pl-[3dvw] pr-[1.5dvw]` on the landscape container. |
+| Landscape | Full-bleed stage | `py-[10dvh] pl-[3dvw] pr-[1.5dvw]` on the landscape container (tighter right gutter). |
 
 Settings control is `fixed top-4 left-4` (not part of game panels).
 
@@ -25,7 +25,9 @@ Use the shared token so column weights and gutters match t1mer:
 - Import `GAME_LANDSCAPE_THREE_COL_GRID` from [`src/core/ui/gameScreenLayout.ts`](../src/core/ui/gameScreenLayout.ts).
 - Equivalent classes: `grid grid-cols-[25%_40%_25%] gap-4 items-stretch h-full min-h-0`.
 
-Left: `GameLandscapeInfoColumn` (own internal padding `p-4 sm:p-5`). Center: main game. Right: `sidebarElement` (ranking, players, etc.).
+Left: `GameLandscapeLeftColumn` — info panel (`GameLandscapeInfoColumn`: logo, QR, optional avatar, manual/legal footer) + `playersElement` below. Pass instructions as `children` for the modal. Center: main game. Right: `sidebarElement` only (Ranking `flex-1` if `showRanking`, RaffleData, GameStateAvatar fallback) — **no Players**.
+
+`AppShell` passes `playersElement` and `sidebarElement` separately. Infocards (two-col): `playersElement` stays on the right sidebar above `sidebarElement`.
 
 ## Landscape center panel (main column)
 
@@ -41,13 +43,29 @@ Do not use the older `minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)` + `g
 
 - `GAME_LANDSCAPE_TWO_COL_GRID`: `grid-cols-[minmax(0,1fr)_minmax(180px,260px)] gap-4` (same gutter as three-col).
 - Main area: prefer `p-6 sm:p-8` on the outer `card` for parity with the center column of other games.
+- Right sidebar: `playersElement` on top, then `sidebarElement` (ranking, raffle, avatar) — no left info column.
 
-## Portrait: QR + instructions row
+## Portrait: join panel (QR + manual)
 
-- Import `GAME_PORTRAIT_QR_INSTRUCTIONS_GRID`.
-- Equivalent: `flex-shrink-0 overflow-hidden grid grid-cols-1 md:grid-cols-2 gap-4`.
+- Import `GamePortraitJoinPanel` from [`src/core/widgets/GamePortraitJoinPanel.tsx`](../src/core/widgets/GamePortraitJoinPanel.tsx).
+- Layout token: `GAME_PORTRAIT_JOIN_PANEL` in [`gameScreenLayout.ts`](../src/core/ui/gameScreenLayout.ts) — centered column (`flex flex-col items-center gap-2`).
+- Props: `gameId`, `qrSize`, optional `qrMargin` / `qrClassName` / `containerClassName`.
+- Pass game instructions as `children` (`LandscapeInfoInstruction`); same modal/footer as landscape (`GamePanelFooter`).
+- Do **not** render an instructions column beside the QR.
 
 Below that, the main stack typically uses `justify-center gap-8` when `orientation === 'portrait'` (see t1mer).
+
+## Join panel footer, instructions modal, and legal notice
+
+Shared widgets:
+
+| Widget | Path | Role |
+|--------|------|------|
+| `GamePanelFooter` | `src/core/widgets/GamePanelFooter.tsx` | Manual icon + one-line data notice + opens modal |
+| `GameInstructionsModal` | `src/core/widgets/GameInstructionsModal.tsx` | Scrollable instructions + expanded legal text |
+| `gameLegalCopy` | `src/core/ui/gameLegalCopy.ts` | `PRIVACY_POLICY_URL`, `GAME_DATA_NOTICE_PANEL`, `GAME_DATA_NOTICE_MODAL` |
+
+Privacy policy (Spanish UI): `/pages/privacy-es.html`. English: `/pages/privacy.html`.
 
 ## Internal spacers
 
@@ -88,5 +106,6 @@ Two fixed-size cells above the code inputs; on success, same cells show `charact
 ### Files that often change
 
 - `src/games/<gameId>/GameScreen.tsx`
-- `src/core/ui/gameScreenLayout.ts`, `gameValidationCopy.ts`
+- `src/core/ui/gameScreenLayout.ts`, `gameValidationCopy.ts`, `gameLegalCopy.ts`
+- `src/core/widgets/GameLandscapeLeftColumn.tsx`, `GameLandscapeInfoColumn.tsx`, `GamePortraitJoinPanel.tsx`, `GamePanelFooter.tsx`
 - `src/core/shell/AppShell.tsx` (only if global insets change)

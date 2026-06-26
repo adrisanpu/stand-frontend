@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
-import QRCode from '../../core/widgets/QRCode'
-import GameLandscapeInfoColumn, { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
+import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
+import GamePortraitJoinPanel from '../../core/widgets/GamePortraitJoinPanel'
 import BackButton from '../../core/widgets/BackButton'
-import { getInstagramDmUrl } from '../../core/lib/instagram'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
-  GAME_PORTRAIT_QR_INSTRUCTIONS_GRID,
 } from '../../core/ui/gameScreenLayout'
 
 const CROSS_QUIZ_QUESTION_COUNT = 3
@@ -89,7 +88,7 @@ function buildCrossQuizRounds(res: ValidationResponse): CrossQuizRound[] {
   return shuffleArray(rounds)
 }
 
-export default function SemaforoGameScreen({ gameId, orientation, logoElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function SemaforoGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
   const [stats] = useState<SemaforoStats>({ redCount: 0, yellowCount: 0, greenCount: 0 })
   const [statsLoading] = useState(false)
   const [gameState, setGameState] = useState<GameState>('idle')
@@ -420,20 +419,20 @@ export default function SemaforoGameScreen({ gameId, orientation, logoElement, s
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
-        <GameLandscapeInfoColumn gameId={gameId} logoElement={logoElement}>
-          <LandscapeInfoInstruction emoji="📸" emojiLabel="Escanear QR">
+        <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
+          <LandscapeInfoInstruction>
             Escanea el QR y pulsa JUGAR. Responde al quiz.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="🔴🟡🟢" emojiLabel="Grupos">
+          <LandscapeInfoInstruction>
             Te asignamos un grupo (Casado / Puede ser / Soltero).
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="👥" emojiLabel="Jugadores por grupo">
+          <LandscapeInfoInstruction>
             Aquí ves cuánta gente hay en cada grupo.
           </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction emoji="✅" emojiLabel="Validar">
+          <LandscapeInfoInstruction>
             Validad juntos vuestros códigos aquí.
           </LandscapeInfoInstruction>
-        </GameLandscapeInfoColumn>
+        </GameLandscapeLeftColumn>
         <div className={GAME_LANDSCAPE_CENTER_CARD}>
           {semaforoMainContent}
         </div>
@@ -455,32 +454,14 @@ export default function SemaforoGameScreen({ gameId, orientation, logoElement, s
       )}
       <div className={showJoinBlock ? 'space-y-6' : 'flex flex-col flex-1 min-h-0 space-y-4'}>
       {/* QR and instructions first (no game code block) */}
-      <div className={GAME_PORTRAIT_QR_INSTRUCTIONS_GRID}>
-          <div className="flex justify-center items-start">
-            <QRCode data={getInstagramDmUrl(gameId)} size={380} margin={12} alt="QR Code para Instagram DM" />
-          </div>
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-textMain mb-3">Instrucciones</h3>
-            <ol className="space-y-4 text-base text-gray-300">
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-sm">1</span>
-                <span className="pt-0.5">Escanea el QR y pulsa JUGAR en el chat de Instagram. Luego responde al quiz (estado sentimental / interés social).</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-sm">2</span>
-                <span className="pt-0.5">Te asignamos a un grupo: 🔴 Casado, 🟡 Puede ser, 🟢 Soltero.</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-sm">3</span>
-                <span className="pt-0.5">Aquí ves cuánta gente hay en cada grupo.</span>
-              </li>
-              <li className="flex gap-4">
-                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(34,197,94,0.2)] border border-[rgba(34,197,94,0.4)] flex items-center justify-center font-semibold text-green-500 text-sm">4</span>
-                <span className="pt-0.5">Cuando os encontréis, validad juntos vuestros códigos aquí.</span>
-              </li>
-            </ol>
-          </div>
-        </div>
+      <GamePortraitJoinPanel gameId={gameId} qrSize={380} qrMargin={12}>
+        <LandscapeInfoInstruction>
+          Escanea el QR y pulsa JUGAR en el chat de Instagram. Luego responde al quiz (estado sentimental / interés social).
+        </LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>Te asignamos a un grupo: Casado, Puede ser o Soltero.</LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>Aquí ves cuánta gente hay en cada grupo.</LandscapeInfoInstruction>
+        <LandscapeInfoInstruction>Cuando os encontréis, validad juntos vuestros códigos aquí.</LandscapeInfoInstruction>
+      </GamePortraitJoinPanel>
 
       {/* Main content - flex-1 when expanded for more space */}
       <div className={showJoinBlock ? '' : 'flex-1 flex flex-col min-h-0'}>

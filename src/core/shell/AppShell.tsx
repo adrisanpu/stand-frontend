@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { ThemeProvider, useAppThemeIsDark } from '../theme'
+import { ThemeProvider, useAppThemeIsDark, useAvatarsEnabled, getAvatarsEnabled } from '../theme'
 import GameGate from './GameGate'
 import SettingsMenu from './SettingsMenu'
 import Ranking from '../widgets/Ranking'
@@ -29,6 +29,7 @@ export default function AppShell() {
   const [gameType, setGameType] = useState<string | null>(null)
   const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
   const themeIsDark = useAppThemeIsDark()
+  const avatarsEnabled = useAvatarsEnabled()
   const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
   const customLogo = userMedia ? resolveLogoDisplayUrl(userMedia, themeIsDark) : null
   const [avatarMediaUrls, setAvatarMediaUrls] = useState<Partial<Record<'idle' | 'win' | 'lose', string | null>>>({})
@@ -49,11 +50,15 @@ export default function AppShell() {
       try {
         const media = await fetchUserMedia()
         setUserMedia(media)
-        setAvatarMediaUrls({
-          idle: media.avatar.selected?.idle?.url ?? null,
-          win: media.avatar.selected?.win?.url ?? null,
-          lose: media.avatar.selected?.lose?.url ?? null,
-        })
+        if (getAvatarsEnabled()) {
+          setAvatarMediaUrls({
+            idle: media.avatar.selected?.idle?.url ?? null,
+            win: media.avatar.selected?.win?.url ?? null,
+            lose: media.avatar.selected?.lose?.url ?? null,
+          })
+        } else {
+          setAvatarMediaUrls({})
+        }
       } catch {
         setUserMedia(null)
       }
@@ -340,6 +345,7 @@ export default function AppShell() {
                           prizeLabel={rankingPrizeLabel}
                           onCounterActiveChange={setCounterActive}
                           onAvatarStateChange={setAvatarState}
+                          avatarMediaUrls={avatarMediaUrls}
                         />
                       </div>
                       <div className="grow-[2] basis-0 shrink min-h-0 flex flex-col gap-3 min-w-0 overflow-hidden">
@@ -367,6 +373,7 @@ export default function AppShell() {
                           prizeLabel={rankingPrizeLabel}
                           onCounterActiveChange={setCounterActive}
                           onAvatarStateChange={setAvatarState}
+                          avatarMediaUrls={avatarMediaUrls}
                         />
                       </div>
                       <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
@@ -409,6 +416,7 @@ export default function AppShell() {
                         prizeLabel={rankingPrizeLabel}
                         onCounterActiveChange={setCounterActive}
                         onAvatarStateChange={setAvatarState}
+                        avatarMediaUrls={avatarMediaUrls}
                         logoElement={
                           (customLogo || currentGame.assets?.logo) ? (
                             <div className="flex justify-center items-center w-full min-w-0">
@@ -420,22 +428,22 @@ export default function AppShell() {
                             </div>
                           ) : null
                         }
+                        playersElement={
+                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                        }
                         sidebarElement={
-                          <div className="flex flex-col gap-2 w-full min-w-0 min-h-0 flex-1 h-full overflow-y-auto self-stretch pr-1">
-                            <div className="flex-shrink-0 w-full">
-                              <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={gameType?.toLowerCase() === 'empareja2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
-                            </div>
+                          <div className="flex flex-col gap-2 w-full min-w-0 min-h-0 flex-1 h-full overflow-y-auto self-stretch">
                             {currentGame.showRanking && (
                               <div className="min-h-0 flex-1 flex flex-col w-full overflow-hidden">
                                 <Ranking gameId={gameId} gameType={gameType ?? undefined} compact prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                               </div>
                             )}
                             {features.raffles && (
-                              <div className="flex-shrink-0 w-full">
+                              <div className="flex-shrink-0 w-full min-h-[min(32vh,220px)] flex flex-col">
                                 <RaffleData gameId={gameId} gameName={gameName} compact prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                               </div>
                             )}
-                            {!currentGame.showRanking && (
+                            {avatarsEnabled && !currentGame.showRanking && (
                               <div className="min-h-[180px] flex-[1_1_180px] w-full overflow-hidden">
                                 <GameStateAvatar
                                   state={avatarState}
