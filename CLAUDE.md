@@ -29,6 +29,7 @@ Canonical game id strings: `mapGameTypeToId()` in `src/core/gameTypeMap.ts` (use
 **Operator game UI** (margins, layout tokens, validation): [`docs/operator-game-ui.md`](docs/operator-game-ui.md)
 
 ## HOW
+- **Agent rules:** workspace [software-rule.md](../software-rule.md) + [infrastructure-rule.md](../infrastructure-rule.md)
 - Register new game: add GameDefinition to `src/games/index.ts`, wire routing in `src/core/shell/AppShell.tsx`
 - Feature gates: `getFeaturesByPlan(plan)` from `src/auth/featureFlags.ts`
 - Plans: `'free'` (1 game, 25 players) | `'event'` | `'enterprise'` (unlimited)

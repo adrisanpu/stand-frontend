@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import type { ThemeColors, GameDefinition } from '../types'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
-import { STORAGE_KEY_COLORS, STORAGE_KEY_THEME_MODE } from '../storageKeys'
+import { STORAGE_KEY_COLORS, STORAGE_KEY_THEME_MODE, STORAGE_KEY_AVATARS_ENABLED } from '../storageKeys'
 import {
   deleteUserMedia,
   fetchUserMedia,
@@ -49,6 +49,7 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
   const [customPrimary, setCustomPrimary] = useState('#B026FF')
   const [customAccent, setCustomAccent] = useState('#22D3EE')
   const [isDarkMode, setIsDarkMode] = useState(true)
+  const [avatarsEnabled, setAvatarsEnabled] = useState(true)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
   const [logoError, setLogoError] = useState<string | null>(null)
@@ -95,6 +96,8 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
     } else {
       setIsDarkMode(true)
     }
+
+    setAvatarsEnabled(localStorage.getItem(STORAGE_KEY_AVATARS_ENABLED) !== 'false')
 
     const loadMedia = async () => {
       try {
@@ -287,6 +290,13 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
     // Save theme mode (always available)
     localStorage.setItem(STORAGE_KEY_THEME_MODE, isDarkMode ? 'dark' : 'light')
 
+    // Save operator avatars visibility (always available)
+    if (avatarsEnabled) {
+      localStorage.removeItem(STORAGE_KEY_AVATARS_ENABLED)
+    } else {
+      localStorage.setItem(STORAGE_KEY_AVATARS_ENABLED, 'false')
+    }
+
     // Trigger a page reload to apply changes
     window.location.reload()
   }
@@ -294,10 +304,12 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
   const handleReset = () => {
     localStorage.removeItem(STORAGE_KEY_COLORS)
     localStorage.removeItem(STORAGE_KEY_THEME_MODE)
+    localStorage.removeItem(STORAGE_KEY_AVATARS_ENABLED)
     setUseDefaultPalette(true)
     setCustomPrimary('#B026FF')
     setCustomAccent('#22D3EE')
     setIsDarkMode(true)
+    setAvatarsEnabled(true)
     setLogoPreview(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -314,6 +326,9 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
     if (!id) return null
     return avatarHistory.find((it) => it.id === id)?.url ?? null
   }, [avatarHistory, selectedAvatars, avatarState])
+
+  const avatarStateOptionLabel = (state: AvatarState) =>
+    `${state} ${selectedAvatars[state] ? '✓' : '−'}`
 
   return (
     <div
@@ -366,7 +381,7 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
           type="file"
           accept="video/mp4,video/webm"
           onChange={handleAvatarUpload}
-          disabled={!features.advancedCustomization}
+          disabled={!features.advancedCustomization || !avatarsEnabled}
           className="hidden"
           id="avatar-upload"
         />
@@ -493,8 +508,22 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                   {logoError}
                 </div>
               )}
-              <div className={`mt-4 pt-4 border-t border-white/10 ${!features.advancedCustomization ? 'opacity-50' : ''}`}>
-                <h3 className="text-sm font-semibold text-gray-300 mb-3">Avatares por estado</h3>
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                  <h3 className="text-sm font-semibold text-gray-300">Avatares por estado</h3>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0 self-start sm:self-center">
+                    <input
+                      type="checkbox"
+                      checked={avatarsEnabled}
+                      onChange={(e) => setAvatarsEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+                  </label>
+                </div>
+                <div
+                  className={`transition-opacity ${!avatarsEnabled || !features.advancedCustomization ? 'opacity-50' : ''} ${!avatarsEnabled ? 'pointer-events-none' : ''}`}
+                >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
                   {/* Columna 1: vista previa del vídeo del estado seleccionado */}
                   <div className="flex justify-center sm:justify-start min-w-0">
@@ -531,24 +560,24 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                         value={avatarState}
                         onChange={(e) => setAvatarState(e.target.value as AvatarState)}
                         className="flex-1 min-w-0 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 py-2.5 text-sm"
-                        disabled={!features.advancedCustomization}
+                        disabled={!features.advancedCustomization || !avatarsEnabled}
                         aria-label="Estado del avatar"
                       >
-                        <option value="idle">idle</option>
-                        <option value="win">win</option>
-                        <option value="lose">lose</option>
+                        <option value="idle">{avatarStateOptionLabel('idle')}</option>
+                        <option value="win">{avatarStateOptionLabel('win')}</option>
+                        <option value="lose">{avatarStateOptionLabel('lose')}</option>
                       </select>
                       <label
-                        htmlFor={features.advancedCustomization ? 'avatar-upload' : undefined}
+                        htmlFor={features.advancedCustomization && avatarsEnabled ? 'avatar-upload' : undefined}
                         className={`inline-flex items-center justify-center shrink-0 w-11 rounded-xl border border-white/10 bg-[rgba(255,255,255,0.05)] transition-colors ${
-                          features.advancedCustomization
+                          features.advancedCustomization && avatarsEnabled
                             ? 'hover:bg-[rgba(255,255,255,0.1)] cursor-pointer'
                             : 'cursor-not-allowed pointer-events-none opacity-50'
                         }`}
                         title="Subir vídeo"
                         aria-label="Subir vídeo para este estado"
                         onClick={(e) => {
-                          if (!features.advancedCustomization) e.preventDefault()
+                          if (!features.advancedCustomization || !avatarsEnabled) e.preventDefault()
                         }}
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -566,9 +595,9 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                       <button
                         type="button"
                         onClick={() => setAvatarPickerOpen((o) => !o)}
-                        disabled={!features.advancedCustomization || avatarHistory.length === 0}
+                        disabled={!features.advancedCustomization || !avatarsEnabled || avatarHistory.length === 0}
                         className={`inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors text-sm w-full ${
-                          features.advancedCustomization && avatarHistory.length > 0
+                          features.advancedCustomization && avatarsEnabled && avatarHistory.length > 0
                             ? 'hover:bg-[rgba(255,255,255,0.1)]'
                             : 'opacity-50 cursor-not-allowed'
                         }`}
@@ -586,7 +615,7 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
-                      {avatarPickerOpen && features.advancedCustomization && avatarHistory.length > 0 && (
+                      {avatarPickerOpen && features.advancedCustomization && avatarsEnabled && avatarHistory.length > 0 && (
                         <div
                           className="absolute z-40 top-full mt-2 left-0 right-0 rounded-xl border border-white/10 bg-[#14141f] shadow-xl p-2 max-h-40 overflow-y-auto"
                           role="listbox"
@@ -619,32 +648,12 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                         </div>
                       )}
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-400 pt-1 border-t border-white/10">
-                      <span className="text-gray-500 shrink-0">Configurados:</span>
-                      {(['idle', 'win', 'lose'] as const).map((state) => {
-                        const ok = Boolean(selectedAvatars[state])
-                        return (
-                          <span key={state} className="inline-flex items-center gap-1 font-medium text-gray-300">
-                            {state}
-                            {ok ? (
-                              <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="configurado">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                            ) : (
-                              <span className="inline-flex items-center justify-center w-4 h-4 text-gray-500" aria-label="pendiente">
-                                −
-                              </span>
-                            )}
-                          </span>
-                        )
-                      })}
-                    </div>
                   </div>
                 </div>
                 {avatarError && (
                   <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-xs mt-3">{avatarError}</div>
                 )}
+                </div>
               </div>
             </div>
           </div>

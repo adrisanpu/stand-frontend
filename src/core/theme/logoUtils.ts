@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { STORAGE_KEY_THEME_MODE } from '../storageKeys'
+import { STORAGE_KEY_AVATARS_ENABLED, STORAGE_KEY_THEME_MODE } from '../storageKeys'
 
 /**
  * Get the appropriate Stand logo based on theme mode
@@ -63,4 +63,29 @@ export function useAppThemeIsDark(): boolean {
   }, [])
 
   return isDark
+}
+
+/** True when operator avatar videos should render on game screens (default: enabled). */
+export function getAvatarsEnabled(): boolean {
+  return localStorage.getItem(STORAGE_KEY_AVATARS_ENABLED) !== 'false'
+}
+
+/** Updates when `STORAGE_KEY_AVATARS_ENABLED` changes. */
+export function useAvatarsEnabled(): boolean {
+  const [enabled, setEnabled] = useState(getAvatarsEnabled)
+
+  useEffect(() => {
+    const update = () => setEnabled(getAvatarsEnabled())
+    const interval = setInterval(update, 500)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY_AVATARS_ENABLED) update()
+    }
+    window.addEventListener('storage', handleStorageChange)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [])
+
+  return enabled
 }
