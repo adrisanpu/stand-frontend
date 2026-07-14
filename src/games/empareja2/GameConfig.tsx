@@ -1,14 +1,23 @@
 import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
+import { getDisplayUrl, getWebPlayUrl } from '../../core/lib/joinUrl'
 
 export type Empareja2Settings = {
   numPairs?: number
+  emailRequired?: boolean
+  instagramRequired?: boolean
 }
 
 interface GameDataResponse {
   ok: boolean
-  game?: { gameId: string; gameName: string; gameType: string }
+  game?: {
+    gameId: string
+    gameName: string
+    gameType: string
+    joinChannel?: string
+    participantFields?: { email?: { required?: boolean }; instagram?: { required?: boolean } }
+  }
   settings?: { empareja2?: { numPairs?: number } }
   empareja2CatalogPairCount?: number
 }
@@ -20,6 +29,9 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       : ''
   )
   const [catalogPairCount, setCatalogPairCount] = useState<number | null>(null)
+  const [emailRequired, setEmailRequired] = useState(true)
+  const [instagramRequired, setInstagramRequired] = useState(false)
+  const [joinChannel, setJoinChannel] = useState('web')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string>('')
 
@@ -40,6 +52,10 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
         if (data.empareja2CatalogPairCount != null) setCatalogPairCount(data.empareja2CatalogPairCount)
         const backend = data.settings?.empareja2
         if (backend?.numPairs != null) setNumPairsInput(String(backend.numPairs))
+        const pf = data.game?.participantFields
+        if (pf?.email?.required != null) setEmailRequired(Boolean(pf.email.required))
+        if (pf?.instagram?.required != null) setInstagramRequired(Boolean(pf.instagram.required))
+        if (data.game?.joinChannel) setJoinChannel(data.game.joinChannel)
       } catch {
         // ignore; keep UI working with localStorage only
       }
@@ -57,6 +73,8 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
 
     const newSettings: Empareja2Settings = {
       numPairs: numPairsClamped,
+      emailRequired,
+      instagramRequired,
     }
     onChange(newSettings)
     setSaveStatus('idle')
@@ -68,6 +86,11 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       try {
         await api.put('/v1/game', {
           gameId,
+          joinChannel: 'web',
+          participantFields: {
+            email: { required: emailRequired },
+            instagram: { required: instagramRequired },
+          },
           settings: {
             empareja2: {
               numPairs: numPairsClamped,
@@ -151,6 +174,30 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
             </div>
           )}
         </div>
+
+        <div className="space-y-3 border-t border-white/10 pt-4">
+          <p className="text-sm font-medium text-gray-300">Datos del participante</p>
+          <label className="flex items-center gap-2 text-sm text-gray-300">
+            <input type="checkbox" checked={emailRequired} onChange={(e) => setEmailRequired(e.target.checked)} />
+            Email obligatorio (CRM / contacto)
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-300">
+            <input type="checkbox" checked={instagramRequired} onChange={(e) => setInstagramRequired(e.target.checked)} />
+            Instagram obligatorio
+          </label>
+        </div>
+
+        {gameId && joinChannel === 'web' && (
+          <div className="space-y-2 border-t border-white/10 pt-4 text-sm">
+            <p className="font-medium text-gray-300">Enlaces pantalla dual</p>
+            <a href={getDisplayUrl(gameId)} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
+              Pantalla pública
+            </a>
+            <a href={getWebPlayUrl(gameId)} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
+              Participante (móvil)
+            </a>
+          </div>
+        )}
       </div>
 
       {saveStatus !== 'idle' && (

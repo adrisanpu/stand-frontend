@@ -14,6 +14,7 @@ import { useOrientation } from '../../hooks/useOrientation'
 import { readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle } from '../settings/operatorPrizeSlots'
 import { inputManager } from '../input/inputManager'
 import { normalizeGameType } from '../gameTypeMap'
+import { api } from '../../api/api'
 import GamePortraitHeaderJoin from '../widgets/GamePortraitHeaderJoin'
 import { getJoinInstructions } from '../ui/gameJoinInstructions'
 import { fetchUserMedia, resolveLogoDisplayUrl, type UserMediaResponse } from '../../api/userMedia'
@@ -35,6 +36,7 @@ export default function AppShell() {
   const customLogo = userMedia ? resolveLogoDisplayUrl(userMedia, themeIsDark) : null
   const [avatarMediaUrls, setAvatarMediaUrls] = useState<Partial<Record<'idle' | 'win' | 'lose', string | null>>>({})
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
+  const [joinChannel, setJoinChannel] = useState<string | null>(null)
   const [gameSettings, setGameSettings] = useState<Record<string, unknown> | null>(null)
   const [counterActive, setCounterActive] = useState(false)
   const [avatarState, setAvatarState] = useState('idle')
@@ -147,6 +149,30 @@ export default function AppShell() {
       setGameSettings(null)
     }
   }, [gameId, gameDefinition?.id, gameConfigVersion])
+
+  useEffect(() => {
+    if (!gameId) {
+      setJoinChannel(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const data = await api.get<{ ok: boolean; game?: { joinChannel?: string; gameType?: string } }>(
+          `/v1/game?gameId=${encodeURIComponent(gameId)}`
+        )
+        if (!cancelled && data.ok) {
+          const gt = (data.game?.gameType || '').toUpperCase()
+          setJoinChannel(data.game?.joinChannel ?? (gt === 'EMPAREJA2' ? 'web' : null))
+        }
+      } catch {
+        if (!cancelled) setJoinChannel(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [gameId, gameConfigVersion])
 
   useEffect(() => {
     setAvatarState('idle')
@@ -326,6 +352,7 @@ export default function AppShell() {
                 >
                   <GamePortraitHeaderJoin
                     gameId={gameId}
+                    joinChannel={joinChannel}
                     logoElement={
                       customLogo || currentGame.assets?.logo ? (
                         <img
@@ -350,6 +377,7 @@ export default function AppShell() {
                           onCounterActiveChange={setCounterActive}
                           onAvatarStateChange={setAvatarState}
                           avatarMediaUrls={avatarMediaUrls}
+                          joinChannel={joinChannel}
                         />
                       </div>
                       <div className="grow-[2] basis-0 shrink min-h-0 flex flex-col gap-3 min-w-0 overflow-hidden">
@@ -378,6 +406,7 @@ export default function AppShell() {
                           onCounterActiveChange={setCounterActive}
                           onAvatarStateChange={setAvatarState}
                           avatarMediaUrls={avatarMediaUrls}
+                          joinChannel={joinChannel}
                         />
                       </div>
                       <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">

@@ -115,7 +115,9 @@ function PairCharacterSlot({
   )
 }
 
-export default function Empareja2GameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+import Empareja2OperatorScreen from './OperatorScreen'
+
+export default function Empareja2GameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange, joinChannel }: GameScreenProps) {
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
@@ -296,6 +298,12 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
   useEffect(() => {
     onAvatarStateChange?.(avatarState)
   }, [avatarState, onAvatarStateChange])
+
+  if (joinChannel === 'web') {
+    const gameName = localStorage.getItem('gameName') || gameId
+    return <Empareja2OperatorScreen gameId={gameId} gameName={gameName} />
+  }
+
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>

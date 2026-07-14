@@ -29,10 +29,10 @@ const INSTRUCTIONS: Record<string, ReactNode> = {
   ),
   EMPAREJA2: (
     <>
-      <LandscapeInfoInstruction>Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.</LandscapeInfoInstruction>
-      <LandscapeInfoInstruction>Recibe tu pareja asignada y tu código de validación.</LandscapeInfoInstruction>
-      <LandscapeInfoInstruction>Encuentra a tu pareja físicamente.</LandscapeInfoInstruction>
-      <LandscapeInfoInstruction>Cuando os encontréis, validad juntos vuestros códigos.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>Escanea el QR con tu móvil para registrarte.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>Recibe tu personaje, pareja y código de validación.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>Encuentra a tu pareja en la sala.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>Validad los dos códigos desde el móvil; el resultado aparece aquí.</LandscapeInfoInstruction>
     </>
   ),
   CUPIDO: (

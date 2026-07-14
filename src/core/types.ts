@@ -20,6 +20,8 @@ export interface GameScreenProps {
   onAvatarStateChange?: (state: string) => void
   /** Optional: presigned avatar video URLs per state (used by games that embed GameStateAvatar) */
   avatarMediaUrls?: Partial<Record<'idle' | 'win' | 'lose', string | null>>
+  /** web | instagram — dual-screen campaigns use web */
+  joinChannel?: string | null
 }
 
 export interface ThemeColors {
