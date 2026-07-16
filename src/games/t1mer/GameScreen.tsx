@@ -4,6 +4,7 @@ import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoCo
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
 import GameStateAvatar from '../../core/widgets/GameStateAvatar'
 import BackButton from '../../core/widgets/BackButton'
+import DualScreenOperatorPanel from '../../core/widgets/DualScreenOperatorPanel'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import {
@@ -17,8 +18,21 @@ import { useWebOsPointerPrimary } from '../../core/input/useWebOsPointerPrimary'
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
 
-export default function T1merGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, topX, prizeLabel, onCounterActiveChange, onAvatarStateChange, avatarMediaUrls }: GameScreenProps) {
+export default function T1merGameScreen({
+  gameId,
+  orientation,
+  logoElement,
+  playersElement,
+  sidebarElement,
+  topX,
+  prizeLabel,
+  onCounterActiveChange,
+  onAvatarStateChange,
+  avatarMediaUrls,
+  joinChannel,
+}: GameScreenProps) {
   const avatarsEnabled = useAvatarsEnabled()
+  const isPhoneMode = (joinChannel || '').toLowerCase() === 'web'
   const [gameState, setGameState] = useState<GameState>('idle')
   const [timer, setTimer] = useState(0)
   const [playerCode, setPlayerCode] = useState('')
@@ -241,8 +255,9 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
   })
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
-  const avatarState: string =
-    gameState === 'preparing'
+  const avatarState: string = isPhoneMode
+    ? 'idle'
+    : gameState === 'preparing'
       ? 'ready'
       : gameState === 'hidden'
         ? 'playing'
@@ -251,6 +266,21 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
   useEffect(() => {
     onAvatarStateChange?.(avatarState)
   }, [avatarState, onAvatarStateChange])
+
+  const gameName = localStorage.getItem('gameName') || gameId || 'T1MER'
+
+  const renderPhoneCenter = () => {
+    if (avatarsEnabled) {
+      return (
+        <GameStateAvatar
+          state="idle"
+          mediaUrls={avatarMediaUrls}
+          className="w-full h-full min-h-[200px]"
+        />
+      )
+    }
+    return <DualScreenOperatorPanel gameId={gameId!} gameName={gameName} />
+  }
 
   /** Altura fija del contador: no crece ni se mueve entre estados. */
   const t1merTimerSlotClassPortrait =
@@ -267,6 +297,34 @@ export default function T1merGameScreen({ gameId, orientation, logoElement, play
     'shrink-0 h-[9rem] flex flex-col justify-center text-center py-3 min-h-0 px-2 sm:px-3'
   const t1merPreparingHeaderSlotPortrait =
     'shrink-0 h-[12.5rem] sm:h-[13rem] flex flex-col justify-center text-center py-4 min-h-0 px-3 sm:px-4'
+
+  if (isPhoneMode && isLandscape) {
+    return (
+      <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
+        <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
+          <LandscapeInfoInstruction>Los asistentes juegan desde su móvil (/play).</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Abre la pantalla pública en el monitor o proyector.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Los enlaces están en Configurar juego.</LandscapeInfoInstruction>
+        </GameLandscapeLeftColumn>
+        <div className={`${GAME_LANDSCAPE_CENTER_CARD} justify-center items-center min-h-0`}>
+          {renderPhoneCenter()}
+        </div>
+        <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
+          <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
+            {sidebarElement}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (isPhoneMode) {
+    return (
+      <div className="w-full h-full min-h-0 flex flex-col overflow-hidden items-center justify-center">
+        {renderPhoneCenter()}
+      </div>
+    )
+  }
 
   if (isLandscape) {
     return (

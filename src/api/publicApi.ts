@@ -25,6 +25,14 @@ export type ParticipantFieldsConfig = {
   instagram?: { required?: boolean }
 }
 
+export type PublicRankingEntry = {
+  playerId: number
+  username?: string
+  timer: number
+  score: number
+  rank: number
+}
+
 export type PublicGameResponse = {
   ok: boolean
   gameId: string
@@ -36,6 +44,7 @@ export type PublicGameResponse = {
   playerCount: number
   validatedCount: number
   recentPairs: Array<{ label: string; characterNames: string[]; validatedAt: string }>
+  ranking?: PublicRankingEntry[]
   joinUrl: string
 }
 
@@ -49,12 +58,21 @@ export type Empareja2Assignment = {
   validated: boolean
 }
 
+export type T1merAssignment = {
+  playerId: number
+  displayName: string
+  validationCode?: number
+  validated: boolean
+}
+
+export type PlayerAssignment = Empareja2Assignment | T1merAssignment
+
 export type JoinResponse = {
   ok: boolean
   gameId: string
   gameType: string
   playerToken: string
-  assignment: Empareja2Assignment
+  assignment: PlayerAssignment
   alreadyJoined?: boolean
 }
 
@@ -83,7 +101,7 @@ export type PlayerResponse = {
   gameId: string
   gameType: string
   playerToken: string
-  assignment: Empareja2Assignment | null
+  assignment: PlayerAssignment | null
   prizes: PlayerPrize[]
 }
 
@@ -97,6 +115,17 @@ export type RedeemResponse = {
   error?: string
 }
 
+export type PublicScoreResponse = {
+  ok: boolean
+  gameId?: string
+  playerId?: number
+  timer?: number
+  score?: number
+  rank?: number | null
+  error?: string
+  message?: string
+}
+
 export const publicApi = {
   getGame: (gameId: string) =>
     publicRequest<PublicGameResponse>(`/v1/public/game?gameId=${encodeURIComponent(gameId)}`),
@@ -106,6 +135,9 @@ export const publicApi = {
 
   validate: (body: { gameId: string; playerToken: string; codes: string[] }) =>
     publicRequest<ValidateResponse>('/v1/public/validate', { method: 'POST', body: JSON.stringify(body) }),
+
+  score: (body: { gameId: string; playerToken: string; timer: string; score: number }) =>
+    publicRequest<PublicScoreResponse>('/v1/public/score', { method: 'POST', body: JSON.stringify(body) }),
 
   getPlayer: (playerToken: string, gameId?: string) => {
     const qs = new URLSearchParams({ playerToken })
