@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
+import GameStateAvatar from '../../core/widgets/GameStateAvatar'
 import BackButton from '../../core/widgets/BackButton'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
@@ -9,6 +10,9 @@ import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
 } from '../../core/ui/gameScreenLayout'
+import { useAvatarsEnabled } from '../../core/theme'
+import Empareja2OperatorScreen from './OperatorScreen'
+import { getEmpareja2CenterKind } from './centerKind'
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
 
@@ -115,9 +119,19 @@ function PairCharacterSlot({
   )
 }
 
-import Empareja2OperatorScreen from './OperatorScreen'
-
-export default function Empareja2GameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange, joinChannel }: GameScreenProps) {
+export default function Empareja2GameScreen({
+  gameId,
+  orientation,
+  logoElement,
+  playersElement,
+  sidebarElement,
+  onAvatarStateChange,
+  avatarMediaUrls,
+  joinChannel,
+}: GameScreenProps) {
+  const avatarsEnabled = useAvatarsEnabled()
+  const centerKind = getEmpareja2CenterKind(joinChannel, avatarsEnabled)
+  const isPhoneMode = centerKind !== 'pair'
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
@@ -293,14 +307,29 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
   }
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
-  const avatarState = gameState === 'valid' ? 'win' : gameState === 'invalid' ? 'lose' : gameState
+  const avatarState = isPhoneMode
+    ? 'idle'
+    : gameState === 'valid'
+      ? 'win'
+      : gameState === 'invalid'
+        ? 'lose'
+        : gameState
+  const gameName = localStorage.getItem('gameName') || gameId
 
   useEffect(() => {
     onAvatarStateChange?.(avatarState)
   }, [avatarState, onAvatarStateChange])
 
-  if (joinChannel === 'web') {
-    const gameName = localStorage.getItem('gameName') || gameId
+  const renderPhoneCenter = () => {
+    if (centerKind === 'avatar') {
+      return (
+        <GameStateAvatar
+          state="idle"
+          mediaUrls={avatarMediaUrls}
+          className="w-full h-full min-h-[200px]"
+        />
+      )
+    }
     return <Empareja2OperatorScreen gameId={gameId} gameName={gameName} />
   }
 
@@ -308,33 +337,55 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
-          <LandscapeInfoInstruction>
-            Escanea el QR y pulsa JUGAR en el chat.
-          </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>
-            Recibe tu pareja asignada y tu código de validación.
-          </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>
-            Encuentra a tu pareja físicamente.
-          </LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>
-            Cuando os encontréis, validad juntos vuestros códigos.
-          </LandscapeInfoInstruction>
+          {isPhoneMode ? (
+            <>
+              <LandscapeInfoInstruction>
+                Los asistentes juegan desde su móvil (/play).
+              </LandscapeInfoInstruction>
+              <LandscapeInfoInstruction>
+                Abre la pantalla pública en el monitor o proyector.
+              </LandscapeInfoInstruction>
+              <LandscapeInfoInstruction>
+                Los enlaces están en Configurar juego.
+              </LandscapeInfoInstruction>
+            </>
+          ) : (
+            <>
+              <LandscapeInfoInstruction>
+                Escanea el QR y pulsa JUGAR en el chat.
+              </LandscapeInfoInstruction>
+              <LandscapeInfoInstruction>
+                Recibe tu pareja asignada y tu código de validación.
+              </LandscapeInfoInstruction>
+              <LandscapeInfoInstruction>
+                Encuentra a tu pareja físicamente.
+              </LandscapeInfoInstruction>
+              <LandscapeInfoInstruction>
+                Cuando os encontréis, validad juntos vuestros códigos.
+              </LandscapeInfoInstruction>
+            </>
+          )}
         </GameLandscapeLeftColumn>
-        <div className={`${GAME_LANDSCAPE_CENTER_CARD} justify-center`}>
-          {renderCentralPairPanel('landscape')}
-          {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && (
-            <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in">
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <span className="text-xl font-semibold text-red-400">Pareja Inválida</span>
-              </div>
-              {(validationResult.message || error) && (
-                <p className="text-base text-red-300">{validationResult.message || error}</p>
+        <div className={`${GAME_LANDSCAPE_CENTER_CARD} justify-center items-center min-h-0`}>
+          {isPhoneMode ? (
+            renderPhoneCenter()
+          ) : (
+            <>
+              {renderCentralPairPanel('landscape')}
+              {gameState === 'invalid' && validationResult && !validationResult.valid && showInvalidMessage && (
+                <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in">
+                  <div className="flex items-center justify-center gap-3 mb-2">
+                    <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span className="text-xl font-semibold text-red-400">Pareja Inválida</span>
+                  </div>
+                  {(validationResult.message || error) && (
+                    <p className="text-base text-red-300">{validationResult.message || error}</p>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
         <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
@@ -342,6 +393,14 @@ export default function Empareja2GameScreen({ gameId, orientation, logoElement, 
             {sidebarElement}
           </div>
         </div>
+      </div>
+    )
+  }
+
+  if (isPhoneMode) {
+    return (
+      <div className="w-full h-full min-h-0 flex flex-col overflow-hidden items-center justify-center">
+        {renderPhoneCenter()}
       </div>
     )
   }

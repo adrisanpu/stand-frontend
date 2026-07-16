@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
+import { normalizeGameType } from '../gameTypeMap'
 import { publicApi, type PublicGameResponse } from '../../api/publicApi'
 import { getJoinUrl } from '../lib/joinUrl'
 import QRCode from '../widgets/QRCode'
@@ -11,7 +12,6 @@ const POLL_MS = 4000
 
 export default function PublicDisplayShell() {
   const { gameId = '' } = useParams()
-  const game = getGameById('EMPAREJA2')
   const [data, setData] = useState<PublicGameResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -37,9 +37,13 @@ export default function PublicDisplayShell() {
     }
   }, [gameId])
 
+  const gameType = normalizeGameType(data?.gameType)
+  const game = getGameById(gameType)
   const joinChannel = data?.joinChannel ?? 'web'
   const qrUrl = getJoinUrl(gameId, joinChannel)
   const colors = game?.colors
+  const isT1mer = gameType === 'T1MER'
+  const ranking = data?.ranking ?? []
 
   return (
     <ThemeProvider game={game ?? null}>
@@ -48,10 +52,9 @@ export default function PublicDisplayShell() {
         style={{ background: colors?.background ?? '#0B0A12', color: colors?.textMain ?? '#EAEAF2' }}
       >
         <div className="mx-auto max-w-6xl grid lg:grid-cols-[1fr_1.2fr_1fr] gap-6 items-stretch min-h-[calc(100dvh-2rem)]">
-          {/* Left: brand + QR */}
           <div className="card flex flex-col items-center justify-center gap-4 p-6">
             {game?.assets?.logo && (
-              <img src={game.assets.logo} alt="EMPAREJA2" className="h-24 w-auto object-contain" />
+              <img src={game.assets.logo} alt={game.name} className="h-24 w-auto object-contain" />
             )}
             <QRCode
               data={qrUrl}
@@ -66,18 +69,16 @@ export default function PublicDisplayShell() {
             <p className="text-xs text-textSub font-mono">{gameId}</p>
           </div>
 
-          {/* Center: instructions */}
           <div className="card flex flex-col justify-center p-6 sm:p-8 space-y-4">
             <h1 className="text-2xl sm:text-3xl font-bold text-center">
-              {data?.gameName || 'EMPAREJA2'}
+              {data?.gameName || game?.name || gameType}
             </h1>
             <ul className="space-y-2 text-sm sm:text-base text-textSub list-disc pl-5">
-              {getJoinInstructions('EMPAREJA2')}
+              {getJoinInstructions(gameType)}
             </ul>
             {error && <p className="text-red-300 text-sm text-center">{error}</p>}
           </div>
 
-          {/* Right: live results */}
           <div className="card flex flex-col p-6 gap-4 min-h-0">
             <h2 className="text-lg font-semibold text-center">En vivo</h2>
             <div className="grid grid-cols-2 gap-3 text-center">
@@ -86,26 +87,54 @@ export default function PublicDisplayShell() {
                 <p className="text-xs text-textSub">Jugadores</p>
               </div>
               <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                <p className="text-2xl font-bold">{data?.validatedCount ?? '—'}</p>
-                <p className="text-xs text-textSub">Validados</p>
+                <p className="text-2xl font-bold">
+                  {isT1mer ? ranking.length : (data?.validatedCount ?? '—')}
+                </p>
+                <p className="text-xs text-textSub">{isT1mer ? 'Con score' : 'Validados'}</p>
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
-              <p className="text-xs uppercase tracking-wide text-textSub">Últimas parejas</p>
-              {(data?.recentPairs?.length ?? 0) === 0 ? (
-                <p className="text-sm text-textSub text-center py-8">Aún no hay parejas validadas</p>
+              {isT1mer ? (
+                <>
+                  <p className="text-xs uppercase tracking-wide text-textSub">Ranking</p>
+                  {ranking.length === 0 ? (
+                    <p className="text-sm text-textSub text-center py-8">Aún no hay puntuaciones</p>
+                  ) : (
+                    ranking.map((entry) => (
+                      <div
+                        key={`${entry.playerId}-${entry.rank}`}
+                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">
+                            #{entry.rank} {entry.username || `Jugador ${entry.playerId}`}
+                          </p>
+                          <p className="text-xs text-textSub">{Number(entry.timer).toFixed(3)} s</p>
+                        </div>
+                        <p className="text-sm font-semibold shrink-0">{Math.round(Number(entry.score))} ms</p>
+                      </div>
+                    ))
+                  )}
+                </>
               ) : (
-                data!.recentPairs
-                  .slice()
-                  .reverse()
-                  .map((pair, i) => (
-                    <div key={`${pair.validatedAt}-${i}`} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                      <p className="font-medium">{pair.label}</p>
-                      {pair.characterNames?.length > 0 && (
-                        <p className="text-xs text-textSub">{pair.characterNames.join(' · ')}</p>
-                      )}
-                    </div>
-                  ))
+                <>
+                  <p className="text-xs uppercase tracking-wide text-textSub">Últimas parejas</p>
+                  {(data?.recentPairs?.length ?? 0) === 0 ? (
+                    <p className="text-sm text-textSub text-center py-8">Aún no hay parejas validadas</p>
+                  ) : (
+                    data!.recentPairs
+                      .slice()
+                      .reverse()
+                      .map((pair, i) => (
+                        <div key={`${pair.validatedAt}-${i}`} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                          <p className="font-medium">{pair.label}</p>
+                          {pair.characterNames?.length > 0 && (
+                            <p className="text-xs text-textSub">{pair.characterNames.join(' · ')}</p>
+                          )}
+                        </div>
+                      ))
+                  )}
+                </>
               )}
             </div>
           </div>

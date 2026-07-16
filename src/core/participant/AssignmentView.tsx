@@ -10,7 +10,7 @@ type Props = {
 
 export default function AssignmentView({ gameId, gameMeta, onValidate }: Props) {
   const assignment = loadAssignment(gameId)
-  if (!assignment) {
+  if (!assignment || !('characterName' in assignment)) {
     return <p className="text-center text-textSub">Sesión no encontrada. Vuelve a registrarte.</p>
   }
 

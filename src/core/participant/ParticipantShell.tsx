@@ -2,22 +2,36 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
+import { normalizeGameType } from '../gameTypeMap'
 import { publicApi, type PublicGameResponse } from '../../api/publicApi'
 import { loadAssignment, loadPlayerToken } from './playerSession'
 import JoinForm from './JoinForm'
 import AssignmentView from './AssignmentView'
 import ValidateView from './ValidateView'
 import ResultView from './ResultView'
+import T1merParticipantPlay from '../../games/t1mer/ParticipantPlay'
+import T1merParticipantResult from '../../games/t1mer/ParticipantResult'
 
-type Step = 'loading' | 'unsupported' | 'join' | 'assignment' | 'validate' | 'result'
+type Empareja2Step = 'loading' | 'unsupported' | 'join' | 'assignment' | 'validate' | 'result'
+type T1merStep = 'loading' | 'unsupported' | 'join' | 'play' | 'result'
+type Step = Empareja2Step | T1merStep
+
+const WEB_PLAY_TYPES = new Set(['EMPAREJA2', 'T1MER'])
 
 export default function ParticipantShell() {
   const { gameId = '' } = useParams()
-  const game = getGameById('EMPAREJA2')
   const [step, setStep] = useState<Step>('loading')
   const [gameMeta, setGameMeta] = useState<PublicGameResponse | null>(null)
   const [playerToken, setPlayerToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [t1merResult, setT1merResult] = useState<{
+    time: number
+    difference: number
+    rank: number | null
+  } | null>(null)
+
+  const gameType = normalizeGameType(gameMeta?.gameType)
+  const game = getGameById(gameType)
 
   useEffect(() => {
     let cancelled = false
@@ -30,7 +44,8 @@ export default function ParticipantShell() {
         const meta = await publicApi.getGame(gameId)
         if (cancelled) return
         setGameMeta(meta)
-        if (meta.gameType !== 'EMPAREJA2') {
+        const gt = normalizeGameType(meta.gameType)
+        if (!WEB_PLAY_TYPES.has(gt)) {
           setStep('unsupported')
           return
         }
@@ -38,7 +53,9 @@ export default function ParticipantShell() {
         const assignment = loadAssignment(gameId)
         if (token && assignment) {
           setPlayerToken(token)
-          if (assignment.validated) {
+          if (gt === 'T1MER') {
+            setStep('play')
+          } else if ('validated' in assignment && assignment.validated) {
             setStep('result')
           } else {
             setStep('assignment')
@@ -71,7 +88,9 @@ export default function ParticipantShell() {
           {step === 'unsupported' && (
             <div className="card p-6 text-center space-y-2">
               <p className="font-semibold">Juego no disponible</p>
-              <p className="text-sm text-textSub">{error || 'Este enlace no es válido o el juego no admite participación web todavía.'}</p>
+              <p className="text-sm text-textSub">
+                {error || 'Este enlace no es válido o el juego no admite participación web todavía.'}
+              </p>
             </div>
           )}
           {step === 'join' && gameMeta && (
@@ -80,11 +99,13 @@ export default function ParticipantShell() {
               gameMeta={gameMeta}
               onJoined={(token) => {
                 setPlayerToken(token)
-                setStep('assignment')
+                const gt = normalizeGameType(gameMeta.gameType)
+                setStep(gt === 'T1MER' ? 'play' : 'assignment')
               }}
             />
           )}
-          {step === 'assignment' && gameMeta && playerToken && (
+
+          {gameType === 'EMPAREJA2' && step === 'assignment' && gameMeta && playerToken && (
             <AssignmentView
               gameId={gameId}
               gameMeta={gameMeta}
@@ -92,7 +113,7 @@ export default function ParticipantShell() {
               onValidate={() => setStep('validate')}
             />
           )}
-          {step === 'validate' && playerToken && (
+          {gameType === 'EMPAREJA2' && step === 'validate' && playerToken && (
             <ValidateView
               gameId={gameId}
               playerToken={playerToken}
@@ -100,8 +121,30 @@ export default function ParticipantShell() {
               onBack={() => setStep('assignment')}
             />
           )}
-          {step === 'result' && (
+          {gameType === 'EMPAREJA2' && step === 'result' && (
             <ResultView gameId={gameId} onPlayAgain={() => setStep('validate')} />
+          )}
+
+          {gameType === 'T1MER' && step === 'play' && playerToken && (
+            <T1merParticipantPlay
+              gameId={gameId}
+              playerToken={playerToken}
+              onFinished={(result) => {
+                setT1merResult(result)
+                setStep('result')
+              }}
+            />
+          )}
+          {gameType === 'T1MER' && step === 'result' && t1merResult && (
+            <T1merParticipantResult
+              time={t1merResult.time}
+              difference={t1merResult.difference}
+              rank={t1merResult.rank}
+              onPlayAgain={() => {
+                setT1merResult(null)
+                setStep('play')
+              }}
+            />
           )}
         </div>
       </div>

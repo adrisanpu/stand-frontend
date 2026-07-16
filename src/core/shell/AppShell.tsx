@@ -163,7 +163,7 @@ export default function AppShell() {
         )
         if (!cancelled && data.ok) {
           const gt = (data.game?.gameType || '').toUpperCase()
-          setJoinChannel(data.game?.joinChannel ?? (gt === 'EMPAREJA2' ? 'web' : null))
+          setJoinChannel(data.game?.joinChannel ?? (gt === 'EMPAREJA2' || gt === 'T1MER' ? 'web' : null))
         }
       } catch {
         if (!cancelled) setJoinChannel(null)
@@ -476,7 +476,9 @@ export default function AppShell() {
                                 <RaffleData gameId={gameId} gameName={gameName} compact prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                               </div>
                             )}
-                            {avatarsEnabled && !currentGame.showRanking && (
+                            {avatarsEnabled &&
+                              !currentGame.showRanking &&
+                              !(normalizeGameType(gameType ?? undefined) === 'EMPAREJA2' && joinChannel === 'web') && (
                               <div className="min-h-[180px] flex-[1_1_180px] w-full overflow-hidden">
                                 <GameStateAvatar
                                   state={avatarState}

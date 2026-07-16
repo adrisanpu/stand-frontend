@@ -13,7 +13,19 @@ const PRIZE_LABEL: Record<string, string> = {
   raffle: 'Premio del sorteo',
 }
 
-const POLL_MS = 8000
+// ponytail: 30s poll is enough while players sit on result; move to push/WebSocket if concurrent result viewers spike.
+const POLL_MS = 30000
+
+/** Keep the first pending token per kind so the QR image stays stable across polls. */
+function mergePrizes(prev: PlayerPrize[], next: PlayerPrize[]): PlayerPrize[] {
+  return next.map((n) => {
+    const old = prev.find((p) => p.kind === n.kind)
+    if (old && !n.delivered && !old.delivered) {
+      return { ...n, token: old.token }
+    }
+    return n
+  })
+}
 
 export default function ResultView({ gameId, onPlayAgain }: Props) {
   const [prizes, setPrizes] = useState<PlayerPrize[]>([])
@@ -30,7 +42,7 @@ export default function ResultView({ gameId, onPlayAgain }: Props) {
       try {
         const res = await publicApi.getPlayer(token, gameId)
         if (!cancelled) {
-          setPrizes(res.prizes || [])
+          setPrizes((prev) => mergePrizes(prev, res.prizes || []))
           setLoading(false)
         }
       } catch {

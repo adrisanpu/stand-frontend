@@ -5,10 +5,10 @@ import { normalizeGameType } from '../gameTypeMap'
 const INSTRUCTIONS: Record<string, ReactNode> = {
   T1MER: (
     <>
-      <LandscapeInfoInstruction>Escanea el QR y pulsa JUGAR.</LandscapeInfoInstruction>
-      <LandscapeInfoInstruction>Ingresa tu código y valida.</LandscapeInfoInstruction>
-      <LandscapeInfoInstruction>El temporizador se oculta a los 5 s.</LandscapeInfoInstruction>
-      <LandscapeInfoInstruction>Detén en 10 segundos.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>Escanea el QR con tu móvil para registrarte.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>Juega el timer en el teléfono: empieza y detén cerca de 10 s.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>El temporizador se oculta a los 5 segundos.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>Tu posición aparece en el ranking de esta pantalla.</LandscapeInfoInstruction>
     </>
   ),
   RULET4: (
