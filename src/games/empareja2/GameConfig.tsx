@@ -8,6 +8,7 @@ export type Empareja2Settings = {
   numPairs?: number
   emailRequired?: boolean
   instagramRequired?: boolean
+  joinChannel?: string
 }
 
 interface GameDataResponse {
@@ -76,8 +77,8 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       numPairs: numPairsClamped,
       emailRequired,
       instagramRequired,
+      joinChannel,
     }
-    onChange(newSettings)
     setSaveStatus('idle')
     setSaveMessage('')
 
@@ -98,6 +99,8 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
             },
           },
         })
+        // After PUT so AppShell GET sees the new joinChannel (not a stale race).
+        onChange(newSettings)
         setSaveStatus('success')
         setSaveMessage('Configuración guardada correctamente.')
         setTimeout(() => {
@@ -109,6 +112,7 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
         setSaveMessage(e instanceof Error ? e.message : 'Error al guardar en el servidor')
       }
     } else {
+      onChange(newSettings)
       setSaveStatus('success')
       setSaveMessage('Configuración guardada.')
       setTimeout(() => {

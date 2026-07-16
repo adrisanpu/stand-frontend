@@ -3,8 +3,8 @@ import { useParams } from 'react-router-dom'
 import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
 import { normalizeGameType } from '../gameTypeMap'
-import { publicApi, type PublicGameResponse } from '../../api/publicApi'
-import { loadAssignment, loadPlayerToken } from './playerSession'
+import { publicApi, type PublicGameResponse, type T1merAssignment } from '../../api/publicApi'
+import { loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
 import JoinForm from './JoinForm'
 import AssignmentView from './AssignmentView'
 import ValidateView from './ValidateView'
@@ -17,6 +17,19 @@ type T1merStep = 'loading' | 'unsupported' | 'join' | 'play' | 'result'
 type Step = Empareja2Step | T1merStep
 
 const WEB_PLAY_TYPES = new Set(['EMPAREJA2', 'T1MER'])
+
+function t1merResultFromAssignment(a: T1merAssignment): {
+  time: number
+  difference: number
+  rank: number | null
+} | null {
+  if (a.score == null || a.timer == null) return null
+  return {
+    time: a.timer,
+    difference: a.score / 1000,
+    rank: null,
+  }
+}
 
 export default function ParticipantShell() {
   const { gameId = '' } = useParams()
@@ -50,11 +63,30 @@ export default function ParticipantShell() {
           return
         }
         const token = loadPlayerToken(gameId)
-        const assignment = loadAssignment(gameId)
+        let assignment = loadAssignment(gameId)
         if (token && assignment) {
           setPlayerToken(token)
           if (gt === 'T1MER') {
-            setStep('play')
+            try {
+              const player = await publicApi.getPlayer(token, gameId)
+              if (cancelled) return
+              if (player.assignment && 'displayName' in player.assignment) {
+                assignment = player.assignment
+                savePlayerSession(gameId, token, player.assignment)
+              }
+            } catch {
+              // keep local assignment
+            }
+            const scored =
+              assignment && 'displayName' in assignment
+                ? t1merResultFromAssignment(assignment)
+                : null
+            if (scored) {
+              setT1merResult(scored)
+              setStep('result')
+            } else {
+              setStep('play')
+            }
           } else if ('validated' in assignment && assignment.validated) {
             setStep('result')
           } else {
@@ -75,14 +107,9 @@ export default function ParticipantShell() {
     }
   }, [gameId])
 
-  const colors = game?.colors
-
   return (
     <ThemeProvider game={game ?? null}>
-      <div
-        className="min-h-dvh text-textMain font-sans px-4 py-6"
-        style={{ background: colors?.background ?? '#0B0A12', color: colors?.textMain ?? '#EAEAF2' }}
-      >
+      <div className="min-h-dvh bg-club text-textMain font-sans px-4 py-6">
         <div className="mx-auto max-w-md w-full space-y-6">
           {step === 'loading' && <p className="text-center text-textSub">Cargando...</p>}
           {step === 'unsupported' && (
@@ -100,6 +127,15 @@ export default function ParticipantShell() {
               onJoined={(token) => {
                 setPlayerToken(token)
                 const gt = normalizeGameType(gameMeta.gameType)
+                const assignment = loadAssignment(gameId)
+                if (gt === 'T1MER' && assignment && 'displayName' in assignment) {
+                  const scored = t1merResultFromAssignment(assignment)
+                  if (scored) {
+                    setT1merResult(scored)
+                    setStep('result')
+                    return
+                  }
+                }
                 setStep(gt === 'T1MER' ? 'play' : 'assignment')
               }}
             />
@@ -137,13 +173,10 @@ export default function ParticipantShell() {
           )}
           {gameType === 'T1MER' && step === 'result' && t1merResult && (
             <T1merParticipantResult
+              gameId={gameId}
               time={t1merResult.time}
               difference={t1merResult.difference}
               rank={t1merResult.rank}
-              onPlayAgain={() => {
-                setT1merResult(null)
-                setStep('play')
-              }}
             />
           )}
         </div>

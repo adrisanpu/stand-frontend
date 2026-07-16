@@ -42,11 +42,12 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange 
   }, [gameId])
 
   const handleSave = async () => {
-    onChange({ emailRequired, instagramRequired, joinChannel })
+    const settings = { emailRequired, instagramRequired, joinChannel }
     setSaveStatus('idle')
     setSaveMessage('')
 
     if (!gameId) {
+      onChange(settings)
       setSaveStatus('success')
       setSaveMessage('Configuración guardada.')
       setTimeout(() => {
@@ -67,6 +68,8 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange 
           instagram: { required: instagramRequired },
         },
       })
+      // After PUT so AppShell GET sees the new joinChannel (not a stale race).
+      onChange(settings)
       setSaveStatus('success')
       setSaveMessage('Configuración guardada correctamente.')
       setTimeout(() => {
