@@ -70,6 +70,33 @@ export type ValidateResponse = {
   }>
 }
 
+export type PrizeKind = 'validation' | 'raffle'
+
+export type PlayerPrize = {
+  kind: PrizeKind
+  token: string
+  delivered: boolean
+}
+
+export type PlayerResponse = {
+  ok: boolean
+  gameId: string
+  gameType: string
+  playerToken: string
+  assignment: Empareja2Assignment | null
+  prizes: PlayerPrize[]
+}
+
+export type RedeemResponse = {
+  ok: boolean
+  gameId: string
+  playerId: number
+  kind: PrizeKind
+  delivered: boolean
+  label?: string
+  error?: string
+}
+
 export const publicApi = {
   getGame: (gameId: string) =>
     publicRequest<PublicGameResponse>(`/v1/public/game?gameId=${encodeURIComponent(gameId)}`),
@@ -83,8 +110,22 @@ export const publicApi = {
   getPlayer: (playerToken: string, gameId?: string) => {
     const qs = new URLSearchParams({ playerToken })
     if (gameId) qs.set('gameId', gameId)
-    return publicRequest<{ ok: boolean; assignment: Empareja2Assignment; playerToken: string }>(
-      `/v1/public/player?${qs.toString()}`
-    )
+    return publicRequest<PlayerResponse>(`/v1/public/player?${qs.toString()}`)
+  },
+
+  redeem: async (prizeToken: string): Promise<RedeemResponse> => {
+    const url = `${API_BASE_URL}/v1/public/redeem`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prizeToken }),
+    })
+    const data = (await response.json().catch(() => ({}))) as RedeemResponse & { error?: string; message?: string }
+    if (!response.ok) {
+      const err = new Error(data.error || data.message || `HTTP ${response.status}`) as Error & { status?: number }
+      err.status = response.status
+      throw err
+    }
+    return data
   },
 }

@@ -11,6 +11,11 @@ export function getDisplayUrl(gameId: string): string {
   return `${base}/display/${encodeURIComponent(gameId.trim())}`
 }
 
+export function getRedeemUrl(gameId: string): string {
+  const base = typeof window !== 'undefined' ? window.location.origin : 'https://playstand.app'
+  return `${base}/redeem/${encodeURIComponent(gameId.trim())}`
+}
+
 /** QR target: web play or Instagram DM depending on campaign join channel. */
 export function getJoinUrl(gameId: string, joinChannel?: string | null): string {
   if ((joinChannel || 'web').toLowerCase() === 'instagram') {

@@ -12,6 +12,7 @@ import BillingCheckout from './pages/BillingCheckout'
 import InputDebugOverlay from './core/input/InputDebugOverlay'
 import ParticipantShell from './core/participant/ParticipantShell'
 import PublicDisplayShell from './core/display/PublicDisplayShell'
+import ValidatorShell from './core/validator/ValidatorShell'
 
 function RootRedirect() {
   const { isAuthenticated } = useAuth()
@@ -49,6 +50,7 @@ function AppRoutes() {
       />
       <Route path="/play/:gameId" element={<ParticipantShell />} />
       <Route path="/display/:gameId" element={<PublicDisplayShell />} />
+      <Route path="/redeem/:gameId" element={<ValidatorShell />} />
       <Route
         path="/home/*"
         element={

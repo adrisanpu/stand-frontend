@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
-import { getDisplayUrl, getWebPlayUrl } from '../../core/lib/joinUrl'
+import { getDisplayUrl, getWebPlayUrl, getRedeemUrl } from '../../core/lib/joinUrl'
+import QRCode from '../../core/widgets/QRCode'
 
 export type Empareja2Settings = {
   numPairs?: number
@@ -86,7 +87,7 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       try {
         await api.put('/v1/game', {
           gameId,
-          joinChannel: 'web',
+          joinChannel,
           participantFields: {
             email: { required: emailRequired },
             instagram: { required: instagramRequired },
@@ -123,10 +124,45 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       ? maxPairs
       : Math.min(maxPairs, Math.max(1, Math.floor(Number(numPairsInput)) || 1))
   const sliderDisabled = catalogPairCount == null
+  const isPhoneMode = joinChannel === 'web'
+  const redeemUrl = gameId ? getRedeemUrl(gameId) : ''
 
   return (
     <div className="space-y-6">
       <div className="space-y-4">
+        <div className="space-y-3 border-b border-white/10 pb-4">
+          <p className="text-sm font-medium text-gray-300">Modo de juego</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setJoinChannel('instagram')}
+              className={`rounded-xl px-3 py-3 text-sm font-medium border transition-colors ${
+                !isPhoneMode
+                  ? 'bg-[rgba(176,38,255,0.25)] border-[rgba(176,38,255,0.5)] text-white'
+                  : 'bg-white/5 border-white/10 text-gray-300'
+              }`}
+            >
+              Pantalla del evento
+            </button>
+            <button
+              type="button"
+              onClick={() => setJoinChannel('web')}
+              className={`rounded-xl px-3 py-3 text-sm font-medium border transition-colors ${
+                isPhoneMode
+                  ? 'bg-[rgba(176,38,255,0.25)] border-[rgba(176,38,255,0.5)] text-white'
+                  : 'bg-white/5 border-white/10 text-gray-300'
+              }`}
+            >
+              Teléfonos
+            </button>
+          </div>
+          <p className="text-xs text-gray-400">
+            {isPhoneMode
+              ? 'Los asistentes juegan desde su móvil (/play).'
+              : 'Los asistentes juegan por Instagram; validación en la pantalla del operador.'}
+          </p>
+        </div>
+
         <div>
           <div className="mb-2 flex items-center gap-2">
             <label className="block text-sm font-medium text-gray-300" htmlFor="empareja2-difficulty-range">
@@ -187,15 +223,26 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
           </label>
         </div>
 
-        {gameId && joinChannel === 'web' && (
-          <div className="space-y-2 border-t border-white/10 pt-4 text-sm">
-            <p className="font-medium text-gray-300">Enlaces pantalla dual</p>
-            <a href={getDisplayUrl(gameId)} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
-              Pantalla pública
-            </a>
-            <a href={getWebPlayUrl(gameId)} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
-              Participante (móvil)
-            </a>
+        {gameId && (
+          <div className="space-y-3 border-t border-white/10 pt-4 text-sm">
+            <p className="font-medium text-gray-300">Enlaces del evento</p>
+            {isPhoneMode && (
+              <>
+                <a href={getDisplayUrl(gameId)} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
+                  Pantalla pública
+                </a>
+                <a href={getWebPlayUrl(gameId)} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
+                  Participante (móvil)
+                </a>
+              </>
+            )}
+            <div className="space-y-2">
+              <a href={redeemUrl} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
+                Validador de premios
+              </a>
+              <QRCode data={redeemUrl} size={160} alt="QR validador de premios" className="!bg-white !p-2" />
+              <p className="text-xs text-gray-400">Escanea este QR con el móvil del staff para abrir el validador.</p>
+            </div>
           </div>
         )}
       </div>
