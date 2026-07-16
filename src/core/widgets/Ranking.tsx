@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../../api/api'
 import { normalizeGameType } from '../gameTypeMap'
 import { usePolling } from '../../hooks/usePolling'
+import ProfileAvatar from './ProfileAvatar'
 
 export interface RankingEntry {
   rank?: number
@@ -39,42 +40,6 @@ function truncateUsername(username: string | undefined, maxLen: number): string 
 
 function rankingFetchLimit(topX: number | undefined, maxPrizeRanking: number | undefined): number {
   return Math.max(DEFAULT_DISPLAY_COUNT, topX ?? 0, maxPrizeRanking ?? 0)
-}
-
-function avatarInitial(username: string | undefined): string {
-  const raw = (username || 'A').replace(/^@/, '').trim()
-  return (raw[0] || 'A').toUpperCase()
-}
-
-function RankingAvatar({
-  profilePicUrl,
-  username,
-  compact,
-}: {
-  profilePicUrl?: string
-  username?: string
-  compact: boolean
-}) {
-  const sizeClass = compact ? 'h-6 w-6 text-[10px]' : 'h-8 w-8 text-xs'
-  const pic = typeof profilePicUrl === 'string' ? profilePicUrl.trim() : ''
-  if (pic) {
-    return (
-      <img
-        src={pic}
-        alt=""
-        referrerPolicy="no-referrer"
-        className={`${sizeClass} shrink-0 rounded-full border border-white/20 object-cover`}
-      />
-    )
-  }
-  return (
-    <span
-      className={`${sizeClass} shrink-0 rounded-full bg-primary/20 text-primary font-semibold flex items-center justify-center`}
-      aria-hidden
-    >
-      {avatarInitial(username)}
-    </span>
-  )
 }
 
 export default function Ranking({
@@ -165,7 +130,7 @@ export default function Ranking({
                   <span className={`text-[var(--color-primary)] font-bold flex-shrink-0 ${compact ? 'text-base w-5' : 'text-base sm:text-lg w-5 sm:w-6'}`}>
                     {rank}
                   </span>
-                  <RankingAvatar profilePicUrl={entry.profilePicUrl} username={entry.username} compact={compact} />
+                  <ProfileAvatar profilePicUrl={entry.profilePicUrl} username={entry.username} size={compact ? 'sm' : 'md'} />
                   <span className={`text-textMain font-medium min-w-0 flex items-baseline gap-1.5 overflow-hidden ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`} title={entry.username || undefined}>
                     <span className="truncate">{isT1mer ? truncateUsername(entry.username, T1MER_USERNAME_MAX_LEN) : (entry.username || 'Anónimo')}</span>
                     {isPrizeRow && (

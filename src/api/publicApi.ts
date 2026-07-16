@@ -28,6 +28,7 @@ export type ParticipantFieldsConfig = {
 export type PublicRankingEntry = {
   playerId: number
   username?: string
+  profilePicUrl?: string | null
   timer: number
   score: number
   rank: number
@@ -63,6 +64,10 @@ export type T1merAssignment = {
   displayName: string
   validationCode?: number
   validated: boolean
+  profilePicUrl?: string | null
+  /** Present when the player already submitted their one score. */
+  score?: number
+  timer?: number
 }
 
 export type PlayerAssignment = Empareja2Assignment | T1merAssignment

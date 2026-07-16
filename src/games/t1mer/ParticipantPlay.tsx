@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { publicApi } from '../../api/publicApi'
-import { loadAssignment } from '../../core/participant/playerSession'
+import { loadAssignment, savePlayerSession } from '../../core/participant/playerSession'
+import ProfileAvatar from '../../core/widgets/ProfileAvatar'
 
 type GameState = 'preparing' | 'playing' | 'hidden' | 'finished'
 
@@ -22,9 +23,9 @@ export default function T1merParticipantPlay({ gameId, playerToken, onFinished }
   const displayName =
     assignment && 'displayName' in assignment
       ? assignment.displayName
-      : assignment && 'characterName' in assignment
-        ? assignment.characterName
-        : 'Jugador'
+      : 'Jugador'
+  const profilePicUrl =
+    assignment && 'profilePicUrl' in assignment ? assignment.profilePicUrl : null
 
   const [gameState, setGameState] = useState<GameState>('preparing')
   const [timer, setTimer] = useState(0)
@@ -65,14 +66,23 @@ export default function T1merParticipantPlay({ gameId, playerToken, onFinished }
     setSubmitting(true)
     setError(null)
     let rank: number | null = null
+    const scoreMs = Math.round(difference * 1000)
     try {
       const data = await publicApi.score({
         gameId,
         playerToken,
         timer: finalTime.toFixed(3),
-        score: Math.round(difference * 1000),
+        score: scoreMs,
       })
       if (typeof data.rank === 'number') rank = data.rank
+      const prev = loadAssignment(gameId)
+      if (prev && 'displayName' in prev) {
+        savePlayerSession(gameId, playerToken, {
+          ...prev,
+          timer: finalTime,
+          score: scoreMs,
+        })
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al enviar la puntuación')
     } finally {
@@ -83,22 +93,27 @@ export default function T1merParticipantPlay({ gameId, playerToken, onFinished }
 
   return (
     <div className="card p-6 space-y-6 text-center">
-      <div>
-        <p className="text-sm text-textSub">Jugando como</p>
-        <h1 className="text-xl font-bold truncate">{displayName}</h1>
+      <div className="flex flex-col items-center gap-2">
+        <ProfileAvatar profilePicUrl={profilePicUrl} username={displayName} size="lg" />
+        <div>
+          <p className="text-sm text-textSub">Jugando como</p>
+          <h1 className="text-xl font-bold truncate max-w-full">{displayName}</h1>
+        </div>
       </div>
 
       <div className="h-24 flex items-center justify-center">
         {gameState === 'hidden' || gameState === 'finished' ? (
-          <p className="text-4xl font-bold text-textSub tracking-widest">??:??.?</p>
+          <p className="text-4xl font-bold text-textSub tracking-widest font-digital">??:??.?</p>
         ) : (
-          <p className="text-5xl font-mono font-bold tabular-nums">{formatTimer(timer)}</p>
+          <p className="text-5xl font-digital font-bold tabular-nums">{formatTimer(timer)}</p>
         )}
       </div>
 
       {gameState === 'preparing' && (
         <>
-          <p className="text-sm text-textSub">Detén el cronómetro lo más cerca posible de 10 segundos. Se oculta a los 5 s.</p>
+          <p className="text-sm text-textSub">
+            Detén el cronómetro lo más cerca posible de 10 segundos. Se oculta a los 5 s. Solo un intento.
+          </p>
           <button
             type="button"
             onClick={handleStart}

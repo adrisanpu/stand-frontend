@@ -6,6 +6,7 @@ import { normalizeGameType } from '../gameTypeMap'
 import { publicApi, type PublicGameResponse } from '../../api/publicApi'
 import { getJoinUrl } from '../lib/joinUrl'
 import QRCode from '../widgets/QRCode'
+import ProfileAvatar from '../widgets/ProfileAvatar'
 import { getJoinInstructions } from '../ui/gameJoinInstructions'
 
 const POLL_MS = 4000
@@ -41,16 +42,12 @@ export default function PublicDisplayShell() {
   const game = getGameById(gameType)
   const joinChannel = data?.joinChannel ?? 'web'
   const qrUrl = getJoinUrl(gameId, joinChannel)
-  const colors = game?.colors
   const isT1mer = gameType === 'T1MER'
   const ranking = data?.ranking ?? []
 
   return (
     <ThemeProvider game={game ?? null}>
-      <div
-        className="min-h-dvh text-textMain font-sans p-4 sm:p-8"
-        style={{ background: colors?.background ?? '#0B0A12', color: colors?.textMain ?? '#EAEAF2' }}
-      >
+      <div className="min-h-dvh bg-club text-textMain font-sans p-4 sm:p-8">
         <div className="mx-auto max-w-6xl grid lg:grid-cols-[1fr_1.2fr_1fr] gap-6 items-stretch min-h-[calc(100dvh-2rem)]">
           <div className="card flex flex-col items-center justify-center gap-4 p-6">
             {game?.assets?.logo && (
@@ -105,11 +102,18 @@ export default function PublicDisplayShell() {
                         key={`${entry.playerId}-${entry.rank}`}
                         className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 flex items-center justify-between gap-2"
                       >
-                        <div className="min-w-0">
-                          <p className="font-medium truncate">
-                            #{entry.rank} {entry.username || `Jugador ${entry.playerId}`}
-                          </p>
-                          <p className="text-xs text-textSub">{Number(entry.timer).toFixed(3)} s</p>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ProfileAvatar
+                            profilePicUrl={entry.profilePicUrl}
+                            username={entry.username}
+                            size="md"
+                          />
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">
+                              #{entry.rank} {entry.username || `Jugador ${entry.playerId}`}
+                            </p>
+                            <p className="text-xs text-textSub">{Number(entry.timer).toFixed(3)} s</p>
+                          </div>
                         </div>
                         <p className="text-sm font-semibold shrink-0">{Math.round(Number(entry.score))} ms</p>
                       </div>
