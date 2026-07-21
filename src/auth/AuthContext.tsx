@@ -5,7 +5,6 @@ import { loadTokens, clearAuth, isTokenExpired } from './authStorage'
 interface AuthContextType {
   isAuthenticated: boolean
   accessToken: string | null
-  login: (nextPath?: string) => void
   logout: () => void
   setAuth: (token: string) => void
 }
@@ -29,7 +28,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const navigate = useNavigate()
 
-  // Restore session from sessionStorage on mount
   useEffect(() => {
     const tokens = loadTokens()
     if (tokens) {
@@ -37,26 +35,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setIsAuthenticated(true)
         setAccessToken(tokens.accessToken)
       } else {
-        // Clear expired tokens
-        console.log('Tokens expired, clearing auth')
         clearAuth()
       }
     } else {
-      // No tokens found, ensure clean state
       setIsAuthenticated(false)
       setAccessToken(null)
     }
   }, [])
 
-  const login = useCallback((nextPath: string = '/home') => {
-    navigate(`/auth/start?next=${encodeURIComponent(nextPath)}`)
-  }, [navigate])
-
   const logout = useCallback(() => {
     clearAuth()
     setIsAuthenticated(false)
     setAccessToken(null)
-    navigate('/logout')
+    navigate('/login', { replace: true })
   }, [navigate])
 
   const setAuth = useCallback((token: string) => {
@@ -69,7 +60,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       value={{
         isAuthenticated,
         accessToken,
-        login,
         logout,
         setAuth,
       }}
@@ -78,4 +68,3 @@ export function AuthProvider({ children }: AuthProviderProps) {
     </AuthContext.Provider>
   )
 }
-
