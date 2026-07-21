@@ -2,15 +2,16 @@
 
 ## WHY
 React 18 + TypeScript operator dashboard. Operators create/manage games; players join via Instagram/QR.
-Auth uses Cognito PKCE OAuth2. All API calls go through the central api.ts client.
+Auth uses Cognito in-app (`USER_PASSWORD_AUTH` via IdP API). All API calls go through the central api.ts client.
 
 ## WHAT
 **Commands:** `npm run dev` | `npm run build` | `npm run test`
 
-**Auth flow:** Cognito PKCE → tokens in sessionStorage as `stand_tokens`
+**Auth flow:** Login UI → Cognito IdP → tokens in sessionStorage as `stand_tokens`
 - Send **idToken** (NOT accessToken) as Bearer — backend validates `sub` from ID token
 - `getIdToken()` from `src/auth/authStorage.ts` — api.ts uses this automatically
-- `useAuth()` hook from `src/auth/AuthContext.tsx` — provides user, plan, loading
+- `useAuth()` — session flags + `setAuth` / `logout`; plan/user via `useCurrentUser()`
+- `cognitoClient.ts` — SignUp / ConfirmSignUp / InitiateAuth / ForgotPassword
 
 **API client** (`src/api/api.ts`): `api.get(path)` | `api.post(path, body)` | `api.put(path, body)` | `api.delete(path)`
 

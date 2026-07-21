@@ -5,6 +5,7 @@ import AppearanceSettings from '../settings/AppearanceSettings'
 import OperatorPrizeSettings from '../settings/OperatorPrizeSettings'
 import type { GameDefinition } from '../types'
 import { api } from '../../api/api'
+import { useAuth } from '../../auth/AuthContext'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { inputManager } from '../input/inputManager'
@@ -38,6 +39,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [showAppearanceSettings, setShowAppearanceSettings] = useState(false)
   const [showUserInfo, setShowUserInfo] = useState(false)
   const [isStartingCheckout, setIsStartingCheckout] = useState(false)
+  const { logout } = useAuth()
   const { user, loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
 
@@ -493,6 +495,20 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </button>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={() => {
+                onClose()
+                logout()
+              }}
+              className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-red-500/20 hover:border-red-500/30 transition-colors font-medium text-red-300"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Cerrar sesión
+            </button>
           </div>
         </div>
       </div>

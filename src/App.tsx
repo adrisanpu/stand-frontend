@@ -3,8 +3,6 @@ import { AuthProvider, useAuth } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import AppShell from './core/shell/AppShell'
 import Login from './pages/Login'
-import AuthStart from './auth/AuthStart'
-import AuthCallback from './auth/AuthCallback'
 import Logout from './auth/Logout'
 import BillingSuccess from './pages/BillingSuccess'
 import BillingCancel from './pages/BillingCancel'
@@ -16,8 +14,6 @@ import ValidatorShell from './core/validator/ValidatorShell'
 
 function RootRedirect() {
   const { isAuthenticated } = useAuth()
-  // Always redirect to login if not authenticated
-  // This ensures we don't try to access protected routes without auth
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
@@ -28,8 +24,6 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/auth/start" element={<AuthStart />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/logout" element={<Logout />} />
       <Route path="/billing/checkout" element={<BillingCheckout />} />
       <Route

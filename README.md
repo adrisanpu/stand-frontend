@@ -39,11 +39,11 @@ Vite loads env files by mode:
 
 | File | When used |
 |------|-----------|
-| [`.env.development`](.env.development) | `npm run dev` (dev API + localhost Cognito redirects) |
+| [`.env.development`](.env.development) | `npm run dev` (dev API + Cognito client) |
 | `.env` | Optional overrides (gitignored) |
 | [`.env.example`](.env.example) | Template for prod and dev values |
 
-Required variables: `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_REDIRECT_URI`, `VITE_COGNITO_LOGOUT_URI`, `VITE_API_BASE_URL`.
+Required variables: `VITE_COGNITO_USER_POOL_ID`, `VITE_COGNITO_CLIENT_ID`, `VITE_API_BASE_URL`.
 
 ### Environments (prod vs dev)
 
@@ -69,7 +69,7 @@ Full setup (AWS, Cognito, Amplify, deploy): **[stand-backend/docs/DEV_ENVIRONMEN
 stand-frontend/
 ├── public/           # Static assets (logos, pages like privacy.html, legal.html)
 ├── src/
-│   ├── auth/         # Cognito OAuth, PKCE, protected routes, user hook
+│   ├── auth/         # Cognito IdP (in-app login), tokens, protected routes, user hook
 │   ├── api/          # API client (base URL, auth headers)
 │   ├── core/         # App shell, game gate, settings, ranking, quiz, raffle, theme, types
 │   ├── games/        # One folder per game (config + GameScreen)
@@ -104,7 +104,7 @@ Backend APIs used by games (e.g. validate, score, stats) are implemented in [sta
 
 ## Authentication
 
-- **Flow:** Login → `/auth/start` (PKCE) → Cognito → `/auth/callback` → tokens in `sessionStorage` → bootstrap via `POST /users` → redirect to `/app`.
+- **Flow:** In-app login UI (`/login`) → Cognito `USER_PASSWORD_AUTH` → tokens in `sessionStorage` (`stand_tokens`) → bootstrap `POST /v1/user` → `/home`.
 - **Plans:** FREE, EVENT_24H, ENTERPRISE (feature gating in the app).
 - **API:** Requests use `Authorization: Bearer <id_token>`; see `src/api/api.ts`.
 
