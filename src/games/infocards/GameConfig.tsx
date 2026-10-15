@@ -20,7 +20,7 @@ type InfoCard = {
 type UploadUrlResponse = {
   ok: boolean
   gameId: string
-  uploadUrls: Array<{ key: string; url: string; fileName: string; expiresIn: number }>
+  uploadUrls: Array<{ key: string; url: string; fields: Record<string, string>; fileName: string; expiresIn: number }>
 }
 
 type GetResponse = {
@@ -135,21 +135,19 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
     try {
       const uploadRes = await api.post<UploadUrlResponse>('/v1/game/infocards/upload-url', {
         gameId,
-        files: [{ fileName: file.name, contentType: file.type }],
+        files: [{ fileName: file.name, contentType: file.type, sizeBytes: file.size }],
       })
 
       if (!uploadRes.ok || !uploadRes.uploadUrls?.[0]) {
         throw new Error('No se pudo obtener URL de subida.')
       }
 
-      const { key, url } = uploadRes.uploadUrls[0]
-
-      const putRes = await fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type },
-        body: file,
-      })
-      if (!putRes.ok) throw new Error(`Error al subir archivo (${putRes.status})`)
+      const { key, url, fields } = uploadRes.uploadUrls[0]
+      const form = new FormData()
+      Object.entries(fields).forEach(([field, value]) => form.append(field, value))
+      form.append('file', file)
+      const uploadResponse = await fetch(url, { method: 'POST', body: form })
+      if (!uploadResponse.ok) throw new Error(`Error al subir archivo (${uploadResponse.status})`)
 
       const localPreview = URL.createObjectURL(file)
       setCards(prev => prev.map(c => {
@@ -227,7 +225,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
       if (pdfFiles.length > 0) {
         const uploadRes = await api.post<UploadUrlResponse>('/v1/game/infocards/upload-url', {
           gameId,
-          files: pdfFiles.map(f => ({ fileName: f.name, contentType: f.type })),
+          files: pdfFiles.map(f => ({ fileName: f.name, contentType: f.type, sizeBytes: f.size })),
         })
 
         if (!uploadRes.ok || !uploadRes.uploadUrls) {
@@ -235,13 +233,12 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
         }
 
         await Promise.all(
-          uploadRes.uploadUrls.map(async ({ key, url }, idx) => {
+          uploadRes.uploadUrls.map(async ({ key, url, fields }, idx) => {
             const file = pdfFiles[idx]
-            const res = await fetch(url, {
-              method: 'PUT',
-              headers: { 'Content-Type': file.type },
-              body: file,
-            })
+            const form = new FormData()
+            Object.entries(fields).forEach(([field, value]) => form.append(field, value))
+            form.append('file', file)
+            const res = await fetch(url, { method: 'POST', body: form })
             if (!res.ok) throw new Error(`Error al subir "${file.name}" (${res.status})`)
             fileKeys.push(key)
           })

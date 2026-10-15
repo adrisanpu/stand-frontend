@@ -32,7 +32,7 @@ vi.mock('../../games', () => ({ games: mockGames }))
 
 vi.mock('../../api/api', () => ({
   api: {
-    get: vi.fn().mockResolvedValue({ ok: true, games: [] }),
+    get: vi.fn(() => new Promise(() => undefined)),
     post: vi.fn().mockResolvedValue({ ok: true }),
   },
 }))

@@ -57,9 +57,9 @@ export default function AuthCallback() {
 
       // Validate state (CSRF protection)
       const savedState = loadPkceState()
-      if (state && savedState && state !== savedState) {
+      if (!state || !savedState || state !== savedState) {
         setError('Estado de seguridad inválido')
-        console.error('State mismatch:', { received: state, saved: savedState })
+        console.error('OAuth state validation failed')
         return
       }
 
@@ -104,11 +104,12 @@ export default function AuthCallback() {
         })
 
         if (!tokenResponse.ok) {
+          const responseText = await tokenResponse.text()
           let errorData: any
           try {
-            errorData = await tokenResponse.json()
+            errorData = JSON.parse(responseText)
           } catch {
-            errorData = await tokenResponse.text()
+            errorData = responseText
           }
           
           const errorMessage = typeof errorData === 'string' 
@@ -121,7 +122,6 @@ export default function AuthCallback() {
             error: errorData,
             url: tokenUrl,
             redirectUri: redirectUri,
-            requestBody: Object.fromEntries(tokenBody),
           })
           
           // Clear state on error
@@ -258,4 +258,3 @@ export default function AuthCallback() {
     </ThemeProvider>
   )
 }
-

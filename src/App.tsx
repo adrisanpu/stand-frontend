@@ -12,7 +12,10 @@ import BillingCheckout from './pages/BillingCheckout'
 import InputDebugOverlay from './core/input/InputDebugOverlay'
 
 function RootRedirect() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isInitializing } = useAuth()
+  if (isInitializing) {
+    return <div role="status">Cargando...</div>
+  }
   // Always redirect to login if not authenticated
   // This ensures we don't try to access protected routes without auth
   if (!isAuthenticated) {
