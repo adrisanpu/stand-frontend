@@ -49,12 +49,11 @@ async function request<T>(
   }
 
   if (!response.ok) {
-    let errorText: string
+    let errorText = await response.text()
     try {
-      const errorJson = await response.json()
-      errorText = JSON.stringify(errorJson)
+      errorText = JSON.stringify(JSON.parse(errorText))
     } catch {
-      errorText = await response.text()
+      // Keep plain-text error responses as-is.
     }
     
     // Log full request details for debugging
@@ -109,4 +108,3 @@ export const api = {
       token,
     }),
 }
-

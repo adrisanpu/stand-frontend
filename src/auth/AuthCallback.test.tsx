@@ -48,13 +48,16 @@ function renderCallback(search: string) {
   )
 }
 
-function mockFetch(ok: boolean, body: object) {
+function mockFetch(ok: boolean, body: object | string) {
   globalThis.fetch = vi.fn().mockResolvedValue({
     ok,
     status: ok ? 200 : 400,
     statusText: ok ? 'OK' : 'Bad Request',
-    json: async () => body,
-    text: async () => JSON.stringify(body),
+    json: async () => {
+      if (typeof body === 'string') throw new SyntaxError('Invalid JSON')
+      return body
+    },
+    text: async () => typeof body === 'string' ? body : JSON.stringify(body),
   }) as unknown as typeof fetch
 }
 
@@ -101,6 +104,21 @@ describe('AuthCallback', () => {
     )
   })
 
+  it('shows error when callback state is missing', async () => {
+    renderCallback('?code=CODE')
+    await waitFor(() =>
+      expect(screen.getByText(/Estado de seguridad inválido/i)).toBeInTheDocument()
+    )
+  })
+
+  it('shows error when stored state is missing', async () => {
+    mockLoadPkceState.mockReturnValue(null)
+    renderCallback('?code=CODE&state=state123')
+    await waitFor(() =>
+      expect(screen.getByText(/Estado de seguridad inválido/i)).toBeInTheDocument()
+    )
+  })
+
   it('shows error when PKCE verifier is missing', async () => {
     mockLoadPkceVerifier.mockReturnValue(null)
     renderCallback('?code=CODE&state=state123')
@@ -115,6 +133,21 @@ describe('AuthCallback', () => {
     await waitFor(() =>
       expect(screen.getByText(/invalid_grant/i)).toBeInTheDocument()
     )
+  })
+
+  it('handles a non-JSON token error without logging the code or verifier', async () => {
+    mockFetch(false, 'gateway unavailable')
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      renderCallback('?code=SECRET_CODE&state=state123')
+      await waitFor(() =>
+        expect(screen.getByText(/gateway unavailable/i)).toBeInTheDocument()
+      )
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('SECRET_CODE')
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('verifier_abc')
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 
   it('calls saveTokens and setAuth on success', async () => {
