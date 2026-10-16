@@ -13,7 +13,12 @@ import PublicDisplayShell from './core/display/PublicDisplayShell'
 import ValidatorShell from './core/validator/ValidatorShell'
 
 function RootRedirect() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isInitializing } = useAuth()
+  if (isInitializing) {
+    return <div role="status">Cargando...</div>
+  }
+  // Always redirect to login if not authenticated
+  // This ensures we don't try to access protected routes without auth
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
