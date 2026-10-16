@@ -343,7 +343,7 @@ export default function Empareja2GameScreen({
                 Los asistentes juegan desde su móvil (/play).
               </LandscapeInfoInstruction>
               <LandscapeInfoInstruction>
-                Abre la pantalla pública en el monitor o proyector.
+                Esta es la pantalla del evento para el monitor o proyector.
               </LandscapeInfoInstruction>
               <LandscapeInfoInstruction>
                 Los enlaces están en Configurar juego.

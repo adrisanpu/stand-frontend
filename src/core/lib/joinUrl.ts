@@ -6,11 +6,6 @@ export function getWebPlayUrl(gameId: string): string {
   return `${base}/play/${encodeURIComponent(gameId.trim())}`
 }
 
-export function getDisplayUrl(gameId: string): string {
-  const base = typeof window !== 'undefined' ? window.location.origin : 'https://playstand.app'
-  return `${base}/display/${encodeURIComponent(gameId.trim())}`
-}
-
 export function getRedeemUrl(gameId: string): string {
   const base = typeof window !== 'undefined' ? window.location.origin : 'https://playstand.app'
   return `${base}/redeem/${encodeURIComponent(gameId.trim())}`

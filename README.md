@@ -97,8 +97,46 @@ Each game is a **module**: `src/games/<game-id>/` with `config.ts` (game definit
 | **rulet4**   | Configurable roulette with ranking |
 | **cupido**   | Quiz-based matching; traffic light + couple validation (backend stats/validate) |
 | **semaforo** | Groups by social interest (e.g. red/yellow/green); backend stats |
+| **STACK** | Mobile 3D pizza stacking: one server-started attempt, validated results and event ranking |
 
 Backend APIs used by games (e.g. validate, score, stats) are implemented in [stand-backend](https://github.com/adrisanpu/stand-backend).
+
+### STACK integration status (Phase 5: local validation complete, physical devices pending)
+
+Create a STACK event in the existing operator catalog, configure it through the game settings, and open its participant link (`/play/:gameId`). Registration, branding, operator layouts and API clients reuse the existing platform. After the scene loads, EMPEZAR consumes the player's single attempt on the server. Tap the canvas or use COLOCAR to stop the active pizza. Movement alternates X/Z, overhangs fall away, dimensions shrink, and no overlap ends the match. Each valid placement scores one pizza; Perfect snaps within the configured tolerance without adding a bonus point. The base scores zero.
+
+All games use the existing `/home` game view as their single event screen. There is no separate public display screen; legacy `/display/:gameId` links redirect to `/home`, using the existing operator login and selected-event flow. Participants keep their separate `/play/:gameId` links. STACK uses the supplied `public/images/stack-logo.png` logo in the catalog, event layout and the horizontally centered mobile identity header.
+
+Deploy the matching Phase 3 backend before playing. Public getGame advertises `stackStartSnapshot: true` and `stackFinishSupported: true`; if either is absent, the start button stays disabled rather than consuming an attempt against an older backend. The existing public score endpoint accepts `{ action: "start", attemptId, gameId, playerToken }`, returns `startedAt` and its authoritative `configSnapshot`, and consumes the attempt atomically. Only a confirmed response starts gameplay with those rules. A network retry retains the same identifier; conflicting/rejected starts are shown explicitly. Refreshing retrieves server state rather than granting or resuming a match. There is no practice/restart button after consumption.
+
+Game Over reuses the shared result presentation extracted from T1MER and sends `{ action: "finish", attemptId, gameId, playerToken, placements }` to the same endpoint. Each placement contains its axis, signed pre-snap offset and Perfect flag, including the final miss. The browser does not submit a claimed score: the server recomputes it using the attempt's original configuration, checks replay and timing coherence, and finalizes the result atomically. This is basic validation, not proof that a client-provided replay came from genuine human play.
+
+The result remains visibly pending until the server confirms a saved score and rank. Network failures expose a retry button that resends identical evidence, never starts another attempt, and cannot overwrite a different finalized result. Only final evidence is retained in per-game sessionStorage while awaiting confirmation; this is not a gameplay checkpoint. After a refresh in the same tab, server state is fetched first: a finished score is displayed directly, or matching pending evidence can be resubmitted without resuming gameplay. If the tab/session data is lost before confirmation, an abandoned attempt is not restored. Storage failures are shown explicitly. The existing `/home` ranking polls saved results, ordered by pizzas descending with deterministic tie-breaking.
+
+STACK loads its Three.js renderer lazily and requires a real WebGL 2 context. It uses frame-time-based movement and a vertically following orthographic camera, with low-cost reusable materials/geometries and resource cleanup. Placement is blocked while another placement is in progress. Manual pause, focus/visibility and context-loss handling preserve the same attempt without advancing hidden time. Mobile device validation and the later LG Swing/webOS 24 implementation remain pending. Automated renderer mocks are not evidence of physical iOS/Android GPU compatibility. No audio is added.
+
+The Phase 4 visual finish keeps the same gameplay, collision bounds, Perfect tolerance and score contract. The mobile HUD uses the existing theme, centered logo/profile header, a warm stage background and brief score/Perfect feedback. Perfect still scores exactly one pizza and never grants extra surface. Decorative HUD animations respect `prefers-reduced-motion`; they do not affect gameplay timing or input. No additional dependencies, external asset requests or backend deployment are required for the visual update.
+
+Pizza assets are generated locally in `src/games/stack/stackPizzaVisuals.ts`: rounded dough, a toasted crust and a deterministic shared DataTexture with cheese, tomato, pepperoni and herbs. Retained pieces and falling offcuts preserve the original surface coordinates rather than stretching or regenerating the toppings after each cut. Shared assets and reusable per-piece buffers are disposed with the scene. A short Perfect halo respects pause and reduced-motion preferences; warm lighting and smooth camera tracking follow the actual support position.
+
+Phase 4 checks include automated asset/resource tests and real headless Chrome WebGL 2 rendering through SwiftShader at emulated 390x844 and 320x844 viewports, with no horizontal overflow or browser runtime errors. These local checks used a deterministic animation clock and substituted API responses, not a real participant attempt. They do not establish physical mobile GPU performance, Safari compatibility or webOS support.
+
+#### Final compatibility checks (2026-10-16)
+
+| Surface | Executed check | Status / limitation |
+| --- | --- | --- |
+| Chrome 155 / Edge 155, Windows | Real headless WebGL 2 through SwiftShader, actual React UI and engine in StrictMode | Passed; both are Chromium, not Safari or a mobile GPU |
+| Portrait / landscape / 16:9 | 320x844, 390x844, 844x390, 1920x1080; DPR 3 capped at 1.5 | No horizontal overflow; base/active bounds also covered by tests; 16:9 rendering does not certify TV support |
+| Input | Native browser touch and Enter on the focused COLOCAR button; pause/resume; secondary-pointer rejection tests | Passed; no LG remote/Magic Remote hardware verification |
+| Context / lifecycle | Real `WEBGL_lose_context` loss and restoration, no duplicate start; no-ResizeObserver fallback; teardown | Passed; owned buffers/shared pizza texture and animation callbacks released; Three's internal placeholder textures remain context-owned until collection |
+| Long match | 300 Perfect placements, stable GPU buffer/texture allocation after warm-up, 91 draw calls in final observed frame | Passed resource-bounds check; accelerated animation clock/software rendering is **not** an FPS measurement |
+| Error / accessibility | No-WebGL incompatibility before start, failed final submission and retry, reduced-motion styling | Passed with substituted API responses; real dev API persistence/idempotency/ranking verified separately in Phase 3 |
+| Safari iOS / Chrome Android | Physical touch, backgrounding, rotation, safe areas, memory and sustained FPS | **Pending physical devices** |
+| LG Swing, webOS 24 | Browser/WebGL capabilities, touchscreen, OK/Enter, focus/navigation and distance readability | **Deferred** from the agreed initial mobile scope; no webOS certification |
+
+The final checks do not require a backend redeploy: Phase 3 is already deployed to dev and exposes both STACK capability flags. Frontend production assets build successfully, but production publication is a separate authorized step; no production deployment has been performed.
+
+Before event/production sign-off, use a fresh **test event** on physical iOS and Android devices: complete a match and confirm the `/home` ranking and post-refresh score; verify one-attempt enforcement, touch accuracy, pause/background/resume, rotation and safe-area buttons; retry after a connection loss at Game Over. Measure sustained frame times and memory on the lowest-spec target device, including a long match and repeated route entry/exit. Never reset real participants' attempts for these checks. Record device/OS/browser versions and observed performance; a stable 60 FPS target cannot be asserted from desktop software-rendering checks.
 
 ---
 

@@ -3,6 +3,14 @@ import { LandscapeInfoInstruction } from '../widgets/GameLandscapeInfoColumn'
 import { normalizeGameType } from '../gameTypeMap'
 
 const INSTRUCTIONS: Record<string, ReactNode> = {
+  STACK: (
+    <>
+      <LandscapeInfoInstruction>Escanea el QR y regístrate desde tu móvil.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>Toca la pizza o pulsa COLOCAR para apilar. Las partes que sobresalen se cortan.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>Solo tienes un intento; se consume al pulsar EMPEZAR. Recargar no permite repetir.</LandscapeInfoInstruction>
+      <LandscapeInfoInstruction>El servidor valida tu partida y guarda la puntuación en el ranking al terminar.</LandscapeInfoInstruction>
+    </>
+  ),
   T1MER: (
     <>
       <LandscapeInfoInstruction>Escanea el QR con tu móvil para registrarte.</LandscapeInfoInstruction>

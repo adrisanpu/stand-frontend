@@ -10,7 +10,8 @@ type Props = {
 }
 
 export default function ValidateView({ gameId, playerToken, onResult, onBack }: Props) {
-  const own = loadAssignment(gameId)?.validationCode
+  const ownAssignment = loadAssignment(gameId)
+  const own = ownAssignment && 'validationCode' in ownAssignment ? ownAssignment.validationCode : undefined
   const [code1, setCode1] = useState(own ? String(own) : '')
   const [code2, setCode2] = useState('')
   const [loading, setLoading] = useState(false)

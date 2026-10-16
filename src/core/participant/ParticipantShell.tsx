@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
 import { normalizeGameType } from '../gameTypeMap'
-import { publicApi, type PublicGameResponse, type T1merAssignment } from '../../api/publicApi'
+import { PublicApiError, publicApi, isStackAssignment, type PublicGameResponse, type T1merAssignment, type StackAssignment } from '../../api/publicApi'
 import { loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
 import JoinForm from './JoinForm'
 import AssignmentView from './AssignmentView'
@@ -11,12 +11,13 @@ import ValidateView from './ValidateView'
 import ResultView from './ResultView'
 import T1merParticipantPlay from '../../games/t1mer/ParticipantPlay'
 import T1merParticipantResult from '../../games/t1mer/ParticipantResult'
+import StackParticipantPlay from '../../games/stack/ParticipantPlay'
 
 type Empareja2Step = 'loading' | 'unsupported' | 'join' | 'assignment' | 'validate' | 'result'
 type T1merStep = 'loading' | 'unsupported' | 'join' | 'play' | 'result'
-type Step = Empareja2Step | T1merStep
+type Step = Empareja2Step | T1merStep | 'load-error'
 
-const WEB_PLAY_TYPES = new Set(['EMPAREJA2', 'T1MER'])
+const WEB_PLAY_TYPES = new Set(['EMPAREJA2', 'T1MER', 'STACK'])
 
 function t1merResultFromAssignment(a: T1merAssignment): {
   time: number
@@ -37,6 +38,8 @@ export default function ParticipantShell() {
   const [gameMeta, setGameMeta] = useState<PublicGameResponse | null>(null)
   const [playerToken, setPlayerToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loadVersion, setLoadVersion] = useState(0)
+  const [stackAssignment, setStackAssignment] = useState<StackAssignment | null>(null)
   const [t1merResult, setT1merResult] = useState<{
     time: number
     difference: number
@@ -48,6 +51,9 @@ export default function ParticipantShell() {
 
   useEffect(() => {
     let cancelled = false
+    setStep('loading')
+    setError(null)
+    setStackAssignment(null)
     ;(async () => {
       if (!gameId) {
         setStep('unsupported')
@@ -64,6 +70,18 @@ export default function ParticipantShell() {
         }
         const token = loadPlayerToken(gameId)
         let assignment = loadAssignment(gameId)
+        if (gt === 'STACK' && token) {
+          const player = await publicApi.getPlayer(token, gameId)
+          if (cancelled) return
+          if (!player.assignment || !isStackAssignment(player.assignment)) {
+            throw new Error('No se pudo recuperar tu participante de STACK.')
+          }
+          savePlayerSession(gameId, token, player.assignment)
+          setPlayerToken(token)
+          setStackAssignment(player.assignment)
+          setStep('play')
+          return
+        }
         if (token && assignment) {
           setPlayerToken(token)
           if (gt === 'T1MER') {
@@ -78,7 +96,7 @@ export default function ParticipantShell() {
               // keep local assignment
             }
             const scored =
-              assignment && 'displayName' in assignment
+              assignment && 'displayName' in assignment && !isStackAssignment(assignment)
                 ? t1merResultFromAssignment(assignment)
                 : null
             if (scored) {
@@ -98,18 +116,25 @@ export default function ParticipantShell() {
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'No se pudo cargar el juego')
-          setStep('unsupported')
+          const rejected = e instanceof PublicApiError && e.status >= 400 && e.status < 500 && e.status !== 408 && e.status !== 429
+          setStep(rejected ? 'unsupported' : 'load-error')
         }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [gameId])
+  }, [gameId, loadVersion])
 
   return (
     <ThemeProvider game={game ?? null}>
-      <div className="min-h-dvh bg-club text-textMain font-sans px-4 py-6">
+      <div
+        className="min-h-dvh bg-club text-textMain font-sans px-4 py-6"
+        style={gameType === 'STACK' ? {
+          paddingTop: 'max(1.5rem, env(safe-area-inset-top, 0px))',
+          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
+        } : undefined}
+      >
         <div className="mx-auto max-w-md w-full space-y-6">
           {step === 'loading' && <p className="text-center text-textSub">Cargando...</p>}
           {step === 'unsupported' && (
@@ -120,6 +145,19 @@ export default function ParticipantShell() {
               </p>
             </div>
           )}
+          {step === 'load-error' && (
+            <div className="card p-6 text-center space-y-3">
+              <p className="font-semibold">No se pudo cargar el juego</p>
+              <p role="alert" className="text-sm text-textSub">{error}</p>
+              <button
+                type="button"
+                onClick={() => setLoadVersion((version) => version + 1)}
+                className="w-full rounded-xl py-3 font-bold bg-primary/20 border border-primary/30"
+              >
+                Reintentar carga
+              </button>
+            </div>
+          )}
           {step === 'join' && gameMeta && (
             <JoinForm
               gameId={gameId}
@@ -128,7 +166,17 @@ export default function ParticipantShell() {
                 setPlayerToken(token)
                 const gt = normalizeGameType(gameMeta.gameType)
                 const assignment = loadAssignment(gameId)
-                if (gt === 'T1MER' && assignment && 'displayName' in assignment) {
+                if (gt === 'STACK') {
+                  if (!assignment || !isStackAssignment(assignment)) {
+                    setError('El registro no devolvió un participante válido de STACK.')
+                    setStep('unsupported')
+                    return
+                  }
+                  setStackAssignment(assignment)
+                  setStep('play')
+                  return
+                }
+                if (gt === 'T1MER' && assignment && 'displayName' in assignment && !isStackAssignment(assignment)) {
                   const scored = t1merResultFromAssignment(assignment)
                   if (scored) {
                     setT1merResult(scored)
@@ -139,6 +187,10 @@ export default function ParticipantShell() {
                 setStep(gt === 'T1MER' ? 'play' : 'assignment')
               }}
             />
+          )}
+
+          {gameType === 'STACK' && step === 'play' && stackAssignment && playerToken && (
+            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} />
           )}
 
           {gameType === 'EMPAREJA2' && step === 'assignment' && gameMeta && playerToken && (

@@ -1,4 +1,4 @@
-import DualScreenOperatorPanel from '../../core/widgets/DualScreenOperatorPanel'
+import MobileParticipantsPanel from '../../core/widgets/MobileParticipantsPanel'
 
 type Props = {
   gameId: string
@@ -6,5 +6,5 @@ type Props = {
 }
 
 export default function Empareja2OperatorScreen({ gameId, gameName }: Props) {
-  return <DualScreenOperatorPanel gameId={gameId} gameName={gameName} />
+  return <MobileParticipantsPanel gameId={gameId} gameName={gameName} />
 }

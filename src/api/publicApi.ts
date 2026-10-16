@@ -1,4 +1,13 @@
+import type { StackConfig, StackPlacement } from '../games/stack/stackLogic'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+
+export class PublicApiError extends Error {
+  constructor(message: string, public readonly status: number, public readonly code?: string) {
+    super(message)
+    this.name = 'PublicApiError'
+  }
+}
 
 async function publicRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`
@@ -15,7 +24,7 @@ async function publicRequest<T>(endpoint: string, options: RequestInit = {}): Pr
       || (data as { error?: string }).error
       || (data as { reason?: string }).reason
       || `HTTP ${response.status}`
-    throw new Error(msg)
+    throw new PublicApiError(msg, response.status, (data as { error?: string }).error)
   }
   return data as T
 }
@@ -29,7 +38,7 @@ export type PublicRankingEntry = {
   playerId: number
   username?: string
   profilePicUrl?: string | null
-  timer: number
+  timer?: number
   score: number
   rank: number
 }
@@ -46,6 +55,9 @@ export type PublicGameResponse = {
   validatedCount: number
   recentPairs: Array<{ label: string; characterNames: string[]; validatedAt: string }>
   ranking?: PublicRankingEntry[]
+  stackConfig?: StackConfig
+  stackStartSnapshot?: boolean
+  stackFinishSupported?: boolean
   joinUrl: string
 }
 
@@ -70,7 +82,52 @@ export type T1merAssignment = {
   timer?: number
 }
 
-export type PlayerAssignment = Empareja2Assignment | T1merAssignment
+export type StackAttempt = {
+  attemptId: string
+  status: 'started' | 'finished'
+  startedAt: string
+  configVersion: '1'
+  finishedAt?: string
+}
+
+export type StackAssignment = {
+  gameType: 'STACK'
+  playerId: number
+  displayName: string
+  profilePicUrl?: string | null
+  attempt: StackAttempt | null
+  score?: number
+  rank?: number | null
+}
+
+export type PlayerAssignment = Empareja2Assignment | T1merAssignment | StackAssignment
+
+export function isStackAssignment(assignment: PlayerAssignment): assignment is StackAssignment {
+  return 'gameType' in assignment && assignment.gameType === 'STACK'
+}
+
+export type StackStartResponse = {
+  ok: true
+  gameId: string
+  playerId: number
+  attemptId: string
+  status: 'started'
+  configVersion: '1'
+  startedAt: string
+  configSnapshot: StackConfig
+}
+
+export type StackFinishResponse = {
+  ok: true
+  gameId: string
+  playerId: number
+  attemptId: string
+  status: 'finished'
+  configVersion: '1'
+  score: number
+  scoreUpdatedAt: string
+  rank: number | null
+}
 
 export type JoinResponse = {
   ok: boolean
@@ -143,6 +200,18 @@ export const publicApi = {
 
   score: (body: { gameId: string; playerToken: string; timer: string; score: number }) =>
     publicRequest<PublicScoreResponse>('/v1/public/score', { method: 'POST', body: JSON.stringify(body) }),
+
+  startStackAttempt: (body: { gameId: string; playerToken: string; attemptId: string }) =>
+    publicRequest<StackStartResponse>('/v1/public/score', {
+      method: 'POST',
+      body: JSON.stringify({ ...body, action: 'start' }),
+    }),
+
+  finishStackAttempt: (body: { gameId: string; playerToken: string; attemptId: string; placements: readonly StackPlacement[] }) =>
+    publicRequest<StackFinishResponse>('/v1/public/score', {
+      method: 'POST',
+      body: JSON.stringify({ ...body, action: 'finish' }),
+    }),
 
   getPlayer: (playerToken: string, gameId?: string) => {
     const qs = new URLSearchParams({ playerToken })
