@@ -7,12 +7,14 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isInitializing } = useAuth()
 
+  if (isInitializing) {
+    return <div role="status">Cargando...</div>
+  }
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 
   return <>{children}</>
 }
-

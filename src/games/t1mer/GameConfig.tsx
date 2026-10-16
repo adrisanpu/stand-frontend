@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
-import { getDisplayUrl, getWebPlayUrl } from '../../core/lib/joinUrl'
+import { getWebPlayUrl } from '../../core/lib/joinUrl'
 
 interface GameDataResponse {
   ok: boolean
@@ -139,14 +139,6 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange 
         {gameId && isPhoneMode && (
           <div className="space-y-3 border-t border-white/10 pt-4 text-sm">
             <p className="font-medium text-gray-300">Enlaces del evento</p>
-            <a
-              href={getDisplayUrl(gameId)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-neonCyan underline truncate"
-            >
-              Pantalla pública
-            </a>
             <a
               href={getWebPlayUrl(gameId)}
               target="_blank"

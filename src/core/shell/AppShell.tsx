@@ -163,7 +163,7 @@ export default function AppShell() {
         )
         if (!cancelled && data.ok) {
           const gt = (data.game?.gameType || '').toUpperCase()
-          setJoinChannel(data.game?.joinChannel ?? (gt === 'EMPAREJA2' || gt === 'T1MER' ? 'web' : null))
+          setJoinChannel(data.game?.joinChannel ?? (gt === 'EMPAREJA2' || gt === 'T1MER' || gt === 'STACK' ? 'web' : null))
         }
       } catch {
         if (!cancelled) setJoinChannel(null)
@@ -531,4 +531,3 @@ export default function AppShell() {
     </ThemeProvider>
   )
 }
-

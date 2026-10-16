@@ -4,6 +4,7 @@ import { loadTokens, clearAuth, isTokenExpired } from './authStorage'
 
 interface AuthContextType {
   isAuthenticated: boolean
+  isInitializing: boolean
   accessToken: string | null
   logout: () => void
   setAuth: (token: string) => void
@@ -25,6 +26,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const navigate = useNavigate()
 
@@ -41,6 +43,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsAuthenticated(false)
       setAccessToken(null)
     }
+    setIsInitializing(false)
   }, [])
 
   const logout = useCallback(() => {
@@ -59,6 +62,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     <AuthContext.Provider
       value={{
         isAuthenticated,
+        isInitializing,
         accessToken,
         logout,
         setAuth,

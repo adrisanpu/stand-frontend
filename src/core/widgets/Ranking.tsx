@@ -52,6 +52,7 @@ export default function Ranking({
   gameType,
 }: RankingProps) {
   const isT1mer = normalizeGameType(gameType) === 'T1MER'
+  const isStack = normalizeGameType(gameType) === 'STACK'
   const [ranking, setRanking] = useState<RankingEntry[] | null>(null)
 
   const limit = rankingFetchLimit(topX, maxPrizeRanking)
@@ -142,11 +143,13 @@ export default function Ranking({
                 </div>
                 <div className="text-right flex-shrink-0 ml-2">
                   <div className="text-textMain font-semibold text-[14px]">
-                    {entry.timer !== undefined && typeof entry.timer === 'number'
+                    {isStack && typeof entry.score === 'number'
+                      ? `${entry.score} pizzas`
+                      : entry.timer !== undefined && typeof entry.timer === 'number'
                       ? `${entry.timer.toFixed(3)}s`
                       : 'N/A'}
                   </div>
-                  {!isT1mer && entry.score !== undefined && typeof entry.score === 'number' && (
+                  {!isT1mer && !isStack && entry.score !== undefined && typeof entry.score === 'number' && (
                     <div className={`text-textSub ${compact ? 'text-xs' : 'text-[10px] sm:text-xs'}`}>
                       {entry.score.toFixed(0)}ms
                     </div>

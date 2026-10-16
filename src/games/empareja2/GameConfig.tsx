@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
-import { getDisplayUrl, getWebPlayUrl, getRedeemUrl } from '../../core/lib/joinUrl'
+import { getWebPlayUrl, getRedeemUrl } from '../../core/lib/joinUrl'
 import QRCode from '../../core/widgets/QRCode'
 
 export type Empareja2Settings = {
@@ -232,9 +232,6 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
             <p className="font-medium text-gray-300">Enlaces del evento</p>
             {isPhoneMode && (
               <>
-                <a href={getDisplayUrl(gameId)} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
-                  Pantalla pública
-                </a>
                 <a href={getWebPlayUrl(gameId)} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
                   Participante (móvil)
                 </a>

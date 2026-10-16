@@ -4,7 +4,7 @@ import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoCo
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
 import GameStateAvatar from '../../core/widgets/GameStateAvatar'
 import BackButton from '../../core/widgets/BackButton'
-import DualScreenOperatorPanel from '../../core/widgets/DualScreenOperatorPanel'
+import MobileParticipantsPanel from '../../core/widgets/MobileParticipantsPanel'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import {
@@ -279,7 +279,7 @@ export default function T1merGameScreen({
         />
       )
     }
-    return <DualScreenOperatorPanel gameId={gameId!} gameName={gameName} />
+    return <MobileParticipantsPanel gameId={gameId!} gameName={gameName} />
   }
 
   /** Altura fija del contador: no crece ni se mueve entre estados. */
@@ -303,7 +303,7 @@ export default function T1merGameScreen({
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
           <LandscapeInfoInstruction>Los asistentes juegan desde su móvil (/play).</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Abre la pantalla pública en el monitor o proyector.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>Esta es la pantalla del evento para el monitor o proyector.</LandscapeInfoInstruction>
           <LandscapeInfoInstruction>Los enlaces están en Configurar juego.</LandscapeInfoInstruction>
         </GameLandscapeLeftColumn>
         <div className={`${GAME_LANDSCAPE_CENTER_CARD} justify-center items-center min-h-0`}>
