@@ -111,7 +111,7 @@ export default function ImpostorGameConfig({ gameId, settings, onChange, registe
         <button
           type="button"
           onClick={save}
-          className="w-full p-3 rounded-xl bg-[rgba(124,58,237,0.25)] border border-[rgba(124,58,237,0.45)] hover:bg-[rgba(124,58,237,0.35)] transition-colors font-medium"
+          className="w-full p-3 rounded-xl bg-primary/25 border border-primary/45 hover:bg-primary/35 transition-colors font-medium"
         >
           {t('Guardar configuración', 'Save configuration')}
         </button>

@@ -4,7 +4,8 @@ import { api } from '../../api/api'
 import { usePolling } from '../../hooks/usePolling'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import type { GamePrize } from '../prizes'
-import { PrizeImage } from './PrizePresentation'
+import PrizeSticker from './PrizeSticker'
+import { HOME_TITLE_TEXT, HOME_BODY_TEXT } from '../ui/homeTypography'
 
 interface RaffleWinner {
   username: string
@@ -43,7 +44,7 @@ interface RaffleDataProps {
   gameName: string
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and show fewer items
-  prizeLabel?: string // e.g. "🎁 Entrada gratis" — shown below title when set
+  prizeLabel?: string // Legacy prize name, shown in the prize sticker
   prize?: GamePrize
   maxPrizeRaffle?: number
 }
@@ -317,110 +318,100 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
   if (loading) {
     return (
       <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden h-full' : 'p-3 sm:p-4 lg:p-6'}`}>
-        <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>{t('Sorteo', 'Raffle')}</h2>
-        <p className="text-textSub text-xs sm:text-sm">{t('Cargando...', 'Loading...')}</p>
+        <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${HOME_TITLE_TEXT}`}>{t('Sorteo', 'Raffle')}</h2>
+        <p className={`text-textSub ${HOME_BODY_TEXT}`}>{t('Cargando...', 'Loading...')}</p>
       </div>
     )
   }
 
   return (
-    <div
-      className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col relative h-full min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0' : 'p-3 sm:p-4 lg:p-6 flex-1'} ${winnersDropdownOpen ? 'overflow-visible' : 'overflow-hidden'}`}
-      ref={winnersDropdownRef}
-    >
-      <h2 className={`font-bold text-textMain mb-1 sm:mb-2 flex items-center gap-2 flex-shrink-0 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>
-        {t('Sorteo', 'Raffle')}
-        {isStale && <span className="text-[10px] font-normal text-yellow-500">● {t('sin señal', 'offline')}</span>}
-      </h2>
-      {(prizeLabel || prize?.imageUrl) && (
-        <div
-          className={`text-textSub flex-shrink-0 mb-1 flex items-center justify-between gap-2 min-w-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}
-        >
-          <PrizeImage prize={prize} compact />
-          <span className="min-w-0 truncate">{t('Premio', 'Prize')}: {prizeLabel}</span>
-          {maxPrizeRaffle !== undefined && (
-            <span className="flex-shrink-0 text-[10px] sm:text-xs tabular-nums">
-              {winners.length}/{maxPrizeRaffle}
-            </span>
+    <div className="flex flex-col h-full min-h-0 min-w-0 flex-1">
+      <PrizeSticker prize={prize} label={prizeLabel} current={winners.length} max={maxPrizeRaffle} compact={compact} />
+      <div
+        className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col relative flex-1 min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0' : 'p-3 sm:p-4 lg:p-6'} ${winnersDropdownOpen ? 'overflow-visible' : 'overflow-hidden'}`}
+        ref={winnersDropdownRef}
+      >
+        <h2 className={`font-bold text-textMain mb-1 sm:mb-2 flex flex-wrap items-center gap-2 flex-shrink-0 ${HOME_TITLE_TEXT}`}>
+          {t('Sorteo', 'Raffle')}
+          {isStale && <span className={`${HOME_BODY_TEXT} font-normal text-yellow-500`}>● {t('sin señal', 'offline')}</span>}
+        </h2>
+        <div className={`flex-1 min-h-0 flex flex-col ${compact ? 'gap-1' : 'gap-3 sm:gap-4'}`}>
+          {/* Next Raffle Countdown */}
+          {timeUntilNext !== null && timeUntilNext > 0 && autoRaffleConfig?.enabled && (
+            <div className={`rounded-lg bg-surface border border-white/10 flex-shrink-0 ${compact ? 'p-2' : 'p-2 sm:p-3'}`}>
+              <div className={`flex flex-row flex-wrap items-baseline justify-start gap-x-2 gap-y-0 ${HOME_BODY_TEXT}`}>
+                <span className="text-textSub shrink-0">{t('Próximo en:', 'Next in:')}</span>
+                <span className={`font-semibold text-[var(--color-primary)] ${HOME_BODY_TEXT}`}>
+                  {formatTime(timeUntilNext)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Winners dropdown: panel from Ganadores button, above the Sorteo container */}
+          {winners.length > 0 ? (
+            <div className="relative flex-shrink-0">
+              <button
+                ref={winnersButtonRef}
+                type="button"
+                onClick={() => setWinnersDropdownOpen(open => !open)}
+                className={`w-full rounded-lg bg-surface border border-white/10 px-3 py-2 text-left text-textMain flex items-center justify-between ${HOME_BODY_TEXT}`}
+                aria-expanded={winnersDropdownOpen}
+                aria-haspopup="listbox"
+                aria-label={`${t('Ganadores', 'Winners')} (${winners.length}). ${winnersDropdownOpen ? t('Cerrar lista', 'Close list') : t('Ver lista', 'View list')}`}
+              >
+                <span>{t('Ganadores', 'Winners')} ({winners.length})</span>
+                <span className="text-textSub ml-2">{winnersDropdownOpen ? '▲' : '▼'}</span>
+              </button>
+              {winnersDropdownOpen &&
+                dropdownPosition &&
+                createPortal(
+                  <div
+                    ref={dropdownPortalRef}
+                    className="fixed z-[9999] rounded-xl border border-white/15 bg-[rgba(30,30,40,0.98)] shadow-lg shadow-purple-500/10 overflow-hidden flex flex-col w-max min-w-0"
+                    style={{
+                      top: dropdownPosition.top,
+                      right: dropdownPosition.right,
+                      minWidth: dropdownPosition.minWidth,
+                      maxWidth: 'calc(100vw - 2rem)',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(147,51,234,0.25)',
+                    }}
+                    role="listbox"
+                    aria-label={t('Lista de ganadores', 'Winners list')}
+                  >
+                    <div
+                      className="overflow-y-auto overflow-x-auto overscroll-contain p-1.5 min-w-0 max-h-40"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {winnersSortedByName.map((w, index) => (
+                        <label
+                          key={w.raffleId ?? index}
+                          role="option"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg min-w-0 cursor-pointer border-b border-white/5 last:border-b-0 hover:bg-white/10 transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!w.prizeDelivered}
+                            onChange={() => handleToggleDelivered(w.raffleId!, w.prizeDelivered ?? false)}
+                            disabled={updatingDelivered || !gameType}
+                            className="w-4 h-4 flex-shrink-0 rounded border-white/20 text-purple-500 focus:ring-purple-500"
+                            onClick={e => e.stopPropagation()}
+                            aria-label={`${t('Premio entregado para', 'Prize delivered for')} ${w.username}`}
+                          />
+                          <span className={`text-textMain font-medium whitespace-nowrap shrink-0 ${HOME_BODY_TEXT}`} title={w.username}>
+                            {w.username}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>,
+                  document.body
+                )}
+            </div>
+          ) : (
+            <p className={`text-textSub ${HOME_BODY_TEXT}`}>{t('No hay ganadores aún', 'No winners yet')}</p>
           )}
         </div>
-      )}
-      <div className={`flex-1 min-h-0 flex flex-col ${compact ? 'gap-1' : 'gap-3 sm:gap-4'}`}>
-        {/* Next Raffle Countdown */}
-        {timeUntilNext !== null && timeUntilNext > 0 && autoRaffleConfig?.enabled && (
-          <div className={`rounded-lg bg-surface border border-white/10 flex-shrink-0 ${compact ? 'p-2' : 'p-2 sm:p-3'}`}>
-            <div className={`flex flex-row flex-wrap items-baseline justify-start gap-x-2 gap-y-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-              <span className="text-textSub shrink-0">{t('Próximo en:', 'Next in:')}</span>
-              <span className={`font-semibold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-base sm:text-lg'}`}>
-                {formatTime(timeUntilNext)}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Winners dropdown: panel from Ganadores button, above the Sorteo container */}
-        {winners.length > 0 ? (
-          <div className="relative flex-shrink-0">
-            <button
-              ref={winnersButtonRef}
-              type="button"
-              onClick={() => setWinnersDropdownOpen(open => !open)}
-              className={`w-full rounded-lg bg-surface border border-white/10 px-3 py-2 text-left text-textMain flex items-center justify-between ${compact ? 'text-xs' : 'text-sm'}`}
-              aria-expanded={winnersDropdownOpen}
-              aria-haspopup="listbox"
-              aria-label={`${t('Ganadores', 'Winners')} (${winners.length}). ${winnersDropdownOpen ? t('Cerrar lista', 'Close list') : t('Ver lista', 'View list')}`}
-            >
-              <span>{t('Ganadores', 'Winners')} ({winners.length})</span>
-              <span className="text-textSub ml-2">{winnersDropdownOpen ? '▲' : '▼'}</span>
-            </button>
-            {winnersDropdownOpen &&
-              dropdownPosition &&
-              createPortal(
-                <div
-                  ref={dropdownPortalRef}
-                  className="fixed z-[9999] rounded-xl border border-white/15 bg-[rgba(30,30,40,0.98)] shadow-lg shadow-purple-500/10 overflow-hidden flex flex-col w-max min-w-0"
-                  style={{
-                    top: dropdownPosition.top,
-                    right: dropdownPosition.right,
-                    minWidth: dropdownPosition.minWidth,
-                    maxWidth: 'calc(100vw - 2rem)',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(147,51,234,0.25)',
-                  }}
-                  role="listbox"
-                  aria-label={t('Lista de ganadores', 'Winners list')}
-                >
-                  <div
-                    className="overflow-y-auto overflow-x-auto overscroll-contain p-1.5 min-w-0 max-h-40"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {winnersSortedByName.map((w, index) => (
-                      <label
-                        key={w.raffleId ?? index}
-                        role="option"
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg min-w-0 cursor-pointer border-b border-white/5 last:border-b-0 hover:bg-white/10 transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={!!w.prizeDelivered}
-                          onChange={() => handleToggleDelivered(w.raffleId!, w.prizeDelivered ?? false)}
-                          disabled={updatingDelivered || !gameType}
-                          className="w-4 h-4 flex-shrink-0 rounded border-white/20 text-purple-500 focus:ring-purple-500"
-                          onClick={e => e.stopPropagation()}
-                          aria-label={`${t('Premio entregado para', 'Prize delivered for')} ${w.username}`}
-                        />
-                        <span className="text-textMain font-medium whitespace-nowrap shrink-0 text-xs sm:text-sm" title={w.username}>
-                          {w.username}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>,
-                document.body
-              )}
-          </div>
-        ) : (
-          <p className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>{t('No hay ganadores aún', 'No winners yet')}</p>
-        )}
       </div>
     </div>
   )

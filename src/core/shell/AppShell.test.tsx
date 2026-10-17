@@ -70,6 +70,27 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('game home identity and configuration', () => {
+  it.each([
+    [true, 'mobile', true], [false, 'mobile', true],
+    [true, 'master', true], [false, 'master', true],
+    [true, 'mobile', false], [false, 'mobile', false],
+    [true, 'master', false], [false, 'master', false],
+  ] as const)('waits for appearance before choosing a logo (portrait=%s, mode=%s, selected=%s)', async (portrait, playMode, selected) => {
+    state.portrait = portrait
+    localStorage.setItem('gameType', 'T1MER')
+    vi.mocked(api.get).mockResolvedValue({ ok: true, game: { gameType: 'T1MER', playMode, joinChannel: 'web' } })
+    let resolveMedia!: (value: UserMediaResponse) => void
+    vi.mocked(fetchUserMedia).mockReturnValue(new Promise(resolve => { resolveMedia = resolve }))
+    render(<AppShell />)
+    await screen.findByText('Cargando aspecto del juego...')
+    expect(screen.queryByRole('img', { name: 'T1MER' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Logo del cliente' })).not.toBeInTheDocument()
+    await act(async () => { resolveMedia(media(selected)) })
+    const logo = await screen.findByRole('img', { name: selected ? 'Logo del cliente' : 'T1MER' })
+    expect(logo).toHaveAttribute('src', selected ? '/client.png' : '/images/t1mer-logo.png')
+    expect(document.body.innerHTML).not.toContain('/platform.png')
+  })
+
   it('uses legacy local prize names and limits only when the server catalog is absent', async () => {
     localStorage.setItem('gameType', 'T1MER')
     localStorage.setItem('T1MER_settings_ABC123', JSON.stringify({
@@ -223,6 +244,7 @@ describe('game home identity and configuration', () => {
     expect(left.lastElementChild).toContainElement(screen.getByTestId('raffle'))
     expect(screen.getByTestId('raffle')).toHaveAttribute('data-compact', String(!portrait))
     const center = screen.getByLabelText('QR de acceso al juego')
+    expect(center).toHaveClass('justify-evenly', 'p-4', 'gap-4', 'sm:p-6', 'sm:gap-6')
     const headline = screen.getByRole('heading', { name: 'NO ESCANEAR, POR FAVOR.' })
     expect(headline).toHaveAttribute('lang', 'es')
     expect(headline).toHaveClass('text-white', 'text-4xl', 'sm:text-5xl', 'lg:text-6xl')

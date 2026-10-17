@@ -46,6 +46,7 @@ function AppContent() {
   const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
   const avatarsEnabled = useAvatarsEnabled()
   const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
+  const [mediaLoading, setMediaLoading] = useState(true)
   const customLogo = userMedia ? resolveUserSelectedLogoUrl(userMedia) : null
   const [avatarMediaUrls, setAvatarMediaUrls] = useState<Partial<Record<'idle' | 'win' | 'lose', string | null>>>({})
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
@@ -71,9 +72,12 @@ function AppContent() {
 
   // Load custom logo and avatar media from backend.
   useEffect(() => {
+    let cancelled = false
     const load = async () => {
       try {
         const media = await fetchUserMedia()
+        if (cancelled) return
+        if (!media.ok) throw new Error('Unable to load appearance media')
         setUserMedia(media)
         if (getAvatarsEnabled()) {
           setAvatarMediaUrls({
@@ -84,15 +88,22 @@ function AppContent() {
         } else {
           setAvatarMediaUrls({})
         }
-      } catch {
+      } catch (error) {
+        if (cancelled) return
+        console.error('Unable to load appearance media:', error)
         setUserMedia(null)
+      } finally {
+        if (!cancelled) setMediaLoading(false)
       }
     }
     void load()
 
     const onMediaUpdate = () => void load()
     window.addEventListener('user-media-updated', onMediaUpdate)
-    return () => window.removeEventListener('user-media-updated', onMediaUpdate)
+    return () => {
+      cancelled = true
+      window.removeEventListener('user-media-updated', onMediaUpdate)
+    }
   }, [])
 
   // Load gameId, gameName, and gameType from localStorage on mount
@@ -372,13 +383,15 @@ function AppContent() {
 
         <div className={gameId && gameName && currentGame ? 'h-screen overflow-hidden' : 'min-h-screen grid place-items-center px-4 sm:px-6 lg:px-6 xl:px-8'}>
           {gameId && gameName && currentGame ? (
-            !access ? (
+            !access || mediaLoading ? (
               <div className="h-dvh flex flex-col items-center justify-center gap-4 px-6">
                 <p role={accessError ? 'alert' : 'status'}>{accessError
                   ? accessError === 'No se pudo cargar el acceso del juego.'
                     ? t(accessError, 'Unable to load game access.')
                     : accessError
-                  : t('Cargando acceso del juego...', 'Loading game access...')}</p>
+                  : mediaLoading
+                    ? t('Cargando aspecto del juego...', 'Loading game appearance...')
+                    : t('Cargando acceso del juego...', 'Loading game access...')}</p>
                 {accessError && <button type="button" onClick={() => setGameConfigVersion((v) => v + 1)}>{t('Reintentar carga', 'Retry loading')}</button>}
               </div>
             ) : playMode === 'mobile' ? (

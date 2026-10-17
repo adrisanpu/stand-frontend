@@ -72,9 +72,11 @@ export type PublicGameResponse = {
 
 export type Empareja2Assignment = {
   playerId: number
+  participantName?: string
   characterId: number
   characterName: string
   partnerCharacterName: string
+  profilePicUrl?: string | null
   characterImageUrl?: string | null
   partnerCharacterImageUrl?: string | null
   validationCode: number
@@ -148,9 +150,53 @@ export type JoinResponse = {
   alreadyJoined?: boolean
 }
 
+type ParticipantPhotoUploadUrlResponse = {
+  ok: true
+  uploadUrl: string
+  uploadFields: Record<string, string>
+  photoKey: string
+}
+
+type ParticipantPhotoCompleteResponse = {
+  ok: true
+  profilePicUrl: string
+}
+
+const PARTICIPANT_PHOTO_MAX_BYTES = 5 * 1024 * 1024
+const PARTICIPANT_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+async function uploadParticipantPhoto(file: File, playerToken: string): Promise<string> {
+  if (!PARTICIPANT_PHOTO_TYPES.has(file.type) || file.size <= 0 || file.size > PARTICIPANT_PHOTO_MAX_BYTES) {
+    throw new Error('La foto debe ser JPG, PNG o WebP y no superar 5 MB.')
+  }
+
+  const upload = await publicRequest<ParticipantPhotoUploadUrlResponse>('/v1/public/player/photo', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'upload-url',
+      playerToken,
+      contentType: file.type,
+      sizeBytes: file.size,
+    }),
+  })
+  const formData = new FormData()
+  for (const [name, value] of Object.entries(upload.uploadFields)) formData.append(name, value)
+  formData.append('file', file)
+  const response = await fetch(upload.uploadUrl, { method: 'POST', body: formData })
+  if (!response.ok) throw new Error(`No se pudo subir la foto (HTTP ${response.status}).`)
+
+  const completed = await publicRequest<ParticipantPhotoCompleteResponse>('/v1/public/player/photo', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'complete', playerToken, photoKey: upload.photoKey }),
+  })
+  return completed.profilePicUrl
+}
+
 export type EmailRegistration = {
   gameId: string
   email?: string
+  /** Required for registration unless Instagram is requested by the game. */
+  username?: string
   instagram?: string
   phone?: string
   consent: boolean
@@ -167,7 +213,7 @@ export type EmailChallengeResponse = {
 
 export type JoinRequest =
   | (Omit<EmailRegistration, 'language'> & { challengeId?: never; code?: never })
-  | { gameId: string; challengeId: string; code: string; consent?: boolean; email?: never; instagram?: never; phone?: never }
+  | { gameId: string; challengeId: string; code: string; consent?: boolean; email?: never; username?: never; instagram?: never; phone?: never }
 
 export type ValidateResponse = {
   valid: boolean
@@ -181,7 +227,7 @@ export type ValidateResponse = {
   }>
 }
 
-export type PrizeKind = 'validation' | 'raffle'
+export type PrizeKind = 'validation' | 'raffle' | 'ranking'
 
 export type PlayerPrize = {
   kind: PrizeKind
@@ -229,6 +275,8 @@ export const publicApi = {
 
   join: (body: JoinRequest) =>
     publicRequest<JoinResponse>('/v1/public/join', { method: 'POST', body: JSON.stringify(body) }),
+
+  uploadParticipantPhoto,
 
   exchangeAccess: (body: { gameId: string; accessToken: string }) =>
     publicRequest<PlayerResponse>('/v1/public/access', { method: 'POST', body: JSON.stringify(body) }),

@@ -17,7 +17,7 @@ const { createScene, controller } = vi.hoisted(() => ({
 vi.mock('./stackScene', () => ({ createStackScene: createScene }))
 vi.mock('../../api/publicApi', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/publicApi')>(),
-  publicApi: { startStackAttempt: vi.fn(), finishStackAttempt: vi.fn(), score: vi.fn() },
+  publicApi: { startStackAttempt: vi.fn(), finishStackAttempt: vi.fn(), score: vi.fn(), getPlayer: vi.fn() },
 }))
 
 const assignment: StackAssignment = {
@@ -69,17 +69,22 @@ describe('STACK participant gameplay', () => {
     createScene.mockReturnValue(controller satisfies StackSceneController)
     vi.mocked(publicApi.startStackAttempt).mockImplementation(async ({ attemptId }) => startResponse(attemptId))
     vi.mocked(publicApi.finishStackAttempt).mockImplementation(async ({ attemptId }) => finishResponse(attemptId))
+    vi.mocked(publicApi.getPlayer).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'STACK', playerToken: 'token', assignment, prizes: [],
+    })
   })
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
   })
 
-  it('loads the scene without consuming an attempt and keeps the centered identity header', async () => {
+  it('loads the scene without consuming an attempt and places identity to the right of the score', async () => {
     const { unmount } = renderGame()
     await ready()
     const header = screen.getByText('@rekete').closest('header')
-    expect(header).toHaveClass('justify-center')
+    expect(header).toHaveClass('justify-between')
+    expect(header?.firstElementChild).toHaveTextContent('Bloques: 0')
+    expect(header?.lastElementChild).toContainElement(screen.getByText('@rekete'))
     expect(header).toContainElement(screen.getByText('@rekete'))
     expect(header?.querySelector('img[src="/profile.jpg"]')).not.toBeNull()
     expect(publicApi.startStackAttempt).not.toHaveBeenCalled()
@@ -139,7 +144,8 @@ describe('STACK participant gameplay', () => {
     renderGame({ ...assignment, score: 0 })
     await ready()
     expect(screen.queryByRole('button', { name: 'EMPEZAR' })).not.toBeInTheDocument()
-    expect(screen.getByText(/Resultado validado y guardado/)).toBeInTheDocument()
+    expect(screen.getByText('0', { selector: 'span' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Posición/ })).not.toBeInTheDocument()
     expect(publicApi.startStackAttempt).not.toHaveBeenCalled()
   })
 
@@ -190,6 +196,7 @@ describe('STACK participant gameplay', () => {
     expect(controller.dispose).not.toHaveBeenCalled()
     expect(publicApi.startStackAttempt).toHaveBeenCalledTimes(1)
     expect(publicApi.score).not.toHaveBeenCalled()
+    expect(publicApi.getPlayer).not.toHaveBeenCalled()
     expect(publicApi.finishStackAttempt).not.toHaveBeenCalled()
   })
 
@@ -321,21 +328,64 @@ describe('STACK participant gameplay', () => {
     vi.mocked(publicApi.finishStackAttempt).mockReturnValue(new Promise((done) => { resolve = done }))
     const { options, attemptId } = await startGame()
     update(options, { state: 'GAME_OVER', score: 7, placements })
-    expect(screen.getByRole('heading', { name: 'Fin de la partida' })).toBeInTheDocument()
-    expect(screen.getByText('7', { selector: 'p' })).toBeInTheDocument()
-    expect(screen.getByText(/Resultado local pendiente/)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Fin de la partida' })).not.toBeInTheDocument()
+    expect(screen.getByText('7', { selector: 'span' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Posición/ })).not.toBeInTheDocument()
     expect(screen.getByText('Validando y guardando resultado...')).toBeInTheDocument()
     expect(publicApi.finishStackAttempt).toHaveBeenCalledWith({ gameId: 'GAME1234', playerToken: 'token', attemptId, placements })
     expect(loadPendingStackResult('GAME1234', 1, attemptId)?.placements).toEqual(placements)
     expect(publicApi.score).not.toHaveBeenCalled()
+    expect(publicApi.getPlayer).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: /EMPEZAR|COLOCAR|reiniciar/i })).not.toBeInTheDocument()
     await act(async () => { resolve(finishResponse(attemptId)) })
-    expect(screen.getByText(/Resultado validado y guardado/)).toBeInTheDocument()
-    expect(screen.getByText('#2')).toBeInTheDocument()
+    const rank = screen.getByRole('heading', { name: 'Posición: #2' })
+    expect(rank).toHaveClass('text-4xl')
+    expect(screen.getByLabelText('Escena 3D de bloques apilados').parentElement).toContainElement(rank)
+    expect(screen.queryByText('Bloques apilados')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Resultado validado y guardado/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Resultado local pendiente/)).not.toBeInTheDocument()
+    expect(screen.getAllByText('@rekete')).toHaveLength(1)
     expect(loadAssignment('GAME1234')).toEqual(expect.objectContaining({
       score: 7, rank: 2, attempt: expect.objectContaining({ status: 'finished' }),
     }))
     expect(loadPendingStackResult('GAME1234', 1, attemptId)).toBeNull()
+  })
+
+  it('shows the ranking-prize QR alongside the position after the saved result is eligible', async () => {
+    vi.mocked(publicApi.getPlayer).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'STACK', playerToken: 'token',
+      assignment: { ...assignment, score: 7, rank: 2 },
+      prizes: [{ kind: 'ranking', token: 'signed-ranking-claim', delivered: false }],
+      prizeCatalog: { ranking: { name: 'Consola', limit: 3, topX: 3, imageUrl: '/prize.png' } },
+    })
+    const { options } = await startGame()
+    expect(publicApi.getPlayer).not.toHaveBeenCalled()
+    update(options, { state: 'GAME_OVER', score: 7, placements })
+    expect(await screen.findByRole('img', { name: 'QR Premio del ranking' })).toHaveAttribute(
+      'src', expect.stringContaining('data:image/gif;base64,'),
+    )
+    expect(screen.getByRole('heading', { name: 'Posición: #2' })).toBeInTheDocument()
+    expect(screen.getByText('Consola')).toBeInTheDocument()
+    const viewport = screen.getByLabelText('Escena 3D de bloques apilados').parentElement!
+    const qr = screen.getByRole('img', { name: 'QR Premio del ranking' })
+    const image = screen.getByRole('img', { name: 'Consola' })
+    const name = screen.getByText('Consola')
+    expect(viewport).toContainElement(qr)
+    expect(viewport).toContainElement(image)
+    expect(viewport).toContainElement(name)
+    expect(image.nextElementSibling).toBe(name)
+    expect(name.parentElement?.parentElement).toBe(qr.parentElement?.parentElement)
+    expect(viewport).not.toContainElement(screen.getByText('Muestra este QR en el punto de recogida para canjear tu premio.'))
+    expect(screen.queryByRole('heading', { name: 'Premio del ranking' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Fin de la partida')).not.toBeInTheDocument()
+  })
+
+  it('does not show a prize QR when the saved result has no eligible claim', async () => {
+    renderGame({ ...assignment, score: 7, rank: 8 })
+    await ready()
+    await waitFor(() => expect(publicApi.getPlayer).toHaveBeenCalled())
+    expect(screen.getByRole('heading', { name: 'Posición: #8' })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'QR Premio del ranking' })).not.toBeInTheDocument()
   })
 
   it('retries exactly the same evidence after a lost finish response without starting again', async () => {
@@ -343,9 +393,9 @@ describe('STACK participant gameplay', () => {
     const { options } = await startGame()
     update(options, { state: 'GAME_OVER', score: 7, placements })
     expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión')
-    expect(screen.getByText(/Resultado local pendiente/)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Posición/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar guardado' }))
-    expect(await screen.findByText(/Resultado validado y guardado/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Posición: #2' })).toBeInTheDocument()
     const calls = vi.mocked(publicApi.finishStackAttempt).mock.calls
     expect(calls).toHaveLength(2)
     expect(calls[1][0]).toEqual(calls[0][0])
@@ -357,7 +407,7 @@ describe('STACK participant gameplay', () => {
     const { options } = await startGame()
     update(options, { state: 'GAME_OVER', score: 7, placements })
     expect(await screen.findByRole('alert')).toHaveTextContent('InvalidStackReplay')
-    expect(screen.getByText(/Resultado local pendiente/)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Posición/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Reintentar guardado|EMPEZAR/ })).not.toBeInTheDocument()
   })
 
@@ -366,7 +416,7 @@ describe('STACK participant gameplay', () => {
     const { options } = await startGame()
     update(options, { state: 'GAME_OVER', score: 7, placements })
     expect(await screen.findByRole('alert')).toHaveTextContent('no confirmó un resultado válido')
-    expect(screen.queryByText(/Resultado validado y guardado/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Posición/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reintentar guardado' })).toBeEnabled()
   })
 
@@ -376,7 +426,7 @@ describe('STACK participant gameplay', () => {
     }
     savePendingStackResult('GAME1234', { playerId: 1, attemptId: 'old', placements })
     renderGame(consumed)
-    expect(await screen.findByText(/Resultado validado y guardado/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Posición: #2' })).toBeInTheDocument()
     expect(publicApi.finishStackAttempt).toHaveBeenCalledWith({ gameId: 'GAME1234', playerToken: 'token', attemptId: 'old', placements })
     expect(publicApi.startStackAttempt).not.toHaveBeenCalled()
     expect(controller.start).not.toHaveBeenCalled()
@@ -392,7 +442,7 @@ describe('STACK participant gameplay', () => {
         <StackParticipantPlay gameId="GAME1234" playerToken="token" assignment={consumed} config={DEFAULT_STACK_CONFIG} startSupported finishSupported />
       </StrictMode>,
     )
-    expect(await screen.findByText(/Resultado validado y guardado/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Posición: #2' })).toBeInTheDocument()
     expect(publicApi.finishStackAttempt).toHaveBeenCalledTimes(1)
     expect(publicApi.startStackAttempt).not.toHaveBeenCalled()
   })
@@ -402,7 +452,7 @@ describe('STACK participant gameplay', () => {
     const { options } = await startGame()
     update(options, { state: 'GAME_OVER', score: 7, placements })
     expect(await screen.findByRole('button', { name: 'Reintentar guardado' })).toBeEnabled()
-    expect(screen.queryByText(/Resultado validado y guardado/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Posición/ })).not.toBeInTheDocument()
   })
 
   it('does not submit stale pending evidence belonging to a different attempt', async () => {
@@ -426,14 +476,14 @@ describe('STACK participant gameplay', () => {
     expect(publicApi.finishStackAttempt).not.toHaveBeenCalled()
   })
 
-  it('shows a server-recovered final result without submitting or replaying again', async () => {
+  it.each([1, 3])('shows server-recovered rank #%s inside the scene without submitting or replaying again', async (rank) => {
     renderGame({
-      ...assignment, score: 7, rank: 3,
+      ...assignment, score: 7, rank,
       attempt: { attemptId: 'old', status: 'finished', startedAt: '2026-10-16T10:00:00Z', configVersion: '1' },
     })
     await ready()
-    expect(screen.getByText(/Resultado validado y guardado/)).toBeInTheDocument()
-    expect(screen.getByText('#3')).toBeInTheDocument()
+    const heading = screen.getByRole('heading', { name: `Posición: #${rank}` })
+    expect(screen.getByLabelText('Escena 3D de bloques apilados').parentElement).toContainElement(heading)
     expect(publicApi.finishStackAttempt).not.toHaveBeenCalled()
     expect(publicApi.startStackAttempt).not.toHaveBeenCalled()
   })
@@ -454,7 +504,7 @@ describe('STACK participant gameplay', () => {
     const { options } = await startGame()
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage blocked') })
     update(options, { state: 'GAME_OVER', score: 7, placements })
-    expect(await screen.findByText(/Resultado validado y guardado/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Posición: #2' })).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('no se pudo actualizar la copia')
     expect(publicApi.finishStackAttempt).toHaveBeenCalledTimes(1)
   })

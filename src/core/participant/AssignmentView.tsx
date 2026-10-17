@@ -5,15 +5,17 @@ import { resolveGameAccess } from '../settings/gameAccess'
 import { normalizeGameType } from '../gameTypeMap'
 import { useParticipantLanguage } from './participantLanguage'
 import ParticipantPrizePromo from './ParticipantPrizePromo'
+import ProfileAvatar from '../widgets/ProfileAvatar'
 
 type Props = {
   gameId: string
   gameMeta: PublicGameResponse
   playerToken: string
   onValidate: () => void
+  showPrizePromo?: boolean
 }
 
-export default function AssignmentView({ gameId, gameMeta, onValidate }: Props) {
+export default function AssignmentView({ gameId, gameMeta, onValidate, showPrizePromo = true }: Props) {
   const { t } = useParticipantLanguage()
   const assignment = loadAssignment(gameId)
   const [showCode, setShowCode] = useState(false)
@@ -25,7 +27,13 @@ export default function AssignmentView({ gameId, gameMeta, onValidate }: Props) 
   return (
     <div className="space-y-5 text-center">
       <div className="relative min-h-[16rem] overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-        <p className="absolute left-3 top-3 z-10 rounded-lg bg-black/60 px-2 py-1 text-left text-sm text-white uppercase tracking-wide">{t('Te toca')}</p>
+        <div className="absolute left-3 right-3 top-3 z-10 flex items-center justify-between gap-2">
+          <p className="shrink-0 rounded-lg bg-black/60 px-2 py-1 text-left text-sm text-white uppercase tracking-wide">{t('Te toca')}</p>
+          <div className="flex min-w-0 items-center gap-2 rounded-lg bg-black/60 px-2 py-1 text-white">
+            <ProfileAvatar profilePicUrl={assignment.profilePicUrl} username={assignment.participantName} size="md" />
+            <span className="truncate text-sm font-medium">{assignment.participantName || t('Jugador')}</span>
+          </div>
+        </div>
         {assignment.characterImageUrl && (
           <img
             src={assignment.characterImageUrl}
@@ -64,7 +72,7 @@ export default function AssignmentView({ gameId, gameMeta, onValidate }: Props) 
           : 'Cuando os encontréis, llevad vuestros códigos a la pantalla máster del evento para validar la pareja.')}
       </p>
 
-      <ParticipantPrizePromo catalog={gameMeta.prizeCatalog} slots={['validation']} />
+      {showPrizePromo && <ParticipantPrizePromo catalog={gameMeta.prizeCatalog} slots={['validation']} />}
 
       {(isMobile || !showCode) && <button
         type="button"

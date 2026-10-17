@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 function avatarInitial(username: string | undefined): string {
   const raw = (username || 'A').replace(/^@/, '').trim()
   return (raw[0] || 'A').toUpperCase()
@@ -19,14 +21,16 @@ const SIZE: Record<NonNullable<Props['size']>, string> = {
 
 /** Circular IG profile pic or initials fallback (shared by ranking / play / display). */
 export default function ProfileAvatar({ profilePicUrl, username, size = 'md', className = '' }: Props) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const sizeClass = SIZE[size]
   const pic = typeof profilePicUrl === 'string' ? profilePicUrl.trim() : ''
-  if (pic) {
+  if (pic && pic !== failedUrl) {
     return (
       <img
         src={pic}
         alt=""
         referrerPolicy="no-referrer"
+        onError={() => setFailedUrl(pic)}
         className={`${sizeClass} shrink-0 rounded-full border border-white/20 object-cover ${className}`}
       />
     )

@@ -467,7 +467,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                     type="button"
                     onClick={() => void addRequiredFollow()}
                     disabled={savingFollows || !gameId}
-                    className="px-3 h-10 rounded-lg bg-[rgba(255,255,255,0.1)] border border-white/10 hover:bg-white/15 text-sm font-medium flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 h-10 rounded-lg bg-primary/10 border border-primary/30 hover:bg-primary/20 text-sm font-medium flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {savingFollows ? t('Guardando…', 'Saving…') : t('Añadir', 'Add')}
                   </button>
@@ -478,7 +478,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                 <button
                   onClick={runRaffle}
                   disabled={isRunning || numberOfWinners < 1}
-                  className="w-full p-3 rounded-xl bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-center gap-2">
                     {isRunning ? (
@@ -536,7 +536,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
           <div className="flex-shrink-0 mt-4">
             <button
               onClick={resetRaffle}
-              className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              className="w-full p-3 rounded-xl bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-colors"
             >
               {t('Realizar otro sorteo', 'Run another raffle')}
             </button>

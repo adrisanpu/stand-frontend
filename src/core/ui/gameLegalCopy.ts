@@ -3,7 +3,7 @@ export const PRIVACY_POLICY_URL = '/pages/privacy-es.html'
 
 /** Texto para registro web de participantes. */
 export const PARTICIPANT_PRIVACY_NOTICE =
-  'Acepto que Stand y el organizador traten los datos que facilito (email, usuario de Instagram o teléfono, según el formulario) para gestionar la participación en el juego. Consulta la política de privacidad.'
+  'Acepto que Stand y el organizador usen mis datos y, si subo una foto, la muestren en el juego.'
 
 /** Una línea discreta para el pie del panel de unión (QR). */
 export const GAME_DATA_NOTICE_PANEL =

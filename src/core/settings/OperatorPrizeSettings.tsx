@@ -269,42 +269,51 @@ export default function OperatorPrizeSettings({
       : t('El archivo no es una imagen PNG válida o no se puede decodificar.', 'The file is not a valid PNG image or cannot be decoded.')
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {noSlots && <p>{t('No hay premios configurables para este juego con tu plan actual.', 'No prizes can be configured for this game on your current plan.')}</p>}
       {loading && <p role="status">{t('Cargando premios...', 'Loading prizes...')}</p>}
       {loadError && <div role="alert">
         <p>{t('No se pudieron cargar los premios. Reintenta antes de guardar.', 'Prizes could not be loaded. Retry before saving.')}</p>
         <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>{t('Reintentar', 'Retry')}</button>
       </div>}
-      <fieldset disabled={loading || loadError || saving} className="space-y-5 min-w-0">
+      <fieldset disabled={loading || loadError || saving} className="space-y-3 min-w-0">
         {slotNames.filter(slot => slots[slot]).map(slot => {
           const draft = drafts[slot]
           const title = slot === 'validation' ? t('Validación / participación', 'Validation / participation')
             : slot === 'ranking' ? t('Ranking', 'Ranking') : t('Sorteo', 'Raffle')
           const id = `op-prize-${slot}`
           return (
-            <section key={slot} aria-labelledby={`${id}-title`} className="space-y-2 border-b border-white/10 pb-4">
+            <section key={slot} aria-labelledby={`${id}-title`} className="space-y-2 border-b border-white/10 pb-3">
               <h3 id={`${id}-title`} className="text-sm font-medium text-gray-300">{title}</h3>
-              <div className={`grid grid-cols-1 gap-3 items-start ${slot === 'ranking' ? 'sm:grid-cols-[minmax(0,1fr)_8rem_4rem_5rem]' : 'sm:grid-cols-[minmax(0,1fr)_8rem_5rem]'}`}>
+              <div className={`grid grid-cols-1 gap-2 items-start ${slot === 'ranking' ? 'sm:grid-cols-[minmax(0,1fr)_12rem_4rem_5rem]' : 'sm:grid-cols-[minmax(0,1fr)_12rem_5rem]'}`}>
                 <div className="min-w-0">
                   <label className={labelClass} htmlFor={`${id}-name`}>{t('Premio', 'Prize')}</label>
                   <input id={`${id}-name`} className={inputClass} value={draft.name} placeholder={t('🎁 Nombre del premio', '🎁 Prize name')}
                     onChange={event => changeDraft(slot, { name: event.target.value })} />
                 </div>
-                <div className="min-w-0 space-y-2">
+                <div className="min-w-0">
                   <label className={labelClass} htmlFor={`${id}-image`}>{t('Imagen PNG', 'PNG image')}</label>
-                  {draft.imageUrl && <img src={draft.imageUrl} alt={t('Vista previa del premio', 'Prize preview')} className="w-full h-20 object-contain" />}
-                  <input id={`${id}-image`} type="file" accept=".png,image/png"
-                    aria-label={`${title}: ${t('Imagen PNG', 'PNG image')}`}
-                    className="block w-full text-xs" aria-describedby={`${id}-image-help${imageErrors[slot] ? ` ${id}-image-error` : ''}`}
-                    aria-invalid={!!imageErrors[slot]}
-                    onChange={event => {
-                      const file = event.target.files?.[0]
-                      event.target.value = ''
-                      if (file) void chooseImage(slot, file)
-                    }} />
-                  <p id={`${id}-image-help`} className="text-xs text-gray-400">{t('PNG, máx. 5 MB. Elige otro para sustituir.', 'PNG, max. 5 MB. Choose another to replace.')}</p>
-                  {(draft.imageUrl || draft.imageKey || draft.file || validating[slot]) && <button type="button" className="text-sm underline" onClick={() => removeImage(slot)}>{t('Quitar imagen', 'Remove image')}</button>}
+                  <div className="flex h-11 items-center gap-2">
+                    {draft.imageUrl && <img src={draft.imageUrl} alt={t('Vista previa del premio', 'Prize preview')} className="h-11 w-11 shrink-0 rounded-lg object-contain" />}
+                    <div className="relative flex h-11 min-w-0 flex-1 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 px-2 text-xs hover:bg-primary/20 focus-within:ring-2 focus-within:ring-primary">
+                      <span aria-hidden="true">{draft.imageUrl || draft.imageKey || draft.file ? t('Cambiar', 'Replace') : t('Elegir PNG', 'Choose PNG')}</span>
+                      <input id={`${id}-image`} type="file" accept=".png,image/png"
+                        aria-label={`${title}: ${t('Imagen PNG', 'PNG image')}`}
+                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-describedby={`${id}-image-help${imageErrors[slot] ? ` ${id}-image-error` : ''}`}
+                        aria-invalid={!!imageErrors[slot]}
+                        onChange={event => {
+                          const file = event.target.files?.[0]
+                          event.target.value = ''
+                          if (file) void chooseImage(slot, file)
+                        }} />
+                    </div>
+                    {(draft.imageUrl || draft.imageKey || draft.file || validating[slot]) && (
+                      <button type="button" className="h-11 w-8 shrink-0 rounded-lg border border-red-500/30 text-red-400 text-lg hover:bg-red-500/20"
+                        aria-label={t('Quitar imagen', 'Remove image')} title={t('Quitar imagen', 'Remove image')}
+                        onClick={() => removeImage(slot)}><span aria-hidden="true">&times;</span></button>
+                    )}
+                  </div>
+                  <p id={`${id}-image-help`} className="mt-1 text-xs text-gray-400">{t('PNG, máx. 5 MB.', 'PNG, max. 5 MB.')}</p>
                   {validating[slot] && <p role="status">{t('Comprobando PNG...', 'Checking PNG...')}</p>}
                   {imageErrors[slot] && <p id={`${id}-image-error`} role="alert" className="text-xs text-red-300">{imageErrorText(imageErrors[slot]!)}</p>}
                 </div>
@@ -333,7 +342,7 @@ export default function OperatorPrizeSettings({
       {refreshWarning && <p role="status">{t('Los premios se guardaron en el servidor, pero no se pudo actualizar la vista. Se conserva la vista previa; vuelve a abrir para refrescar antes de guardar de nuevo.', 'Prizes were saved on the server, but the display could not be refreshed. The preview is retained; reopen to refresh before saving again.')}</p>}
       {cacheWarning && <p role="status">{t('Los premios se guardaron en el servidor, pero no se pudo actualizar la caché local. Vuelve a abrir la partida para refrescar.', 'Prizes were saved on the server, but the local cache could not be updated. Reopen the game to refresh.')}</p>}
       <button type="button" onClick={() => void handleSave()} disabled={loading || loadError || saving || refreshWarning || Object.values(validating).some(Boolean) || noSlots}
-        className="w-full p-3 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed">
+        className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 disabled:opacity-50 disabled:cursor-not-allowed">
         {saving ? t('Guardando...', 'Saving...') : t('Guardar', 'Save')}
       </button>
     </div>

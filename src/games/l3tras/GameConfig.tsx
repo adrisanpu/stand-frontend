@@ -225,7 +225,7 @@ export default function L3trasGameConfig({ gameId, settings, onChange, registerS
         <button
           onClick={() => void handleSave()}
           disabled={saveStatus === 'saving'}
-          className="w-full p-3 rounded-xl bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.3)] hover:bg-[rgba(16,185,129,0.3)] transition-colors font-medium disabled:opacity-50"
+          className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors font-medium disabled:opacity-50"
         >
           {t('Guardar configuración', 'Save configuration')}
         </button>

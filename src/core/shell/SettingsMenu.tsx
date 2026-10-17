@@ -505,7 +505,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 <button
                   onClick={handleStartCheckout}
                   disabled={isStartingCheckout}
-                  className="w-full p-3 rounded-xl bg-blue-500/30 border border-blue-500/40 hover:bg-blue-500/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+                  className="w-full p-3 rounded-xl bg-primary/30 border border-primary/40 hover:bg-primary/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
                 >
                   {isStartingCheckout ? (
                     <>
@@ -704,7 +704,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   <button
                     onClick={handleExportQuizBeforeTerminate}
                     disabled={isExportingQuiz || !gameId || !features.exportResults}
-                    className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title={!features.exportResults ? t('Disponible en el plan Event', 'Available on the Event plan') : undefined}
                   >
                     <div className="flex items-center justify-center gap-2">
@@ -733,7 +733,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   <button
                     onClick={proceedWithTermination}
                     disabled={isTerminating}
-                    className="w-full p-3 rounded-xl bg-yellow-500/20 border border-yellow-500/30 hover:bg-yellow-500/30 transition-colors disabled:opacity-50"
+                    className="w-full p-3 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-50"
                   >
                     <div className="flex items-center justify-center gap-2">
                       {isTerminating ? (
@@ -761,7 +761,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   <div className="space-y-2">
                     <button
                       onClick={handleShareQuizData}
-                      className="w-full p-3 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+                      className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors"
                     >
                       <div className="flex items-center justify-center gap-2">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -772,7 +772,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     </button>
                     <button
                       onClick={handleDownloadQuizData}
-                      className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors"
+                      className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors"
                     >
                       <div className="flex items-center justify-center gap-2">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -795,7 +795,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 setExportQuizData(null)
                 setShowExportShareOptions(false)
               }}
-              className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              className="w-full p-3 rounded-xl bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-colors"
             >
               {t('Cancelar', 'Cancel')}
             </button>

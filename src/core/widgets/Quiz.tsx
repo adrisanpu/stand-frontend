@@ -451,7 +451,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
           <div className="mb-4">
             <button
               onClick={() => setShowGenerate(v => !v)}
-              className="flex items-center justify-between w-full text-left mb-1 p-2 rounded-lg hover:bg-white/5 transition-colors"
+              className="flex items-center justify-between w-full text-left mb-1 p-2 rounded-lg hover:bg-primary/10 transition-colors"
               aria-expanded={showGenerate}
             >
               <span className="flex items-center gap-2 text-sm font-medium text-gray-300">
@@ -536,8 +536,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                 <button
                   onClick={handleGenerate}
                   disabled={generateStatus === 'loading' || !generateText.trim()}
-                  className="w-full py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: '#6366F1', color: '#fff' }}
+                  className="w-full py-2.5 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {generateStatus === 'loading' ? t('Generando...', 'Generating...') : t('Generar quiz', 'Generate quiz')}
                 </button>
@@ -608,7 +607,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
               {question.options.length < 3 && (
                 <button
                   onClick={() => addOption(questionIndex)}
-                  className="w-full p-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors text-sm text-gray-300"
+                  className="w-full p-2 rounded-lg bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-colors text-sm text-gray-300"
                 >
                   + {t('Añadir opción', 'Add option')}
                 </button>
@@ -620,7 +619,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
           {questions.length < 5 && (
             <button
               onClick={addQuestion}
-              className="w-full mb-4 p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              className="w-full mb-4 p-3 rounded-xl bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-colors"
             >
               <div className="flex items-center justify-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -637,7 +636,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
             type="button"
             onClick={submitQuiz}
             disabled={isSubmitting}
-            className="flex-1 min-w-0 p-3 rounded-xl bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 min-w-0 p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex items-center justify-center gap-2">
               {isSubmitting ? (
@@ -661,7 +660,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
             type="button"
             onClick={exportQuizData}
             disabled={isExporting || !gameId}
-            className="flex-1 min-w-0 p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 min-w-0 p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex items-center justify-center gap-2">
               {isExporting ? (
@@ -692,7 +691,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                     setShowShareOptions(false)
                     setExportData(null)
                   }}
-                  className="p-1 rounded-lg hover:bg-white/10 transition-colors"
+                  className="p-1 rounded-lg hover:bg-primary/20 transition-colors"
                   aria-label={t('Cerrar opciones de compartir', 'Close sharing options')}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -703,7 +702,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
               <div className="flex gap-2">
                 <button
                   onClick={handleShare}
-                  className="flex-1 p-2 rounded-lg bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors text-sm"
+                  className="flex-1 p-2 rounded-lg bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors text-sm"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -714,7 +713,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="flex-1 p-2 rounded-lg bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors text-sm"
+                  className="flex-1 p-2 rounded-lg bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors text-sm"
                 >
                   <div className="flex items-center justify-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

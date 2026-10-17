@@ -3,6 +3,7 @@ import QRCode from './QRCode'
 import { getJoinUrl } from '../lib/joinUrl'
 import type { JoinChannel } from '../settings/gameAccess'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
+import { HOME_BODY_TEXT } from '../ui/homeTypography'
 
 type Props = {
   gameId: string
@@ -35,7 +36,7 @@ export default function MobileGameHome({
           {logoSrc ? (
             <img src={logoSrc} alt={logoAlt} className="h-full w-full object-contain" />
           ) : (
-            <h1 className="text-3xl sm:text-5xl font-bold text-center break-words">{gameName}</h1>
+            <h1 className={`${HOME_BODY_TEXT} font-bold text-center break-words`}>{gameName}</h1>
           )}
         </div>
         <div aria-label={t('Jugadores del evento', 'Event players')} className={`shrink-0 w-full min-w-0 ${portrait ? 'order-3' : ''}`}>{players}</div>
@@ -50,7 +51,7 @@ export default function MobileGameHome({
       </div>
       <div
         aria-label={t('QR de acceso al juego', 'Game access QR code')}
-        className={`card flex flex-col items-center justify-center gap-4 min-w-0 p-4 sm:p-6 ${portrait ? 'order-2 min-h-[32dvh]' : 'h-full min-h-0 overflow-hidden'}`}
+        className={`card flex flex-col items-center justify-evenly gap-4 sm:gap-6 min-w-0 p-4 sm:p-6 ${portrait ? 'order-2 min-h-[32dvh]' : 'h-full min-h-0 overflow-hidden'}`}
       >
         <h2 lang={language} className="shrink-0 text-center text-4xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-wide text-white">
           {language === 'es'
