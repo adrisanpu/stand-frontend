@@ -62,7 +62,7 @@ describe('mobile event links', () => {
     }))
     mount(definition(id, Config))
     await waitFor(() => expect(footer()).toBeEnabled())
-    const participant = screen.getByRole('link', { name: 'Participante (móvil)' })
+    const participant = screen.getByRole('link', { name: 'Participante' })
     const validator = screen.getByRole('link', { name: 'Validador de premios' })
     expect(participant).toHaveAttribute('href', `${window.location.origin}/play/ABC123`)
     expect(validator).toHaveAttribute('href', `${window.location.origin}/redeem/ABC123`)
@@ -73,14 +73,21 @@ describe('mobile event links', () => {
     const qr = screen.getByRole('img', { name: 'QR validador de premios' })
     expect(new URL(qr.getAttribute('src')!).searchParams.get('data')).toBe(validator.getAttribute('href'))
     expect(new URL(qr.getAttribute('src')!).searchParams.get('size')).toBe('80x80')
-    expect(screen.getByRole('link', { name: 'Abrir validador de premios desde el QR' })).toContainElement(qr)
+    const participantQr = screen.getByRole('img', { name: 'QR participante' })
+    expect(new URL(participantQr.getAttribute('src')!).searchParams.get('data')).toBe(participant.getAttribute('href'))
+    expect(participant.parentElement).toContainElement(participantQr)
+    expect(validator.parentElement).toContainElement(qr)
     const section = screen.getByRole('region', { name: 'Enlaces del evento' })
-    expect(section).toHaveClass('flex', 'items-center', 'justify-between')
+    expect(section).toHaveClass('grid', 'grid-cols-3')
+    expect(section.children).toHaveLength(3)
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3)
     expect(screen.queryByText('Enlaces del evento')).not.toBeInTheDocument()
     const selectors = screen.getByRole('group', { name: 'Acceso del participante' }).parentElement!
     expect(selectors.nextElementSibling).toBe(section)
-    const rules = id === 'STACK' ? screen.getByLabelText('Velocidad inicial') : screen.getByLabelText('Instagram obligatorio')
-    expect(section.compareDocumentPosition(rules) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    if (id !== 'T1MER') {
+      const rules = id === 'STACK' ? screen.getByLabelText('Velocidad inicial') : screen.getByText('Dificultad para encontrar a tu pareja')
+      expect(section.compareDocumentPosition(rules) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    }
   })
 
   it.each(Object.keys(GAME_ACCESS_CAPABILITIES).filter((id) =>
@@ -94,6 +101,45 @@ describe('mobile event links', () => {
 })
 
 describe('unified game configuration save', () => {
+  it.each(['EMPAREJA2', 'T1MER', 'STACK'])('loads and saves all participant fields centrally for %s', async (id) => {
+    const participantFields = {
+      email: { required: false }, instagram: { required: true }, phone: { required: true },
+    }
+    vi.mocked(api.get).mockResolvedValue(gameResponse({
+      playMode: 'mobile', joinChannel: 'web', participantFields,
+    }))
+    const { onSaved } = mount(definition(id, id === 'EMPAREJA2' ? Empareja2Config : id === 'T1MER' ? T1merConfig : undefined))
+    await waitFor(() => expect(footer()).toBeEnabled())
+    expect(screen.getByLabelText('Email')).not.toBeChecked()
+    expect(screen.getByLabelText('Instagram')).toBeChecked()
+    expect(screen.getByLabelText('Teléfono')).toBeChecked()
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3)
+    fireEvent.click(footer())
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ participantFields })))
+    expect(api.put).toHaveBeenCalledWith('/v1/game', {
+      gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web', participantFields,
+    })
+    const writes = vi.mocked(api.put).mock.calls.filter(([, body]) => 'participantFields' in (body as Record<string, unknown>))
+    expect(writes).toHaveLength(1)
+  })
+
+  it('disables participant fields while loading and saving and reports persistence failures', async () => {
+    vi.mocked(api.get).mockResolvedValue(gameResponse({ playMode: 'mobile' }))
+    let resolvePut: (value: unknown) => void = () => {}
+    vi.mocked(api.put).mockImplementationOnce(() => new Promise((resolve) => { resolvePut = resolve }))
+    const { onSaved } = mount(definition('STACK'))
+    expect(screen.getByLabelText('Teléfono')).toBeDisabled()
+    await waitFor(() => expect(footer()).toBeEnabled())
+    fireEvent.click(screen.getByLabelText('Teléfono'))
+    fireEvent.click(footer())
+    expect(screen.getByLabelText('Teléfono')).toBeDisabled()
+    await act(async () => { resolvePut({ ok: false }) })
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo guardar')
+    expect(onSaved).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Teléfono')).toBeChecked()
+    expect(screen.getByLabelText('Teléfono')).toBeEnabled()
+  })
+
   it('pairs L3TRAS short fields without changing their draft or validation', async () => {
     mount(definition('L3TRAS', L3trasConfig))
     await waitFor(() => expect(footer()).toBeEnabled())
@@ -170,19 +216,24 @@ describe('unified game configuration save', () => {
     await waitFor(() => expect(screen.queryByText('Cargando configuración...')).not.toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: '∞ móviles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Web' }))
-    fireEvent.click(screen.getByLabelText('Instagram obligatorio'))
-    expect(screen.getByText('Participante (móvil)')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Instagram'))
+    fireEvent.click(screen.getByLabelText('Teléfono'))
+    fireEvent.click(screen.getByLabelText('Email'))
+    expect(screen.getByText('Participante')).toBeInTheDocument()
     expect(api.put).not.toHaveBeenCalled()
     expect(onSettingsChange).not.toHaveBeenCalled()
 
     fireEvent.click(footer())
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(api.put).toHaveBeenNthCalledWith(1, '/v1/game', { gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web' })
-    expect(api.put).toHaveBeenNthCalledWith(2, '/v1/game', {
-      gameId: 'ABC123',
-      participantFields: { email: { required: true }, instagram: { required: true } },
+    expect(api.put).toHaveBeenCalledTimes(1)
+    expect(api.put).toHaveBeenCalledWith('/v1/game', {
+      gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web',
+      participantFields: { email: { required: false }, instagram: { required: true }, phone: { required: true } },
     })
-    expect(onSaved).toHaveBeenCalledWith({ playMode: 'mobile', joinChannel: 'web', emailRequired: true, instagramRequired: true })
+    expect(onSaved).toHaveBeenCalledWith({
+      playMode: 'mobile', joinChannel: 'web',
+      participantFields: { email: { required: false }, instagram: { required: true }, phone: { required: true } },
+    })
     expect(onSettingsChange).not.toHaveBeenCalled()
   })
 
@@ -208,7 +259,7 @@ describe('unified game configuration save', () => {
 
   it('reports rule save failures explicitly and does not apply or close', async () => {
     vi.mocked(api.put).mockResolvedValueOnce({ ok: true }).mockRejectedValueOnce(new Error('Servidor caído'))
-    const { onSaved, onSettingsChange } = mount(definition('T1MER', T1merConfig))
+    const { onSaved, onSettingsChange } = mount(definition('EMPAREJA2', Empareja2Config))
     await waitFor(() => expect(footer()).toBeEnabled())
     await waitFor(() => expect(screen.queryByText('Cargando configuración...')).not.toBeInTheDocument())
     fireEvent.click(footer())

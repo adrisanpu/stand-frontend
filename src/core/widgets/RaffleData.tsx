@@ -2,6 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react
 import { createPortal } from 'react-dom'
 import { api } from '../../api/api'
 import { usePolling } from '../../hooks/usePolling'
+import { useOperatorLanguage } from '../shell/operatorLanguage'
+import type { GamePrize } from '../prizes'
+import { PrizeImage } from './PrizePresentation'
 
 interface RaffleWinner {
   username: string
@@ -41,6 +44,7 @@ interface RaffleDataProps {
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and show fewer items
   prizeLabel?: string // e.g. "🎁 Entrada gratis" — shown below title when set
+  prize?: GamePrize
   maxPrizeRaffle?: number
 }
 
@@ -58,7 +62,10 @@ const loadAutoRaffleConfig = (gameId: string): AutoRaffleConfig | null => {
   return null
 }
 
-export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false, prizeLabel, maxPrizeRaffle }: RaffleDataProps) {
+export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false, prizeLabel: legacyPrizeLabel, prize, maxPrizeRaffle: legacyMax }: RaffleDataProps) {
+  const { t } = useOperatorLanguage()
+  const prizeLabel = prize ? prize.name : legacyPrizeLabel
+  const maxPrizeRaffle = prize ? prize.limit ?? undefined : legacyMax
   const [winners, setWinners] = useState<RaffleWinner[]>([])
   const [updatingDelivered, setUpdatingDelivered] = useState(false)
   const [nextRaffleTime, setNextRaffleTime] = useState<Date | null>(null)
@@ -310,8 +317,8 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
   if (loading) {
     return (
       <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden h-full' : 'p-3 sm:p-4 lg:p-6'}`}>
-        <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>Sorteo</h2>
-        <p className="text-textSub text-xs sm:text-sm">Cargando...</p>
+        <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>{t('Sorteo', 'Raffle')}</h2>
+        <p className="text-textSub text-xs sm:text-sm">{t('Cargando...', 'Loading...')}</p>
       </div>
     )
   }
@@ -322,14 +329,15 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
       ref={winnersDropdownRef}
     >
       <h2 className={`font-bold text-textMain mb-1 sm:mb-2 flex items-center gap-2 flex-shrink-0 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>
-        Sorteo
-        {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
+        {t('Sorteo', 'Raffle')}
+        {isStale && <span className="text-[10px] font-normal text-yellow-500">● {t('sin señal', 'offline')}</span>}
       </h2>
-      {prizeLabel && (
+      {(prizeLabel || prize?.imageUrl) && (
         <div
-          className={`text-textSub flex-shrink-0 mb-1 flex items-baseline justify-between gap-2 min-w-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}
+          className={`text-textSub flex-shrink-0 mb-1 flex items-center justify-between gap-2 min-w-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}
         >
-          <span className="min-w-0 truncate">Premio: {prizeLabel}</span>
+          <PrizeImage prize={prize} compact />
+          <span className="min-w-0 truncate">{t('Premio', 'Prize')}: {prizeLabel}</span>
           {maxPrizeRaffle !== undefined && (
             <span className="flex-shrink-0 text-[10px] sm:text-xs tabular-nums">
               {winners.length}/{maxPrizeRaffle}
@@ -342,7 +350,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
         {timeUntilNext !== null && timeUntilNext > 0 && autoRaffleConfig?.enabled && (
           <div className={`rounded-lg bg-surface border border-white/10 flex-shrink-0 ${compact ? 'p-2' : 'p-2 sm:p-3'}`}>
             <div className={`flex flex-row flex-wrap items-baseline justify-start gap-x-2 gap-y-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-              <span className="text-textSub shrink-0">Próximo en:</span>
+              <span className="text-textSub shrink-0">{t('Próximo en:', 'Next in:')}</span>
               <span className={`font-semibold text-[var(--color-primary)] ${compact ? 'text-base' : 'text-base sm:text-lg'}`}>
                 {formatTime(timeUntilNext)}
               </span>
@@ -360,9 +368,9 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
               className={`w-full rounded-lg bg-surface border border-white/10 px-3 py-2 text-left text-textMain flex items-center justify-between ${compact ? 'text-xs' : 'text-sm'}`}
               aria-expanded={winnersDropdownOpen}
               aria-haspopup="listbox"
-              aria-label={`Ganadores (${winners.length}). ${winnersDropdownOpen ? 'Cerrar lista' : 'Ver lista'}`}
+              aria-label={`${t('Ganadores', 'Winners')} (${winners.length}). ${winnersDropdownOpen ? t('Cerrar lista', 'Close list') : t('Ver lista', 'View list')}`}
             >
-              <span>Ganadores ({winners.length})</span>
+              <span>{t('Ganadores', 'Winners')} ({winners.length})</span>
               <span className="text-textSub ml-2">{winnersDropdownOpen ? '▲' : '▼'}</span>
             </button>
             {winnersDropdownOpen &&
@@ -379,7 +387,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
                     boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(147,51,234,0.25)',
                   }}
                   role="listbox"
-                  aria-label="Lista de ganadores"
+                  aria-label={t('Lista de ganadores', 'Winners list')}
                 >
                   <div
                     className="overflow-y-auto overflow-x-auto overscroll-contain p-1.5 min-w-0 max-h-40"
@@ -398,7 +406,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
                           disabled={updatingDelivered || !gameType}
                           className="w-4 h-4 flex-shrink-0 rounded border-white/20 text-purple-500 focus:ring-purple-500"
                           onClick={e => e.stopPropagation()}
-                          aria-label={`Premio entregado para ${w.username}`}
+                          aria-label={`${t('Premio entregado para', 'Prize delivered for')} ${w.username}`}
                         />
                         <span className="text-textMain font-medium whitespace-nowrap shrink-0 text-xs sm:text-sm" title={w.username}>
                           {w.username}
@@ -411,7 +419,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
               )}
           </div>
         ) : (
-          <p className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>No hay ganadores aún</p>
+          <p className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>{t('No hay ganadores aún', 'No winners yet')}</p>
         )}
       </div>
     </div>

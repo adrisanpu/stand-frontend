@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../../api/api'
+import { useOperatorLanguage } from '../shell/operatorLanguage'
 
 type RaffleProps = {
   onBack: () => void
@@ -45,7 +46,19 @@ const saveAutoRaffleConfig = (gameId: string | undefined, config: AutoRaffleConf
 
 type EligibilityMode = 'all' | 'quiz' | 'validated'
 
+function translateRaffleError(message: string, t: (spanish: string, english?: string) => string): string {
+  const knownErrors: Record<string, string> = {
+    'No hay gameId disponible': t('No hay gameId disponible', 'No gameId is available'),
+    'El número de ganadores debe ser al menos 1': t('El número de ganadores debe ser al menos 1', 'The number of winners must be at least 1'),
+    'Formato de respuesta inválido': t('Formato de respuesta inválido', 'Invalid response format'),
+    'Error al ejecutar el sorteo': t('Error al ejecutar el sorteo', 'Error running the raffle'),
+    'Error al guardar las cuentas': t('Error al guardar las cuentas', 'Error saving accounts'),
+  }
+  return Object.prototype.hasOwnProperty.call(knownErrors, message) ? knownErrors[message] : message
+}
+
 export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
+  const { t } = useOperatorLanguage()
   const [numberOfWinners, setNumberOfWinners] = useState<number>(1)
   const [eligibilityMode, setEligibilityMode] = useState<EligibilityMode>('all')
   const [isRunning, setIsRunning] = useState(false)
@@ -306,18 +319,18 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
             <button
               onClick={onBack}
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
-              aria-label="Volver"
+              aria-label={t('Volver', 'Go back')}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h2 id="raffle-title" className="text-xl font-semibold">Sorteo</h2>
+            <h2 id="raffle-title" className="text-xl font-semibold">{t('Sorteo', 'Raffle')}</h2>
           </div>
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            aria-label="Cerrar"
+            aria-label={t('Cerrar', 'Close')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -328,7 +341,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
         <div className="flex-1 min-h-0 overflow-y-auto">
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-              {error}
+              {translateRaffleError(error, t)}
             </div>
           )}
 
@@ -336,7 +349,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
             <>
               {/* Sorteo automático */}
               <div className="mb-5">
-                <h3 className="mb-3 text-sm font-medium text-gray-300">Sorteo automático</h3>
+                <h3 className="mb-3 text-sm font-medium text-gray-300">{t('Sorteo automático', 'Automatic raffle')}</h3>
                 <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                   <label className="relative inline-flex cursor-pointer items-center">
                     <input
@@ -353,12 +366,12 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                         }
                       }}
                       className="peer sr-only"
-                      aria-label="Activar sorteo automático"
+                      aria-label={t('Activar sorteo automático', 'Enable automatic raffle')}
                     />
                     <div className="relative h-6 w-11 shrink-0 rounded-full bg-gray-600 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-purple-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500" />
                   </label>
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                    <span className="text-sm text-gray-300 whitespace-nowrap">Cada:</span>
+                    <span className="text-sm text-gray-300 whitespace-nowrap">{t('Cada:', 'Every:')}</span>
                     <input
                       id="auto-interval"
                       type="number"
@@ -366,10 +379,10 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                       value={autoRaffleInterval}
                       onChange={(e) => handleAutoIntervalChange(e.target.value)}
                       disabled={!autoRaffleEnabled}
-                      aria-label="Intervalo en minutos"
+                      aria-label={t('Intervalo en minutos', 'Interval in minutes')}
                       className="h-10 w-16 shrink-0 rounded-lg border border-white/10 bg-[rgba(255,255,255,0.05)] px-2 text-center text-sm font-mono focus:border-white/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-45"
                     />
-                    <span className="text-sm text-gray-400">minutos</span>
+                    <span className="text-sm text-gray-400">{t('minutos', 'minutes')}</span>
                   </div>
                 </div>
               </div>
@@ -378,7 +391,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
               <div className="mb-5 grid grid-cols-1 min-[400px]:grid-cols-[1fr_minmax(8.5rem,10rem)] gap-3 items-end">
                 <div className="min-w-0">
                   <label htmlFor="number-of-winners" className="block text-sm font-medium text-gray-300 mb-1.5">
-                    Número de ganadores
+                    {t('Número de ganadores', 'Number of winners')}
                   </label>
                   <input
                     id="number-of-winners"
@@ -391,7 +404,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                 </div>
                 <div className="min-w-0 w-full">
                   <label htmlFor="raffle-eligibility" className="block text-sm font-medium text-gray-300 mb-1.5">
-                    Aplicable a
+                    {t('Aplicable a', 'Eligible participants')}
                   </label>
                   <select
                     id="raffle-eligibility"
@@ -399,9 +412,9 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                     onChange={(e) => setEligibilityMode(e.target.value as EligibilityMode)}
                     className="w-full h-11 px-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm text-textMain focus:border-white/20 focus:outline-none"
                   >
-                    <option value="all">Todos</option>
-                    <option value="quiz">Quiz completado</option>
-                    <option value="validated">Validados</option>
+                    <option value="all">{t('Todos', 'Everyone')}</option>
+                    <option value="quiz">{t('Quiz completado', 'Quiz completed')}</option>
+                    <option value="validated">{t('Validados', 'Validated')}</option>
                   </select>
                 </div>
               </div>
@@ -409,12 +422,12 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
               {/* Requisitos para ganar */}
               <div className="mb-5">
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Requisitos para ganar
+                  {t('Requisitos para ganar', 'Requirements to win')}
                 </label>
-                <p className="text-sm font-medium text-gray-300 mb-2">Seguir a:</p>
+                <p className="text-sm font-medium text-gray-300 mb-2">{t('Seguir a:', 'Follow:')}</p>
                 <div className="flex flex-wrap gap-2 mb-2 min-h-[2rem]">
                   {requiredFollows.length === 0 && (
-                    <span className="text-xs text-gray-500">Ninguna cuenta configurada</span>
+                    <span className="text-xs text-gray-500">{t('Ninguna cuenta configurada', 'No accounts configured')}</span>
                   )}
                   {requiredFollows.map((handle) => (
                     <span
@@ -427,7 +440,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                         onClick={() => void removeRequiredFollow(handle)}
                         disabled={savingFollows}
                         className="ml-0.5 p-0.5 rounded hover:bg-white/20 text-gray-400 hover:text-white disabled:opacity-40 disabled:pointer-events-none"
-                        aria-label={`Quitar @${handle}`}
+                        aria-label={`${t('Quitar', 'Remove')} @${handle}`}
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -439,7 +452,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="usuario (sin @)"
+                    placeholder={t('usuario (sin @)', 'username (without @)')}
                     value={newHandle}
                     onChange={(e) => setNewHandle(e.target.value)}
                     onKeyDown={(e) => {
@@ -456,7 +469,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                     disabled={savingFollows || !gameId}
                     className="px-3 h-10 rounded-lg bg-[rgba(255,255,255,0.1)] border border-white/10 hover:bg-white/15 text-sm font-medium flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {savingFollows ? 'Guardando…' : 'Añadir'}
+                    {savingFollows ? t('Guardando…', 'Saving…') : t('Añadir', 'Add')}
                   </button>
                 </div>
               </div>
@@ -477,7 +490,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                       </svg>
                     )}
-                    {isRunning ? 'Ejecutando sorteo...' : 'Ejecutar sorteo'}
+                    {isRunning ? t('Ejecutando sorteo...', 'Running raffle...') : t('Ejecutar sorteo', 'Run raffle')}
                   </div>
                 </button>
               </div>
@@ -495,7 +508,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                     </svg>
                     <span className="font-medium text-green-300 text-lg">
-                      ¡Ganadores del Sorteo!
+                      {t('¡Ganadores del Sorteo!', 'Raffle winners!')}
                     </span>
                   </div>
                   <div className="space-y-2">
@@ -525,7 +538,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
               onClick={resetRaffle}
               className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
             >
-              Realizar otro sorteo
+              {t('Realizar otro sorteo', 'Run another raffle')}
             </button>
           </div>
         )}
@@ -533,4 +546,3 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
     </div>
   )
 }
-

@@ -107,6 +107,26 @@ describe('STACK participant gameplay', () => {
     expect(publicApi.startStackAttempt).not.toHaveBeenCalled()
   })
 
+  it('refreshes a ranking prize image in results without recreating the scene or consuming another attempt', async () => {
+    const scored = { ...assignment, score: 7, rank: 2 }
+    const { rerender } = render(
+      <StackParticipantPlay gameId="GAME1234" playerToken="token" assignment={scored}
+        config={DEFAULT_STACK_CONFIG} startSupported finishSupported
+        prizeCatalog={{ ranking: { name: 'Consola', limit: null, topX: 3, imageUrl: '/first.png' } }} />
+    )
+    await ready()
+    expect(screen.getByRole('img', { name: 'Consola' })).toHaveAttribute('src', '/first.png')
+    rerender(
+      <StackParticipantPlay gameId="GAME1234" playerToken="token" assignment={scored}
+        config={DEFAULT_STACK_CONFIG} startSupported finishSupported
+        prizeCatalog={{ ranking: { name: 'Consola', limit: null, topX: 3, imageUrl: '/fresh.png' } }} />
+    )
+    expect(screen.getByRole('img', { name: 'Consola' })).toHaveAttribute('src', '/fresh.png')
+    expect(createScene).toHaveBeenCalledTimes(1)
+    expect(controller.start).not.toHaveBeenCalled()
+    expect(publicApi.startStackAttempt).not.toHaveBeenCalled()
+  })
+
   it('does not start against a phase-two backend without finish support', async () => {
     render(<StackParticipantPlay gameId="GAME1234" playerToken="token" assignment={assignment} config={DEFAULT_STACK_CONFIG} startSupported />)
     await ready()

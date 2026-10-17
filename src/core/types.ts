@@ -1,5 +1,6 @@
 import React from 'react'
 import type { GameAccess, PlayMode } from './settings/gameAccess'
+import type { PrizeCatalog } from './prizes'
 
 export interface GameScreenProps {
   gameId: string
@@ -15,6 +16,7 @@ export interface GameScreenProps {
   topX?: number
   /** Optional: label for the prize (e.g. "Merchandising"); shown when player ranks in top X */
   prizeLabel?: string
+  prizeCatalog?: PrizeCatalog
   /** When the in-game counter/timer is running, call with true to pause API polling (score, ranking, game) and avoid lag */
   onCounterActiveChange?: (active: boolean) => void
   /** Optional: report current avatar state so shell widgets can render synced animations */

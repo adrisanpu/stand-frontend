@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { GAME_DATA_NOTICE_MODAL, PRIVACY_POLICY_URL } from '../ui/gameLegalCopy'
+import { useOperatorLanguage } from '../shell/operatorLanguage'
 
 type GameInstructionsModalProps = {
   open: boolean
@@ -8,6 +9,7 @@ type GameInstructionsModalProps = {
 }
 
 export default function GameInstructionsModal({ open, onClose, children }: GameInstructionsModalProps) {
+  const { language, t } = useOperatorLanguage()
   useEffect(() => {
     if (!open) return
     const onKeyDown = (e: KeyboardEvent) => {
@@ -30,13 +32,13 @@ export default function GameInstructionsModal({ open, onClose, children }: GameI
       <div className="relative card w-full max-w-md p-5 sm:p-6 max-h-[90vh] flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <h2 id="game-instructions-title" className="text-lg font-semibold text-textMain">
-            Instrucciones
+            {t('Instrucciones', 'Instructions')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            aria-label="Cerrar"
+            aria-label={t('Cerrar', 'Close')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -49,14 +51,19 @@ export default function GameInstructionsModal({ open, onClose, children }: GameI
         </div>
 
         <footer className="flex-shrink-0 mt-4 pt-4 border-t border-white/10 space-y-2">
-          <p className="text-[11px] sm:text-xs leading-snug text-gray-400">{GAME_DATA_NOTICE_MODAL}</p>
+          <p className="text-[11px] sm:text-xs leading-snug text-gray-400">
+            {t(
+              GAME_DATA_NOTICE_MODAL,
+              'By scanning the QR code and participating, you agree that Stand (the service provider) and the event organizer may process your personal data—including your Instagram username, participation data, and quiz answers, if any—to manage the game experience, scores, and raffles. You may exercise your rights of access, rectification, and erasure as described in the privacy policy.'
+            )}
+          </p>
           <a
-            href={PRIVACY_POLICY_URL}
+            href={language === 'en' ? '/pages/privacy.html' : PRIVACY_POLICY_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block text-[11px] sm:text-xs text-gray-400 underline underline-offset-2 hover:text-gray-300"
           >
-            Política de privacidad
+            {t('Política de privacidad', 'Privacy policy')}
           </a>
         </footer>
       </div>

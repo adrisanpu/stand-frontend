@@ -1,10 +1,11 @@
 import type { StackConfig, StackPlacement } from '../games/stack/stackLogic'
 import type { ParticipantAppearance } from '../core/theme/appearance'
+import type { PrizeCatalog } from '../core/prizes'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 export class PublicApiError extends Error {
-  constructor(message: string, public readonly status: number, public readonly code?: string) {
+  constructor(message: string, public readonly status: number, public readonly code?: string, public readonly retryAfter?: number) {
     super(message)
     this.name = 'PublicApiError'
   }
@@ -25,7 +26,9 @@ async function publicRequest<T>(endpoint: string, options: RequestInit = {}): Pr
       || (data as { error?: string }).error
       || (data as { reason?: string }).reason
       || `HTTP ${response.status}`
-    throw new PublicApiError(msg, response.status, (data as { error?: string }).error)
+    const retryAfter = Number(response.headers?.get('Retry-After') ?? (data as { retryAfter?: number }).retryAfter)
+    throw new PublicApiError(msg, response.status, (data as { code?: string; error?: string }).code
+      ?? (data as { error?: string }).error, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined)
   }
   return data as T
 }
@@ -33,6 +36,7 @@ async function publicRequest<T>(endpoint: string, options: RequestInit = {}): Pr
 export type ParticipantFieldsConfig = {
   email?: { required?: boolean }
   instagram?: { required?: boolean }
+  phone?: { required?: boolean }
 }
 
 export type PublicRankingEntry = {
@@ -55,6 +59,7 @@ export type PublicGameResponse = {
   playMode?: 'master' | 'mobile'
   joinChannel?: string
   participantFields?: ParticipantFieldsConfig
+  prizeCatalog?: PrizeCatalog
   playerCount: number
   validatedCount: number
   recentPairs: Array<{ label: string; characterNames: string[]; validatedAt: string }>
@@ -143,6 +148,27 @@ export type JoinResponse = {
   alreadyJoined?: boolean
 }
 
+export type EmailRegistration = {
+  gameId: string
+  email?: string
+  instagram?: string
+  phone?: string
+  consent: boolean
+  language?: 'es' | 'en'
+}
+
+export type EmailChallengeResponse = {
+  ok: true
+  challengeId: string
+  emailMasked: string
+  expiresAt: string
+  resendAvailableAt: string
+}
+
+export type JoinRequest =
+  | (Omit<EmailRegistration, 'language'> & { challengeId?: never; code?: never })
+  | { gameId: string; challengeId: string; code: string; consent?: boolean; email?: never; instagram?: never; phone?: never }
+
 export type ValidateResponse = {
   valid: boolean
   gameId: string
@@ -170,6 +196,7 @@ export type PlayerResponse = {
   playerToken: string
   assignment: PlayerAssignment | null
   prizes: PlayerPrize[]
+  prizeCatalog?: PrizeCatalog
 }
 
 export type RedeemResponse = {
@@ -197,7 +224,10 @@ export const publicApi = {
   getGame: (gameId: string) =>
     publicRequest<PublicGameResponse>(`/v1/public/game?gameId=${encodeURIComponent(gameId)}`),
 
-  join: (body: { gameId: string; email: string; instagram?: string; consent: boolean }) =>
+  requestEmailCode: (body: EmailRegistration) =>
+    publicRequest<EmailChallengeResponse>('/v1/public/email/request', { method: 'POST', body: JSON.stringify(body) }),
+
+  join: (body: JoinRequest) =>
     publicRequest<JoinResponse>('/v1/public/join', { method: 'POST', body: JSON.stringify(body) }),
 
   exchangeAccess: (body: { gameId: string; accessToken: string }) =>

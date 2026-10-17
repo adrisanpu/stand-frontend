@@ -6,6 +6,8 @@ import BackButton from '../../core/widgets/BackButton'
 import type { Rulet4Settings, Rulet4PanelConfig } from './GameConfig'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import { localizeOperatorMessage } from '../operatorText'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
@@ -20,6 +22,7 @@ type GameState =
   | 'finished'   // optional; auto-reset logic
 
 export default function Rulet4GameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+  const { t } = useOperatorLanguage()
   const [gameState, setGameState] = useState<GameState>('idle')
   const [playerCode, setPlayerCode] = useState('')
   const [playerId, setPlayerId] = useState<string | null>(null)
@@ -63,7 +66,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
 
   const handleValidate = async () => {
     if (!playerCode.trim() || !gameId) {
-      setError('Por favor ingresa tu código de jugador')
+      setError(t('Por favor ingresa tu código de jugador', 'Please enter your player code'))
       return
     }
 
@@ -93,10 +96,10 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
         hasSpunRef.current = false
         setGameState('ready')
       } else {
-        throw new Error(data.message || 'Código inválido')
+        throw new Error(data.message || t('Código inválido', 'Invalid code'))
       }
     } catch (err: any) {
-      setError(err.message || 'Error al validar el código')
+      setError(err.message || t('Error al validar el código', 'Error validating the code'))
       setGameState('idle')
     } finally {
       setIsValidating(false)
@@ -105,7 +108,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
 
   const handleSpin = () => {
     if (segments.length === 0) {
-      setError('La ruleta no tiene paneles configurados')
+      setError(t('La ruleta no tiene paneles configurados', 'The roulette has no panels configured'))
       return
     }
 
@@ -236,7 +239,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     <div className="flex w-20 shrink-0 flex-col items-center justify-center sm:w-24">
       <img
         src={profilePicUrl}
-        alt={username ? `Foto de perfil de ${username}` : 'Foto de perfil'}
+        alt={username ? t(`Foto de perfil de ${username}`, `Profile picture of ${username}`) : t('Foto de perfil', 'Profile picture')}
         className="h-20 w-20 rounded-full border-2 border-[rgba(250,204,21,0.4)] object-cover shadow-md sm:h-24 sm:w-24"
       />
     </div>
@@ -277,9 +280,9 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
 
     const innerMsg = (
       <div className={hasProfilePic ? 'min-w-0 flex-1 text-left' : 'text-center'}>
-        <div className={titleClass}>¡Bienvenido{username ? `, ${username}` : ''}!</div>
+        <div className={titleClass}>{username ? `${t('¡Bienvenido', 'Welcome')}, ${username}!` : t('¡Bienvenido!', 'Welcome!')}</div>
         <div className={subClass}>
-          {spinning ? 'Girando...' : 'Estás listo para girar la ruleta'}
+          {spinning ? t('Girando...', 'Spinning...') : t('Estás listo para girar la ruleta', 'You are ready to spin the wheel')}
         </div>
       </div>
     )
@@ -323,7 +326,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
 
     const inner = (
       <div className={hasProfilePic ? 'min-w-0 flex-1 text-left' : 'text-center'}>
-        <div className={titleClass}>{username ? `${username}, ` : ''}¡Has ganado!</div>
+        <div className={titleClass}>{username ? `${username}, ` : ''}{t('¡Has ganado!', 'You won!')}</div>
         <div className={prizeClass}>{winningPanel.label}</div>
       </div>
     )
@@ -349,16 +352,16 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
           <LandscapeInfoInstruction>
-            Escanea el QR y pulsa JUGAR.
+            {t('Escanea el QR y pulsa JUGAR.', 'Scan the QR code and tap PLAY.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Recibe tu código por DM.
+            {t('Recibe tu código por DM.', 'Get your code by DM.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Ingresa y valida tu código.
+            {t('Ingresa y valida tu código.', 'Enter and validate your code.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Tienes una tirada de la ruleta.
+            {t('Tienes una tirada de la ruleta.', 'You get one spin of the wheel.')}
           </LandscapeInfoInstruction>
         </GameLandscapeLeftColumn>
         <div className={GAME_LANDSCAPE_CENTER_CARD}>
@@ -372,14 +375,14 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
                     <div className="flex gap-3">
                       <input
                         id="player-code-landscape"
-                        aria-label={CODE_INPUT_PLACEHOLDER}
+                        aria-label={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
                         type="number"
                         inputMode="numeric"
                         min={1000}
                         max={9999}
                         value={playerCode}
                         onChange={(e) => setPlayerCode(String(e.target.value))}
-                        placeholder={CODE_INPUT_PLACEHOLDER}
+                        placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
                         className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
                         onKeyPress={(e) => { if (e.key === 'Enter') handleValidate() }}
                       />
@@ -398,11 +401,11 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         )}
-                        {isValidating ? 'Validando…' : VALIDATE_LABEL}
+                        {isValidating ? t('Validando…', 'Validating…') : t(VALIDATE_LABEL, 'Validate')}
                       </button>
                     </div>
                   </div>
-                  {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
+                  {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{localizeOperatorMessage(error, t)}</div>}
                 </>
               )}
             {gameState === 'validating' &&
@@ -413,7 +416,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
                     <svg className="w-8 h-8 animate-spin text-[#FACC15]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    <p className="text-2xl font-semibold text-[#FACC15]">Validando código...</p>
+                    <p className="text-2xl font-semibold text-[#FACC15]">{t('Validando código...', 'Validating code...')}</p>
                   </div>
                 </div>
               )}
@@ -468,9 +471,9 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
               </div>
               <div className="text-center flex justify-center items-center min-h-[76px]">
                 {gameState === 'result' ? (
-                  <BackButton onClick={handleReset} aria-label="Volver a introducir código" className="scale-125" />
+                  <BackButton onClick={handleReset} aria-label={t('Volver a introducir código', 'Back to enter code')} className="scale-125" />
                 ) : (
-                  <button type="button" onClick={handleSpin} disabled={gameState !== 'ready' || hasSpunRef.current} className="px-10 py-5 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-2xl">GIRAR RULETA</button>
+                  <button type="button" onClick={handleSpin} disabled={gameState !== 'ready' || hasSpunRef.current} className="px-10 py-5 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-2xl">{t('GIRAR RULETA', 'SPIN THE WHEEL')}</button>
                 )}
               </div>
             </div>
@@ -489,7 +492,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
       {!showJoinBlock && gameState !== 'result' && (
         <div className="flex justify-end mb-2 flex-shrink-0">
-          <BackButton onClick={handleReset} aria-label="Volver" />
+          <BackButton onClick={handleReset} aria-label={t('Volver', 'Back')} />
         </div>
       )}
       <div className="flex flex-col flex-1 min-h-0 space-y-4 overflow-hidden">
@@ -501,14 +504,14 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
                 <div className="flex gap-3">
                   <input
                     id="player-code"
-                    aria-label={CODE_INPUT_PLACEHOLDER}
+                    aria-label={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
                     type="number"
                     inputMode="numeric"
                     min={1000}
                     max={9999}
                     value={playerCode}
                     onChange={(e) => setPlayerCode(String(e.target.value))}
-                    placeholder={CODE_INPUT_PLACEHOLDER}
+                    placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
                     className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
@@ -531,14 +534,14 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     )}
-                    {isValidating ? 'Validando…' : VALIDATE_LABEL}
+                    {isValidating ? t('Validando…', 'Validating…') : t(VALIDATE_LABEL, 'Validate')}
                   </button>
                 </div>
               </div>
 
               {error && (
                 <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">
-                  {error}
+                  {error && localizeOperatorMessage(error, t)}
                 </div>
               )}
             </>
@@ -553,7 +556,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
                 <svg className="w-8 h-8 animate-spin text-[#FACC15]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <p className="text-2xl font-semibold text-[#FACC15]">Validando código...</p>
+                <p className="text-2xl font-semibold text-[#FACC15]">{t('Validando código...', 'Validating code...')}</p>
               </div>
             </div>
           )}
@@ -659,7 +662,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
           {/* Spin / volver: mismo hueco bajo la ruleta */}
           <div className="text-center flex justify-center items-center min-h-[76px]">
             {gameState === 'result' ? (
-              <BackButton onClick={handleReset} aria-label="Volver a introducir código" className="scale-125" />
+              <BackButton onClick={handleReset} aria-label={t('Volver a introducir código', 'Back to enter code')} className="scale-125" />
             ) : (
               <button
                 type="button"
@@ -667,7 +670,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
                 disabled={gameState !== 'ready' || hasSpunRef.current}
                 className="px-10 py-5 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-2xl"
               >
-                GIRAR RULETA
+                {t('GIRAR RULETA', 'SPIN THE WHEEL')}
               </button>
             )}
           </div>
@@ -676,4 +679,3 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     </div>
   )
 }
-

@@ -3,10 +3,12 @@ import { publicApi, type PlayerPrize } from '../../api/publicApi'
 import { loadPlayerToken } from './playerSession'
 import QRCode from '../widgets/QRCode'
 import { useParticipantLanguage } from './participantLanguage'
+import type { PrizeCatalog } from '../prizes'
+import PrizePresentation from '../widgets/PrizePresentation'
 
 type Props = {
   gameId: string
-  onPlayAgain?: () => void
+  prizeCatalog?: PrizeCatalog
 }
 
 const PRIZE_LABEL: Record<string, string> = {
@@ -28,10 +30,13 @@ function mergePrizes(prev: PlayerPrize[], next: PlayerPrize[]): PlayerPrize[] {
   })
 }
 
-export default function ResultView({ gameId, onPlayAgain }: Props) {
+export default function ResultView({ gameId, prizeCatalog }: Props) {
   const { t } = useParticipantLanguage()
   const [prizes, setPrizes] = useState<PlayerPrize[]>([])
   const [loading, setLoading] = useState(true)
+  const [catalogResponse, setCatalogResponse] = useState<{ gameId: string; catalog: PrizeCatalog } | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const catalog = catalogResponse?.gameId === gameId ? catalogResponse.catalog : prizeCatalog
 
   useEffect(() => {
     const token = loadPlayerToken(gameId)
@@ -45,10 +50,15 @@ export default function ResultView({ gameId, onPlayAgain }: Props) {
         const res = await publicApi.getPlayer(token, gameId)
         if (!cancelled) {
           setPrizes((prev) => mergePrizes(prev, res.prizes || []))
+          if (res.prizeCatalog !== undefined) setCatalogResponse({ gameId, catalog: res.prizeCatalog })
+          setLoadError(false)
           setLoading(false)
         }
       } catch {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+          setLoadError(true)
+        }
       }
     }
     void load()
@@ -73,25 +83,22 @@ export default function ResultView({ gameId, onPlayAgain }: Props) {
       </p>
 
       {loading && <p className="text-sm text-textSub">{t('Cargando premios...')}</p>}
+      {loadError && <p role="alert" className="text-sm text-red-300">{t('No se pudieron actualizar los premios.')}</p>}
 
       {pending.map((p) => (
         <div key={p.kind} className="space-y-2">
           <p className="text-sm font-medium">{t(PRIZE_LABEL[p.kind] || p.kind)}</p>
+          <PrizePresentation prize={catalog?.[p.kind]} />
           <QRCode data={p.token} size={220} alt={`QR ${t(PRIZE_LABEL[p.kind] || p.kind)}`} className="!bg-white !p-3" />
         </div>
       ))}
 
       {delivered.length > 0 && pending.length === 0 && (
-        <p className="text-sm text-green-300/90">{t('Premio(s) ya recogido(s). ¡Disfrutad!')}</p>
+        <div className="space-y-3">
+          {delivered.map((prize) => <PrizePresentation key={prize.kind} prize={catalog?.[prize.kind]} />)}
+          <p className="text-sm text-green-300/90">{t('Premio(s) ya recogido(s). ¡Disfrutad!')}</p>
+        </div>
       )}
-
-      {onPlayAgain && <button
-        type="button"
-        onClick={onPlayAgain}
-        className="w-full rounded-xl py-3 font-semibold text-primary bg-[rgba(var(--color-primary-rgb),0.2)] border border-[rgba(var(--color-primary-rgb),0.35)]"
-      >
-        {t('Validar otra pareja')}
-      </button>}
     </div>
   )
 }

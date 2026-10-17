@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/api'
 import type { GameConfigProps } from '../../core/types'
 import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import { localizeOperatorMessage } from '../operatorText'
 import { DEFAULT_STACK_CONFIG, isStackConfig, STACK_SKINS, type StackConfig, type StackSkin } from './stackLogic'
 
 const FIELDS = [
@@ -18,6 +20,7 @@ const SKIN_LABELS: Record<StackSkin, string> = {
 }
 
 export default function StackGameConfig({ gameId, onChange, registerSave }: GameConfigProps) {
+  const { t } = useOperatorLanguage()
   const [config, setConfig] = useState<StackConfig>(DEFAULT_STACK_CONFIG)
   const [status, setStatus] = useState<'loading' | 'ready' | 'saving' | 'saved' | 'error'>('loading')
   const [message, setMessage] = useState('')
@@ -45,15 +48,15 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
   }, [gameId])
 
   const validate = () => {
-    if (status === 'loading') return 'La configuración de STACK aún se está cargando.'
-    if (status === 'error') return message || 'No se pudo cargar la configuración.'
-    if (!gameId || !isStackConfig(config)) return 'Revisa las velocidades y la tolerancia antes de guardar.'
+    if (status === 'loading') return t('La configuración de STACK aún se está cargando.', 'The STACK configuration is still loading.')
+    if (status === 'error') return message || t('No se pudo cargar la configuración.', 'Could not load the configuration.')
+    if (!gameId || !isStackConfig(config)) return t('Revisa las velocidades y la tolerancia antes de guardar.', 'Check the speeds and tolerance before saving.')
     return null
   }
 
   const persist = async () => {
     const invalid = validate()
-    if (invalid || !gameId) throw new Error(invalid ?? 'Revisa las velocidades y la tolerancia antes de guardar.')
+    if (invalid || !gameId) throw new Error(invalid ?? t('Revisa las velocidades y la tolerancia antes de guardar.', 'Check the speeds and tolerance before saving.'))
     const settings = {
       initialSpeed: config.initialSpeed,
       speedIncrement: config.speedIncrement,
@@ -69,7 +72,7 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
 
   const save = async () => {
     if (!gameId || !isStackConfig(config)) {
-      setMessage('Revisa las velocidades y la tolerancia antes de guardar.')
+      setMessage(t('Revisa las velocidades y la tolerancia antes de guardar.', 'Check the speeds and tolerance before saving.'))
       return
     }
     setStatus('saving')
@@ -77,18 +80,18 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
     try {
       await persist()
       setStatus('saved')
-      setMessage('Configuración guardada. Se aplicará a los nuevos intentos.')
+      setMessage(t('Configuración guardada. Se aplicará a los nuevos intentos.', 'Configuration saved. It will apply to new attempts.'))
     } catch (cause) {
       setStatus('ready')
-      setMessage(saveErrorMessage(cause, 'No se pudo guardar la configuración.'))
+      setMessage(saveErrorMessage(cause, t('No se pudo guardar la configuración.', 'Could not save the configuration.')))
     }
   }
 
   return (
     <div className="space-y-4">
-      {status === 'loading' && <p role="status">Cargando configuración...</p>}
+      {status === 'loading' && <p role="status">{t('Cargando configuración...', 'Loading configuration...')}</p>}
       <label className="flex flex-col gap-1">
-        <span className="text-sm">Aspecto de las piezas</span>
+        <span className="text-sm">{t('Aspecto de las piezas', 'Piece appearance')}</span>
         <select
           value={config.skin ?? 'blocks'}
           disabled={status === 'loading' || status === 'error' || status === 'saving'}
@@ -98,13 +101,13 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
           }}
           className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-3"
         >
-          {STACK_SKINS.map((skin) => <option key={skin} value={skin}>{SKIN_LABELS[skin]}</option>)}
+          {STACK_SKINS.map((skin) => <option key={skin} value={skin}>{t(SKIN_LABELS[skin], skin === 'blocks' ? 'Color blocks' : skin === 'pizza' ? 'Pizza' : 'Pistachio baklava')}</option>)}
         </select>
       </label>
       <div className="grid grid-cols-2 gap-4">
         {FIELDS.map(({ key, label, min, step }) => (
           <label key={key} className="min-w-0 flex flex-col gap-1">
-            <span className="text-sm">{label}</span>
+            <span className="text-sm">{t(label, key === 'initialSpeed' ? 'Initial speed' : key === 'speedIncrement' ? 'Increment per block' : key === 'maxSpeed' ? 'Maximum speed' : 'Perfect tolerance')}</span>
             <input
               type="number"
               min={min}
@@ -120,7 +123,7 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
           </label>
         ))}
       </div>
-      {message && <p role={status === 'saved' ? 'status' : 'alert'} className="text-sm">{message}</p>}
+      {message && <p role={status === 'saved' ? 'status' : 'alert'} className="text-sm">{localizeOperatorMessage(message, t)}</p>}
       {!embedded && (
         <button
           type="button"
@@ -128,7 +131,7 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
           disabled={!gameId || status === 'loading' || status === 'error' || status === 'saving' || !isStackConfig(config)}
           className="w-full rounded-xl py-3 font-semibold bg-primary/20 border border-primary/30 disabled:opacity-50"
         >
-          {status === 'saving' ? 'Guardando...' : 'Guardar configuración'}
+          {status === 'saving' ? t('Guardando...', 'Saving...') : t('Guardar configuración', 'Save configuration')}
         </button>
       )}
     </div>

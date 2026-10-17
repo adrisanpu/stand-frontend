@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../../api/api'
+import { useOperatorLanguage } from '../shell/operatorLanguage'
 
 type QuizProps = {
   onBack: () => void
@@ -40,7 +41,36 @@ type QuizDataResponse = {
   }>
 }
 
+function translateQuizMessage(message: string, t: (spanish: string, english?: string) => string): string {
+  const knownMessages: Record<string, string> = {
+    'Máximo 5 preguntas permitidas': t('Máximo 5 preguntas permitidas', 'A maximum of 5 questions is allowed'),
+    'Debe haber al menos una pregunta': t('Debe haber al menos una pregunta', 'There must be at least one question'),
+    'Máximo 3 opciones por pregunta': t('Máximo 3 opciones por pregunta', 'A maximum of 3 options is allowed per question'),
+    'Debe haber al menos una opción por pregunta': t('Debe haber al menos una opción por pregunta', 'There must be at least one option per question'),
+    'No hay gameId disponible': t('No hay gameId disponible', 'No gameId is available'),
+    'Error al crear el quiz': t('Error al crear el quiz', 'Error creating the quiz'),
+    'Describe el tema del quiz antes de generar.': t('Describe el tema del quiz antes de generar.', 'Describe the quiz topic before generating.'),
+    'Generando quiz con IA...': t('Generando quiz con IA...', 'Generating quiz with AI...'),
+    'No se generaron preguntas.': t('No se generaron preguntas.', 'No questions were generated.'),
+    'Error al generar el quiz.': t('Error al generar el quiz.', 'Error generating the quiz.'),
+    'Error al exportar los datos del quiz': t('Error al exportar los datos del quiz', 'Error exporting quiz data'),
+    'No se pudo copiar al portapapeles. Por favor, copia manualmente.': t('No se pudo copiar al portapapeles. Por favor, copia manualmente.', 'Could not copy to the clipboard. Please copy it manually.'),
+  }
+  if (Object.prototype.hasOwnProperty.call(knownMessages, message)) return knownMessages[message]
+
+  let match = message.match(/^La pregunta (\d+) no puede estar vacía$/)
+  if (match) return t(`La pregunta ${match[1]} no puede estar vacía`, `Question ${match[1]} cannot be empty`)
+  match = message.match(/^La pregunta (\d+) debe tener al menos una opción$/)
+  if (match) return t(`La pregunta ${match[1]} debe tener al menos una opción`, `Question ${match[1]} must have at least one option`)
+  match = message.match(/^La opción (\d+) de la pregunta (\d+) no puede estar vacía$/)
+  if (match) return t(`La opción ${match[1]} de la pregunta ${match[2]} no puede estar vacía`, `Option ${match[1]} in question ${match[2]} cannot be empty`)
+  match = message.match(/^Listo\. Se generaron (\d+) preguntas\.$/)
+  if (match) return t(`Listo. Se generaron ${match[1]} preguntas.`, `Done. Generated ${match[1]} questions.`)
+  return message
+}
+
 export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
+  const { t } = useOperatorLanguage()
   const [questions, setQuestions] = useState<Question[]>([
     {
       id: 'q1',
@@ -334,7 +364,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Datos del Quiz - ${exportData.gameId}`,
+          title: `${t('Datos del Quiz', 'Quiz data')} - ${exportData.gameId}`,
           text: jsonString
         })
         return
@@ -384,7 +414,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
             <button
               onClick={onBack}
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
-              aria-label="Volver"
+              aria-label={t('Volver', 'Go back')}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -395,7 +425,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            aria-label="Cerrar"
+            aria-label={t('Cerrar', 'Close')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -407,13 +437,13 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
 
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-              {error}
+              {translateQuizMessage(error, t)}
             </div>
           )}
 
           {success && (
             <div className="mb-4 p-3 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 text-sm">
-              ¡Quiz creado exitosamente!
+              {t('¡Quiz creado exitosamente!', 'Quiz created successfully!')}
             </div>
           )}
 
@@ -428,7 +458,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                 <svg className="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                   <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
                 </svg>
-                IA
+                {t('IA', 'AI')}
               </span>
               <svg
                 className={`w-4 h-4 text-gray-400 transition-transform ${showGenerate ? 'rotate-180' : ''}`}
@@ -442,7 +472,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
               <div className="mt-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-3">
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="min-w-[100px]">
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Nº de preguntas</label>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">{t('Nº de preguntas', 'Number of questions')}</label>
                     <select
                       value={numQuestions}
                       onChange={(e) => setNumQuestions(Number(e.target.value))}
@@ -455,7 +485,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                     </select>
                   </div>
                   <div className="min-w-[100px]">
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Nº de respuestas</label>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">{t('Nº de respuestas', 'Number of answers')}</label>
                     <select
                       value={numOptions}
                       onChange={(e) => setNumOptions(Number(e.target.value))}
@@ -475,14 +505,14 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                       disabled={generateStatus === 'loading'}
                       className="rounded border-white/20 bg-[rgba(255,255,255,0.05)] text-indigo-500 focus:ring-white/20 disabled:opacity-50"
                     />
-                    <span className="text-sm text-gray-300 whitespace-nowrap">Usar emoticonos</span>
+                    <span className="text-sm text-gray-300 whitespace-nowrap">{t('Usar emoticonos', 'Use emojis')}</span>
                   </label>
                 </div>
 
                 <textarea
                   value={generateText}
                   onChange={(e) => setGenerateText(e.target.value)}
-                  placeholder="Describe el tema del quiz..."
+                  placeholder={t('Describe el tema del quiz...', 'Describe the quiz topic...')}
                   rows={3}
                   disabled={generateStatus === 'loading'}
                   className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none resize-none disabled:opacity-50"
@@ -499,7 +529,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                     {generateStatus === 'loading' && (
                       <span className="inline-block w-3 h-3 rounded-full bg-current animate-pulse mr-2 align-middle" />
                     )}
-                    {generateMessage}
+                    {translateQuizMessage(generateMessage, t)}
                   </div>
                 )}
 
@@ -509,7 +539,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                   className="w-full py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ background: '#6366F1', color: '#fff' }}
                 >
-                  {generateStatus === 'loading' ? 'Generando...' : 'Generar quiz'}
+                  {generateStatus === 'loading' ? t('Generando...', 'Generating...') : t('Generar quiz', 'Generate quiz')}
                 </button>
               </div>
             )}
@@ -524,13 +554,13 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Pregunta {questionIndex + 1}
+                    {t('Pregunta', 'Question')} {questionIndex + 1}
                   </label>
                   <input
                     type="text"
                     value={question.text}
                     onChange={(e) => updateQuestionText(questionIndex, e.target.value)}
-                    placeholder="Escribe la pregunta aquí..."
+                    placeholder={t('Escribe la pregunta aquí...', 'Write the question here...')}
                     className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 focus:border-white/20 focus:outline-none"
                   />
                 </div>
@@ -538,7 +568,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                   <button
                     onClick={() => removeQuestion(questionIndex)}
                     className="ml-3 p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
-                    aria-label="Eliminar pregunta"
+                    aria-label={t('Eliminar pregunta', 'Delete question')}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -549,7 +579,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
 
               <div className="space-y-2 mb-3">
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Opciones de respuesta
+                  {t('Opciones de respuesta', 'Answer options')}
                 </label>
                 {question.options.map((option, optionIndex) => (
                   <div key={optionIndex} className="flex items-center gap-2">
@@ -557,14 +587,14 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                       type="text"
                       value={option.title}
                       onChange={(e) => updateOptionTitle(questionIndex, optionIndex, e.target.value)}
-                      placeholder={`Opción ${optionIndex + 1}...`}
+                      placeholder={`${t('Opción', 'Option')} ${optionIndex + 1}...`}
                       className="flex-1 h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none"
                     />
                     {question.options.length > 1 && (
                       <button
                         onClick={() => removeOption(questionIndex, optionIndex)}
                         className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
-                        aria-label="Eliminar opción"
+                        aria-label={t('Eliminar opción', 'Delete option')}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -580,7 +610,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                   onClick={() => addOption(questionIndex)}
                   className="w-full p-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors text-sm text-gray-300"
                 >
-                  + Añadir opción
+                  + {t('Añadir opción', 'Add option')}
                 </button>
               )}
             </div>
@@ -596,7 +626,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                Añadir pregunta
+                {t('Añadir pregunta', 'Add question')}
               </div>
             </button>
           )}
@@ -615,14 +645,14 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                   <svg className="w-5 h-5 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <span className="truncate">Creando quiz...</span>
+                  <span className="truncate">{t('Creando quiz...', 'Creating quiz...')}</span>
                 </>
               ) : (
                 <>
                   <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="truncate">Crear quiz</span>
+                  <span className="truncate">{t('Crear quiz', 'Create quiz')}</span>
                 </>
               )}
             </div>
@@ -639,14 +669,14 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                   <svg className="w-5 h-5 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <span className="truncate">Exportando...</span>
+                  <span className="truncate">{t('Exportando...', 'Exporting...')}</span>
                 </>
               ) : (
                 <>
                   <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 8m4-4v12" />
                   </svg>
-                  <span className="truncate">Exportar</span>
+                  <span className="truncate">{t('Exportar', 'Export')}</span>
                 </>
               )}
             </div>
@@ -656,14 +686,14 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
         {showShareOptions && exportData && (
             <div className="flex-shrink-0 mt-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-gray-300">Opciones de compartir</h3>
+                <h3 className="text-sm font-medium text-gray-300">{t('Opciones de compartir', 'Sharing options')}</h3>
                 <button
                   onClick={() => {
                     setShowShareOptions(false)
                     setExportData(null)
                   }}
                   className="p-1 rounded-lg hover:bg-white/10 transition-colors"
-                  aria-label="Cerrar opciones de compartir"
+                  aria-label={t('Cerrar opciones de compartir', 'Close sharing options')}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -679,7 +709,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                     </svg>
-                    Compartir
+                    {t('Compartir', 'Share')}
                   </div>
                 </button>
                 <button
@@ -690,7 +720,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 8m4-4v12" />
                     </svg>
-                    Descargar
+                    {t('Descargar', 'Download')}
                   </div>
                 </button>
               </div>
@@ -700,4 +730,3 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
     </div>
   )
 }
-

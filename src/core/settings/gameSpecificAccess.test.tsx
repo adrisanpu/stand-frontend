@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../api/api'
 import Empareja2Config from '../../games/empareja2/GameConfig'
 import T1merConfig from '../../games/t1mer/GameConfig'
+import { OperatorLanguageProvider, OperatorLanguageSelector } from '../shell/operatorLanguage'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn() } }))
 vi.mock('../widgets/QRCode', () => ({ default: () => null }))
@@ -20,6 +21,25 @@ describe.each([
   ['EMPAREJA2', Empareja2Config],
   ['T1MER', T1merConfig],
 ] as const)('%s specific settings', (_type, Config) => {
+  it('translates loaded rules without refetching or saving configuration', async () => {
+    const onChange = vi.fn()
+    render(
+      <OperatorLanguageProvider>
+        <OperatorLanguageSelector />
+        <Config gameId="ABC123" gameName="Event" settings={{}} onChange={onChange} />
+      </OperatorLanguageProvider>
+    )
+    const save = screen.getByRole('button', { name: 'Guardar configuración' })
+    await waitFor(() => expect(save).toBeEnabled())
+    const requests = vi.mocked(api.get).mock.calls.length
+    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
+    expect(save).toHaveAccessibleName(/^Save/)
+    expect(save).toBeEnabled()
+    expect(api.get).toHaveBeenCalledTimes(requests)
+    expect(api.put).not.toHaveBeenCalled()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('does not overwrite separately saved access when saving rules', async () => {
     const onChange = vi.fn()
     render(<Config gameId="ABC123" gameName="Event" settings={{}} access={{ playMode: 'mobile', joinChannel: 'instagram' }} onChange={onChange} />)

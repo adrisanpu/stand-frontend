@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AppShell from './AppShell'
 import { fetchUserMedia, type UserMediaResponse } from '../../api/userMedia'
 import { api } from '../../api/api'
 import { getJoinUrl } from '../lib/joinUrl'
+import type { PrizeCatalog } from '../prizes'
 
 const state = vi.hoisted(() => ({ portrait: true, plan: 'event' }))
 const observeLayout = vi.fn()
@@ -28,14 +29,14 @@ vi.mock('../../games', () => ({
   games: [],
   getGameById: (id: string) => ({
     id, name: id, showRanking: id === 'STACK' || id === 'T1MER', assets: { logo: `/images/${id.toLowerCase()}-logo.png` },
-    GameScreen: ({ logoElement, playMode, joinChannel }: { logoElement: ReactNode; playMode: string; joinChannel: string }) => (
-      <div data-testid="game-screen" data-mode={playMode} data-channel={joinChannel}>{logoElement}</div>
+    GameScreen: ({ logoElement, playersElement, sidebarElement, playMode, joinChannel, prizeCatalog }: { logoElement: ReactNode; playersElement: ReactNode; sidebarElement: ReactNode; playMode: string; joinChannel: string; prizeCatalog?: PrizeCatalog }) => (
+      <div data-testid="game-screen" data-mode={playMode} data-channel={joinChannel} data-prizes={JSON.stringify(prizeCatalog)}>{logoElement}{playersElement}{sidebarElement}</div>
     ),
   }),
 }))
-vi.mock('../widgets/Players', () => ({ default: () => <div data-testid="players">Jugadores</div> }))
-vi.mock('../widgets/RaffleData', () => ({ default: ({ compact }: { compact?: boolean }) => <div data-testid="raffle" data-compact={String(Boolean(compact))}>Sorteo</div> }))
-vi.mock('../widgets/Ranking', () => ({ default: () => <div data-testid="ranking">Ranking</div> }))
+vi.mock('../widgets/Players', () => ({ default: (props: unknown) => <div data-testid="players" data-props={JSON.stringify(props)}>Jugadores</div> }))
+vi.mock('../widgets/RaffleData', () => ({ default: ({ compact, ...props }: { compact?: boolean }) => <div data-testid="raffle" data-compact={String(Boolean(compact))} data-props={JSON.stringify(props)}>Sorteo</div> }))
+vi.mock('../widgets/Ranking', () => ({ default: (props: unknown) => <div data-testid="ranking" data-props={JSON.stringify(props)}>Ranking</div> }))
 vi.mock('../widgets/QRCode', () => ({ default: ({ data }: { data: string }) => <div data-testid="qr" data-url={data} /> }))
 
 function media(selected = false): UserMediaResponse {
@@ -66,9 +67,96 @@ beforeEach(() => {
   observeLayout.mockClear()
   vi.stubGlobal('ResizeObserver', class { observe(target: Element) { observeLayout(target) } disconnect() {} })
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('game home identity and configuration', () => {
+  it('uses legacy local prize names and limits only when the server catalog is absent', async () => {
+    localStorage.setItem('gameType', 'T1MER')
+    localStorage.setItem('T1MER_settings_ABC123', JSON.stringify({
+      prizeValidation: 'Entrada local', maxPrizeValidation: 4,
+      prizeTopX: 'Copa local', maxPrizeRanking: 3, topX: 2,
+      prizeRaffle: 'Bolsa local', maxPrizeRaffle: 8,
+      prizeCatalog: { validation: { name: 'Stale', limit: 99, imageUrl: '/stale.png' } },
+    }))
+    vi.mocked(api.get).mockResolvedValue({ ok: true, game: { gameType: 'T1MER', playMode: 'master', joinChannel: 'web' } })
+    render(<AppShell />)
+    const game = await screen.findByTestId('game-screen')
+    expect(game).not.toHaveAttribute('data-prizes')
+    const players = JSON.parse(screen.getByTestId('players').getAttribute('data-props')!)
+    expect(players.prize).toBeUndefined()
+    expect(players.prizeLabel).toBe('Entrada local')
+    expect(players.maxPrizeValidationLimit).toBe(4)
+    const ranking = JSON.parse(screen.getByTestId('ranking').getAttribute('data-props')!)
+    expect(ranking.prizeLabel).toBe('Copa local')
+    expect(ranking.topX).toBe(2)
+    expect(ranking.maxPrizeRanking).toBe(3)
+    const raffle = JSON.parse(screen.getByTestId('raffle').getAttribute('data-props')!)
+    expect(raffle.prizeLabel).toBe('Bolsa local')
+    expect(raffle.maxPrizeRaffle).toBe(8)
+    expect(document.body.innerHTML).not.toContain('/stale.png')
+  })
+
+  it.each([true, false])('hydrates all prize slots from authoritative metadata (portrait=%s)', async (portrait) => {
+    state.portrait = portrait
+    localStorage.setItem('gameType', 'T1MER')
+    localStorage.setItem('T1MER_settings_ABC123', JSON.stringify({ prizeValidation: 'Old', prizeTopX: 'Old', topX: 99 }))
+    const prizeCatalog = {
+      validation: { name: 'Entrada', limit: 5, imageUrl: '/validation.png' },
+      ranking: { name: 'Trofeo', limit: 3, topX: 2, imageUrl: '/ranking.png' },
+      raffle: { name: 'Bolsa', limit: 8, imageUrl: '/raffle.png' },
+    }
+    vi.mocked(api.get).mockResolvedValue({ ok: true, game: { gameType: 'T1MER', playMode: 'master', joinChannel: 'web' }, prizeCatalog })
+    render(<AppShell />)
+    const game = await screen.findByTestId('game-screen')
+    expect(JSON.parse(game.getAttribute('data-prizes')!)).toEqual(prizeCatalog)
+    for (const [widget, slot] of [['players', 'validation'], ['ranking', 'ranking'], ['raffle', 'raffle']] as const) {
+      const props = JSON.parse(screen.getByTestId(widget).getAttribute('data-props')!)
+      expect(props.prize).toEqual(prizeCatalog[slot])
+      expect(props.prizeLabel).toBe(prizeCatalog[slot].name)
+    }
+  })
+
+  it('refreshes signed URLs and authoritative removal without remounting gameplay or using cached URLs', async () => {
+    vi.useFakeTimers()
+    localStorage.setItem('gameType', 'T1MER')
+    localStorage.setItem('T1MER_settings_ABC123', JSON.stringify({
+      prizeValidation: 'Cached validation', maxPrizeValidation: 99,
+      prizeTopX: 'Cached ranking', maxPrizeRanking: 99, topX: 99,
+      prizeRaffle: 'Cached raffle', maxPrizeRaffle: 99,
+      prizeCatalog: { validation: { name: 'Cached', limit: 99, imageUrl: '/stale.png' } },
+    }))
+    const game = { gameType: 'T1MER', playMode: 'master', joinChannel: 'web' }
+    const initialCatalog = {
+      validation: { name: 'Entrada', limit: 5, imageUrl: '/first.png' },
+      ranking: { name: 'Copa', limit: 3, topX: 2, imageUrl: '/ranking.png' },
+      raffle: { name: 'Bolsa', limit: 8, imageUrl: '/raffle.png' },
+    }
+    vi.mocked(api.get).mockResolvedValue({ ok: true, game, prizeCatalog: initialCatalog })
+    await act(async () => { render(<AppShell />) })
+    const gameplay = screen.getByTestId('game-screen')
+    expect(screen.getByTestId('players').getAttribute('data-props')).toContain('/first.png')
+    vi.mocked(api.get).mockResolvedValue({ ok: true, game, prizeCatalog: {
+      ...initialCatalog, validation: { ...initialCatalog.validation, imageUrl: '/fresh.png' },
+    } })
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(screen.getByTestId('game-screen')).toBe(gameplay)
+    expect(screen.getByTestId('players').getAttribute('data-props')).toContain('/fresh.png')
+    vi.mocked(api.get).mockResolvedValue({ ok: true, game, prizeCatalog: {} })
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(screen.getByTestId('game-screen')).toBe(gameplay)
+    for (const [widget, limitProp] of [
+      ['players', 'maxPrizeValidationLimit'], ['ranking', 'maxPrizeRanking'], ['raffle', 'maxPrizeRaffle'],
+    ]) {
+      const props = JSON.parse(screen.getByTestId(widget).getAttribute('data-props')!)
+      expect(props.prize).toBeUndefined()
+      expect(props.prizeLabel).toBeUndefined()
+      expect(props[limitProp]).toBeUndefined()
+      expect(props.topX).toBeUndefined()
+    }
+    expect(screen.getByTestId('game-screen')).toHaveAttribute('data-prizes', '{}')
+    expect(vi.mocked(api.get)).toHaveBeenCalledTimes(3)
+  })
+
   it.each([true, false])('uses the game logo without a selected client logo (portrait=%s)', async (portrait) => {
     state.portrait = portrait
     render(<AppShell />)
@@ -135,6 +223,13 @@ describe('game home identity and configuration', () => {
     expect(left.lastElementChild).toContainElement(screen.getByTestId('raffle'))
     expect(screen.getByTestId('raffle')).toHaveAttribute('data-compact', String(!portrait))
     const center = screen.getByLabelText('QR de acceso al juego')
+    const headline = screen.getByRole('heading', { name: 'NO ESCANEAR, POR FAVOR.' })
+    expect(headline).toHaveAttribute('lang', 'es')
+    expect(headline).toHaveClass('text-white', 'text-4xl', 'sm:text-5xl', 'lg:text-6xl')
+    expect(screen.getByText('NO')).toHaveClass('text-red-500')
+    expect(center.firstElementChild).toBe(headline)
+    expect(headline.nextElementSibling).toBe(screen.getByTestId('qr'))
+    expect(center).toHaveClass('flex-col', 'items-center')
     expect(center).toContainElement(screen.getByTestId('qr'))
     expect(screen.getByTestId('qr')).toHaveAttribute('data-url', getJoinUrl('ABC123', joinChannel))
     expect(screen.queryByTestId('game-screen')).not.toBeInTheDocument()

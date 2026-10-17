@@ -4,6 +4,7 @@ import { api } from '../../api/api'
 import type { GameDefinition } from '../types'
 import L3trasConfig from '../../games/l3tras/GameConfig'
 import SettingsMenu from './SettingsMenu'
+import { OperatorLanguageProvider } from './operatorLanguage'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }))
 vi.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ logout: vi.fn() }) }))
@@ -36,6 +37,27 @@ function openConfig() {
 const footer = () => screen.getByRole('button', { name: 'Guardar y aplicar cambios' })
 
 describe('SettingsMenu Configurar juego', () => {
+  it('keeps unsaved rules when changing language beside the close button', async () => {
+    render(
+      <OperatorLanguageProvider>
+        <SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />
+      </OperatorLanguageProvider>
+    )
+    fireEvent.click(screen.getByText('Configurar juego'))
+    await waitFor(() => expect(footer()).toBeEnabled())
+    fireEvent.change(screen.getByPlaceholderText('STAND'), { target: { value: 'PIZZA' } })
+    const requests = vi.mocked(api.get).mock.calls.length
+    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
+    expect(screen.getByPlaceholderText('STAND')).toHaveValue('PIZZA')
+    expect(screen.getByRole('button', { name: 'Save and apply changes' })).toBeEnabled()
+    expect(api.put).not.toHaveBeenCalled()
+    expect(api.get).toHaveBeenCalledTimes(requests)
+    expect(JSON.parse(localStorage.getItem('L3TRAS_settings_ABC123') ?? '{}')).toEqual({ objectiveWord: 'STAND' })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), { target: { value: 'es' } })
+    expect(screen.getByPlaceholderText('STAND')).toHaveValue('PIZZA')
+    expect(footer()).toBeEnabled()
+  })
+
   it('saves access and rules with one button, then applies and closes', async () => {
     const { onClose, onConfigSaved } = openConfig()
     await waitFor(() => expect(footer()).toBeEnabled())

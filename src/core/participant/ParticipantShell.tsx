@@ -4,7 +4,7 @@ import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
 import { normalizeGameType } from '../gameTypeMap'
 import { PublicApiError, publicApi, isStackAssignment, type PublicGameResponse, type PlayerAssignment, type T1merAssignment, type StackAssignment } from '../../api/publicApi'
-import { loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
+import { clearPlayerSession, loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
 import { captureParticipantAccess, completeParticipantAccess } from './participantAccess'
 import { resolveGameAccess } from '../settings/gameAccess'
 import { getInstagramDmUrl } from '../lib/instagram'
@@ -57,6 +57,9 @@ function ParticipantContent() {
   const [playerToken, setPlayerToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loadVersion, setLoadVersion] = useState(0)
+  const [prizeRefreshFailed, setPrizeRefreshFailed] = useState(false)
+  const activeGameId = useRef(gameId)
+  activeGameId.current = gameId
   const [stackAssignment, setStackAssignment] = useState<StackAssignment | null>(null)
   const [t1merResult, setT1merResult] = useState<{
     time: number
@@ -64,10 +67,46 @@ function ParticipantContent() {
     rank: number | null
   } | null>(null)
 
-  const gameType = normalizeGameType(gameMeta?.gameType)
+  const currentGameMeta = gameMeta?.gameId === gameId ? gameMeta : null
+  const gameType = currentGameMeta ? normalizeGameType(currentGameMeta.gameType) : ''
   const game = getGameById(gameType)
+  const logo = currentGameMeta ? currentGameMeta.clientLogoUrl || game?.assets?.logo : undefined
   const isMobile = gameMeta && WEB_PLAY_TYPES.has(gameType)
     ? resolveGameAccess(gameType, gameMeta).playMode === 'mobile' : false
+  const hasPrizeCatalog = currentGameMeta?.prizeCatalog !== undefined
+
+  const refreshPrizes = useCallback(async () => {
+    try {
+      const meta = await publicApi.getGame(gameId)
+      if (activeGameId.current !== gameId) return
+      if (!meta.ok || meta.gameId !== gameId) throw new Error('Invalid game metadata')
+      setGameMeta((previous) => previous?.gameId === gameId
+        ? { ...previous, prizeCatalog: meta.prizeCatalog }
+        : previous)
+      setPrizeRefreshFailed(false)
+    } catch {
+      if (activeGameId.current === gameId) setPrizeRefreshFailed(true)
+    }
+  }, [gameId])
+
+  useEffect(() => {
+    setPrizeRefreshFailed(false)
+    if (!hasPrizeCatalog) return
+    let lastRefresh = Date.now()
+    const refresh = () => {
+      lastRefresh = Date.now()
+      void refreshPrizes()
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastRefresh >= 30 * 60 * 1000) refresh()
+    }
+    const interval = window.setInterval(refresh, 30 * 60 * 1000)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [gameId, hasPrizeCatalog, refreshPrizes])
 
   const applyAssignment = useCallback((meta: PublicGameResponse, token: string, assignment: PlayerAssignment | null) => {
     const gt = normalizeGameType(meta.gameType)
@@ -103,6 +142,10 @@ function ParticipantContent() {
       try {
         const meta = await publicApi.getGame(gameId)
         if (cancelled) return
+        if (!meta.ok || meta.gameId !== gameId || !meta.isActive) {
+          setStep('unsupported')
+          return
+        }
         const gt = normalizeGameType(meta.gameType)
         if (!WEB_PLAY_TYPES.has(gt)) {
           setStep('unsupported')
@@ -112,9 +155,24 @@ function ParticipantContent() {
         setGameMeta(meta)
         const token = loadPlayerToken(gameId)
         if (access || token) {
-          const player = access
-            ? await access.exchange()
-            : await publicApi.getPlayer(token!, gameId)
+          let player
+          try {
+            player = access
+              ? await access.exchange()
+              : await publicApi.getPlayer(token!, gameId)
+          } catch (sessionError) {
+            if (cancelled) return
+            if (!access && sessionError instanceof PublicApiError
+              && [401, 403, 404].includes(sessionError.status)
+              && ['InvalidPlayerToken', 'PlayerNotFound'].includes(sessionError.code ?? '')) {
+              clearPlayerSession(gameId)
+              setPlayerToken(null)
+              setT1merResult(null)
+              setStep(resolveGameAccess(gt, meta).joinChannel === 'instagram' ? 'instagram' : 'join')
+              return
+            }
+            throw sessionError
+          }
           if (cancelled) return
           if (!player.ok || player.gameId !== gameId || normalizeGameType(player.gameType) !== gt || !player.playerToken) {
             throw new Error('El enlace o la sesión de participante no es válido.')
@@ -152,12 +210,20 @@ function ParticipantContent() {
       >
         <div className="card relative mx-auto max-w-md w-full p-6 space-y-5">
           <ParticipantLanguageSelector />
-          {(gameMeta?.clientLogoUrl || game?.assets?.logo) && (
+          {logo && (
             <img
-              src={gameMeta?.clientLogoUrl || game?.assets?.logo}
-              alt={gameMeta?.clientLogoUrl ? t('Logo del cliente') : game?.name}
+              src={logo}
+              alt={currentGameMeta?.clientLogoUrl ? t('Logo del cliente') : game?.name}
               className="mx-auto h-24 w-auto max-w-full object-contain"
             />
+          )}
+          {prizeRefreshFailed && (
+            <div role="alert" className="space-y-2 text-sm text-red-300">
+              <p>{t('No se pudieron actualizar los premios.')}</p>
+              <button type="button" onClick={() => void refreshPrizes()} className="underline">
+                {t('Reintentar actualización de premios')}
+              </button>
+            </div>
           )}
           {step === 'loading' && <p className="text-center text-textSub">{t('Cargando...')}</p>}
           {step === 'access-error' && (
@@ -213,7 +279,7 @@ function ParticipantContent() {
           )}
 
           {gameType === 'STACK' && step === 'play' && stackAssignment && playerToken && (
-            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} />
+            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} />
           )}
 
           {gameType === 'EMPAREJA2' && step === 'assignment' && gameMeta && playerToken && (
@@ -233,7 +299,7 @@ function ParticipantContent() {
             />
           )}
           {gameType === 'EMPAREJA2' && step === 'result' && (
-            <ResultView gameId={gameId} onPlayAgain={isMobile ? () => setStep('validate') : undefined} />
+            <ResultView gameId={gameId} prizeCatalog={currentGameMeta?.prizeCatalog} />
           )}
 
           {gameType === 'T1MER' && step === 'master' && (
@@ -263,6 +329,7 @@ function ParticipantContent() {
               time={t1merResult.time}
               difference={t1merResult.difference}
               rank={t1merResult.rank}
+              prizeCatalog={currentGameMeta?.prizeCatalog}
             />
           )}
         </div>

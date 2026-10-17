@@ -7,6 +7,8 @@ import type { L3trasSettings } from './GameConfig'
 import { normalizeValidationTimeLimitSeconds } from './GameConfig'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import { localizeOperatorMessage } from '../operatorText'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
@@ -58,6 +60,7 @@ function formatIgHandle(username: string) {
 }
 
 function L3trasPieTimer({ remainingMs, totalMs }: { remainingMs: number; totalMs: number }) {
+  const { t } = useOperatorLanguage()
   const fraction = totalMs > 0 ? Math.min(1, Math.max(0, remainingMs / totalMs)) : 0
   const sec = Math.max(0, Math.ceil(remainingMs / 1000))
   const m = Math.floor(sec / 60)
@@ -67,7 +70,7 @@ function L3trasPieTimer({ remainingMs, totalMs }: { remainingMs: number; totalMs
   const urgent = sec > 0 && sec <= 10
   const ring = urgent ? 'rgba(248,113,113,0.95)' : 'rgba(16,185,129,0.95)'
   return (
-    <div className="pointer-events-none shrink-0" title="Tiempo restante para completar la palabra">
+    <div className="pointer-events-none shrink-0" title={t('Tiempo restante para completar la palabra', 'Time remaining to complete the word')}>
       <div
         className="relative flex h-[52px] w-[52px] items-center justify-center rounded-full border border-white/20 shadow-md"
         style={{
@@ -83,6 +86,7 @@ function L3trasPieTimer({ remainingMs, totalMs }: { remainingMs: number; totalMs
 }
 
 export default function L3trasGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+  const { t } = useOperatorLanguage()
   const [gameState, setGameState] = useState<GameState>('idle')
   const [settings, setSettings] = useState<L3trasSettings | null>(null)
   const [slots, setSlots] = useState<L3trasSlotCell[]>([])
@@ -135,7 +139,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
     setUsedCodes([])
     setCodesUsedOrder([])
     setGameState('idle')
-    setError('Se acabó el tiempo. Volvéis a empezar.')
+    setError(t('Se acabó el tiempo. Volvéis a empezar.', 'Time is up. Start over.'))
     setMessage(null)
     setTimerSession((s) => s + 1)
     const gid = gameIdRef.current
@@ -249,22 +253,22 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
   const validateOneCode = async () => {
     const word = settings?.objectiveWord
     if (!word) {
-      setError('No hay palabra objetivo configurada. Configura el juego primero.')
+      setError(t('No hay palabra objetivo configurada. Configura el juego primero.', 'No target word is configured. Set up the game first.'))
       return
     }
     if (!gameId) {
-      setError('No hay gameId disponible')
+      setError(t('No hay gameId disponible', 'No gameId available'))
       return
     }
 
     const trimmed = codeInput.replace(/\D/g, '').trim()
     if (!trimmed) {
-      setError('Introduce un código.')
+      setError(t('Introduce un código.', 'Enter a code.'))
       return
     }
 
     if (usedCodes.includes(trimmed)) {
-      setError('Ese código ya se ha usado.')
+      setError(t('Ese código ya se ha usado.', 'That code has already been used.'))
       return
     }
 
@@ -283,7 +287,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
         setError(
           typeof result.message === 'string' && result.message
             ? result.message
-            : 'Código no válido.'
+            : t('Código no válido.', 'Invalid code.')
         )
         return
       }
@@ -291,7 +295,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
       const letter = pickLetter(result)
       if (!letter) {
         setGameState('idle')
-        setError('No se pudo leer la letra del código.')
+        setError(t('No se pudo leer la letra del código.', 'Could not read the letter from the code.'))
         return
       }
 
@@ -335,19 +339,19 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
           roundDurationMsRef.current = 0
           setTimerSession((s) => s + 1)
           setGameState('success')
-          setMessage('¡Habéis ganado!')
+          setMessage(t('¡Habéis ganado!', 'You won!'))
           void submitScore(order, word, true)
         } else {
           setGameState('idle')
           if (!filledAny) {
-            setError('Esta letra ya estaba descubierta.')
+            setError(t('Esta letra ya estaba descubierta.', 'This letter was already revealed.'))
           }
         }
         return order
       })
     } catch (err: unknown) {
       setGameState('idle')
-      setError(err instanceof Error ? err.message : 'Error al validar el código')
+      setError(err instanceof Error ? err.message : t('Error al validar el código', 'Error validating the code'))
     }
   }
 
@@ -372,7 +376,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
   const renderHangmanRow = (compact: boolean) => (
     <div
       className={`flex flex-wrap justify-center ${compact ? 'gap-5 sm:gap-6' : 'gap-6 sm:gap-8'}`}
-      aria-label="Letras descubiertas"
+      aria-label={t('Letras descubiertas', 'Revealed letters')}
     >
       {slots.map((cell, i) => {
         const ch = cell?.letter ?? ''
@@ -412,7 +416,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
                 {pic ? (
                   <img
                     src={pic}
-                    alt={handle ? `Foto de perfil de ${handle}` : 'Foto de perfil'}
+                    alt={handle ? t(`Foto de perfil de ${handle}`, `Profile picture of ${handle}`) : t('Foto de perfil', 'Profile picture')}
                     referrerPolicy="no-referrer"
                     className={`shrink-0 rounded-full border-2 border-[rgba(16,185,129,0.45)] object-cover shadow-sm ${
                       compact ? 'h-9 w-9' : 'h-11 w-11'
@@ -470,7 +474,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
           <div
             className={`text-center shrink-0 ${compact ? 'space-y-2' : 'space-y-2.5'} ${showRoundTimer ? 'pr-[3.25rem] sm:pr-14' : ''}`}
           >
-            <p className={compact ? 'text-xs text-gray-400' : 'text-sm text-gray-400'}>Palabra objetivo</p>
+            <p className={compact ? 'text-xs text-gray-400' : 'text-sm text-gray-400'}>{t('Palabra objetivo', 'Target word')}</p>
             <p
               className={`font-bold tracking-[0.2em] sm:tracking-widest text-[#34D399] ${
                 compact ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl lg:text-5xl'
@@ -497,7 +501,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
                   compact ? 'p-3 text-sm' : 'p-4 text-base'
                 }`}
               >
-                {error}
+                {localizeOperatorMessage(error, t)}
               </div>
             )}
 
@@ -506,7 +510,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
                 <svg className={`animate-spin text-[#10B981] ${compact ? 'w-6 h-6' : 'w-8 h-8'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <span className={`font-semibold text-[#10B981] ${compact ? 'text-base' : 'text-xl'}`}>Validando…</span>
+                <span className={`font-semibold text-[#10B981] ${compact ? 'text-base' : 'text-xl'}`}>{t('Validando…', 'Validating…')}</span>
               </div>
             ) : (
             <div className="flex gap-3 w-full max-w-md mx-auto sm:max-w-none">
@@ -522,7 +526,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void validateOneCode()
                 }}
-                placeholder={CODE_INPUT_PLACEHOLDER}
+                placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
                 className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg text-center font-mono outline-none focus:border-[rgba(16,185,129,0.5)]"
               />
               <button
@@ -533,7 +537,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
                 <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {VALIDATE_LABEL}
+                {t(VALIDATE_LABEL, 'Validate')}
               </button>
             </div>
             )}
@@ -552,10 +556,10 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
               <svg className={compact ? 'w-7 h-7' : 'w-10 h-10'} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span className={`font-semibold text-green-400 ${compact ? 'text-xl' : 'text-2xl'}`}>¡Habéis ganado!</span>
+              <span className={`font-semibold text-green-400 ${compact ? 'text-xl' : 'text-2xl'}`}>{t('¡Habéis ganado!', 'You won!')}</span>
             </div>
             {message && (
-              <p className={`text-green-300 mb-4 ${compact ? 'text-sm' : 'text-lg'}`}>{message}</p>
+              <p className={`text-green-300 mb-4 ${compact ? 'text-sm' : 'text-lg'}`}>{message && localizeOperatorMessage(message, t)}</p>
             )}
             <div className="flex flex-wrap justify-center gap-2">
               {objectiveWord.split('').map((c, i) => (
@@ -576,7 +580,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
             onClick={handleReset}
             className="w-full p-3 rounded-xl bg-[rgba(0,245,255,0.2)] border border-[rgba(0,245,255,0.3)] hover:bg-[rgba(0,245,255,0.3)] transition-colors font-medium text-sm"
           >
-            Reiniciar
+            {t('Reiniciar', 'Restart')}
           </button>
         </div>
       )}
@@ -596,16 +600,16 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
           <LandscapeInfoInstruction>
-            Escanea el QR y pulsa JUGAR.
+            {t('Escanea el QR y pulsa JUGAR.', 'Scan the QR code and tap PLAY.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Cada jugador recibe un código (letra).
+            {t('Cada jugador recibe un código (letra).', 'Each player gets a code (letter).')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Reuníos; cada uno tendrá su código.
+            {t('Reuníos; cada uno tendrá su código.', 'Gather together; everyone will have their code.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Introducid los códigos de uno en uno en el validador.
+            {t('Introducid los códigos de uno en uno en el validador.', 'Enter the codes one at a time in the validator.')}
           </LandscapeInfoInstruction>
         </GameLandscapeLeftColumn>
         <div className={`${GAME_LANDSCAPE_CENTER_CARD} flex-1 gap-6 space-y-0`}>
@@ -624,7 +628,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
       {!showJoinBlock && (
         <div className="flex justify-end mb-2 flex-shrink-0">
-          <BackButton onClick={handleReset} aria-label="Volver" />
+          <BackButton onClick={handleReset} aria-label={t('Volver', 'Back')} />
         </div>
       )}
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">

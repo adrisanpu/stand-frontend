@@ -4,6 +4,8 @@ import type { CardLayoutPosition } from './GameConfig'
 import { api } from '../../api/api'
 import { useGameInput } from '../../core/input/useGameInput'
 import { GAME_LANDSCAPE_TWO_COL_GRID } from '../../core/ui/gameScreenLayout'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import { localizeOperatorMessage } from '../operatorText'
 
 const INFOCARDS_SETTINGS_KEY_PREFIX = 'INFOCARDS_settings_'
 const CARD_CONTAINER_HEIGHT_CLASS = 'h-[min(72vh,620px)] min-h-[420px] sm:min-h-[460px]'
@@ -52,6 +54,7 @@ function getCardLayouts(gameId: string): Record<string, CardLayoutPosition> {
 }
 
 export default function InfocardsGameScreen({ gameId, orientation, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+  const { t } = useOperatorLanguage()
   const [cards, setCards] = useState<InfoCard[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -83,7 +86,7 @@ export default function InfocardsGameScreen({ gameId, orientation, playersElemen
 
   const joinCardVirtual: InfoCard = {
     id: INFOCARDS_JOIN_CARD_ID,
-    title: 'Unirse a la partida',
+    title: t('Unirse a la partida', 'Join the game'),
     body: '',
   }
   const displayCards = cards.length > 0 ? [...cards, joinCardVirtual] : []
@@ -109,7 +112,7 @@ export default function InfocardsGameScreen({ gameId, orientation, playersElemen
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
-        <p className="text-textSub text-sm animate-pulse">Cargando tarjetas...</p>
+        <p className="text-textSub text-sm animate-pulse">{t('Cargando tarjetas...', 'Loading cards...')}</p>
       </div>
     )
   }
@@ -117,12 +120,12 @@ export default function InfocardsGameScreen({ gameId, orientation, playersElemen
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
-        <p className="text-red-400 text-sm text-center">{error}</p>
+        <p className="text-red-400 text-sm text-center">{localizeOperatorMessage(error, t)}</p>
         <button
           onClick={fetchCards}
           className="px-4 py-2 rounded-lg bg-primary/20 text-primary text-sm hover:bg-primary/30 transition-colors"
         >
-          Reintentar
+          {t('Reintentar', 'Retry')}
         </button>
       </div>
     )
@@ -137,7 +140,7 @@ export default function InfocardsGameScreen({ gameId, orientation, playersElemen
           </svg>
         </div>
         <p className="text-textSub text-sm leading-relaxed">
-          Configura el juego en Ajustes y sube contenido para generar las tarjetas informativas.
+          {t('Configura el juego en Ajustes y sube contenido para generar las tarjetas informativas.', 'Set up the game in Settings and upload content to generate the info cards.')}
         </p>
       </div>
     )
@@ -207,7 +210,7 @@ export default function InfocardsGameScreen({ gameId, orientation, playersElemen
     <div key={INFOCARDS_JOIN_CARD_ID} className={baseClass} style={cardStyle}>
       <div className="flex flex-col items-center justify-center flex-1 min-h-0 overflow-hidden px-4 text-center">
         <p className="text-base sm:text-lg text-textSub leading-relaxed">
-          Escanea el QR de arriba y pulsa JUGAR en el chat de Instagram para unirte.
+          {t('Escanea el QR de arriba y pulsa JUGAR en el chat de Instagram para unirte.', 'Scan the QR code above and tap PLAY in the Instagram chat to join.')}
         </p>
       </div>
     </div>
@@ -216,15 +219,15 @@ export default function InfocardsGameScreen({ gameId, orientation, playersElemen
   const rowClassGrid = 'w-full h-full min-h-0 rounded-2xl p-5 sm:p-6 grid grid-cols-2 gap-4 overflow-hidden'
   const renderNavigation = () => (
     <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4">
-      <button onClick={goToPrev} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label="Tarjeta anterior">
+      <button onClick={goToPrev} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label={t('Tarjeta anterior', 'Previous card')}>
         <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
       </button>
       <div className="flex gap-2">
         {displayCards.map((_, idx) => (
-          <button key={idx} onClick={() => setCurrentIndex(idx)} className="rounded-full transition-all duration-200" style={{ width: idx === currentIndex ? '20px' : '8px', height: '8px', background: idx === currentIndex ? 'var(--color-primary, #6366F1)' : 'rgba(255,255,255,0.2)' }} aria-label={`Ir a tarjeta ${idx + 1}`} />
+          <button key={idx} onClick={() => setCurrentIndex(idx)} className="rounded-full transition-all duration-200" style={{ width: idx === currentIndex ? '20px' : '8px', height: '8px', background: idx === currentIndex ? 'var(--color-primary, #6366F1)' : 'rgba(255,255,255,0.2)' }} aria-label={t(`Ir a tarjeta ${idx + 1}`, `Go to card ${idx + 1}`)} />
         ))}
       </div>
-      <button onClick={goToNext} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label="Tarjeta siguiente">
+      <button onClick={goToNext} className="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-white/10" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} aria-label={t('Tarjeta siguiente', 'Next card')}>
         <svg className="w-5 h-5 text-textSub" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
       </button>
     </div>

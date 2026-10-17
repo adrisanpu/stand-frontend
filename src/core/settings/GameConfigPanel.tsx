@@ -2,9 +2,10 @@ import { useCallback, useRef, useState } from 'react'
 import type { GameConfigSaveRegistration, GameDefinition } from '../types'
 import { getRedeemUrl, getWebPlayUrl } from '../lib/joinUrl'
 import QRCode from '../widgets/QRCode'
-import { GameAccessFields, useGameAccessDraft } from './GameAccessSettings'
+import { GameAccessFields, translateGameAccessMessage, useGameAccessDraft } from './GameAccessSettings'
 import { GAME_ACCESS_CAPABILITIES, resolveGameAccess, type GameAccess } from './gameAccess'
 import { saveErrorMessage } from './gameConfigSave'
+import { useOperatorLanguage } from '../shell/operatorLanguage'
 
 export type GameConfigSavedPatch = Record<string, unknown> & GameAccess
 
@@ -31,6 +32,7 @@ export const GAME_CONFIG_SAVE_LABEL = 'Guardar y aplicar cambios'
  * config component and a single footer button that persists everything together.
  */
 export default function GameConfigPanel({ gameId, gameDefinition, settings, onSettingsChange, onSaved, onSavingChange }: Props) {
+  const { t } = useOperatorLanguage()
   const accessDraft = useGameAccessDraft(gameId, gameDefinition.id)
   const GameConfigComponent = gameDefinition.GameConfigComponent
   const rulesSaveRef = useRef<GameConfigSaveRegistration | null>(null)
@@ -40,6 +42,31 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
   const saving = saveState.status === 'saving'
   const supportsMobile = GAME_ACCESS_CAPABILITIES[gameDefinition.id.toUpperCase()]?.playModes.includes('mobile')
   const redeemUrl = getRedeemUrl(gameId)
+  const playUrl = getWebPlayUrl(gameId)
+
+  const translateSaveError = (message: string): string => {
+    const exact: Record<string, string> = {
+      'El modo y acceso aún se están cargando.': t('El modo y acceso aún se están cargando.', 'Game mode and access are still loading.'),
+      'Modo y acceso no válidos.': t('Modo y acceso no válidos.', 'Invalid game mode and access.'),
+      'La configuración del juego aún no está lista. Inténtalo de nuevo.': t('La configuración del juego aún no está lista. Inténtalo de nuevo.', 'Game settings are not ready yet. Please try again.'),
+      'error desconocido.': t('error desconocido.', 'unknown error.'),
+      'No se pudo guardar la configuración del juego.': t('No se pudo guardar la configuración del juego.', 'Could not save game settings.'),
+      'No se pudo guardar.': t('No se pudo guardar.', 'Could not save.'),
+    }
+    if (Object.prototype.hasOwnProperty.call(exact, message)) return exact[message]
+    const prefixes: Array<[string, string]> = [
+      ['No se puede guardar: ', `${t('No se puede guardar:', 'Cannot save:')} `],
+      ['No se pudo guardar el modo y acceso: ', `${t('No se pudo guardar el modo y acceso:', 'Could not save game mode and access:')} `],
+      ['El modo y acceso se guardaron, pero la configuración del juego no: ', `${t('El modo y acceso se guardaron, pero la configuración del juego no:', 'Game mode and access were saved, but game settings were not:')} `],
+    ]
+    for (const [spanish, translated] of prefixes) {
+      if (message.startsWith(spanish)) {
+        const rest = message.slice(spanish.length)
+        return translated + translateGameAccessMessage(rest, t)
+      }
+    }
+    return translateGameAccessMessage(message, t)
+  }
 
   const registerSave = useCallback((registration: GameConfigSaveRegistration | null) => {
     rulesSaveRef.current = registration
@@ -93,7 +120,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
     let accessSaved = false
     try {
       try {
-        access = await accessDraft.persist()
+        access = await accessDraft.persist(supportsMobile)
         accessSaved = true
       } catch (cause) {
         throw new Error(`No se pudo guardar el modo y acceso: ${saveErrorMessage(cause, 'error desconocido.')}`)
@@ -111,7 +138,10 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
       fail(saveErrorMessage(cause, accessSaved ? 'No se pudo guardar la configuración del juego.' : 'No se pudo guardar.'))
       return
     }
-    const patch: GameConfigSavedPatch = { ...pendingPatchRef.current, ...access }
+    const patch: GameConfigSavedPatch = {
+      ...pendingPatchRef.current, ...access,
+      ...(supportsMobile ? { participantFields: accessDraft.participantFields } : {}),
+    }
     pendingPatchRef.current = {}
     setSaving(false)
     setSaveState({ status: 'idle' })
@@ -131,26 +161,39 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
               if (saveState.status === 'error') setSaveState({ status: 'idle' })
             }}
           />
-          {accessDraft.status === 'loading' && <p role="status">Cargando acceso...</p>}
+          {accessDraft.status === 'loading' && <p role="status">{t('Cargando acceso...', 'Loading access...')}</p>}
           {accessDraft.status === 'error' && (
             <>
-              <p role="alert" className="text-sm text-red-300">{accessDraft.loadError}</p>
-              <button type="button" onClick={accessDraft.reload} className="text-sm underline">Reintentar carga</button>
+              <p role="alert" className="text-sm text-red-300">{translateGameAccessMessage(accessDraft.loadError, t)}</p>
+              <button type="button" onClick={accessDraft.reload} className="text-sm underline">{t('Reintentar carga', 'Retry loading')}</button>
             </>
           )}
           {gameId && supportsMobile && (
-            <section aria-label="Enlaces del evento" className="flex items-center justify-between gap-3 border-t border-white/10 pt-3 text-sm">
-              <div className="min-w-0 space-y-2">
-                <a href={getWebPlayUrl(gameId)} target="_blank" rel="noopener noreferrer" className="block text-primary underline underline-offset-4">
-                  Participante (móvil)
-                </a>
-                <a href={redeemUrl} target="_blank" rel="noopener noreferrer" className="block text-primary underline underline-offset-4">
-                  Validador de premios
+            <section aria-label={t('Enlaces del evento', 'Event links')} className="grid grid-cols-3 items-start gap-3 border-t border-white/10 pt-3 text-xs">
+              <div className="min-w-0 space-y-2 text-center">
+                <QRCode data={playUrl} size={80} margin={4} alt={t('QR participante', 'Participant QR code')} className="!bg-white !p-1" />
+                <a href={playUrl} target="_blank" rel="noopener noreferrer" className="block text-primary underline underline-offset-4">
+                  {t('Participante', 'Participant')}
                 </a>
               </div>
-              <a href={redeemUrl} target="_blank" rel="noopener noreferrer" aria-label="Abrir validador de premios desde el QR" className="shrink-0">
-                <QRCode data={redeemUrl} size={80} margin={4} alt="QR validador de premios" className="!bg-white !p-1" />
-              </a>
+              <div className="min-w-0 space-y-2 text-center">
+                <QRCode data={redeemUrl} size={80} margin={4} alt={t('QR validador de premios', 'Prize validator QR code')} className="!bg-white !p-1" />
+                <a href={redeemUrl} target="_blank" rel="noopener noreferrer" className="block text-primary underline underline-offset-4">
+                  {t('Validador de premios', 'Prize validator')}
+                </a>
+              </div>
+              <fieldset disabled={accessDraft.status !== 'ready'} className="min-w-0 space-y-2">
+                <legend className="mb-2 font-medium">{t('Datos del participante', 'Participant information')}</legend>
+                {([['email', 'Email'], ['instagram', 'Instagram'], ['phone', 'Teléfono']] as const).map(([field, label]) => (
+                  <label key={field} className="flex items-center gap-2">
+                    <input type="checkbox" checked={accessDraft.participantFields[field].required}
+                      onChange={(event) => accessDraft.setParticipantFields({
+                        ...accessDraft.participantFields, [field]: { required: event.target.checked },
+                      })} />
+                    {label === 'Teléfono' ? t(label, 'Phone') : label}
+                  </label>
+                ))}
+              </fieldset>
             </section>
           )}
         </fieldset>
@@ -169,16 +212,16 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
       </div>
       <div className="flex-shrink-0 border-t border-white/10 px-6 py-4 space-y-2">
         {saveState.status === 'error' && (
-          <p role="alert" className="text-sm text-red-300">{saveState.message}</p>
+          <p role="alert" className="text-sm text-red-300">{translateSaveError(saveState.message)}</p>
         )}
-        {saving && <p role="status" className="text-sm text-textSub">Guardando cambios...</p>}
+        {saving && <p role="status" className="text-sm text-textSub">{t('Guardando cambios...', 'Saving changes...')}</p>}
         <button
           type="button"
           onClick={() => void handleSave()}
           disabled={saving || accessDraft.status !== 'ready'}
           className="w-full rounded-xl p-3 font-medium bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saving ? 'Guardando...' : GAME_CONFIG_SAVE_LABEL}
+          {saving ? t('Guardando...', 'Saving...') : t(GAME_CONFIG_SAVE_LABEL, 'Save and apply changes')}
         </button>
       </div>
     </>
