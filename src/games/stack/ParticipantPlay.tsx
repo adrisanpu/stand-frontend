@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PublicApiError, publicApi, type StackAssignment, type StackFinishResponse } from '../../api/publicApi'
-import ScoreResultView from '../../core/participant/ScoreResultView'
 import { useParticipantLanguage } from '../../core/participant/participantLanguage'
 import { savePlayerSession } from '../../core/participant/playerSession'
 import ProfileAvatar from '../../core/widgets/ProfileAvatar'
@@ -10,6 +9,7 @@ import { clearPendingStackResult, loadPendingStackResult, savePendingStackResult
 import './stack.css'
 import type { PrizeCatalog } from '../../core/prizes'
 import ParticipantPrizePromo from '../../core/participant/ParticipantPrizePromo'
+import RankingPrizeClaim from './RankingPrizeClaim'
 
 type Props = {
   gameId: string
@@ -19,13 +19,14 @@ type Props = {
   startSupported?: boolean
   finishSupported?: boolean
   prizeCatalog?: PrizeCatalog
+  showPrizePromo?: boolean
 }
 
 type SceneStatus = 'loading' | 'ready' | 'lost' | 'error'
 type StartStatus = 'idle' | 'pending' | 'retry' | 'started' | 'blocked'
 const INITIAL_SNAPSHOT: StackSnapshot = { state: 'IDLE', score: 0, perfect: false, placements: [] }
 
-export default function StackParticipantPlay({ gameId, playerToken, config, assignment, startSupported = false, finishSupported = false, prizeCatalog }: Props) {
+export default function StackParticipantPlay({ gameId, playerToken, config, assignment, startSupported = false, finishSupported = false, prizeCatalog, showPrizePromo = true }: Props) {
   const { t } = useParticipantLanguage()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<StackSceneController | null>(null)
@@ -226,23 +227,29 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
 
   return (
     <section className="space-y-4 text-center" aria-label="STACK">
-      <header className="flex items-center justify-center gap-3 min-w-0">
+      <header className="flex items-center justify-between gap-3 min-w-0">
+        <p className="stack-score shrink-0 rounded-xl border border-primary/20 bg-primary/10 px-4 py-2 font-semibold tabular-nums" aria-live="polite" aria-atomic="true">
+          {t('Bloques: ')}<span key={savedScore ?? localScore} className={playing ? 'stack-score-value' : undefined}>{savedScore ?? localScore}</span>
+        </p>
         <div className="flex items-center gap-2 min-w-0">
           <ProfileAvatar username={assignment.displayName} profilePicUrl={assignment.profilePicUrl} size="md" />
           <p className="text-sm font-semibold truncate text-left" title={assignment.displayName}>{assignment.displayName}</p>
         </div>
       </header>
-      <div className="flex items-center justify-between gap-3">
-        <p className="stack-score rounded-xl border border-primary/20 bg-primary/10 px-4 py-2 font-semibold tabular-nums" aria-live="polite" aria-atomic="true">
-          {t('Bloques: ')}<span key={savedScore ?? localScore} className={playing ? 'stack-score-value' : undefined}>{savedScore ?? localScore}</span>
-        </p>
-        {playing && (
+      {playing && (
+        <div className="flex justify-end">
           <button type="button" onClick={togglePause} className="rounded-xl border border-[rgba(var(--color-accent-rgb),0.35)] text-accent px-4 py-2 text-sm">
             {manualPause ? t('Reanudar') : t('Pausar')}
           </button>
-        )}
-      </div>
-      <div className="stack-viewport relative w-full h-[45vh] min-h-[220px] max-h-[440px] rounded-xl overflow-hidden border border-primary/20">
+        </div>
+      )}
+      <RankingPrizeClaim
+        gameId={gameId}
+        playerToken={playerToken}
+        prizeCatalog={prizeCatalog}
+        enabled={hasResult && savedScore != null}
+        rank={hasResult && savedScore != null ? savedRank : null}
+      >
         <canvas
           ref={canvasRef}
           className="block w-full h-full"
@@ -279,7 +286,7 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
         {paused && playing && status === 'ready' && (
           <p role="status" className="absolute inset-0 flex items-center justify-center bg-black/70 text-white pointer-events-none">{t('Partida pausada')}</p>
         )}
-      </div>
+      </RankingPrizeClaim>
       {error && <p role="alert" className="text-sm text-red-300">{errorPrefix && t(errorPrefix)}{t(error)}</p>}
       {storageWarning && <p role="alert" className="text-sm text-red-300">{t(storageWarning)}</p>}
       {(startStatus === 'idle' || startStatus === 'pending' || startStatus === 'retry') && (
@@ -315,20 +322,8 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
         </p>
       )}
       {hasResult && (
-        <ScoreResultView
-          title={t('Fin de la partida')}
-          displayName={assignment.displayName}
-          profilePicUrl={assignment.profilePicUrl}
-          rank={savedScore != null ? savedRank : null}
-          notice={savedScore != null
-            ? t('Resultado validado y guardado en el ranking. Tu único intento ya está consumido.')
-            : t('Resultado local pendiente de confirmación del servidor. Tu único intento ya está consumido.')}
-        >
-          <ParticipantPrizePromo catalog={prizeCatalog} slots={['ranking']} />
-          <div className="space-y-1">
-            <p className="text-sm text-textSub">{t('Bloques apilados')}</p>
-            <p className="text-3xl font-bold tabular-nums">{savedScore ?? localScore}</p>
-          </div>
+        <>
+          {showPrizePromo && <ParticipantPrizePromo catalog={prizeCatalog} slots={['ranking']} />}
           {finishStatus === 'pending' && <p role="status">{t('Validando y guardando resultado...')}</p>}
           {finishError && <p role="alert" className="text-sm text-red-300">{t(finishError)}</p>}
           {finishEvidence && !finishSupported && savedScore == null && (
@@ -343,7 +338,7 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
               {t('Reintentar guardado')}
             </button>
           )}
-        </ScoreResultView>
+        </>
       )}
     </section>
   )

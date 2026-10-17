@@ -482,9 +482,9 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                 <div className="flex flex-col gap-2 min-w-0" ref={logoDropdownRef}>
                   <label
                     htmlFor={features.advancedCustomization ? 'logo-upload' : undefined}
-                    className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors text-sm w-full ${
+                    className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/30 transition-colors text-sm w-full ${
                       features.advancedCustomization
-                        ? 'hover:bg-[rgba(255,255,255,0.1)] cursor-pointer'
+                        ? 'hover:bg-primary/20 cursor-pointer'
                         : 'cursor-not-allowed pointer-events-none'
                     }`}
                     onClick={(e) => {
@@ -501,9 +501,9 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                       type="button"
                       disabled={!features.advancedCustomization || logoHistory.length === 0}
                       onClick={() => features.advancedCustomization && setLogoPickerOpen((o) => !o)}
-                      className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors text-sm w-full ${
+                      className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/30 transition-colors text-sm w-full ${
                         features.advancedCustomization && logoHistory.length > 0
-                          ? 'hover:bg-[rgba(255,255,255,0.1)]'
+                          ? 'hover:bg-primary/20'
                           : 'opacity-50 cursor-not-allowed'
                       }`}
                       aria-expanded={logoPickerOpen}
@@ -539,7 +539,7 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                               className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-all ${
                                 selectedLogoId === preset.id
                                   ? 'border-primary bg-primary/10'
-                                  : 'border-white/10 bg-[rgba(255,255,255,0.04)] hover:border-white/25'
+                                  : 'border-primary/30 bg-[rgba(255,255,255,0.04)] hover:border-white/25'
                               }`}
                             >
                               <img src={preset.url ?? ''} alt="" className="h-10 w-10 object-contain rounded" />
@@ -623,9 +623,9 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                       </select>
                       <label
                         htmlFor={features.advancedCustomization && avatarsEnabled ? 'avatar-upload' : undefined}
-                        className={`inline-flex items-center justify-center shrink-0 w-11 rounded-xl border border-white/10 bg-[rgba(255,255,255,0.05)] transition-colors ${
+                        className={`inline-flex items-center justify-center shrink-0 w-11 rounded-xl border border-primary/30 bg-primary/10 transition-colors ${
                           features.advancedCustomization && avatarsEnabled
-                            ? 'hover:bg-[rgba(255,255,255,0.1)] cursor-pointer'
+                            ? 'hover:bg-primary/20 cursor-pointer'
                             : 'cursor-not-allowed pointer-events-none opacity-50'
                         }`}
                         title={t('Subir vídeo', 'Upload video')}
@@ -650,9 +650,9 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                         type="button"
                         onClick={() => setAvatarPickerOpen((o) => !o)}
                         disabled={!features.advancedCustomization || !avatarsEnabled || avatarHistory.length === 0}
-                        className={`inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors text-sm w-full ${
+                        className={`inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-primary/10 border border-primary/30 transition-colors text-sm w-full ${
                           features.advancedCustomization && avatarsEnabled && avatarHistory.length > 0
-                            ? 'hover:bg-[rgba(255,255,255,0.1)]'
+                            ? 'hover:bg-primary/20'
                             : 'opacity-50 cursor-not-allowed'
                         }`}
                         aria-expanded={avatarPickerOpen}
@@ -692,7 +692,7 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                                   className={`w-full text-left text-xs px-2 py-2 rounded ${
                                     selectedAvatars[avatarState] === item.id
                                       ? 'bg-primary/20 border border-primary/40'
-                                      : 'hover:bg-white/10'
+                                      : 'hover:bg-primary/20'
                                   }`}
                                 >
                                   {item.name} ({avatarStateLabel(item.state ?? avatarState)})
@@ -885,7 +885,7 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
             type="button"
             onClick={handleReset}
             disabled={saving}
-            className="flex-1 p-3 rounded-xl bg-yellow-500/20 border border-yellow-500/30 hover:bg-yellow-500/30 transition-colors font-medium"
+            className="flex-1 p-3 rounded-xl bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors font-medium"
           >
             {t('Restaurar por Defecto', 'Restore defaults')}
           </button>
@@ -893,7 +893,7 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors font-medium"
+            className="flex-1 p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors font-medium"
           >
             {saving ? t('Guardando...', 'Saving...') : t('Guardar Cambios', 'Save changes')}
           </button>

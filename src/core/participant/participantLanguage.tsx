@@ -33,6 +33,8 @@ const translations: Record<string, string> = {
   'No se pudo enviar el email. Inténtalo de nuevo.': 'Unable to send the email. Try again.',
   'La verificación por email no está disponible. Inténtalo más tarde.': 'Email verification is unavailable. Try again later.',
   'Premios en juego': 'Prizes to play for',
+  'PREMIO': 'PRIZE',
+  'PREMIO TOP': 'TOP PRIZE',
   'Premio del ranking': 'Leaderboard prize',
   'No se pudieron actualizar los premios.': 'Unable to refresh prizes.',
   'Reintentar actualización de premios': 'Retry refreshing prizes',
@@ -116,7 +118,13 @@ const translations: Record<string, string> = {
   'tu@email.com': 'you@email.com',
   '@usuario': '@username',
   'Política de privacidad': 'Privacy policy',
-  'Acepto que Stand y el organizador traten los datos que facilito (email, usuario de Instagram o teléfono, según el formulario) para gestionar la participación en el juego. Consulta la política de privacidad.': 'I agree that Stand and the organizer may process the details I provide (email, Instagram username or phone number, depending on the form) to manage my participation in the game. See the privacy policy.',
+  'Acepto que Stand y el organizador usen mis datos y, si subo una foto, la muestren en el juego.': 'I agree that Stand and the organizer may use my data and, if I upload a photo, display it in the game.',
+  'Foto de perfil (opcional)': 'Profile photo (optional)',
+  'Nombre de usuario': 'Username',
+  'El nombre de usuario es obligatorio.': 'Username is required.',
+  'Usa un nombre de usuario de hasta 100 caracteres sin caracteres de control.': 'Use a username of up to 100 characters without control characters.',
+  'Usa una imagen JPG, PNG o WebP de hasta 5 MB.': 'Choose a JPG, PNG, or WebP image up to 5 MB.',
+  'No se pudo guardar la foto; se muestra el avatar genérico.': 'The photo could not be saved; the default avatar is shown.',
   'Registrando...': 'Registering...',
   'Empezar': 'Start',
   'Premio por pareja': 'Pair prize',
@@ -173,7 +181,7 @@ export function ParticipantLanguageSelector() {
       aria-label={language === 'es' ? 'Idioma' : 'Language'}
       value={language}
       onChange={(event) => setLanguage(event.target.value === 'en' ? 'en' : 'es')}
-      className="absolute right-3 top-3 z-20 rounded-lg border border-[rgba(var(--color-accent-rgb),0.35)] bg-surface px-2 py-1 text-sm text-accent"
+      className="absolute right-3 top-3 z-50 pointer-events-auto rounded-lg border border-[rgba(var(--color-accent-rgb),0.35)] bg-[var(--color-background,#0B0A12)] px-2 py-1 text-sm text-accent"
     >
       <option value="es">ES</option>
       <option value="en">EN</option>

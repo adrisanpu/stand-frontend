@@ -30,24 +30,27 @@ it('translates the panel but preserves custom prize names', async () => {
   await screen.findByText('25')
   fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
   expect(screen.getByText('Players')).toBeInTheDocument()
-  expect(screen.getByText('Prize: Premio por pareja')).toBeInTheDocument()
+  expect(screen.getByText('PRIZE: Premio por pareja')).toBeInTheDocument()
 })
 
 it.each([
   [true, true], [true, false], [false, true], [false, false],
-])('aligns label left and larger count right (compact=%s, countersOnly=%s)', async (compact, countersOnly) => {
+])('places the count before the equally sized label (compact=%s, countersOnly=%s)', async (compact, countersOnly) => {
   render(<Players gameName="Event" gameType="EMPAREJA2" compact={compact} countersOnly={countersOnly} prizeLabel="Entrada" />)
   const count = await screen.findByText('25')
   const label = screen.getByText('Jugadores')
   const row = label.parentElement
-  expect(row).toHaveClass('flex', 'items-center', 'justify-between')
-  expect(row?.firstElementChild).toBe(label)
-  expect(row?.lastElementChild).toContainElement(count)
-  expect(row?.lastElementChild).toHaveClass('items-end', 'text-right')
-  expect(label).toHaveClass(compact ? 'text-lg' : 'text-xl')
-  expect(count).toHaveClass(compact ? 'text-2xl' : 'text-3xl', 'tabular-nums')
+  expect(row).toHaveClass('flex', 'items-center', 'gap-3')
+  expect(row?.firstElementChild).toContainElement(count)
+  expect(row?.firstElementChild).toHaveClass('items-start', 'text-left')
+  expect(row?.lastElementChild).toBe(label)
+  expect(label).toHaveClass('text-xl', 'sm:text-2xl')
+  expect(count).toHaveClass('text-xl', 'sm:text-2xl', 'tabular-nums')
   expect(screen.getAllByText('Jugadores')).toHaveLength(1)
-  expect(screen.getByText('Premio: Entrada')).toBeInTheDocument()
+  expect(screen.getByText('PREMIO: Entrada')).toBeInTheDocument()
+  const sticker = screen.getByText('PREMIO: Entrada').parentElement?.parentElement
+  expect(sticker?.nextElementSibling).toHaveClass('card', compact ? 'p-2' : 'p-3')
+  expect(sticker?.nextElementSibling).not.toHaveClass('pt-10')
   expect(screen.getByText('3/10')).toBeInTheDocument()
 })
 

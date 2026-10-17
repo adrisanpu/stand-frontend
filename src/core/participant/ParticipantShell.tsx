@@ -9,6 +9,7 @@ import { captureParticipantAccess, completeParticipantAccess } from './participa
 import { resolveGameAccess } from '../settings/gameAccess'
 import { getInstagramDmUrl } from '../lib/instagram'
 import JoinForm from './JoinForm'
+import ParticipantPrizePromo from './ParticipantPrizePromo'
 import AssignmentView from './AssignmentView'
 import ValidateView from './ValidateView'
 import ResultView from './ResultView'
@@ -56,6 +57,7 @@ function ParticipantContent() {
   const [gameMeta, setGameMeta] = useState<PublicGameResponse | null>(null)
   const [playerToken, setPlayerToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [photoUploadWarning, setPhotoUploadWarning] = useState(false)
   const [loadVersion, setLoadVersion] = useState(0)
   const [prizeRefreshFailed, setPrizeRefreshFailed] = useState(false)
   const activeGameId = useRef(gameId)
@@ -133,6 +135,7 @@ function ParticipantContent() {
     let cancelled = false
     setStep('loading')
     setError(null)
+    setPhotoUploadWarning(false)
     setStackAssignment(null)
     ;(async () => {
       if (!gameId) {
@@ -208,13 +211,16 @@ function ParticipantContent() {
           paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
         } : undefined}
       >
-        <div className="card relative mx-auto max-w-md w-full p-6 space-y-5">
+        <div className="relative mx-auto max-w-md w-full flex flex-col">
+          <ParticipantPrizePromo catalog={currentGameMeta?.prizeCatalog} stickers />
+          <div className="relative w-full">
           <ParticipantLanguageSelector />
+        <div className="card relative w-full p-6 pt-14 space-y-5">
           {logo && (
             <img
               src={logo}
               alt={currentGameMeta?.clientLogoUrl ? t('Logo del cliente') : game?.name}
-              className="mx-auto h-24 w-auto max-w-full object-contain"
+              className="mx-auto h-32 w-auto max-w-full object-contain"
             />
           )}
           {prizeRefreshFailed && (
@@ -224,6 +230,11 @@ function ParticipantContent() {
                 {t('Reintentar actualización de premios')}
               </button>
             </div>
+          )}
+          {photoUploadWarning && (
+            <p role="status" className="text-sm text-amber-300">
+              {t('No se pudo guardar la foto; se muestra el avatar genérico.')}
+            </p>
           )}
           {step === 'loading' && <p className="text-center text-textSub">{t('Cargando...')}</p>}
           {step === 'access-error' && (
@@ -272,14 +283,15 @@ function ParticipantContent() {
             <JoinForm
               gameId={gameId}
               gameMeta={gameMeta}
-              onJoined={(token) => {
+              onJoined={(token, photoUploadFailed) => {
+                setPhotoUploadWarning(Boolean(photoUploadFailed))
                 applyAssignment(gameMeta, token, loadAssignment(gameId))
               }}
             />
           )}
 
           {gameType === 'STACK' && step === 'play' && stackAssignment && playerToken && (
-            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} />
+            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} showPrizePromo={false} />
           )}
 
           {gameType === 'EMPAREJA2' && step === 'assignment' && gameMeta && playerToken && (
@@ -287,6 +299,7 @@ function ParticipantContent() {
               gameId={gameId}
               gameMeta={gameMeta}
               playerToken={playerToken}
+              showPrizePromo={false}
               onValidate={() => setStep('validate')}
             />
           )}
@@ -330,8 +343,11 @@ function ParticipantContent() {
               difference={t1merResult.difference}
               rank={t1merResult.rank}
               prizeCatalog={currentGameMeta?.prizeCatalog}
+              showPrizePromo={false}
             />
           )}
+        </div>
+        </div>
         </div>
       </div>
     </ThemeProvider>

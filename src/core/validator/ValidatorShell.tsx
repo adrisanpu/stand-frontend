@@ -10,6 +10,7 @@ type ScanStatus = 'idle' | 'scanning' | 'redeeming' | 'ok' | 'already' | 'error'
 const PRIZE_LABEL: Record<string, string> = {
   validation: 'Premio por pareja',
   raffle: 'Premio del sorteo',
+  ranking: 'Premio del ranking',
 }
 
 export default function ValidatorShell() {

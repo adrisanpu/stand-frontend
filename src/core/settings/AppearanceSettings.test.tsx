@@ -32,6 +32,8 @@ it.each(['Guardar Cambios', 'Restaurar por Defecto'])('reports failure for %s be
   render(<AppearanceSettings onBack={vi.fn()} onCloseMenu={vi.fn()} />)
   expect(await screen.findAllByDisplayValue('#ff0000')).toHaveLength(2)
   expect(screen.getAllByDisplayValue('#00ff00')).toHaveLength(2)
+  expect(screen.getByRole('button', { name: 'Guardar Cambios' })).toHaveClass('bg-primary/20', 'border-primary/30', 'hover:bg-primary/30')
+  expect(screen.getByRole('button', { name: 'Restaurar por Defecto' })).toHaveClass('bg-red-500/20', 'border-red-500/30')
   fireEvent.click(screen.getByRole('button', { name: button }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Servidor no disponible')
   expect(saveAppearance).toHaveBeenCalledWith(button === 'Guardar Cambios'

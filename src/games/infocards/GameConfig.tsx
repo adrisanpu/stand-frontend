@@ -390,7 +390,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
       <button
         onClick={() => handleMediaClick(card.id)}
         disabled={!!mediaUploadingCardId}
-        className={`rounded-lg border-2 border-dashed border-white/15 flex flex-col items-center justify-center gap-1 hover:border-white/30 transition-colors disabled:opacity-40 flex-shrink-0 ${className}`}
+        className={`rounded-lg border-2 border-dashed border-primary/30 flex flex-col items-center justify-center gap-1 hover:border-primary/30 transition-colors disabled:opacity-40 flex-shrink-0 ${className}`}
       >
         {isUploadingThisCard ? (
           <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
@@ -446,7 +446,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
       <div>
         <button
           onClick={() => setAiExpanded(v => !v)}
-          className="flex items-center justify-between w-full text-left mb-1 p-2 rounded-lg hover:bg-white/5 transition-colors"
+          className="flex items-center justify-between w-full text-left mb-1 p-2 rounded-lg hover:bg-primary/10 transition-colors"
           aria-expanded={aiExpanded}
         >
           <span className="flex items-center gap-2 text-sm font-medium text-gray-300">
@@ -631,8 +631,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
             <button
               onClick={handleGenerate}
               disabled={isAiLoading || (!text.trim() && pdfFiles.length === 0)}
-              className="w-full py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: '#6366F1', color: '#fff' }}
+              className="w-full py-2.5 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isAiLoading ? (aiStatus === 'uploading' ? t('Subiendo...', 'Uploading...') : t('Procesando...', 'Processing...')) : t('Generar tarjetas', 'Generate cards')}
             </button>
@@ -778,8 +777,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
           <button
             onClick={handleSaveCards}
             disabled={isSaving}
-            className="mt-3 w-full py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: '#6366F1', color: '#fff' }}
+            className="mt-3 w-full py-2.5 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? t('Guardando...', 'Saving...') : t('Guardar cambios', 'Save changes')}
           </button>

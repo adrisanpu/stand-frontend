@@ -144,7 +144,7 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange,
           type="button"
           onClick={() => void handleSave()}
           disabled={!loaded || saveStatus === 'saving'}
-          className="w-full p-3 rounded-xl bg-[rgba(239,68,68,0.2)] border border-[rgba(239,68,68,0.3)] hover:bg-[rgba(239,68,68,0.3)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saveStatus === 'saving' ? t('Guardando...', 'Saving...') : t('Guardar configuración', 'Save configuration')}
         </button>

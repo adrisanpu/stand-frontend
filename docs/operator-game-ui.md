@@ -8,6 +8,14 @@ Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas d
 
 ## Configurar juego
 
+Action buttons inside settings panels (save/apply, generate Quiz/cards, export,
+share, download and image selection) use the active palette's primary color,
+including hover and border states. Keep destructive actions red. Preserve the
+original category icon colors and neutral navigation styling in the main settings
+menu; do not recolor those icons to match the palette. Use `bg-primary/20`,
+`border-primary/30` and `hover:bg-primary/30`, not hard-coded action colors.
+The Tailwind primary token must support opacity via `--color-primary-rgb`.
+
 ### Prize images
 
 `Settings > Premios` stores independent `validation`, `ranking` and `raffle`
@@ -15,6 +23,9 @@ entries in the game's `prizeCatalog`. Each entry has a name, nullable limit,
 optional ranking `topX` and optional image. In the editor, order controls as
 name -> image -> numeric parameters (including Top X where applicable).
 Allow PNG up to 5 MB, display a preview and provide replace/remove actions.
+Keep image controls in a single 44px-high row: contained thumbnail, choose/replace
+control and accessible remove button. Use a short size hint below, with validation
+errors and progress still visible when applicable.
 File choices remain drafts until the server confirms **Guardar**; failed
 uploads or saves must not publish local success or discard the draft.
 
@@ -25,6 +36,67 @@ and ranking prizes above the fields, never raffle; results still display any
 awarded raffle prize and its existing redemption QR. Keep image-free legacy
 events usable. Store durable keys and refresh signed URLs through metadata reads;
 never persist a presigned URL as the authoritative reference.
+
+Players, ranking and raffle panels use `PrizeSticker` in every orientation and play mode;
+their titles and the player count share `HOME_TITLE_TEXT` (`text-xl sm:text-2xl`),
+regardless of compact mode. All other widget text, including prize names and
+counters, rank numbers, usernames, scores, timers, loading/empty messages,
+warnings and the raffle winners portal, uses `HOME_BODY_TEXT` (`text-sm leading-4`).
+These shared tokens live in `src/core/ui/homeTypography.ts`; preserve existing
+colors and font weights. Keep the mobile home's "NO ESCANEAR, POR FAVOR."
+headline unchanged as the largest text. Settings and participant `/play` retain
+their own typography.
+In STACK `/play`, keep the block counter on the left and the player's avatar and
+username on the right of the same row. After the server confirms the result,
+show the actual rank as a large `Posición: #N` overlay inside the scene, without
+a separate game-over summary below it. Preserve pending-save status, errors and
+save retries; never display an unconfirmed rank.
+Once STACK has a saved score, fetch ranking-prize eligibility from the player
+endpoint. For a server-issued claim, overlay the prize image and its name below
+the position, with the locally generated redemption QR alongside the prize.
+Keep the redemption instruction below the scene, without a separate prize card
+or repeated prize name. Eligibility requires a configured prize, a rank within
+Top X and within its quantity limit (if set). Refresh claims every 30 seconds;
+replace the QR with a collected notice after delivery. The validator rechecks
+the current ranking and records delivery once, even for concurrent scans.
+The shared participant `/play` panel shows validation and ranking prizes as
+compact stickers overlapping its top-left border, instead of a promotion block
+inside each view. Keep them visible during registration, play, validation and results.
+The language selector is a sibling outside the card's backdrop-filter stacking
+context, at `z-50`, anchored inside the panel's top-right corner via a shared
+relative wrapper. Use `pt-14` for logo clearance and a `h-32` logo.
+Keep registration consent concise, with a separate privacy-policy link.
+After a verification code is successfully sent, hide the registration prompt,
+participant fields and consent notice while showing code entry. Keep the
+accepted consent and field values in state; "Cambiar datos" restores them.
+If sending fails, keep the registration fields and consent visible.
+Reserve space to the right of
+the stickers so they do not cover the selector on narrow screens.
+Stack multiple configured prizes above the same corner, hide
+zero-limit/empty prizes and omit counters (registration has no live prize count).
+Use participant language and the active palette; preserve prize redemption QR
+cards in results. Ranking stickers retain
+`PREMIO TOP X` (`TOP PRIZE X` in English) when Top X is configured, and count
+ranking entries against the prize limit; ranking row highlights and scrolling
+remain unchanged. Ranking rows always show a profile avatar: use the participant
+photo when available and the avatar's initials fallback when absent or unavailable.
+Place the sticker at
+the top right, overlapping the card border, with a large `object-contain` image
+inside a circle using the active theme's primary color. To its right, show
+`PREMIO: <name>` (`PRIZE` in English), then the current/limit counter underneath.
+Outline the sticker with the active theme's primary color.
+The sticker background must be opaque: layer the theme surface over the solid
+theme background so translucent surface colors do not reveal the panel behind it.
+Players counts validations; raffle counts winners, not delivered prizes.
+Without an image, keep text only; without a limit, hide the counter. Hide the
+sticker if both name and image are absent. Wrap long names within two lines and
+expose the full name in a title tooltip. Place the player count before the
+Players label, left-aligned; let the label wrap below the count on narrow panels.
+Reserve
+space above the card within the widget so ancestor clipping does not hide the
+sticker. The card's top border crosses the sticker's vertical midpoint: use
+a 4rem height with -2rem bottom margin in compact mode, or 5rem with -2.5rem
+otherwise. Keep the card's normal padding without extra top padding for the sticker.
 
 Place the operator **ES / EN** selector immediately before the close X in the
 settings header. Use `useOperatorLanguage()` from
@@ -56,7 +128,9 @@ from registration requests. Save these settings with the shared footer, not in
 individual game configs. Existing events default to email enabled and Instagram
 and phone disabled when no explicit configuration exists. Show these for both access
 channels and all supported play modes; individual game configs must not duplicate
-them.
+them. Web registration also offers an optional profile photo for every participant,
+independent of the configured contact fields; uploaded photos appear in rankings
+and participant `/play`.
 
 ## Screen edge → content (AppShell)
 
@@ -75,6 +149,12 @@ Settings control is `fixed top-4 left-4` (not part of game panels).
 
 ## Mobile-client event home
 
+On `/home`, check the saved Appearance media before displaying game content.
+Prefer the user-selected client logo; only use the game's default logo when no
+client logo is selected. Do not briefly show the game logo while this initial
+lookup is pending, or substitute the platform Stand logo for the game's logo.
+Apply the same priority in portrait, landscape, master and mobile modes.
+
 When `playMode === 'mobile'`, `AppShell` renders the shared `MobileGameHome`
 instead of the game's operator interaction panel (EMPAREJA2, T1MER and STACK).
 Landscape uses three columns: large logo with players and an expanded raffle
@@ -83,6 +163,9 @@ column. The large QR panel displays **NO ESCANEAR, POR FAVOR.** in Spanish or
 **DO NOT SCAN THIS.** in English, centered above the QR in oversized bold white
 text with **NO** / **NOT** in red, following the selected interface language.
 Reserve vertical space for this heading when sizing the QR so both fit.
+Distribute remaining vertical space evenly above the heading, between the heading
+and QR, and below the QR. Keep base padding and gap equal (1rem, or 1.5rem from
+`sm`) so all three spaces remain equal as the panel height changes.
 Games without a ranking use two columns; raffle plan restrictions and
 prize settings remain unchanged. The logo card contains only the logo, without
 the manual icon or legal footer. No mobile participation explanation, participant

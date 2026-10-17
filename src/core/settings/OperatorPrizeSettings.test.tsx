@@ -116,6 +116,20 @@ describe('prize editor', () => {
       .toEqual(['Premio', 'Imagen PNG', 'Límite'])
   })
 
+  it('keeps image preview, replacement and removal in one compact row', async () => {
+    await mount()
+    const preview = region().getByAltText('Vista previa del premio')
+    expect(preview).toHaveClass('h-11', 'w-11', 'object-contain')
+    expect(preview.parentElement).toHaveClass('flex', 'h-11', 'items-center')
+    expect(preview.parentElement).toContainElement(region().getByLabelText(/Imagen PNG/))
+    expect(preview.parentElement).toContainElement(region().getByRole('button', { name: 'Quitar imagen' }))
+    expect(region().getByText('Cambiar')).toBeInTheDocument()
+    expect(region('Ranking').getByText('Elegir PNG')).toBeInTheDocument()
+    expect(region().getByText('PNG, máx. 5 MB.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar' })).toHaveClass('bg-primary/20', 'border-primary/30', 'hover:bg-primary/30')
+    expect(region().getByRole('button', { name: 'Quitar imagen' })).toHaveClass('text-red-400')
+  })
+
   it('treats an empty server catalog as authoritative instead of reviving local names', async () => {
     serverResponse = { ok: true, prizeCatalog: {} }
     await mount({ settings: { prizeValidation: 'stale', maxPrizeValidation: 99 } })

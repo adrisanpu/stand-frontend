@@ -37,6 +37,17 @@ function openConfig() {
 const footer = () => screen.getByRole('button', { name: 'Guardar y aplicar cambios' })
 
 describe('SettingsMenu Configurar juego', () => {
+  it('preserves menu icon colors while theming action buttons inside submenus', async () => {
+    render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />)
+    const quiz = screen.getByRole('button', { name: /Quiz/ })
+    expect(quiz.querySelector('svg')).toHaveClass('text-green-400')
+    const raffle = screen.getByRole('button', { name: /Sorteo/ })
+    expect(raffle.querySelector('svg')).toHaveClass('text-purple-400')
+    fireEvent.click(screen.getByText('Configurar juego'))
+    await waitFor(() => expect(footer()).toBeEnabled())
+    expect(footer()).toHaveClass('bg-primary/20', 'border-primary/30', 'hover:bg-primary/30')
+  })
+
   it('keeps unsaved rules when changing language beside the close button', async () => {
     render(
       <OperatorLanguageProvider>

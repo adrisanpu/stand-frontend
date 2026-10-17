@@ -6,7 +6,8 @@ import { normalizeGameType } from '../gameTypeMap'
 import { usePolling } from '../../hooks/usePolling'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import type { GamePrize } from '../prizes'
-import { PrizeImage } from './PrizePresentation'
+import PrizeSticker from './PrizeSticker'
+import { HOME_TITLE_TEXT, HOME_BODY_TEXT } from '../ui/homeTypography'
 
 interface GameDataResponse {
   ok: boolean
@@ -25,7 +26,7 @@ interface PlayersProps {
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and avoid scroll
   countersOnly?: boolean // when true (e.g. empareja2 landscape), compact card without main "Jugadores" heading
-  prizeLabel?: string // e.g. "🎁 Entrada gratis" — shown below title when set
+  prizeLabel?: string // Legacy prize name, shown in the prize sticker
   prize?: GamePrize
   /** Límite premio validación (localStorage; empareja2 también API) */
   maxPrizeValidationLimit?: number
@@ -45,38 +46,6 @@ function getEmpareja2MaxValidations(gameId: string | undefined): number | undefi
   } catch {
     return undefined
   }
-}
-
-function PrizeLine({
-  label,
-  current,
-  max,
-  compact,
-  t,
-  prize,
-}: {
-  label: string
-  current: number
-  max: number | undefined
-  compact: boolean
-  t: (spanish: string, english?: string) => string
-  prize?: GamePrize
-}) {
-  return (
-    <div
-      className={`flex items-center justify-between gap-2 min-w-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'} text-textSub mt-2`}
-    >
-      <PrizeImage prize={prize} compact />
-      <span className="min-w-0 truncate">
-        {t('Premio', 'Prize')}: {label}
-      </span>
-      {max !== undefined && (
-        <span className="flex-shrink-0 text-[10px] sm:text-xs text-textSub tabular-nums">
-          {current}/{max}
-        </span>
-      )}
-    </div>
-  )
 }
 
 export default function Players({ gameName, gameId, gameType, refreshInterval = 10000, compact = false, countersOnly = false, prizeLabel: legacyPrizeLabel, prize, maxPrizeValidationLimit }: PlayersProps) {
@@ -113,78 +82,78 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
       <div className={`card rounded-xl sm:rounded-2xl shadow-neon ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
         {!countersOnly && (
           <>
-            <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>{t('Jugadores', 'Players')}</h2>
-            <p className="text-textSub text-xs sm:text-sm">{t('Cargando...', 'Loading...')}</p>
+            <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${HOME_TITLE_TEXT}`}>{t('Jugadores', 'Players')}</h2>
+            <p className={`text-textSub ${HOME_BODY_TEXT}`}>{t('Cargando...', 'Loading...')}</p>
           </>
         )}
-        {countersOnly && <p className="text-textSub text-xs sm:text-sm">{t('Cargando...', 'Loading...')}</p>}
+        {countersOnly && <p className={`text-textSub ${HOME_BODY_TEXT}`}>{t('Cargando...', 'Loading...')}</p>}
       </div>
     )
   }
 
   if (countersOnly && isEmpareja2) {
     return (
-      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
-        {isStale && <span className="text-[10px] font-normal text-yellow-500 mb-1 block">● {t('sin señal', 'offline')}</span>}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className={`font-bold text-textMain ${compact ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'}`}>{t('Jugadores', 'Players')}</div>
-            <div className="flex flex-col items-end gap-1 text-right">
-              <div className="flex items-baseline justify-end gap-2 whitespace-nowrap">
-                <span className={`font-bold tabular-nums text-[var(--color-primary)] ${compact ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'}`}>
-                  {playerCount}
-                </span>
-                {maxPlayers !== null && (
-                  <>
-                    <span className="text-textSub">/</span>
-                    <span className="font-semibold text-lg sm:text-xl tabular-nums text-textMain">{maxPlayers}</span>
-                  </>
+      <div className="flex flex-col shrink-0 min-w-0">
+        <PrizeSticker label={prizeLabel} prize={prize} current={validatedCount} max={effectiveMax} compact={compact} />
+        <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
+          {isStale && <span className={`${HOME_BODY_TEXT} font-normal text-yellow-500 mb-1 block`}>● {t('sin señal', 'offline')}</span>}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-col items-start gap-1 text-left">
+                <div className="flex items-baseline gap-2 whitespace-nowrap">
+                  <span className={`font-bold tabular-nums text-[var(--color-primary)] ${HOME_TITLE_TEXT}`}>
+                    {playerCount}
+                  </span>
+                  {maxPlayers !== null && (
+                    <>
+                      <span className={`text-textSub ${HOME_TITLE_TEXT}`}>/</span>
+                      <span className={`font-semibold ${HOME_TITLE_TEXT} tabular-nums text-textMain`}>{maxPlayers}</span>
+                    </>
+                  )}
+                </div>
+                {maxPlayers !== null && playerCount >= maxPlayers && (
+                  <span className={`text-red-400 ${HOME_BODY_TEXT} whitespace-nowrap`}>{t('Límite alcanzado', 'Limit reached')}</span>
                 )}
               </div>
-              {maxPlayers !== null && playerCount >= maxPlayers && (
-                <span className="text-red-400 text-xs whitespace-nowrap">{t('Límite alcanzado', 'Limit reached')}</span>
-              )}
+              <div className={`font-bold text-textMain ${HOME_TITLE_TEXT}`}>{t('Jugadores', 'Players')}</div>
             </div>
           </div>
-          {(prizeLabel || prize?.imageUrl) && (
-            <PrizeLine label={prizeLabel ?? ''} prize={prize} current={validatedCount} max={effectiveMax} compact={compact} t={t} />
-          )}
         </div>
       </div>
     )
   }
 
   return (
-    <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
-      {isStale && <span className="text-[10px] font-normal text-yellow-500 mb-1 block">● {t('sin señal', 'offline')}</span>}
-      <div className="flex items-center justify-between gap-3">
-        <h2 className={`font-bold text-textMain ${compact ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'}`}>
-          {t('Jugadores', 'Players')}
-        </h2>
-        <div className="flex flex-col items-end gap-1 text-right">
-          <div className="flex items-baseline justify-end gap-2 whitespace-nowrap">
-            <div className={`font-bold tabular-nums text-[var(--color-primary)] ${compact ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'}`}>
-              {playerCount}
+    <div className="flex flex-col shrink-0 min-w-0">
+      <PrizeSticker label={prizeLabel} prize={prize} current={validatedCount} max={effectiveMax} compact={compact} />
+      <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
+        {isStale && <span className={`${HOME_BODY_TEXT} font-normal text-yellow-500 mb-1 block`}>● {t('sin señal', 'offline')}</span>}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col items-start gap-1 text-left">
+            <div className="flex items-baseline gap-2 whitespace-nowrap">
+              <div className={`font-bold tabular-nums text-[var(--color-primary)] ${HOME_TITLE_TEXT}`}>
+                {playerCount}
+              </div>
+              {maxPlayers !== null && (
+                <>
+                  <div className={`text-textSub ${HOME_TITLE_TEXT}`}>/</div>
+                  <div className={`font-semibold text-textMain ${HOME_TITLE_TEXT}`}>
+                    {maxPlayers}
+                  </div>
+                </>
+              )}
             </div>
-            {maxPlayers !== null && (
-              <>
-                <div className={`text-textSub ${compact ? 'text-xs' : 'text-sm sm:text-base'}`}>/</div>
-                <div className={`font-semibold text-textMain ${compact ? 'text-base' : 'text-lg sm:text-xl'}`}>
-                  {maxPlayers}
-                </div>
-              </>
+            {maxPlayers !== null && playerCount >= maxPlayers && (
+              <span className={`text-red-400 whitespace-nowrap ${HOME_BODY_TEXT}`}>
+                {t('Límite alcanzado', 'Limit reached')}
+              </span>
             )}
           </div>
-          {maxPlayers !== null && playerCount >= maxPlayers && (
-            <span className={`text-red-400 whitespace-nowrap ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>
-              {t('Límite alcanzado', 'Limit reached')}
-            </span>
-          )}
+          <h2 className={`font-bold text-textMain ${HOME_TITLE_TEXT}`}>
+            {t('Jugadores', 'Players')}
+          </h2>
         </div>
       </div>
-      {(prizeLabel || prize?.imageUrl) && (
-        <PrizeLine label={prizeLabel ?? ''} prize={prize} current={validatedCount} max={effectiveMax} compact={compact} t={t} />
-      )}
     </div>
   )
 }
