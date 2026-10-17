@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
+import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 
 type InfoCard = {
   id: string
@@ -55,11 +56,15 @@ const LAYOUT_OPTIONS: { value: CardLayoutPosition; label: string }[] = [
   { value: 'bottom', label: 'Abajo' },
 ]
 
-export default function InfocardsGameConfig({ gameId, settings = {}, onChange }: GameConfigProps) {
+export default function InfocardsGameConfig({ gameId, settings = {}, onChange, registerSave }: GameConfigProps) {
   // Section A — current cards
   const [cards, setCards] = useState<InfoCard[]>([])
   const [loadingCards, setLoadingCards] = useState(true)
+  const [cardsLoadError, setCardsLoadError] = useState('')
   const [cardsDirty, setCardsDirty] = useState(false)
+  const savedCardLayouts = settings?.cardLayouts as Record<string, CardLayoutPosition> | undefined
+  const [cardLayouts, setCardLayouts] = useState<Record<string, CardLayoutPosition>>(savedCardLayouts ?? {})
+  const [layoutsDirty, setLayoutsDirty] = useState(false)
   const [saveStatus, setSaveStatus] = useState<Status>('idle')
   const [saveMessage, setSaveMessage] = useState('')
   const [mediaUploadingCardId, setMediaUploadingCardId] = useState<string | null>(null)
@@ -89,6 +94,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
   const fetchCards = useCallback(async () => {
     if (!gameId) return
     setLoadingCards(true)
+    setCardsLoadError('')
     try {
       const data = await api.get<GetResponse>(`/v1/game/infocards?gameId=${encodeURIComponent(gameId)}`)
       const sorted = (data.cards || []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
@@ -97,9 +103,10 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
       setAiExpanded(sorted.length === 0)
       setRequiresValidation(data.requiresValidation ?? false)
       setQuizCompletedMessage(data.quizCompletedMessage ?? '')
-    } catch {
+    } catch (err) {
       setCards([])
       setAiExpanded(true)
+      setCardsLoadError(saveErrorMessage(err, 'No se pudieron cargar las tarjetas.'))
     } finally {
       setLoadingCards(false)
     }
@@ -108,6 +115,11 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
   useEffect(() => {
     fetchCards()
   }, [fetchCards])
+
+  useEffect(() => {
+    setCardLayouts(savedCardLayouts ?? {})
+    setLayoutsDirty(false)
+  }, [savedCardLayouts])
 
   // ===== Per-card media upload =====
 
@@ -173,11 +185,21 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
     setCardsDirty(true)
   }
 
-  const handleSaveCards = async () => {
-    if (!gameId) return
-    setSaveStatus('uploading')
-    setSaveMessage('Guardando...')
-    try {
+  const isAiLoading = aiStatus === 'uploading' || aiStatus === 'processing'
+  const isSaving = saveStatus === 'uploading'
+
+  const validate = () => {
+    if (mediaUploadingCardId) return 'Espera a que termine la subida del archivo.'
+    if (isAiLoading) return 'Espera a que termine la generación con IA.'
+    if (loadingCards && gameId) return 'Las tarjetas aún se están cargando.'
+    if (cardsDirty && cardsLoadError) return cardsLoadError
+    return null
+  }
+
+  const persist = async () => {
+    const invalid = validate()
+    if (invalid) throw new Error(invalid)
+    if (cardsDirty && gameId) {
       // Strip ephemeral/computed fields before sending
       const cardsToSave = cards.map(({ _localImagePreview, _localVideoPreview, imageUrl, videoUrl, ...rest }) => rest)
       const res = await api.put<PutResponse>('/v1/game/infocards', {
@@ -186,14 +208,26 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
         requiresValidation,
         quizCompletedMessage: quizCompletedMessage.trim(),
       })
-      if (!res.ok) throw new Error('No se pudieron guardar las tarjetas.')
+      if (!res?.ok) throw new Error('No se pudieron guardar las tarjetas.')
+      await fetchCards()
+    }
+    setLayoutsDirty(false)
+    onChange({ ...settings, cardLayouts, refreshGameScreen: true })
+  }
+
+  const embedded = useGameConfigSaveRegistration(registerSave, { validate, save: persist })
+
+  const handleSaveCards = async () => {
+    if (!gameId) return
+    setSaveStatus('uploading')
+    setSaveMessage('Guardando...')
+    try {
+      await persist()
       setSaveStatus('done')
       setSaveMessage('Guardado correctamente.')
-      await fetchCards()
-      onChange({ ...settings, refreshGameScreen: true })
     } catch (err) {
       setSaveStatus('error')
-      setSaveMessage(err instanceof Error ? err.message : 'Error al guardar.')
+      setSaveMessage(saveErrorMessage(err, 'Error al guardar.'))
     }
   }
 
@@ -272,14 +306,11 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
     }
   }
 
-  const isAiLoading = aiStatus === 'uploading' || aiStatus === 'processing'
-  const isSaving = saveStatus === 'uploading'
-
-  const getCardLayout = (cardId: string): CardLayoutPosition =>
-    (settings?.cardLayouts?.[cardId] as CardLayoutPosition) ?? 'top'
+  const getCardLayout = (cardId: string): CardLayoutPosition => cardLayouts[cardId] ?? 'top'
 
   const handleLayoutChangeForCard = (cardId: string, position: CardLayoutPosition) => {
-    onChange({ ...settings, cardLayouts: { ...(settings?.cardLayouts || {}), [cardId]: position } })
+    setCardLayouts(prev => ({ ...prev, [cardId]: position }))
+    setLayoutsDirty(true)
   }
 
   const renderImageSlot = (card: InfoCard, className: string) => {
@@ -431,11 +462,11 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
 
         {aiExpanded && (
           <div className="mt-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-3">
-            {/* Fila 1: Nº tarjetas, Generar quiz, y si checked: Nº preguntas, Nº respuestas, Emoticonos */}
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="min-w-[100px]">
-                <label className="block text-xs font-medium text-gray-400 mb-1">Nº de tarjetas</label>
+            <div className="grid grid-cols-2 items-end gap-3">
+              <div className="min-w-0">
+                <label htmlFor="infocards-num-cards" className="block text-xs font-medium text-gray-400 mb-1">Nº de tarjetas</label>
                 <select
+                  id="infocards-num-cards"
                   value={numCards}
                   onChange={e => setNumCards(Number(e.target.value))}
                   disabled={isAiLoading}
@@ -458,9 +489,10 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
               </label>
               {generateQuiz && (
                 <>
-                  <div className="min-w-[100px]">
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Nº preguntas</label>
+                  <div className="min-w-0">
+                    <label htmlFor="infocards-num-questions" className="block text-xs font-medium text-gray-400 mb-1">Nº preguntas</label>
                     <select
+                      id="infocards-num-questions"
                       value={numQuestions}
                       onChange={e => setNumQuestions(Number(e.target.value))}
                       disabled={isAiLoading}
@@ -471,9 +503,10 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
                       ))}
                     </select>
                   </div>
-                  <div className="min-w-[100px]">
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Nº respuestas</label>
+                  <div className="min-w-0">
+                    <label htmlFor="infocards-num-options" className="block text-xs font-medium text-gray-400 mb-1">Nº respuestas</label>
                     <select
+                      id="infocards-num-options"
                       value={numOptions}
                       onChange={e => setNumOptions(Number(e.target.value))}
                       disabled={isAiLoading}
@@ -649,6 +682,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
       <div>
         <h3 className="text-lg font-semibold mb-3">Vista previa</h3>
 
+        {cardsLoadError && <p role="alert" className="mb-3 text-sm text-red-400">{cardsLoadError}</p>}
         {loadingCards ? (
           <p className="text-sm text-gray-400 animate-pulse">Cargando tarjetas...</p>
         ) : cards.length === 0 ? (
@@ -737,7 +771,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
           </div>
         )}
 
-        {cardsDirty && !loadingCards && (
+        {!embedded && (cardsDirty || layoutsDirty) && !loadingCards && (
           <button
             onClick={handleSaveCards}
             disabled={isSaving}

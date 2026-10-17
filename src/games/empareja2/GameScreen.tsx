@@ -13,6 +13,7 @@ import {
 import { useAvatarsEnabled } from '../../core/theme'
 import Empareja2OperatorScreen from './OperatorScreen'
 import { getEmpareja2CenterKind } from './centerKind'
+import { resolveGameAccess } from '../../core/settings/gameAccess'
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
 
@@ -128,9 +129,10 @@ export default function Empareja2GameScreen({
   onAvatarStateChange,
   avatarMediaUrls,
   joinChannel,
+  playMode,
 }: GameScreenProps) {
   const avatarsEnabled = useAvatarsEnabled()
-  const centerKind = getEmpareja2CenterKind(joinChannel, avatarsEnabled)
+  const centerKind = getEmpareja2CenterKind(resolveGameAccess('EMPAREJA2', { playMode, joinChannel }).playMode, avatarsEnabled)
   const isPhoneMode = centerKind !== 'pair'
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
@@ -336,7 +338,7 @@ export default function Empareja2GameScreen({
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
-        <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
+        <GameLandscapeLeftColumn gameId={gameId} joinChannel={joinChannel} logoElement={logoElement} playersElement={playersElement}>
           {isPhoneMode ? (
             <>
               <LandscapeInfoInstruction>
@@ -352,7 +354,7 @@ export default function Empareja2GameScreen({
           ) : (
             <>
               <LandscapeInfoInstruction>
-                Escanea el QR y pulsa JUGAR en el chat.
+                {joinChannel === 'instagram' ? 'Escanea el QR y pulsa JUGAR en el chat.' : 'Escanea el QR y completa el formulario web.'}
               </LandscapeInfoInstruction>
               <LandscapeInfoInstruction>
                 Recibe tu pareja asignada y tu código de validación.

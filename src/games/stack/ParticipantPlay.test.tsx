@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PublicApiError, publicApi, type StackAssignment, type StackFinishResponse } from '../../api/publicApi'
+import { ParticipantLanguageProvider, ParticipantLanguageSelector } from '../../core/participant/participantLanguage'
 import { loadAssignment } from '../../core/participant/playerSession'
 import type { StackSnapshot } from './stackLogic'
 import { DEFAULT_STACK_CONFIG } from './stackLogic'
@@ -77,7 +78,7 @@ describe('STACK participant gameplay', () => {
   it('loads the scene without consuming an attempt and keeps the centered identity header', async () => {
     const { unmount } = renderGame()
     await ready()
-    const header = screen.getByRole('img', { name: 'STACK' }).closest('header')
+    const header = screen.getByText('@rekete').closest('header')
     expect(header).toHaveClass('justify-center')
     expect(header).toContainElement(screen.getByText('@rekete'))
     expect(header?.querySelector('img[src="/profile.jpg"]')).not.toBeNull()
@@ -139,6 +140,39 @@ describe('STACK participant gameplay', () => {
     expect(screen.getByRole('button', { name: 'COLOCAR' })).toBeEnabled()
   })
 
+  it('switches languages during play without recreating the scene, duplicating requests, or losing the snapshot', async () => {
+    render(
+      <ParticipantLanguageProvider>
+        <ParticipantLanguageSelector />
+        <StackParticipantPlay gameId="GAME1234" playerToken="token" assignment={assignment} config={DEFAULT_STACK_CONFIG} startSupported finishSupported />
+      </ParticipantLanguageProvider>,
+    )
+    const options = await ready()
+    fireEvent.click(screen.getByRole('button', { name: 'EMPEZAR' }))
+    await waitFor(() => expect(controller.start).toHaveBeenCalledTimes(1))
+    update(options, { state: 'PLAYING', score: 4 })
+
+    const languageSelector = screen.getByRole('combobox')
+    fireEvent.change(languageSelector, { target: { value: 'en' } })
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'PLACE' })).toBeEnabled()
+    expect(screen.getByText('4', { selector: 'span' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+    expect(screen.getByRole('button', { name: 'Resume' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+
+    fireEvent.change(languageSelector, { target: { value: 'es' } })
+    expect(screen.getByRole('button', { name: 'Pausar' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'COLOCAR' })).toBeEnabled()
+    expect(screen.getByText('4', { selector: 'span' })).toBeInTheDocument()
+    expect(createScene).toHaveBeenCalledTimes(1)
+    expect(controller.start).toHaveBeenCalledTimes(1)
+    expect(controller.dispose).not.toHaveBeenCalled()
+    expect(publicApi.startStackAttempt).toHaveBeenCalledTimes(1)
+    expect(publicApi.score).not.toHaveBeenCalled()
+    expect(publicApi.finishStackAttempt).not.toHaveBeenCalled()
+  })
+
   it('retries the same identifier after a network error, never creating another attempt', async () => {
     vi.mocked(publicApi.startStackAttempt).mockRejectedValueOnce(new Error('Sin conexión'))
     renderGame()
@@ -188,13 +222,13 @@ describe('STACK participant gameplay', () => {
     fireEvent.click(screen.getByRole('button', { name: 'EMPEZAR' }))
     await waitFor(() => expect(controller.start).toHaveBeenCalledTimes(1))
     update(options, {})
-    const canvas = screen.getByLabelText('Escena 3D de pizzas rectangulares')
+    const canvas = screen.getByLabelText('Escena 3D de bloques apilados')
     const primary = new Event('pointerdown', { bubbles: true, cancelable: true })
     Object.defineProperties(primary, { isPrimary: { value: true }, pointerType: { value: 'touch' }, button: { value: 0 } })
     fireEvent(canvas, primary)
     fireEvent.click(canvas)
     expect(controller.place).toHaveBeenCalledTimes(1)
-    fireEvent.click(screen.getByRole('img', { name: 'STACK' }))
+    fireEvent.click(screen.getByText('@rekete'))
     expect(controller.place).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: 'COLOCAR' }))
     expect(controller.place).toHaveBeenCalledTimes(2)
@@ -206,7 +240,7 @@ describe('STACK participant gameplay', () => {
     expect(controller.place).toHaveBeenCalledTimes(2)
   })
 
-  it('clears Perfect feedback for the next pizza without changing the score or submitting a result', async () => {
+  it('clears Perfect feedback for the next block without changing the score or submitting a result', async () => {
     const { options } = await startGame()
     update(options, { state: 'PLACING', score: 1, perfect: true })
     expect(screen.getByText('PERFECT!')).toBeInTheDocument()
@@ -224,7 +258,7 @@ describe('STACK participant gameplay', () => {
   it('ignores secondary fingers and non-primary mouse buttons on the play surface', async () => {
     const { options } = await startGame()
     update(options, {})
-    const canvas = screen.getByLabelText('Escena 3D de pizzas rectangulares')
+    const canvas = screen.getByLabelText('Escena 3D de bloques apilados')
     for (const input of [
       { isPrimary: false, pointerType: 'touch', button: 0 },
       { isPrimary: true, pointerType: 'mouse', button: 1 },

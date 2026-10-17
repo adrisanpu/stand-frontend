@@ -144,7 +144,7 @@ export default function Ranking({
                 <div className="text-right flex-shrink-0 ml-2">
                   <div className="text-textMain font-semibold text-[14px]">
                     {isStack && typeof entry.score === 'number'
-                      ? `${entry.score} pizzas`
+                      ? `${entry.score} bloques`
                       : entry.timer !== undefined && typeof entry.timer === 'number'
                       ? `${entry.timer.toFixed(3)}s`
                       : 'N/A'}

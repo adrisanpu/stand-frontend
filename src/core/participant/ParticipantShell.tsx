@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
 import { normalizeGameType } from '../gameTypeMap'
-import { PublicApiError, publicApi, isStackAssignment, type PublicGameResponse, type T1merAssignment, type StackAssignment } from '../../api/publicApi'
+import { PublicApiError, publicApi, isStackAssignment, type PublicGameResponse, type PlayerAssignment, type T1merAssignment, type StackAssignment } from '../../api/publicApi'
 import { loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
+import { captureParticipantAccess, completeParticipantAccess } from './participantAccess'
+import { resolveGameAccess } from '../settings/gameAccess'
+import { getInstagramDmUrl } from '../lib/instagram'
 import JoinForm from './JoinForm'
 import AssignmentView from './AssignmentView'
 import ValidateView from './ValidateView'
@@ -12,10 +15,11 @@ import ResultView from './ResultView'
 import T1merParticipantPlay from '../../games/t1mer/ParticipantPlay'
 import T1merParticipantResult from '../../games/t1mer/ParticipantResult'
 import StackParticipantPlay from '../../games/stack/ParticipantPlay'
+import { ParticipantLanguageProvider, ParticipantLanguageSelector, useParticipantLanguage } from './participantLanguage'
 
 type Empareja2Step = 'loading' | 'unsupported' | 'join' | 'assignment' | 'validate' | 'result'
 type T1merStep = 'loading' | 'unsupported' | 'join' | 'play' | 'result'
-type Step = Empareja2Step | T1merStep | 'load-error'
+type Step = Empareja2Step | T1merStep | 'load-error' | 'access-error' | 'instagram' | 'master'
 
 const WEB_PLAY_TYPES = new Set(['EMPAREJA2', 'T1MER', 'STACK'])
 
@@ -33,7 +37,21 @@ function t1merResultFromAssignment(a: T1merAssignment): {
 }
 
 export default function ParticipantShell() {
+  return (
+    <ParticipantLanguageProvider>
+      <ParticipantContent />
+    </ParticipantLanguageProvider>
+  )
+}
+
+function ParticipantContent() {
+  const { language, t } = useParticipantLanguage()
   const { gameId = '' } = useParams()
+  const captured = useRef<{ gameId: string; access: ReturnType<typeof captureParticipantAccess> } | null>(null)
+  if (!captured.current || captured.current.gameId !== gameId) {
+    captured.current = { gameId, access: captureParticipantAccess(gameId) }
+  }
+  const access = captured.current.access
   const [step, setStep] = useState<Step>('loading')
   const [gameMeta, setGameMeta] = useState<PublicGameResponse | null>(null)
   const [playerToken, setPlayerToken] = useState<string | null>(null)
@@ -48,6 +66,29 @@ export default function ParticipantShell() {
 
   const gameType = normalizeGameType(gameMeta?.gameType)
   const game = getGameById(gameType)
+  const isMobile = gameMeta && WEB_PLAY_TYPES.has(gameType)
+    ? resolveGameAccess(gameType, gameMeta).playMode === 'mobile' : false
+
+  const applyAssignment = useCallback((meta: PublicGameResponse, token: string, assignment: PlayerAssignment | null) => {
+    const gt = normalizeGameType(meta.gameType)
+    if (!assignment || (gt === 'STACK' ? !isStackAssignment(assignment)
+      : gt === 'EMPAREJA2' ? !('characterName' in assignment)
+        : !('displayName' in assignment) || isStackAssignment(assignment))) {
+      throw new Error('No se pudo recuperar tu participante. Solicita otro enlace por mensaje de Instagram.')
+    }
+    savePlayerSession(gameId, token, assignment)
+    setPlayerToken(token)
+    if (isStackAssignment(assignment)) {
+      setStackAssignment(assignment)
+      setStep('play')
+    } else if (gt === 'T1MER' && 'displayName' in assignment) {
+      const result = t1merResultFromAssignment(assignment)
+      setT1merResult(result)
+      setStep(result ? 'result' : resolveGameAccess(gt, meta).playMode === 'master' ? 'master' : 'play')
+    } else {
+      setStep('validated' in assignment && assignment.validated ? 'result' : 'assignment')
+    }
+  }, [gameId])
 
   useEffect(() => {
     let cancelled = false
@@ -62,99 +103,102 @@ export default function ParticipantShell() {
       try {
         const meta = await publicApi.getGame(gameId)
         if (cancelled) return
-        setGameMeta(meta)
         const gt = normalizeGameType(meta.gameType)
         if (!WEB_PLAY_TYPES.has(gt)) {
           setStep('unsupported')
           return
         }
+        resolveGameAccess(gt, meta)
+        setGameMeta(meta)
         const token = loadPlayerToken(gameId)
-        let assignment = loadAssignment(gameId)
-        if (gt === 'STACK' && token) {
-          const player = await publicApi.getPlayer(token, gameId)
+        if (access || token) {
+          const player = access
+            ? await access.exchange()
+            : await publicApi.getPlayer(token!, gameId)
           if (cancelled) return
-          if (!player.assignment || !isStackAssignment(player.assignment)) {
-            throw new Error('No se pudo recuperar tu participante de STACK.')
+          if (!player.ok || player.gameId !== gameId || normalizeGameType(player.gameType) !== gt || !player.playerToken) {
+            throw new Error('El enlace o la sesión de participante no es válido.')
           }
-          savePlayerSession(gameId, token, player.assignment)
-          setPlayerToken(token)
-          setStackAssignment(player.assignment)
-          setStep('play')
-          return
-        }
-        if (token && assignment) {
-          setPlayerToken(token)
-          if (gt === 'T1MER') {
-            try {
-              const player = await publicApi.getPlayer(token, gameId)
-              if (cancelled) return
-              if (player.assignment && 'displayName' in player.assignment) {
-                assignment = player.assignment
-                savePlayerSession(gameId, token, player.assignment)
-              }
-            } catch {
-              // keep local assignment
-            }
-            const scored =
-              assignment && 'displayName' in assignment && !isStackAssignment(assignment)
-                ? t1merResultFromAssignment(assignment)
-                : null
-            if (scored) {
-              setT1merResult(scored)
-              setStep('result')
-            } else {
-              setStep('play')
-            }
-          } else if ('validated' in assignment && assignment.validated) {
-            setStep('result')
-          } else {
-            setStep('assignment')
-          }
+          applyAssignment(meta, player.playerToken, player.assignment)
+          if (access) completeParticipantAccess(gameId)
         } else {
-          setStep('join')
+          setStep(resolveGameAccess(gt, meta).joinChannel === 'instagram' ? 'instagram' : 'join')
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'No se pudo cargar el juego')
+          if (access) completeParticipantAccess(gameId)
+          setError(access
+            ? 'El enlace de acceso no es válido, ya se ha utilizado o ha caducado. Solicita un nuevo enlace por mensaje directo de Instagram.'
+            : e instanceof Error ? e.message : 'No se pudo cargar el juego')
           const rejected = e instanceof PublicApiError && e.status >= 400 && e.status < 500 && e.status !== 408 && e.status !== 429
-          setStep(rejected ? 'unsupported' : 'load-error')
+          setStep(access ? 'access-error' : rejected ? 'unsupported' : 'load-error')
         }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [gameId, loadVersion])
+  }, [gameId, loadVersion, access, applyAssignment])
 
   return (
-    <ThemeProvider game={game ?? null}>
+    <ThemeProvider game={game ?? null} appearance={gameMeta?.appearance}>
       <div
+        lang={language}
         className="min-h-dvh bg-club text-textMain font-sans px-4 py-6"
         style={gameType === 'STACK' ? {
           paddingTop: 'max(1.5rem, env(safe-area-inset-top, 0px))',
           paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
         } : undefined}
       >
-        <div className="mx-auto max-w-md w-full space-y-6">
-          {step === 'loading' && <p className="text-center text-textSub">Cargando...</p>}
-          {step === 'unsupported' && (
-            <div className="card p-6 text-center space-y-2">
-              <p className="font-semibold">Juego no disponible</p>
+        <div className="card relative mx-auto max-w-md w-full p-6 space-y-5">
+          <ParticipantLanguageSelector />
+          {(gameMeta?.clientLogoUrl || game?.assets?.logo) && (
+            <img
+              src={gameMeta?.clientLogoUrl || game?.assets?.logo}
+              alt={gameMeta?.clientLogoUrl ? t('Logo del cliente') : game?.name}
+              className="mx-auto h-24 w-auto max-w-full object-contain"
+            />
+          )}
+          {step === 'loading' && <p className="text-center text-textSub">{t('Cargando...')}</p>}
+          {step === 'access-error' && (
+            <div className="text-center space-y-2">
+              <p className="font-semibold">{t('No se pudo abrir tu acceso personal')}</p>
+              <p role="alert" className="text-sm text-textSub">{error && t(error)}</p>
+              <p className="text-sm text-textSub">{t('Envía el código')} {gameId} {t('en el chat para recibir otro enlace.')}</p>
+              <a href={getInstagramDmUrl(gameId)} className="inline-block rounded-xl px-4 py-3 text-primary bg-[rgba(var(--color-primary-rgb),0.2)] border border-[rgba(var(--color-primary-rgb),0.3)]">
+                {t('Solicitar nuevo enlace en Instagram')}
+              </a>
+            </div>
+          )}
+          {step === 'instagram' && (
+            <div className="text-center space-y-2">
+              <h1 className="text-xl font-bold">{t('Participa desde Instagram')}</h1>
               <p className="text-sm text-textSub">
-                {error || 'Este enlace no es válido o el juego no admite participación web todavía.'}
+                {t('Envía el código de la partida')} {gameId} {t('por mensaje directo a la cuenta de Instagram del evento para recibir tu enlace personal.')}
+              </p>
+              <a href={getInstagramDmUrl(gameId)} className="inline-block rounded-xl px-4 py-3 text-primary bg-[rgba(var(--color-primary-rgb),0.2)] border border-[rgba(var(--color-primary-rgb),0.3)]">
+                {t('Abrir Instagram')}
+              </a>
+            </div>
+          )}
+          {step === 'unsupported' && (
+            <div className="text-center space-y-2">
+              <p className="font-semibold">{t('Juego no disponible')}</p>
+              <p className="text-sm text-textSub">
+                {t(error || 'Este enlace no es válido o el juego no admite participación web todavía.')}
               </p>
             </div>
           )}
           {step === 'load-error' && (
-            <div className="card p-6 text-center space-y-3">
-              <p className="font-semibold">No se pudo cargar el juego</p>
-              <p role="alert" className="text-sm text-textSub">{error}</p>
+            <div className="text-center space-y-3">
+              <p className="font-semibold">{t('No se pudo cargar el juego')}</p>
+              <p role="alert" className="text-sm text-textSub">{error && t(error)}</p>
               <button
                 type="button"
                 onClick={() => setLoadVersion((version) => version + 1)}
-                className="w-full rounded-xl py-3 font-bold bg-primary/20 border border-primary/30"
+                className="w-full rounded-xl py-3 font-bold text-primary bg-[rgba(var(--color-primary-rgb),0.2)] border border-[rgba(var(--color-primary-rgb),0.3)]"
               >
-                Reintentar carga
+                {t('Reintentar carga')}
               </button>
             </div>
           )}
@@ -163,28 +207,7 @@ export default function ParticipantShell() {
               gameId={gameId}
               gameMeta={gameMeta}
               onJoined={(token) => {
-                setPlayerToken(token)
-                const gt = normalizeGameType(gameMeta.gameType)
-                const assignment = loadAssignment(gameId)
-                if (gt === 'STACK') {
-                  if (!assignment || !isStackAssignment(assignment)) {
-                    setError('El registro no devolvió un participante válido de STACK.')
-                    setStep('unsupported')
-                    return
-                  }
-                  setStackAssignment(assignment)
-                  setStep('play')
-                  return
-                }
-                if (gt === 'T1MER' && assignment && 'displayName' in assignment && !isStackAssignment(assignment)) {
-                  const scored = t1merResultFromAssignment(assignment)
-                  if (scored) {
-                    setT1merResult(scored)
-                    setStep('result')
-                    return
-                  }
-                }
-                setStep(gt === 'T1MER' ? 'play' : 'assignment')
+                applyAssignment(gameMeta, token, loadAssignment(gameId))
               }}
             />
           )}
@@ -201,7 +224,7 @@ export default function ParticipantShell() {
               onValidate={() => setStep('validate')}
             />
           )}
-          {gameType === 'EMPAREJA2' && step === 'validate' && playerToken && (
+          {gameType === 'EMPAREJA2' && isMobile && step === 'validate' && playerToken && (
             <ValidateView
               gameId={gameId}
               playerToken={playerToken}
@@ -210,10 +233,21 @@ export default function ParticipantShell() {
             />
           )}
           {gameType === 'EMPAREJA2' && step === 'result' && (
-            <ResultView gameId={gameId} onPlayAgain={() => setStep('validate')} />
+            <ResultView gameId={gameId} onPlayAgain={isMobile ? () => setStep('validate') : undefined} />
           )}
 
-          {gameType === 'T1MER' && step === 'play' && playerToken && (
+          {gameType === 'T1MER' && step === 'master' && (
+            <div className="text-center space-y-4">
+              <h2 className="text-2xl font-bold">{t('Tu código')}</h2>
+              <p className="text-4xl font-mono font-bold tracking-widest">
+                {(loadAssignment(gameId) as T1merAssignment | null)?.validationCode ?? t('Consulta al equipo del evento')}
+              </p>
+              <p className="text-sm text-textSub">
+                {t('Acércate a la pantalla máster del evento y muestra tu código para jugar. El cronómetro se juega y valida allí, no desde el móvil.')}
+              </p>
+            </div>
+          )}
+          {gameType === 'T1MER' && isMobile && step === 'play' && playerToken && (
             <T1merParticipantPlay
               gameId={gameId}
               playerToken={playerToken}

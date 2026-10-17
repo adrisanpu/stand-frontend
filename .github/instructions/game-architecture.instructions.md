@@ -6,7 +6,7 @@ applyTo: "src/games/**"
 # Game architecture
 
 - A game is a module under `src/games/<id>/`, usually with `config.ts`, `GameScreen.tsx`, and an optional `GameConfig.tsx`.
-- Define games using `GameDefinition` from `src/core/types.ts`. The optional operator config component property is `GameConfigComponent`.
+- Define games using `GameDefinition` from `src/core/types.ts`. The optional operator config component property is `GameConfigComponent`; it must support `registerSave` (via `useGameConfigSaveRegistration`) so the shared "Configurar juego" footer button saves mode/access and rules together.
 - Register each definition in the `games` array in `src/games/index.ts`. Canonical game IDs and backend game types are uppercase; use `normalizeGameType()` from `src/core/gameTypeMap.ts` for aliases and external values.
 - `src/core/shell/AppShell.tsx` owns game selection, orientation, and shell widgets. Do not add standalone game routes or duplicate shell-owned players, ranking, raffle, QR, or orientation behavior.
 - Reuse shared layout tokens from `src/core/ui/gameScreenLayout.ts` and existing landscape/portrait examples. Use the matching three-column or two-column layout; do not force one layout on every game.

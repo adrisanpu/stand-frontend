@@ -32,13 +32,13 @@ export default function GamePortraitHeaderJoin({
             size={qrSize}
             margin={6}
             containerClassName="w-full max-w-[min(100%,128px)] sm:max-w-[140px] aspect-square"
-            alt="QR Code para Instagram DM"
+            alt="QR para unirse al juego"
             className="!border-0 !bg-white !p-2 rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.1)]"
           />
           <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-gray-300/90 text-center">
             Escanea para jugar
           </p>
-          <GameIdHint gameId={gameId} />
+          <GameIdHint gameId={gameId} joinChannel={joinChannel} />
         </div>
       </div>
       {footerChildren ? <GamePanelFooter>{footerChildren}</GamePanelFooter> : null}

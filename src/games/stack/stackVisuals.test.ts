@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BufferGeometry, Material, Mesh, SRGBColorSpace, Texture } from 'three'
-import { createPizzaTexture, createPizzaVisuals } from './stackPizzaVisuals'
+import { BufferGeometry, Material, Mesh, RepeatWrapping, SRGBColorSpace, Texture } from 'three'
+import { createBaklavaSideTexture, createBaklavaTopTexture, createPizzaTexture, createStackVisuals } from './stackVisuals'
 
-describe('STACK lightweight pizza assets', () => {
+describe('STACK lightweight piece assets', () => {
   const source = { x: 0.5, z: -0.25, width: 3, depth: 2, y: 0.24 }
 
   it('bakes deterministic crust, sauce, cheese, round pepperoni and herbs without canvas or external assets', () => {
@@ -28,7 +28,7 @@ describe('STACK lightweight pizza assets', () => {
   })
 
   it('has rounded corners, real dough thickness, upward top normals and exact logical dimensions', () => {
-    const visuals = createPizzaVisuals()
+    const visuals = createStackVisuals('pizza')
     const pizza = visuals.create()
     visuals.update(pizza, source, source, 0.24)
     const geometry = (pizza.children[0] as Mesh).geometry
@@ -57,7 +57,7 @@ describe('STACK lightweight pizza assets', () => {
     const geometryDispose = vi.spyOn(BufferGeometry.prototype, 'dispose')
     const materialDispose = vi.spyOn(Material.prototype, 'dispose')
     const textureDispose = vi.spyOn(Texture.prototype, 'dispose')
-    const visuals = createPizzaVisuals()
+    const visuals = createStackVisuals('pizza')
     const pizza = visuals.create()
     const second = visuals.create()
     const geometry = (pizza.children[0] as Mesh).geometry
@@ -79,6 +79,46 @@ describe('STACK lightweight pizza assets', () => {
     expect(geometryDispose).toHaveBeenCalledTimes(2)
     expect(materialDispose).toHaveBeenCalledTimes(2)
     expect(textureDispose).toHaveBeenCalledTimes(1)
+    vi.restoreAllMocks()
+  })
+
+  it('bakes a deterministic baklava: golden phyllo and a pistachio mound on top, green filling band on the side', () => {
+    const top = createBaklavaTopTexture()
+    const side = createBaklavaSideTexture()
+    expect(top.image.data).toEqual(createBaklavaTopTexture().image.data)
+    const pixel = (texture: typeof top, u: number, v: number) => {
+      const { width, height, data } = texture.image
+      const index = (Math.floor(v * height) * width + Math.floor(u * width)) * 4
+      return Array.from(data.slice(index, index + 3))
+    }
+    const green = ([r, g, b]: number[]) => g > r && g > b
+    expect(green(pixel(top, 0.5, 0.5))).toBe(true)
+    expect(green(pixel(top, 0.1, 0.1))).toBe(false)
+    expect(green(pixel(side, 0.3, 0.45))).toBe(true)
+    expect(green(pixel(side, 0.3, 0.8))).toBe(false)
+    expect(side.wrapS).toBe(RepeatWrapping)
+    top.dispose()
+    side.dispose()
+  })
+
+  it('colours blocks per layer like the logo, lighter on top, and owns no textures', () => {
+    const textureDispose = vi.spyOn(Texture.prototype, 'dispose')
+    const visuals = createStackVisuals('blocks')
+    const first = visuals.create()
+    const second = visuals.create()
+    visuals.update(first, { ...source, y: 0 }, source, 0.24)
+    visuals.update(second, { ...source, y: 0.24 }, source, 0.24)
+    const topColor = (piece: typeof first) => {
+      const geometry = (piece.children[0] as Mesh).geometry
+      const color = geometry.getAttribute('color')
+      const index = geometry.groups[1].start
+      return [color.getX(index), color.getY(index), color.getZ(index)]
+    }
+    expect(topColor(first)).not.toEqual(topColor(second))
+    const sideColor = (first.children[0] as Mesh).geometry.getAttribute('color')
+    expect(topColor(first)[2]).toBeGreaterThan(sideColor.getZ(0))
+    visuals.dispose()
+    expect(textureDispose).not.toHaveBeenCalled()
     vi.restoreAllMocks()
   })
 })

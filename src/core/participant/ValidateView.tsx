@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { publicApi } from '../../api/publicApi'
 import { loadAssignment, savePlayerSession } from './playerSession'
+import { useParticipantLanguage } from './participantLanguage'
 
 type Props = {
   gameId: string
@@ -10,9 +11,10 @@ type Props = {
 }
 
 export default function ValidateView({ gameId, playerToken, onResult, onBack }: Props) {
+  const { t } = useParticipantLanguage()
   const ownAssignment = loadAssignment(gameId)
   const own = ownAssignment && 'validationCode' in ownAssignment ? ownAssignment.validationCode : undefined
-  const [code1, setCode1] = useState(own ? String(own) : '')
+  const code1 = own == null ? '' : String(own)
   const [code2, setCode2] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,47 +47,45 @@ export default function ValidateView({ gameId, playerToken, onResult, onBack }: 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card p-6 space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="text-center space-y-1">
-        <h2 className="text-xl font-bold">Validar pareja</h2>
-        <p className="text-sm text-textSub">Introduce los dos códigos cuando os encontréis</p>
+        <h2 className="text-xl font-bold">{t('Validar pareja')}</h2>
+        <p className="text-sm text-textSub">{t('Muestra tu código e introduce el de tu pareja cuando os encontréis')}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <input
-          type="text"
-          inputMode="numeric"
-          maxLength={4}
-          value={code1}
-          onChange={(e) => setCode1(e.target.value.replace(/\D/g, '').slice(0, 4))}
-          className="rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-center text-2xl font-mono"
-          placeholder="0000"
-          aria-label="Código 1"
-        />
-        <input
-          type="text"
-          inputMode="numeric"
-          maxLength={4}
-          value={code2}
-          onChange={(e) => setCode2(e.target.value.replace(/\D/g, '').slice(0, 4))}
-          className="rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-center text-2xl font-mono"
-          placeholder="0000"
-          aria-label="Código 2"
-        />
+        <div className="space-y-1">
+          <p className="text-sm text-textSub">{t('Tu código')}</p>
+          <p className="rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-center text-2xl font-mono">
+            {code1 || t('No disponible')}
+          </p>
+        </div>
+        <label className="block space-y-1">
+          <span className="text-sm text-textSub">{t('Código de tu pareja')}</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            value={code2}
+            onChange={(e) => setCode2(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-center text-2xl font-mono"
+            placeholder="0000"
+          />
+        </label>
       </div>
 
-      {error && <p className="text-sm text-red-300 text-center">{error}</p>}
+      {error && <p className="text-sm text-red-300 text-center">{t(error)}</p>}
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-xl py-3 font-semibold bg-[rgba(176,38,255,0.25)] border border-[rgba(176,38,255,0.4)] disabled:opacity-50"
+        className="w-full rounded-xl py-3 font-semibold text-primary bg-[rgba(var(--color-primary-rgb),0.25)] border border-[rgba(var(--color-primary-rgb),0.4)] disabled:opacity-50"
       >
-        {loading ? 'Validando...' : 'Validar'}
+        {t(loading ? 'Validando...' : 'Validar')}
       </button>
 
-      <button type="button" onClick={onBack} className="w-full text-sm text-textSub underline">
-        Volver
+      <button type="button" onClick={onBack} className="w-full text-sm text-accent underline">
+        {t('Volver')}
       </button>
     </form>
   )

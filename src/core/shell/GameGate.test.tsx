@@ -76,6 +76,7 @@ describe('GameGate – catalog view', () => {
     renderGate()
     expect(screen.getByText('T1MER')).toBeInTheDocument()
     expect(screen.getByText('RULET4')).toBeInTheDocument()
+    expect(screen.queryAllByRole('combobox')).toHaveLength(0)
   })
 
   it('navigates to create/join view when a game is selected', () => {

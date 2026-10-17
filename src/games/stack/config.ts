@@ -5,8 +5,8 @@ import StackGameConfig from './GameConfig'
 export const stackDefinition: GameDefinition = {
   id: 'STACK',
   name: 'STACK',
-  description: 'Apila pizzas rectangulares en un arcade 3D para móviles.',
-  descriptionLong: 'Arcade 3D de REKETE Pizza. Toca para apilar, encadena colocaciones perfectas y evita perder superficie. Un solo intento por participante, con puntuación validada por el servidor y ranking del evento.',
+  description: 'Apila bloques en un arcade 3D para móviles.',
+  descriptionLong: 'Arcade 3D de apilar bloques. Toca para apilar, encadena colocaciones perfectas y evita perder superficie. Un solo intento por participante, con puntuación validada por el servidor y ranking del evento.',
   tags: { playerMode: 'solo', competitive: true, social: false, idealFor: ['stand_feria', 'fiesta'] },
   colors: {
     primary: '#E85D32',

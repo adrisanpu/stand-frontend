@@ -1,4 +1,5 @@
 import React from 'react'
+import type { GameAccess, PlayMode } from './settings/gameAccess'
 
 export interface GameScreenProps {
   gameId: string
@@ -20,8 +21,9 @@ export interface GameScreenProps {
   onAvatarStateChange?: (state: string) => void
   /** Optional: presigned avatar video URLs per state (used by games that embed GameStateAvatar) */
   avatarMediaUrls?: Partial<Record<'idle' | 'win' | 'lose', string | null>>
-  /** web | instagram — dual-screen campaigns use web */
+  /** Participant registration channel, independent of where gameplay runs. */
   joinChannel?: string | null
+  playMode?: PlayMode
 }
 
 export interface ThemeColors {
@@ -40,12 +42,29 @@ export interface GameAssets {
   backgroundImage?: string
 }
 
+/**
+ * Save contract used by the shared "Configurar juego" footer.
+ * `validate` runs before anything is persisted and returns an error message (or null).
+ * `save` persists the game-specific rules and must reject with an Error on failure.
+ */
+export type GameConfigSaveRegistration = {
+  validate?: () => string | null
+  save: () => Promise<void>
+}
+
 export type GameConfigProps = {
   gameId: string | null
   gameName: string
   // generic configuration state for a given game instance
   settings: any
   onChange: (newSettings: any) => void
+  /** Saved access, or the unsaved access draft when embedded in the shared config modal. */
+  access?: GameAccess
+  /**
+   * When provided, the host owns the single save button: the component must not render its own
+   * save button and must register its save handler instead (pass null on unmount).
+   */
+  registerSave?: (registration: GameConfigSaveRegistration | null) => void
 }
 
 /** Game display tags for catalog / create-join view */
@@ -89,4 +108,3 @@ export interface GameDefinition {
   // NEW: optional per-game config component
   GameConfigComponent?: React.ComponentType<GameConfigProps>
 }
-

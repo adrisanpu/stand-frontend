@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
-import { getWebPlayUrl, getRedeemUrl } from '../../core/lib/joinUrl'
-import QRCode from '../../core/widgets/QRCode'
+import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 
 export type Empareja2Settings = {
   numPairs?: number
   emailRequired?: boolean
   instagramRequired?: boolean
-  joinChannel?: string
 }
 
 interface GameDataResponse {
@@ -17,14 +15,13 @@ interface GameDataResponse {
     gameId: string
     gameName: string
     gameType: string
-    joinChannel?: string
     participantFields?: { email?: { required?: boolean }; instagram?: { required?: boolean } }
   }
   settings?: { empareja2?: { numPairs?: number } }
   empareja2CatalogPairCount?: number
 }
 
-export default function Empareja2GameConfig({ gameId, gameName: _gameName, settings, onChange }: GameConfigProps) {
+export default function Empareja2GameConfig({ gameId, gameName: _gameName, settings, onChange, registerSave }: GameConfigProps) {
   const [numPairsInput, setNumPairsInput] = useState<string>(
     (settings as Empareja2Settings | null)?.numPairs != null
       ? String((settings as Empareja2Settings).numPairs)
@@ -33,33 +30,35 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
   const [catalogPairCount, setCatalogPairCount] = useState<number | null>(null)
   const [emailRequired, setEmailRequired] = useState(true)
   const [instagramRequired, setInstagramRequired] = useState(false)
-  const [joinChannel, setJoinChannel] = useState('web')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string>('')
+  const [loaded, setLoaded] = useState(!gameId)
+  const [loadError, setLoadError] = useState('')
+  const storedNumPairs = (settings as Empareja2Settings | null)?.numPairs
 
   useEffect(() => {
-    if (settings) {
-      const s = settings as Empareja2Settings
-      setNumPairsInput(s.numPairs != null ? String(s.numPairs) : '')
-    }
-  }, [settings])
+    if (storedNumPairs != null) setNumPairsInput(String(storedNumPairs))
+  }, [storedNumPairs])
 
   useEffect(() => {
     if (!gameId) return
     let cancelled = false
+    setLoaded(false)
+    setLoadError('')
     ;(async () => {
       try {
         const data = await api.get<GameDataResponse>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
-        if (cancelled || !data.ok) return
+        if (cancelled) return
+        if (!data.ok || !data.game) throw new Error('No se pudo cargar la configuración.')
         if (data.empareja2CatalogPairCount != null) setCatalogPairCount(data.empareja2CatalogPairCount)
         const backend = data.settings?.empareja2
         if (backend?.numPairs != null) setNumPairsInput(String(backend.numPairs))
         const pf = data.game?.participantFields
         if (pf?.email?.required != null) setEmailRequired(Boolean(pf.email.required))
         if (pf?.instagram?.required != null) setInstagramRequired(Boolean(pf.instagram.required))
-        if (data.game?.joinChannel) setJoinChannel(data.game.joinChannel)
-      } catch {
-        // ignore; keep UI working with localStorage only
+        setLoaded(true)
+      } catch (cause) {
+        if (!cancelled) setLoadError(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración.')
       }
     })()
     return () => {
@@ -67,7 +66,11 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
     }
   }, [gameId])
 
-  const handleSave = async () => {
+  const validate = () => (loaded ? null : loadError || 'La configuración del juego aún se está cargando.')
+
+  const persist = async () => {
+    const invalid = validate()
+    if (invalid) throw new Error(invalid)
     const trimmedNum = numPairsInput.trim()
     const maxPairs = catalogPairCount ?? 50
     const numPairs = trimmedNum === '' ? maxPairs : Math.max(1, Math.floor(Number(trimmedNum)) || 1)
@@ -77,8 +80,28 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       numPairs: numPairsClamped,
       emailRequired,
       instagramRequired,
-      joinChannel,
     }
+    if (gameId) {
+      await api.put('/v1/game', {
+        gameId,
+        participantFields: {
+          email: { required: emailRequired },
+          instagram: { required: instagramRequired },
+        },
+        settings: {
+          empareja2: {
+            numPairs: numPairsClamped,
+          },
+        },
+      })
+    }
+    onChange(newSettings)
+  }
+
+  const embedded = useGameConfigSaveRegistration(registerSave, { validate, save: persist })
+
+  const handleSave = async () => {
+    if (!loaded) return
     setSaveStatus('idle')
     setSaveMessage('')
 
@@ -86,21 +109,7 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       setSaveStatus('saving')
       setSaveMessage('Guardando...')
       try {
-        await api.put('/v1/game', {
-          gameId,
-          joinChannel,
-          participantFields: {
-            email: { required: emailRequired },
-            instagram: { required: instagramRequired },
-          },
-          settings: {
-            empareja2: {
-              numPairs: numPairsClamped,
-            },
-          },
-        })
-        // After PUT so AppShell GET sees the new joinChannel (not a stale race).
-        onChange(newSettings)
+        await persist()
         setSaveStatus('success')
         setSaveMessage('Configuración guardada correctamente.')
         setTimeout(() => {
@@ -109,10 +118,10 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
         }, 3000)
       } catch (e: unknown) {
         setSaveStatus('error')
-        setSaveMessage(e instanceof Error ? e.message : 'Error al guardar en el servidor')
+        setSaveMessage(saveErrorMessage(e, 'Error al guardar en el servidor'))
       }
     } else {
-      onChange(newSettings)
+      await persist()
       setSaveStatus('success')
       setSaveMessage('Configuración guardada.')
       setTimeout(() => {
@@ -128,45 +137,12 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       ? maxPairs
       : Math.min(maxPairs, Math.max(1, Math.floor(Number(numPairsInput)) || 1))
   const sliderDisabled = catalogPairCount == null
-  const isPhoneMode = joinChannel === 'web'
-  const redeemUrl = gameId ? getRedeemUrl(gameId) : ''
 
   return (
     <div className="space-y-6">
+      {loadError && <p role="alert" className="text-sm text-red-300">{loadError}</p>}
+      {!loaded && !loadError && <p role="status">Cargando configuración...</p>}
       <div className="space-y-4">
-        <div className="space-y-3 border-b border-white/10 pb-4">
-          <p className="text-sm font-medium text-gray-300">Modo de juego</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setJoinChannel('instagram')}
-              className={`rounded-xl px-3 py-3 text-sm font-medium border transition-colors ${
-                !isPhoneMode
-                  ? 'bg-[rgba(176,38,255,0.25)] border-[rgba(176,38,255,0.5)] text-white'
-                  : 'bg-white/5 border-white/10 text-gray-300'
-              }`}
-            >
-              Pantalla del evento
-            </button>
-            <button
-              type="button"
-              onClick={() => setJoinChannel('web')}
-              className={`rounded-xl px-3 py-3 text-sm font-medium border transition-colors ${
-                isPhoneMode
-                  ? 'bg-[rgba(176,38,255,0.25)] border-[rgba(176,38,255,0.5)] text-white'
-                  : 'bg-white/5 border-white/10 text-gray-300'
-              }`}
-            >
-              Teléfonos
-            </button>
-          </div>
-          <p className="text-xs text-gray-400">
-            {isPhoneMode
-              ? 'Los asistentes juegan desde su móvil (/play).'
-              : 'Los asistentes juegan por Instagram; validación en la pantalla del operador.'}
-          </p>
-        </div>
-
         <div>
           <div className="mb-2 flex items-center gap-2">
             <label className="block text-sm font-medium text-gray-300" htmlFor="empareja2-difficulty-range">
@@ -226,26 +202,6 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
             Instagram obligatorio
           </label>
         </div>
-
-        {gameId && (
-          <div className="space-y-3 border-t border-white/10 pt-4 text-sm">
-            <p className="font-medium text-gray-300">Enlaces del evento</p>
-            {isPhoneMode && (
-              <>
-                <a href={getWebPlayUrl(gameId)} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
-                  Participante (móvil)
-                </a>
-              </>
-            )}
-            <div className="space-y-2">
-              <a href={redeemUrl} target="_blank" rel="noopener noreferrer" className="block text-neonCyan underline truncate">
-                Validador de premios
-              </a>
-              <QRCode data={redeemUrl} size={160} alt="QR validador de premios" className="!bg-white !p-2" />
-              <p className="text-xs text-gray-400">Escanea este QR con el móvil del staff para abrir el validador.</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {saveStatus !== 'idle' && (
@@ -265,14 +221,16 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={saveStatus === 'saving'}
-        className="w-full p-3 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {saveStatus === 'saving' ? 'Guardando...' : 'Guardar configuración'}
-      </button>
+      {!embedded && (
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!loaded || saveStatus === 'saving'}
+          className="w-full p-3 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saveStatus === 'saving' ? 'Guardando...' : 'Guardar configuración'}
+        </button>
+      )}
     </div>
   )
 }

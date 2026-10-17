@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
-import { getWebPlayUrl } from '../../core/lib/joinUrl'
+import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 
 interface GameDataResponse {
   ok: boolean
@@ -9,31 +9,34 @@ interface GameDataResponse {
     gameId: string
     gameName: string
     gameType: string
-    joinChannel?: string
     participantFields?: { email?: { required?: boolean }; instagram?: { required?: boolean } }
   }
 }
 
-export default function T1merGameConfig({ gameId, gameName: _gameName, onChange }: GameConfigProps) {
+export default function T1merGameConfig({ gameId, gameName: _gameName, onChange, registerSave }: GameConfigProps) {
   const [emailRequired, setEmailRequired] = useState(true)
   const [instagramRequired, setInstagramRequired] = useState(false)
-  const [joinChannel, setJoinChannel] = useState('web')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState('')
+  const [loaded, setLoaded] = useState(!gameId)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     if (!gameId) return
     let cancelled = false
+    setLoaded(false)
+    setLoadError('')
     ;(async () => {
       try {
         const data = await api.get<GameDataResponse>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
-        if (cancelled || !data.ok) return
+        if (cancelled) return
+        if (!data.ok || !data.game) throw new Error('No se pudo cargar la configuración.')
         const pf = data.game?.participantFields
         if (pf?.email?.required != null) setEmailRequired(Boolean(pf.email.required))
         if (pf?.instagram?.required != null) setInstagramRequired(Boolean(pf.instagram.required))
-        if (data.game?.joinChannel) setJoinChannel(data.game.joinChannel)
-      } catch {
-        // keep local defaults
+        setLoaded(true)
+      } catch (cause) {
+        if (!cancelled) setLoadError(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración.')
       }
     })()
     return () => {
@@ -41,13 +44,33 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange 
     }
   }, [gameId])
 
+  const validate = () => (loaded ? null : loadError || 'La configuración del juego aún se está cargando.')
+
+  const persist = async () => {
+    const invalid = validate()
+    if (invalid) throw new Error(invalid)
+    const settings = { emailRequired, instagramRequired }
+    if (gameId) {
+      await api.put('/v1/game', {
+        gameId,
+        participantFields: {
+          email: { required: emailRequired },
+          instagram: { required: instagramRequired },
+        },
+      })
+    }
+    onChange(settings)
+  }
+
+  const embedded = useGameConfigSaveRegistration(registerSave, { validate, save: persist })
+
   const handleSave = async () => {
-    const settings = { emailRequired, instagramRequired, joinChannel }
+    if (!loaded) return
     setSaveStatus('idle')
     setSaveMessage('')
 
     if (!gameId) {
-      onChange(settings)
+      await persist()
       setSaveStatus('success')
       setSaveMessage('Configuración guardada.')
       setTimeout(() => {
@@ -60,16 +83,7 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange 
     setSaveStatus('saving')
     setSaveMessage('Guardando...')
     try {
-      await api.put('/v1/game', {
-        gameId,
-        joinChannel,
-        participantFields: {
-          email: { required: emailRequired },
-          instagram: { required: instagramRequired },
-        },
-      })
-      // After PUT so AppShell GET sees the new joinChannel (not a stale race).
-      onChange(settings)
+      await persist()
       setSaveStatus('success')
       setSaveMessage('Configuración guardada correctamente.')
       setTimeout(() => {
@@ -78,48 +92,15 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange 
       }, 3000)
     } catch (e: unknown) {
       setSaveStatus('error')
-      setSaveMessage(e instanceof Error ? e.message : 'Error al guardar en el servidor')
+      setSaveMessage(saveErrorMessage(e, 'Error al guardar en el servidor'))
     }
   }
 
-  const isPhoneMode = joinChannel === 'web'
-
   return (
     <div className="space-y-6">
+      {loadError && <p role="alert" className="text-sm text-red-300">{loadError}</p>}
+      {!loaded && !loadError && <p role="status">Cargando configuración...</p>}
       <div className="space-y-4">
-        <div className="space-y-3 border-b border-white/10 pb-4">
-          <p className="text-sm font-medium text-gray-300">Modo de juego</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setJoinChannel('instagram')}
-              className={`rounded-xl px-3 py-3 text-sm font-medium border transition-colors ${
-                !isPhoneMode
-                  ? 'bg-[rgba(239,68,68,0.25)] border-[rgba(239,68,68,0.5)] text-white'
-                  : 'bg-white/5 border-white/10 text-gray-300'
-              }`}
-            >
-              Pantalla del evento
-            </button>
-            <button
-              type="button"
-              onClick={() => setJoinChannel('web')}
-              className={`rounded-xl px-3 py-3 text-sm font-medium border transition-colors ${
-                isPhoneMode
-                  ? 'bg-[rgba(239,68,68,0.25)] border-[rgba(239,68,68,0.5)] text-white'
-                  : 'bg-white/5 border-white/10 text-gray-300'
-              }`}
-            >
-              Teléfonos
-            </button>
-          </div>
-          <p className="text-xs text-gray-400">
-            {isPhoneMode
-              ? 'Los asistentes juegan el timer desde su móvil (/play).'
-              : 'Los asistentes juegan por Instagram; el timer corre en la pantalla del operador.'}
-          </p>
-        </div>
-
         <div className="space-y-3 border-t border-white/10 pt-4">
           <p className="text-sm font-medium text-gray-300">Datos del participante</p>
           <label className="flex items-center gap-2 text-sm text-gray-300">
@@ -135,20 +116,6 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange 
             Instagram obligatorio
           </label>
         </div>
-
-        {gameId && isPhoneMode && (
-          <div className="space-y-3 border-t border-white/10 pt-4 text-sm">
-            <p className="font-medium text-gray-300">Enlaces del evento</p>
-            <a
-              href={getWebPlayUrl(gameId)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-neonCyan underline truncate"
-            >
-              Participante (móvil)
-            </a>
-          </div>
-        )}
       </div>
 
       {saveStatus !== 'idle' && (
@@ -168,14 +135,16 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange 
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => void handleSave()}
-        disabled={saveStatus === 'saving'}
-        className="w-full p-3 rounded-xl bg-[rgba(239,68,68,0.2)] border border-[rgba(239,68,68,0.3)] hover:bg-[rgba(239,68,68,0.3)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {saveStatus === 'saving' ? 'Guardando...' : 'Guardar configuración'}
-      </button>
+      {!embedded && (
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={!loaded || saveStatus === 'saving'}
+          className="w-full p-3 rounded-xl bg-[rgba(239,68,68,0.2)] border border-[rgba(239,68,68,0.3)] hover:bg-[rgba(239,68,68,0.3)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saveStatus === 'saving' ? 'Guardando...' : 'Guardar configuración'}
+        </button>
+      )}
     </div>
   )
 }
