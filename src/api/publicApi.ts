@@ -1,6 +1,6 @@
 import type { StackConfig, StackPlacement } from '../games/stack/stackLogic'
 import type { ParticipantAppearance } from '../core/theme/appearance'
-import type { PrizeCatalog } from '../core/prizes'
+import type { GamePrize, PrizeCatalog } from '../core/prizes'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -252,6 +252,7 @@ export type RedeemResponse = {
   kind: PrizeKind
   delivered: boolean
   label?: string
+  prize?: GamePrize | null
   error?: string
 }
 

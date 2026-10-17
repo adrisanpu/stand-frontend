@@ -4,6 +4,8 @@ import jsQR from 'jsqr'
 import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
 import { publicApi } from '../../api/publicApi'
+import type { GamePrize } from '../prizes'
+import PrizePresentation from '../widgets/PrizePresentation'
 
 type ScanStatus = 'idle' | 'scanning' | 'redeeming' | 'ok' | 'already' | 'error'
 
@@ -22,6 +24,7 @@ export default function ValidatorShell() {
   const busyRef = useRef(false)
   const [status, setStatus] = useState<ScanStatus>('idle')
   const [message, setMessage] = useState<string | null>(null)
+  const [prize, setPrize] = useState<GamePrize | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
 
   const stopCamera = useCallback(() => {
@@ -35,8 +38,10 @@ export default function ValidatorShell() {
     busyRef.current = true
     setStatus('redeeming')
     setMessage(null)
+    setPrize(null)
     try {
       const res = await publicApi.redeem(token)
+      setPrize(res.prize ?? null)
       setStatus('ok')
       const kindLabel = PRIZE_LABEL[res.kind] || res.kind
       setMessage(`${kindLabel} entregado${res.label ? ` a ${res.label}` : ''}.`)
@@ -59,6 +64,7 @@ export default function ValidatorShell() {
     setCameraError(null)
     setStatus('scanning')
     setMessage(null)
+    setPrize(null)
     busyRef.current = false
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -132,7 +138,12 @@ export default function ValidatorShell() {
               <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-4 text-center">
                 <div className="space-y-2">
                   {status === 'redeeming' && <p className="text-textSub">Validando...</p>}
-                  {status === 'ok' && <p className="text-green-300 font-semibold">{message}</p>}
+                  {status === 'ok' && (
+                    <>
+                      <PrizePresentation prize={prize ?? undefined} />
+                      <p className="text-green-300 font-semibold">{message}</p>
+                    </>
+                  )}
                   {status === 'already' && <p className="text-amber-300 font-semibold">{message}</p>}
                   {status === 'error' && <p className="text-red-300 font-semibold">{message}</p>}
                 </div>
