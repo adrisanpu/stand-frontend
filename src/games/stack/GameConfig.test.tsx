@@ -20,11 +20,12 @@ describe('STACK operator configuration', () => {
     const save = screen.getByRole('button', { name: 'Guardar configuración' })
     await waitFor(() => expect(save).toBeEnabled())
     fireEvent.change(screen.getByLabelText('Velocidad inicial'), { target: { value: '2.5' } })
+    fireEvent.change(screen.getByLabelText('Aspecto de las piezas'), { target: { value: 'baklava' } })
     fireEvent.click(save)
     await screen.findByText('Configuración guardada. Se aplicará a los nuevos intentos.')
     expect(api.put).toHaveBeenCalledWith('/v1/game', {
       gameId: 'GAME1234',
-      settings: { stack: { initialSpeed: 2.5, speedIncrement: 0.08, maxSpeed: 5, perfectTolerance: 0.06 } },
+      settings: { stack: { initialSpeed: 2.5, speedIncrement: 0.08, maxSpeed: 5, perfectTolerance: 0.06, skin: 'baklava' } },
     })
     expect(onChange).toHaveBeenCalledTimes(1)
   })

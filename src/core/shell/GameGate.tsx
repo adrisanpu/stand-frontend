@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { games } from '../../games'
-import type { GameDefinition, GameIdealFor, GamePlayerMode } from '../types'
+import type { GameDefinition } from '../types'
 import { IDEAL_FOR_LABELS } from '../types'
 import { api } from '../../api/api'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { useStandLogo } from '../theme'
 import { fetchUserMedia, resolveUserSelectedLogoUrl, type UserMediaResponse } from '../../api/userMedia'
+import { resolveGameAccess } from '../settings/gameAccess'
 
 const GAME_RE = /^[A-Za-z0-9._-]{1,40}$/
 
@@ -38,10 +39,6 @@ export default function GameGate({ onGameCreated }: GameGateProps){
   const [userGames, setUserGames] = useState<UserGame[]>([])
   const [loadingGames, setLoadingGames] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
-  const [idealForFilter, setIdealForFilter] = useState<GameIdealFor | null>(null)
-  const [playerModeFilter, setPlayerModeFilter] = useState<GamePlayerMode | null>(null)
-  const [socialFilter, setSocialFilter] = useState<boolean | null>(null)
-  const [competitiveFilter, setCompetitiveFilter] = useState<boolean | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -185,7 +182,8 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         }
       }>('/v1/game', { 
         gameName: gameId.toUpperCase(),
-        gameType: selectedGame.id
+        gameType: selectedGame.id,
+        ...resolveGameAccess(selectedGame.id),
       })
       
       // API returns { message, game: { gameId, gameName, gameType, ... } }
@@ -237,25 +235,16 @@ export default function GameGate({ onGameCreated }: GameGateProps){
 
   // Game Catalog View
   if (!selectedGame) {
-    const filteredGames = games.filter((g) => {
-      if (idealForFilter != null && !g.tags?.idealFor?.includes(idealForFilter)) return false
-      if (playerModeFilter != null && g.tags?.playerMode !== playerModeFilter) return false
-      if (socialFilter !== null && g.tags?.social !== socialFilter) return false
-      if (competitiveFilter !== null && g.tags?.competitive !== competitiveFilter) return false
-      return true
-    })
-    const hasNoGames = filteredGames.length === 0
-
     return (
       <div className="w-full space-y-6">
         {/* Header with Logo */}
         <div className="flex flex-col items-center mb-6">
-          <div className="h-28 flex items-center justify-center">
+          <div className="h-32 flex items-center justify-center">
             {headerLogoSrc ? (
               <img
                 src={headerLogoSrc}
                 alt={customLogo ? 'Logo personalizado' : 'Stand'}
-                className="h-28 w-auto object-contain"
+                className="h-32 w-auto object-contain"
                 onError={(e) => {
                   if (customLogo) return
                   const target = e.target as HTMLImageElement
@@ -270,96 +259,38 @@ export default function GameGate({ onGameCreated }: GameGateProps){
 
         {/* Games Grid */}
         <div className="space-y-4">
-          {/* Filter dropdowns: each defaults to "Todos", filters accumulate (AND) */}
-          <div className="flex flex-wrap gap-3 mb-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-textSub">Ideal para</span>
-              <select
-                value={idealForFilter ?? ''}
-                onChange={(e) => setIdealForFilter((e.target.value || null) as GameIdealFor | null)}
-                className="rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 py-2 text-sm text-textMain focus:border-white/20 outline-none min-w-[140px]"
-              >
-                <option value="">Todos</option>
-                {(Object.keys(IDEAL_FOR_LABELS) as GameIdealFor[]).map((key) => (
-                  <option key={key} value={key}>{IDEAL_FOR_LABELS[key]}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-textSub">Jugadores</span>
-              <select
-                value={playerModeFilter ?? ''}
-                onChange={(e) => setPlayerModeFilter((e.target.value || null) as GamePlayerMode | null)}
-                className="rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 py-2 text-sm text-textMain focus:border-white/20 outline-none min-w-[140px]"
-              >
-                <option value="">Todos</option>
-                <option value="solo">Individual</option>
-                <option value="multi">Multijugador</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-textSub">Social</span>
-              <select
-                value={socialFilter === null ? '' : String(socialFilter)}
-                onChange={(e) => setSocialFilter(e.target.value === '' ? null : e.target.value === 'true')}
-                className="rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 py-2 text-sm text-textMain focus:border-white/20 outline-none min-w-[120px]"
-              >
-                <option value="">Todos</option>
-                <option value="true">Social</option>
-                <option value="false">No social</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-textSub">Tipo</span>
-              <select
-                value={competitiveFilter === null ? '' : String(competitiveFilter)}
-                onChange={(e) => setCompetitiveFilter(e.target.value === '' ? null : e.target.value === 'true')}
-                className="rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 py-2 text-sm text-textMain focus:border-white/20 outline-none min-w-[120px]"
-              >
-                <option value="">Todos</option>
-                <option value="true">Competitivo</option>
-                <option value="false">Casual</option>
-              </select>
-            </label>
-          </div>
-          {/* List with fixed min-height so layout does not jump when filtering */}
+          {/* List with fixed min-height so the catalog layout stays stable */}
           <div className="min-h-[360px] md:min-h-[420px] overflow-y-auto rounded-xl pt-5 sm:pt-6 pb-3">
-            {hasNoGames ? (
-              <p className="text-center text-textSub text-sm py-6">
-                Ningún juego con los filtros seleccionados.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-6 justify-items-center">
-                {filteredGames.map((game) => (
-                  <button
-                    key={game.id}
-                    onClick={() => handleGameSelect(game)}
-                    type="button"
-                    aria-label={game.name}
-                    className="w-full max-w-[120px] sm:max-w-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-3xl transition-transform duration-150 ease-out hover:scale-[1.04]"
-                  >
-                    <div className="flex flex-col items-center">
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-[rgba(255,255,255,0.08)] border border-white/10 shadow-[0_10px_25px_rgba(0,0,0,0.55)] flex items-center justify-center overflow-hidden mb-2">
-                        {game.assets?.logo ? (
-                          <img
-                            src={game.assets.logo}
-                            alt={game.name}
-                            className="w-14 h-14 sm:w-16 sm:h-16 object-contain"
-                          />
-                        ) : (
-                          <span className="text-lg sm:text-xl font-semibold text-textMain">
-                            {game.name.slice(0, 2).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-xs sm:text-sm font-medium text-textMain text-center leading-snug line-clamp-2">
-                        {game.name}
-                      </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-6 justify-items-center">
+              {games.map((game) => (
+                <button
+                  key={game.id}
+                  onClick={() => handleGameSelect(game)}
+                  type="button"
+                  aria-label={game.name}
+                  className="w-full max-w-[120px] sm:max-w-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-3xl transition-transform duration-150 ease-out hover:scale-[1.04]"
+                >
+                  <div className="flex flex-col items-center">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-[rgba(255,255,255,0.08)] border border-white/10 shadow-[0_10px_25px_rgba(0,0,0,0.55)] flex items-center justify-center overflow-hidden mb-2">
+                      {game.assets?.logo ? (
+                        <img
+                          src={game.assets.logo}
+                          alt={game.name}
+                          className="w-14 h-14 sm:w-16 sm:h-16 object-contain"
+                        />
+                      ) : (
+                        <span className="text-lg sm:text-xl font-semibold text-textMain">
+                          {game.name.slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
                     </div>
-                  </button>
-                ))}
-              </div>
-            )}
+                    <h3 className="text-xs sm:text-sm font-medium text-textMain text-center leading-snug line-clamp-2">
+                      {game.name}
+                    </h3>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

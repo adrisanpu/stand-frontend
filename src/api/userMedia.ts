@@ -1,4 +1,5 @@
 import { api } from './api'
+import type { ParticipantAppearance } from '../core/theme/appearance'
 
 export type AvatarState = 'idle' | 'win' | 'lose'
 export type MediaKind = 'logo' | 'avatar'
@@ -18,6 +19,7 @@ export type UserMediaItem = {
 
 export type UserMediaResponse = {
   ok: boolean
+  appearance?: ParticipantAppearance | null
   logo: {
     items: UserMediaItem[]
     selectedId: string | null
@@ -47,7 +49,6 @@ type UploadUrlEntry = {
   state?: AvatarState
   key: string
   url: string
-  fields: Record<string, string>
   expiresIn: number
   meta: Omit<UserMediaItem, 'createdAt' | 'url'>
 }
@@ -57,11 +58,12 @@ type UploadUrlResponse = {
   uploadUrls: UploadUrlEntry[]
 }
 
-async function uploadBinaryToPresignedUrl(url: string, fields: Record<string, string>, file: File): Promise<void> {
-  const form = new FormData()
-  Object.entries(fields).forEach(([key, value]) => form.append(key, value))
-  form.append('file', file)
-  const response = await fetch(url, { method: 'POST', body: form })
+async function uploadBinaryToPresignedUrl(url: string, file: File): Promise<void> {
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  })
   if (!response.ok) {
     throw new Error(`Upload failed (${response.status})`)
   }
@@ -96,6 +98,10 @@ export async function selectLogo(mediaId: string): Promise<void> {
   await api.put('/v1/user/media', { kind: 'logo', mediaId })
 }
 
+export async function saveAppearance(appearance: ParticipantAppearance): Promise<void> {
+  await api.put('/v1/user/media', { kind: 'appearance', appearance })
+}
+
 export async function selectAvatar(mediaId: string, state: AvatarState): Promise<void> {
   await api.put('/v1/user/media', { kind: 'avatar', mediaId, state })
 }
@@ -115,7 +121,7 @@ export async function uploadLogo(file: File, name?: string): Promise<void> {
     },
   ])
   if (!entry) throw new Error('No upload URL received for logo')
-  await uploadBinaryToPresignedUrl(entry.url, entry.fields, file)
+  await uploadBinaryToPresignedUrl(entry.url, file)
   await api.post('/v1/user/media', { items: [entry.meta] })
   await selectLogo(entry.id)
 }
@@ -132,7 +138,7 @@ export async function uploadAvatar(file: File, state: AvatarState, name?: string
     },
   ])
   if (!entry) throw new Error('No upload URL received for avatar')
-  await uploadBinaryToPresignedUrl(entry.url, entry.fields, file)
+  await uploadBinaryToPresignedUrl(entry.url, file)
   await api.post('/v1/user/media', { items: [entry.meta] })
   await selectAvatar(entry.id, state)
 }

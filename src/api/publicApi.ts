@@ -1,4 +1,5 @@
 import type { StackConfig, StackPlacement } from '../games/stack/stackLogic'
+import type { ParticipantAppearance } from '../core/theme/appearance'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -47,8 +48,11 @@ export type PublicGameResponse = {
   ok: boolean
   gameId: string
   gameName?: string
+  clientLogoUrl?: string | null
+  appearance?: ParticipantAppearance
   gameType: string
   isActive: boolean
+  playMode?: 'master' | 'mobile'
   joinChannel?: string
   participantFields?: ParticipantFieldsConfig
   playerCount: number
@@ -67,6 +71,7 @@ export type Empareja2Assignment = {
   characterName: string
   partnerCharacterName: string
   characterImageUrl?: string | null
+  partnerCharacterImageUrl?: string | null
   validationCode: number
   validated: boolean
 }
@@ -195,6 +200,9 @@ export const publicApi = {
   join: (body: { gameId: string; email: string; instagram?: string; consent: boolean }) =>
     publicRequest<JoinResponse>('/v1/public/join', { method: 'POST', body: JSON.stringify(body) }),
 
+  exchangeAccess: (body: { gameId: string; accessToken: string }) =>
+    publicRequest<PlayerResponse>('/v1/public/access', { method: 'POST', body: JSON.stringify(body) }),
+
   validate: (body: { gameId: string; playerToken: string; codes: string[] }) =>
     publicRequest<ValidateResponse>('/v1/public/validate', { method: 'POST', body: JSON.stringify(body) }),
 
@@ -213,11 +221,11 @@ export const publicApi = {
       body: JSON.stringify({ ...body, action: 'finish' }),
     }),
 
-  getPlayer: (playerToken: string, gameId?: string) => {
-    const qs = new URLSearchParams({ playerToken })
-    if (gameId) qs.set('gameId', gameId)
-    return publicRequest<PlayerResponse>(`/v1/public/player?${qs.toString()}`)
-  },
+  getPlayer: (playerToken: string, gameId?: string) =>
+    publicRequest<PlayerResponse>('/v1/public/player', {
+      method: 'POST',
+      body: JSON.stringify({ gameId, playerToken }),
+    }),
 
   redeem: async (prizeToken: string): Promise<RedeemResponse> => {
     const url = `${API_BASE_URL}/v1/public/redeem`

@@ -1,6 +1,7 @@
 import { useEffect, createContext, useContext, ReactNode } from 'react'
 import type { GameDefinition, ThemeColors } from '../types'
 import { STORAGE_KEY_COLORS, STORAGE_KEY_THEME_MODE } from '../storageKeys'
+import type { ParticipantAppearance } from './appearance'
 
 // Helper function to convert hex to RGB
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -30,9 +31,11 @@ const DEFAULT_STAND_PALETTE: ThemeColors = {
 
 export function ThemeProvider({
   game,
+  appearance,
   children
 }: {
   game: GameDefinition | null
+  appearance?: ParticipantAppearance
   children: ReactNode
 }) {
   useEffect(() => {
@@ -49,7 +52,8 @@ export function ThemeProvider({
 
     // Check for theme mode (dark/light)
     const savedThemeMode = localStorage.getItem(STORAGE_KEY_THEME_MODE)
-    const isDarkMode = savedThemeMode !== 'light'
+    const isDarkMode = (appearance?.themeMode ?? savedThemeMode) !== 'light'
+    if (appearance) customColors = null
 
     // Always apply theme - if no game, use default gray theme
     // But prioritize custom colors if they exist
@@ -94,6 +98,8 @@ export function ThemeProvider({
       }
     }
 
+    if (appearance?.colors) colors = { ...colors, ...appearance.colors }
+
     const root = document.documentElement
 
     // Apply CSS variables
@@ -127,7 +133,7 @@ export function ThemeProvider({
     root.style.setProperty('--color-accent-gradient', `rgba(${accentRgb.r},${accentRgb.g},${accentRgb.b},0.16)`)
     root.style.setProperty('--color-border-gradient-1', `rgba(${primaryRgb.r},${primaryRgb.g},${primaryRgb.b},0.65)`)
     root.style.setProperty('--color-border-gradient-2', `rgba(${accentRgb.r},${accentRgb.g},${accentRgb.b},0.65)`)
-  }, [game])
+  }, [game, appearance])
 
   return (
     <ThemeContext.Provider value={{ game }}>

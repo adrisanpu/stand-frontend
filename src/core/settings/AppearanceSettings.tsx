@@ -11,6 +11,7 @@ import {
   uploadAvatar,
   uploadLogo,
   resolveLogoDisplayUrl,
+  saveAppearance,
   type AvatarState,
   type UserMediaItem,
   type UserMediaResponse,
@@ -65,6 +66,8 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
   })
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const logoDropdownRef = useRef<HTMLDivElement>(null)
@@ -102,6 +105,14 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
     const loadMedia = async () => {
       try {
         const media = await fetchUserMedia()
+        if (media.appearance) {
+          setUseDefaultPalette(!media.appearance.colors)
+          if (media.appearance.colors) {
+            setCustomPrimary(media.appearance.colors.primary)
+            setCustomAccent(media.appearance.colors.accent)
+          }
+          setIsDarkMode(media.appearance.themeMode !== 'light')
+        }
         setUserMedia(media)
         setLogoHistory(media.logo.items)
         setSelectedLogoId(media.logo.selectedId)
@@ -271,7 +282,20 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await saveAppearance({
+        colors: features.advancedCustomization && !useDefaultPalette
+          ? { primary: customPrimary, accent: customAccent } : null,
+        themeMode: isDarkMode ? 'dark' : 'light',
+      })
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'No se pudo guardar el aspecto.')
+      setSaving(false)
+      return
+    }
     // Save colors (only if advanced customization is available)
     if (features.advancedCustomization) {
       if (useDefaultPalette) {
@@ -301,7 +325,16 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
     window.location.reload()
   }
 
-  const handleReset = () => {
+  const handleReset = async () => {
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await saveAppearance({ colors: null, themeMode: 'dark' })
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'No se pudo restaurar el aspecto.')
+      setSaving(false)
+      return
+    }
     localStorage.removeItem(STORAGE_KEY_COLORS)
     localStorage.removeItem(STORAGE_KEY_THEME_MODE)
     localStorage.removeItem(STORAGE_KEY_AVATARS_ENABLED)
@@ -824,10 +857,12 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
           </div>
         </div>
 
+        {saveError && <p role="alert" className="text-sm text-red-300">{saveError}</p>}
         <div className="flex gap-3 pt-4 mt-auto border-t border-white/10 shrink-0">
           <button
             type="button"
             onClick={handleReset}
+            disabled={saving}
             className="flex-1 p-3 rounded-xl bg-yellow-500/20 border border-yellow-500/30 hover:bg-yellow-500/30 transition-colors font-medium"
           >
             Restaurar por Defecto
@@ -835,9 +870,10 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
           <button
             type="button"
             onClick={handleSave}
+            disabled={saving}
             className="flex-1 p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors font-medium"
           >
-            Guardar Cambios
+            {saving ? 'Guardando...' : 'Guardar Cambios'}
           </button>
         </div>
       </div>

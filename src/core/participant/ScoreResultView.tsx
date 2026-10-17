@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useParticipantLanguage } from './participantLanguage'
 import ProfileAvatar from '../widgets/ProfileAvatar'
 
 type Props = {
@@ -11,8 +12,10 @@ type Props = {
 }
 
 export default function ScoreResultView({ title, displayName, profilePicUrl, rank, notice, children }: Props) {
+  const { t } = useParticipantLanguage()
+
   return (
-    <div className="card p-6 text-center space-y-4">
+    <div className="text-center space-y-4">
       <div className="flex flex-col items-center gap-2">
         <ProfileAvatar profilePicUrl={profilePicUrl} username={displayName} size="lg" />
         <h2 className="text-2xl font-bold">{title}</h2>
@@ -21,7 +24,7 @@ export default function ScoreResultView({ title, displayName, profilePicUrl, ran
       {children}
       {rank != null && (
         <p className="text-lg">
-          Posición: <span className="font-bold">#{rank}</span>
+          {t('Posición: ')}<span className="font-bold">#{rank}</span>
         </p>
       )}
       <p className="text-sm text-textSub">{notice}</p>

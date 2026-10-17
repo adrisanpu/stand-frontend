@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { ThemeProvider, useAppThemeIsDark, useAvatarsEnabled, getAvatarsEnabled } from '../theme'
+import { ThemeProvider, useAvatarsEnabled, getAvatarsEnabled } from '../theme'
 import GameGate from './GameGate'
 import SettingsMenu from './SettingsMenu'
 import Ranking from '../widgets/Ranking'
@@ -17,7 +17,9 @@ import { normalizeGameType } from '../gameTypeMap'
 import { api } from '../../api/api'
 import GamePortraitHeaderJoin from '../widgets/GamePortraitHeaderJoin'
 import { getJoinInstructions } from '../ui/gameJoinInstructions'
-import { fetchUserMedia, resolveLogoDisplayUrl, type UserMediaResponse } from '../../api/userMedia'
+import { fetchUserMedia, resolveUserSelectedLogoUrl, type UserMediaResponse } from '../../api/userMedia'
+import { resolveGameAccess, type GameAccess } from '../settings/gameAccess'
+import MobileGameHome from '../widgets/MobileGameHome'
 // Logo size on game screens (portrait and landscape) — larger across breakpoints
 // Landscape: slightly smaller so left column fits
 const GAME_SCREEN_LOGO_CLASS_LANDSCAPE = 'h-28 sm:h-32 lg:h-36 xl:h-40 2xl:h-44 w-auto object-contain max-w-full'
@@ -30,13 +32,16 @@ export default function AppShell() {
   const [gameName, setGameName] = useState<string | null>(null)
   const [gameType, setGameType] = useState<string | null>(null)
   const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
-  const themeIsDark = useAppThemeIsDark()
   const avatarsEnabled = useAvatarsEnabled()
   const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
-  const customLogo = userMedia ? resolveLogoDisplayUrl(userMedia, themeIsDark) : null
+  const customLogo = userMedia ? resolveUserSelectedLogoUrl(userMedia) : null
   const [avatarMediaUrls, setAvatarMediaUrls] = useState<Partial<Record<'idle' | 'win' | 'lose', string | null>>>({})
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
-  const [joinChannel, setJoinChannel] = useState<string | null>(null)
+  const [loadedAccess, setLoadedAccess] = useState<{ gameId: string; access: GameAccess } | null>(null)
+  const [accessError, setAccessError] = useState<string | null>(null)
+  const access = loadedAccess?.gameId === gameId ? loadedAccess.access : null
+  const joinChannel = access?.joinChannel
+  const playMode = access?.playMode
   const [gameSettings, setGameSettings] = useState<Record<string, unknown> | null>(null)
   const [counterActive, setCounterActive] = useState(false)
   const [avatarState, setAvatarState] = useState('idle')
@@ -152,27 +157,28 @@ export default function AppShell() {
 
   useEffect(() => {
     if (!gameId) {
-      setJoinChannel(null)
+      setLoadedAccess(null)
       return
     }
     let cancelled = false
+    setAccessError(null)
+    setLoadedAccess(null)
     ;(async () => {
       try {
-        const data = await api.get<{ ok: boolean; game?: { joinChannel?: string; gameType?: string } }>(
+        const data = await api.get<{ ok: boolean; game?: { joinChannel?: string; playMode?: string; gameType?: string } }>(
           `/v1/game?gameId=${encodeURIComponent(gameId)}`
         )
-        if (!cancelled && data.ok) {
-          const gt = (data.game?.gameType || '').toUpperCase()
-          setJoinChannel(data.game?.joinChannel ?? (gt === 'EMPAREJA2' || gt === 'T1MER' || gt === 'STACK' ? 'web' : null))
-        }
-      } catch {
-        if (!cancelled) setJoinChannel(null)
+        if (cancelled) return
+        if (!data.ok || !data.game) throw new Error('No se pudo cargar el acceso del juego.')
+        setLoadedAccess({ gameId, access: resolveGameAccess(data.game.gameType || gameType || '', data.game) })
+      } catch (cause) {
+        if (!cancelled) setAccessError(cause instanceof Error ? cause.message : 'No se pudo cargar el acceso del juego.')
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [gameId, gameConfigVersion])
+  }, [gameId, gameType, gameConfigVersion])
 
   useEffect(() => {
     setAvatarState('idle')
@@ -276,7 +282,7 @@ export default function AppShell() {
       ro.disconnect()
       window.removeEventListener('resize', checkOverflow)
     }
-  }, [isPortrait, gameId, gameConfigVersion])
+  }, [isPortrait, gameId, gameConfigVersion, access, userLoading])
 
   // Scale-to-fit in landscape: content fits in the central 80% (10% air each side and top/bottom)
   useEffect(() => {
@@ -308,7 +314,7 @@ export default function AppShell() {
       ro.disconnect()
       window.removeEventListener('resize', updateScale)
     }
-  }, [isPortrait, gameId, gameConfigVersion])
+  }, [isPortrait, gameId, gameConfigVersion, access, userLoading])
   if (userLoading) {
     return (
       <ThemeProvider game={currentGame}>
@@ -339,7 +345,34 @@ export default function AppShell() {
 
         <div className={gameId && gameName && currentGame ? 'h-screen overflow-hidden' : 'min-h-screen grid place-items-center px-4 sm:px-6 lg:px-6 xl:px-8'}>
           {gameId && gameName && currentGame ? (
-            isPortrait ? (
+            !access ? (
+              <div className="h-dvh flex flex-col items-center justify-center gap-4 px-6">
+                <p role={accessError ? 'alert' : 'status'}>{accessError || 'Cargando acceso del juego...'}</p>
+                {accessError && <button type="button" onClick={() => setGameConfigVersion((v) => v + 1)}>Reintentar carga</button>}
+              </div>
+            ) : playMode === 'mobile' ? (
+              <div className={isPortrait
+                ? 'h-dvh w-screen overflow-y-auto px-6 sm:px-8 pt-[8dvh] pb-[10dvh]'
+                : 'h-dvh w-screen overflow-hidden pt-[7dvh] pb-[max(7dvh,4rem)] px-[4dvw]'}>
+                <MobileGameHome
+                  gameId={gameId}
+                  gameName={gameName}
+                  joinChannel={access.joinChannel}
+                  portrait={isPortrait}
+                  logoSrc={customLogo ?? currentGame.assets?.logo}
+                  logoAlt={customLogo ? 'Logo del cliente' : currentGame.name}
+                  players={
+                    <Players gameName={gameName} gameId={gameId} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={10000} />
+                  }
+                  raffle={features.raffles ? (
+                    <RaffleData gameId={gameId} gameName={gameName} compact={!isPortrait} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={10000} />
+                  ) : undefined}
+                  ranking={currentGame.showRanking ? (
+                    <Ranking gameId={gameId} gameType={gameType ?? undefined} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={10000} />
+                  ) : undefined}
+                />
+              </div>
+            ) : isPortrait ? (
               /* Portrait: fixed height (100dvh) so footer (Sorteo, Validador de Parejas) is always visible without scroll */
               <div className="h-dvh w-screen overflow-hidden flex flex-col">
                 <div
@@ -362,7 +395,7 @@ export default function AppShell() {
                         />
                       ) : null
                     }
-                    footerChildren={getJoinInstructions(currentGame.id)}
+                    footerChildren={getJoinInstructions(currentGame.id, access)}
                   />
                   {/* Main: con ranking, repartimos altura (juego : panel inferior) para que el ranking use el hueco */}
                   {currentGame.showRanking ? (
@@ -378,6 +411,7 @@ export default function AppShell() {
                           onAvatarStateChange={setAvatarState}
                           avatarMediaUrls={avatarMediaUrls}
                           joinChannel={joinChannel}
+                          playMode={playMode}
                         />
                       </div>
                       <div className="grow-[2] basis-0 shrink min-h-0 flex flex-col gap-3 min-w-0 overflow-hidden">
@@ -407,6 +441,7 @@ export default function AppShell() {
                           onAvatarStateChange={setAvatarState}
                           avatarMediaUrls={avatarMediaUrls}
                           joinChannel={joinChannel}
+                          playMode={playMode}
                         />
                       </div>
                       <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
@@ -450,6 +485,8 @@ export default function AppShell() {
                         onCounterActiveChange={setCounterActive}
                         onAvatarStateChange={setAvatarState}
                         avatarMediaUrls={avatarMediaUrls}
+                        joinChannel={joinChannel}
+                        playMode={playMode}
                         logoElement={
                           (customLogo || currentGame.assets?.logo) ? (
                             <div className="flex justify-center items-center w-full min-w-0">
@@ -476,9 +513,7 @@ export default function AppShell() {
                                 <RaffleData gameId={gameId} gameName={gameName} compact prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                               </div>
                             )}
-                            {avatarsEnabled &&
-                              !currentGame.showRanking &&
-                              !(normalizeGameType(gameType ?? undefined) === 'EMPAREJA2' && joinChannel === 'web') && (
+                            {avatarsEnabled && !currentGame.showRanking && (
                               <div className="min-h-[180px] flex-[1_1_180px] w-full overflow-hidden">
                                 <GameStateAvatar
                                   state={avatarState}

@@ -18,6 +18,9 @@ export type StackCut = {
 
 export const STACK_PLACING_SECONDS = 0.22
 
+export const STACK_SKINS = ['blocks', 'pizza', 'baklava'] as const
+export type StackSkin = typeof STACK_SKINS[number]
+
 export type StackConfig = {
   configVersion: '1'
   initialSpeed: number
@@ -28,6 +31,8 @@ export type StackConfig = {
   initialDepth: number
   layerHeight: number
   movementRange: number
+  /** Visual only; configs stored before skins existed omit it and render as blocks. */
+  skin?: StackSkin
 }
 
 export const DEFAULT_STACK_CONFIG: StackConfig = {
@@ -40,6 +45,7 @@ export const DEFAULT_STACK_CONFIG: StackConfig = {
   initialDepth: 2,
   layerHeight: 0.24,
   movementRange: 4,
+  skin: 'blocks',
 }
 
 export function isStackConfig(value: unknown): value is StackConfig {
@@ -47,6 +53,7 @@ export function isStackConfig(value: unknown): value is StackConfig {
   const config = value as Record<string, unknown>
   const positiveFields = ['initialSpeed', 'maxSpeed', 'initialWidth', 'initialDepth', 'layerHeight', 'movementRange']
   if (config.configVersion !== '1') return false
+  if (config.skin !== undefined && !STACK_SKINS.includes(config.skin as StackSkin)) return false
   if (!positiveFields.every((key) => typeof config[key] === 'number' && Number.isFinite(config[key]) && config[key] > 0)) {
     return false
   }

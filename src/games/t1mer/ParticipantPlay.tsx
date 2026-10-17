@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { publicApi } from '../../api/publicApi'
 import { loadAssignment, savePlayerSession } from '../../core/participant/playerSession'
+import { useParticipantLanguage } from '../../core/participant/participantLanguage'
 import ProfileAvatar from '../../core/widgets/ProfileAvatar'
 
 type GameState = 'preparing' | 'playing' | 'hidden' | 'finished'
@@ -19,11 +20,12 @@ function formatTimer(seconds: number): string {
 }
 
 export default function T1merParticipantPlay({ gameId, playerToken, onFinished }: Props) {
+  const { t } = useParticipantLanguage()
   const assignment = loadAssignment(gameId)
   const displayName =
     assignment && 'displayName' in assignment
       ? assignment.displayName
-      : 'Jugador'
+      : t('Jugador')
   const profilePicUrl =
     assignment && 'profilePicUrl' in assignment ? assignment.profilePicUrl : null
 
@@ -92,11 +94,11 @@ export default function T1merParticipantPlay({ gameId, playerToken, onFinished }
   }
 
   return (
-    <div className="card p-6 space-y-6 text-center">
+    <div className="space-y-6 text-center">
       <div className="flex flex-col items-center gap-2">
         <ProfileAvatar profilePicUrl={profilePicUrl} username={displayName} size="lg" />
         <div>
-          <p className="text-sm text-textSub">Jugando como</p>
+          <p className="text-sm text-textSub">{t('Jugando como')}</p>
           <h1 className="text-xl font-bold truncate max-w-full">{displayName}</h1>
         </div>
       </div>
@@ -112,14 +114,14 @@ export default function T1merParticipantPlay({ gameId, playerToken, onFinished }
       {gameState === 'preparing' && (
         <>
           <p className="text-sm text-textSub">
-            Detén el cronómetro lo más cerca posible de 10 segundos. Se oculta a los 5 s. Solo un intento.
+            {t('Detén el cronómetro lo más cerca posible de 10 segundos. Se oculta a los 5 s. Solo un intento.')}
           </p>
           <button
             type="button"
             onClick={handleStart}
-            className="w-full rounded-xl py-4 text-xl font-bold bg-primary/25 border border-primary/40"
+            className="w-full rounded-xl py-4 text-xl font-bold text-primary bg-[rgba(var(--color-primary-rgb),0.25)] border border-[rgba(var(--color-primary-rgb),0.4)]"
           >
-            EMPEZAR
+            {t('EMPEZAR')}
           </button>
         </>
       )}
@@ -128,16 +130,16 @@ export default function T1merParticipantPlay({ gameId, playerToken, onFinished }
         <button
           type="button"
           onClick={() => void handleStop()}
-          className="w-full rounded-xl py-4 text-xl font-bold bg-primary/25 border border-primary/40"
+          className="w-full rounded-xl py-4 text-xl font-bold text-primary bg-[rgba(var(--color-primary-rgb),0.25)] border border-[rgba(var(--color-primary-rgb),0.4)]"
         >
-          DETENER
+          {t('DETENER')}
         </button>
       )}
 
       {gameState === 'finished' && submitting && (
-        <p className="text-sm text-textSub">Enviando puntuación...</p>
+        <p className="text-sm text-textSub">{t('Enviando puntuación...')}</p>
       )}
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-red-300">{t(error)}</p>}
     </div>
   )
 }

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { publicApi, type PlayerPrize } from '../../api/publicApi'
 import { loadPlayerToken } from './playerSession'
 import QRCode from '../widgets/QRCode'
+import { useParticipantLanguage } from './participantLanguage'
 
 type Props = {
   gameId: string
-  onPlayAgain: () => void
+  onPlayAgain?: () => void
 }
 
 const PRIZE_LABEL: Record<string, string> = {
@@ -28,6 +29,7 @@ function mergePrizes(prev: PlayerPrize[], next: PlayerPrize[]): PlayerPrize[] {
 }
 
 export default function ResultView({ gameId, onPlayAgain }: Props) {
+  const { t } = useParticipantLanguage()
   const [prizes, setPrizes] = useState<PlayerPrize[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -61,35 +63,35 @@ export default function ResultView({ gameId, onPlayAgain }: Props) {
   const delivered = prizes.filter((p) => p.delivered)
 
   return (
-    <div className="card p-6 text-center space-y-4">
+    <div className="text-center space-y-4">
       <div className="text-5xl" aria-hidden>✓</div>
-      <h2 className="text-2xl font-bold text-green-300">¡Pareja válida!</h2>
+      <h2 className="text-2xl font-bold text-green-300">{t('¡Pareja válida!')}</h2>
       <p className="text-textSub">
-        {pending.length > 0
+        {t(pending.length > 0
           ? 'Muestra este QR en el punto de recogida para canjear tu premio.'
-          : 'Mirad la pantalla del evento para ver el resultado en vivo.'}
+          : 'Mirad la pantalla del evento para ver el resultado en vivo.')}
       </p>
 
-      {loading && <p className="text-sm text-textSub">Cargando premios...</p>}
+      {loading && <p className="text-sm text-textSub">{t('Cargando premios...')}</p>}
 
       {pending.map((p) => (
         <div key={p.kind} className="space-y-2">
-          <p className="text-sm font-medium">{PRIZE_LABEL[p.kind] || p.kind}</p>
-          <QRCode data={p.token} size={220} alt={`QR ${p.kind}`} className="!bg-white !p-3" />
+          <p className="text-sm font-medium">{t(PRIZE_LABEL[p.kind] || p.kind)}</p>
+          <QRCode data={p.token} size={220} alt={`QR ${t(PRIZE_LABEL[p.kind] || p.kind)}`} className="!bg-white !p-3" />
         </div>
       ))}
 
       {delivered.length > 0 && pending.length === 0 && (
-        <p className="text-sm text-green-300/90">Premio(s) ya recogido(s). ¡Disfrutad!</p>
+        <p className="text-sm text-green-300/90">{t('Premio(s) ya recogido(s). ¡Disfrutad!')}</p>
       )}
 
-      <button
+      {onPlayAgain && <button
         type="button"
         onClick={onPlayAgain}
-        className="w-full rounded-xl py-3 font-semibold border border-white/15"
+        className="w-full rounded-xl py-3 font-semibold text-primary bg-[rgba(var(--color-primary-rgb),0.2)] border border-[rgba(var(--color-primary-rgb),0.35)]"
       >
-        Validar otra pareja
-      </button>
+        {t('Validar otra pareja')}
+      </button>}
     </div>
   )
 }

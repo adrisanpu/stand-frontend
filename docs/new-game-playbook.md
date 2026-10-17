@@ -136,20 +136,29 @@ export function GameScreen({ gameId, gameName }: GameScreenProps) {
 
 ### 5.3 `src/games/<id>/GameConfig.tsx`
 
+The shared **Configurar juego** modal owns the only save button (**Guardar y aplicar cambios**). Config components
+must register their save handler via `registerSave` (use `useGameConfigSaveRegistration`) and hide their own save
+button when embedded. `validate` runs before anything is persisted; `save` must reject on failure and call
+`onChange` only after persisting. `access` is the current (unsaved) mode/access draft.
+
 ```tsx
 import type { GameConfigProps } from '../../core/types';
+import { useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave';
 
-export function GameConfig({ config, onChange }: GameConfigProps) {
+export function GameConfig({ gameId, settings, onChange, registerSave }: GameConfigProps) {
+  const [value, setValue] = useState(settings?.value ?? '');
+  const persist = async () => {
+    await api.put('/v1/game', { gameId, settings: { mygame: { value } } });
+    onChange({ value });
+  };
+  const embedded = useGameConfigSaveRegistration(registerSave, {
+    validate: () => (value ? null : 'El valor es obligatorio'),
+    save: persist,
+  });
   return (
     <section className="space-y-4">
-      <h3 className="text-lg font-semibold">Game settings</h3>
-      <button
-        type="button"
-        className="rounded-xl border border-white/10 px-4 py-2"
-        onClick={() => onChange({ ...config })}
-      >
-        Save
-      </button>
+      <input value={value} onChange={(e) => setValue(e.target.value)} />
+      {!embedded && <button type="button" onClick={() => void persist()}>Guardar configuración</button>}
     </section>
   );
 }

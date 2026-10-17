@@ -43,7 +43,7 @@ export default function GameLandscapeInfoColumn({ gameId, logoElement, children,
           <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-gray-300/90 text-center">
             Escanea para jugar
           </p>
-          <GameIdHint gameId={gameId} />
+          <GameIdHint gameId={gameId} joinChannel={joinChannel} />
         </div>
       </div>
       <GamePanelFooter>{children}</GamePanelFooter>

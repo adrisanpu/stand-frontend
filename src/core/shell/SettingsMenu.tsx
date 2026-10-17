@@ -9,6 +9,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { inputManager } from '../input/inputManager'
+import GameConfigPanel, { type GameConfigSavedPatch } from '../settings/GameConfigPanel'
 
 type SettingsMenuProps = {
   onClose: () => void
@@ -36,6 +37,11 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [showGameConfig, setShowGameConfig] = useState(false)
   const [showOperatorPrizes, setShowOperatorPrizes] = useState(false)
   const [gameSettings, setGameSettings] = useState<any>(null)
+  const gameSettingsRef = useRef(gameSettings)
+  gameSettingsRef.current = gameSettings
+  const [gameConfigSaving, setGameConfigSaving] = useState(false)
+  const gameConfigSavingRef = useRef(false)
+  gameConfigSavingRef.current = gameConfigSaving
   const [showAppearanceSettings, setShowAppearanceSettings] = useState(false)
   const [showUserInfo, setShowUserInfo] = useState(false)
   const [isStartingCheckout, setIsStartingCheckout] = useState(false)
@@ -95,7 +101,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         return true
       }
       if (s.showGameConfig) {
-        setShowGameConfig(false)
+        if (!gameConfigSavingRef.current) setShowGameConfig(false)
         return true
       }
       if (s.showUserInfo) {
@@ -146,9 +152,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const handleGameConfigChange = (newSettings: any) => {
     if (gameId && gameDefinition?.id) {
       const storageKey = `${gameDefinition.id}_settings_${gameId}`
-      const merged = { ...(gameSettings || {}), ...newSettings }
+      const merged = { ...(gameSettingsRef.current || {}), ...newSettings }
       const { close: shouldClose, refreshGameScreen, ...toPersist } = merged
       localStorage.setItem(storageKey, JSON.stringify(toPersist))
+      gameSettingsRef.current = toPersist
       setGameSettings(toPersist)
       // Notify AppShell so it refreshes gameSettings (top X, premios, etc.) in the main view
       onConfigSaved?.()
@@ -162,15 +169,26 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     }
   }
 
+  const closeGameConfig = () => {
+    if (!gameConfigSavingRef.current) setShowGameConfig(false)
+  }
+
+  const handleGameConfigSaved = (patch: GameConfigSavedPatch) => {
+    handleGameConfigChange(patch)
+    setShowGameConfig(false)
+    onClose()
+  }
+
   const handleOperatorPrizePersist = (patch: Record<string, unknown>) => {
     if (!gameId || !gameDefinition?.id) return
     const storageKey = `${gameDefinition.id}_settings_${gameId}`
-    const merged = { ...(gameSettings || {}), ...patch }
+    const merged = { ...(gameSettingsRef.current || {}), ...patch }
     const { close: shouldClose, refreshGameScreen, ...toPersist } = merged as Record<string, unknown> & {
       close?: boolean
       refreshGameScreen?: boolean
     }
     localStorage.setItem(storageKey, JSON.stringify(toPersist))
+    gameSettingsRef.current = toPersist
     setGameSettings(toPersist)
     onConfigSaved?.()
     if (shouldClose === true) {
@@ -564,8 +582,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     )
   }
 
-  if (showGameConfig && gameDefinition?.GameConfigComponent) {
-    const GameConfigComponent = gameDefinition.GameConfigComponent
+  if (showGameConfig && gameDefinition && gameId) {
     return (
       <div
         role="dialog"
@@ -573,14 +590,15 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         aria-labelledby="game-config-title"
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
-        <div className="absolute inset-0 bg-black/70" onClick={() => setShowGameConfig(false)} aria-hidden="true" />
+        <div className="absolute inset-0 bg-black/70" onClick={closeGameConfig} aria-hidden="true" />
         <div className="relative card w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
-                onClick={() => setShowGameConfig(false)}
-                className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
+                onClick={closeGameConfig}
+                disabled={gameConfigSaving}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0 disabled:opacity-40"
                 aria-label="Volver al juego"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -591,8 +609,9 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             </div>
             <button
               type="button"
-              onClick={() => setShowGameConfig(false)}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              onClick={closeGameConfig}
+              disabled={gameConfigSaving}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40"
               aria-label="Cerrar y volver al juego"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -600,14 +619,14 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               </svg>
             </button>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6">
-            <GameConfigComponent
-              gameId={gameId ?? null}
-              gameName={gameDefinition.name}
-              settings={gameSettings}
-              onChange={handleGameConfigChange}
-            />
-          </div>
+          <GameConfigPanel
+            gameId={gameId}
+            gameDefinition={gameDefinition}
+            settings={gameSettings}
+            onSettingsChange={handleGameConfigChange}
+            onSaved={handleGameConfigSaved}
+            onSavingChange={setGameConfigSaving}
+          />
         </div>
       </div>
     )
@@ -976,8 +995,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
           {/* Game-specific options */}
           {gameType && (
             <>
-              {/* Game Config - Only show if game has GameConfigComponent */}
-              {gameDefinition?.GameConfigComponent && (
+              {gameDefinition && gameId && (
                 <button
                   onClick={() => setShowGameConfig(true)}
                   className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"

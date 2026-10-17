@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
+import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 
 interface GameDataResponse {
   ok: boolean
@@ -36,7 +37,7 @@ const DEFAULT_SETTINGS: L3trasSettings = {
   validationTimeLimitSeconds: DEFAULT_VALIDATION_TIME_LIMIT_SECONDS,
 }
 
-export default function L3trasGameConfig({ gameId, settings, onChange }: GameConfigProps) {
+export default function L3trasGameConfig({ gameId, settings, onChange, registerSave }: GameConfigProps) {
   const [objectiveWord, setObjectiveWord] = useState<string>(
     (settings as L3trasSettings | null)?.objectiveWord || DEFAULT_SETTINGS.objectiveWord
   )
@@ -82,17 +83,38 @@ export default function L3trasGameConfig({ gameId, settings, onChange }: GameCon
     setObjectiveWord(cleaned)
   }
 
-  const handleSave = async () => {
-    if (!objectiveWord || objectiveWord.length === 0) {
-      alert('La palabra objetivo no puede estar vacía')
-      return
-    }
+  const validate = () =>
+    !objectiveWord || objectiveWord.length === 0 ? 'La palabra objetivo no puede estar vacía' : null
 
+  const persist = async () => {
+    const invalid = validate()
+    if (invalid) throw new Error(invalid)
     const newSettings: L3trasSettings = {
       objectiveWord: objectiveWord.toUpperCase(),
       validationTimeLimitSeconds: normalizeValidationTimeLimitSeconds(validationTimeLimitSeconds),
     }
+    if (gameId) {
+      await api.put('/v1/game', {
+        gameId,
+        settings: {
+          l3tras: {
+            objectiveWord: newSettings.objectiveWord,
+            validationTimeLimitSeconds: newSettings.validationTimeLimitSeconds,
+          },
+        },
+      })
+    }
     onChange(newSettings)
+  }
+
+  const embedded = useGameConfigSaveRegistration(registerSave, { validate, save: persist })
+
+  const handleSave = async () => {
+    const invalid = validate()
+    if (invalid) {
+      alert(invalid)
+      return
+    }
     setSaveStatus('idle')
     setSaveMessage('')
 
@@ -100,15 +122,7 @@ export default function L3trasGameConfig({ gameId, settings, onChange }: GameCon
       setSaveStatus('saving')
       setSaveMessage('Guardando...')
       try {
-        await api.put('/v1/game', {
-          gameId,
-          settings: {
-            l3tras: {
-              objectiveWord: newSettings.objectiveWord,
-              validationTimeLimitSeconds: newSettings.validationTimeLimitSeconds,
-            },
-          },
-        })
+        await persist()
         setSaveStatus('success')
         setSaveMessage('Configuración guardada correctamente.')
         setTimeout(() => {
@@ -117,9 +131,10 @@ export default function L3trasGameConfig({ gameId, settings, onChange }: GameCon
         }, 3000)
       } catch (e: unknown) {
         setSaveStatus('error')
-        setSaveMessage(e instanceof Error ? e.message : 'Error al guardar en el servidor')
+        setSaveMessage(saveErrorMessage(e, 'Error al guardar en el servidor'))
       }
     } else {
+      await persist()
       setSaveStatus('success')
       setSaveMessage('Configuración guardada.')
       setTimeout(() => {
@@ -131,10 +146,10 @@ export default function L3trasGameConfig({ gameId, settings, onChange }: GameCon
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="min-w-0 flex flex-col">
           <div className="mb-2 flex items-center gap-2">
-            <label className="block text-sm font-medium text-gray-300">
+            <label htmlFor="l3tras-objective-word" className="block text-sm font-medium text-gray-300">
               Palabra objetivo
             </label>
             <span className="group relative inline-flex">
@@ -151,17 +166,18 @@ export default function L3trasGameConfig({ gameId, settings, onChange }: GameCon
             </span>
           </div>
           <input
+            id="l3tras-objective-word"
             type="text"
             value={objectiveWord}
             onChange={(e) => handleObjectiveWordChange(e.target.value)}
             placeholder="STAND"
-            className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none uppercase"
+            className="mt-auto w-full min-w-0 h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none uppercase"
           />
         </div>
 
-        <div>
+        <div className="min-w-0 flex flex-col">
           <div className="mb-2 flex items-center gap-2">
-            <label className="block text-sm font-medium text-gray-300">
+            <label htmlFor="l3tras-time-limit" className="block text-sm font-medium text-gray-300">
               Tiempo para completar la palabra (segundos)
             </label>
             <span className="group relative inline-flex">
@@ -178,6 +194,7 @@ export default function L3trasGameConfig({ gameId, settings, onChange }: GameCon
             </span>
           </div>
           <input
+            id="l3tras-time-limit"
             type="number"
             min={MIN_VALIDATION_TIME_LIMIT_SECONDS}
             max={MAX_VALIDATION_TIME_LIMIT_SECONDS}
@@ -188,7 +205,7 @@ export default function L3trasGameConfig({ gameId, settings, onChange }: GameCon
                 normalizeValidationTimeLimitSeconds(e.target.value === '' ? NaN : Number(e.target.value)),
               )
             }
-            className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
+            className="mt-auto w-full min-w-0 h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
           />
         </div>
       </div>
@@ -201,13 +218,15 @@ export default function L3trasGameConfig({ gameId, settings, onChange }: GameCon
         </p>
       )}
 
-      <button
-        onClick={() => void handleSave()}
-        disabled={saveStatus === 'saving'}
-        className="w-full p-3 rounded-xl bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.3)] hover:bg-[rgba(16,185,129,0.3)] transition-colors font-medium disabled:opacity-50"
-      >
-        Guardar configuración
-      </button>
+      {!embedded && (
+        <button
+          onClick={() => void handleSave()}
+          disabled={saveStatus === 'saving'}
+          className="w-full p-3 rounded-xl bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.3)] hover:bg-[rgba(16,185,129,0.3)] transition-colors font-medium disabled:opacity-50"
+        >
+          Guardar configuración
+        </button>
+      )}
     </div>
   )
 }

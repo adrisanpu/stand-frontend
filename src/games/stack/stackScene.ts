@@ -12,7 +12,7 @@ import {
 } from 'three'
 import { followStackHeight, StackEngine } from './stackLogic'
 import type { StackConfig, StackLayer, StackRectangle, StackSnapshot } from './stackLogic'
-import { createPizzaVisuals } from './stackPizzaVisuals'
+import { createStackVisuals } from './stackVisuals'
 
 export type StackSceneOptions = {
   config: StackConfig
@@ -36,13 +36,16 @@ type Fragment = { pizza: Group; age: number; velocity: number; spin: number; dri
 
 /** Owns GPU resources only; the caller confirms the backend attempt before calling start. */
 export function createStackScene(canvas: HTMLCanvasElement, options: StackSceneOptions): StackSceneController {
-  const engine = new StackEngine(options.config)
+  // Visual only: score replay ignores layerHeight, so taller baklava slices keep the same gameplay.
+  const heightScale = options.config.skin === 'baklava' ? 2 : 1
+  const visualConfig = (config: StackConfig): StackConfig => ({ ...config, layerHeight: config.layerHeight * heightScale })
+  const engine = new StackEngine(visualConfig(options.config))
   const context = canvas.getContext('webgl2', { alpha: true, antialias: false })
   if (!context) throw new Error('Este dispositivo no permite crear una escena WebGL 2.')
   const renderer = new WebGLRenderer({ canvas, context, alpha: true, antialias: false })
   const scene = new Scene()
   const camera = new OrthographicCamera(-4, 4, 4, -4, 0.1, 200)
-  const visuals = createPizzaVisuals()
+  const visuals = createStackVisuals(options.config.skin)
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
   const perfectGeometry = new RingGeometry(0.94, 1, 48)
   const perfectMaterial = new MeshBasicMaterial({
@@ -306,7 +309,7 @@ export function createStackScene(canvas: HTMLCanvasElement, options: StackSceneO
     start(config) {
       if (disposed || failed) return
       try {
-        if (!engine.start(config)) return
+        if (!engine.start(config && visualConfig(config))) return
         for (const layer of layers) release(layer)
         layers.length = 0
         addLayer(engine.top)

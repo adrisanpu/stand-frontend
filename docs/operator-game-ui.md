@@ -6,9 +6,32 @@ Conventions for `GameScreen` layouts, spacing to the viewport, code validation, 
 
 Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas desde `md`**: columna 1 con el **logo grande centrado** (`max-h-44`–`max-h-60` según breakpoint); columna 2 en **columna flex** con la **descripción** arriba (`descriptionLong` o `description`) y **tags** abajo (separador `border-t`, `flex-wrap`). En móvil todo se apila en un orden: logo → texto → tags. Sin `assets.logo`, mostrar iniciales del nombre en un contenedor cuadrado como en la rejilla del catálogo.
 
+## Configurar juego
+
+Keep **Modo de juego** and **Acceso del participante** side by side in a two-column
+row, with one legend each. Options are **1 pantalla** / **∞ móviles** and
+**Instagram** / **Web**; unsupported choices stay visible but disabled.
+On narrow screens, stack the options inside each selector, not the selectors themselves.
+Use two columns for short rule parameters (STACK speeds/tolerance, L3TRAS word/time,
+INFOCARDS generation counts); a lone short field such as IMPOSTOR's player limit
+occupies one column. Long text, word editors and descriptions retain their full
+editing width; EMPAREJA2's difficulty slider stays wide and RULET4's existing
+label/count pair stays in two columns. Keep drafts and the single final
+**Guardar y aplicar cambios** action in the shared panel.
+
+For games supporting mobile play, the shared panel shows the participant
+`/play/:gameId` link and prize validator link with its QR immediately below the
+mode/access selectors, before game-specific rules. Use a compact row with the two
+links on the left and an 80px validator QR on the right, without extra headings
+or explanatory copy. Show these for both access
+channels and all supported play modes; individual game configs must not duplicate
+them.
+
 ## Screen edge → content (AppShell)
 
 Do not reimplement outer page padding inside `GameScreen`; the shell already insets content.
+The table below and the game interaction layout guidelines apply to master mode;
+mobile-client mode uses the event home described in the next section.
 
 | Mode | Where | Classes / behavior |
 |------|--------|-------------------|
@@ -18,6 +41,25 @@ Do not reimplement outer page padding inside `GameScreen`; the shell already ins
 | Landscape | Full-bleed stage | `py-[10dvh] pl-[3dvw] pr-[1.5dvw]` on the landscape container (tighter right gutter). |
 
 Settings control is `fixed top-4 left-4` (not part of game panels).
+
+## Mobile-client event home
+
+When `playMode === 'mobile'`, `AppShell` renders the shared `MobileGameHome`
+instead of the game's operator interaction panel (EMPAREJA2, T1MER and STACK).
+Landscape uses three columns: large logo with players and an expanded raffle
+below on the left, a large QR in the center, and the ranking filling the right
+column. Games without a ranking use two columns; raffle plan restrictions and
+prize settings remain unchanged. The logo card contains only the logo, without
+the manual icon or legal footer. No mobile participation explanation, participant
+link buttons or event-name/code text appears on this home. The QR still follows
+the configured access channel, including Instagram. The mobile landscape stage
+uses `4dvw` horizontal margins and a `7dvh` top inset, and reserves at least
+`max(7dvh, 4rem)` below the panels for the fixed Stand footer logo.
+
+Portrait stacks the logo, QR, players, raffle and ranking in that order in a
+scrollable page with `px-6 sm:px-8` horizontal margins and an `8dvh` top inset.
+This presentation does not change the participant
+registration/consent screens or master-mode layouts.
 
 ## Landscape game grid (three columns)
 

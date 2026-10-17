@@ -15,6 +15,7 @@ import { useGameInput } from '../../core/input/useGameInput'
 import type { InputEventEnvelope } from '../../core/input/types'
 import { useAvatarsEnabled } from '../../core/theme'
 import { useWebOsPointerPrimary } from '../../core/input/useWebOsPointerPrimary'
+import { resolveGameAccess } from '../../core/settings/gameAccess'
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
 
@@ -30,9 +31,10 @@ export default function T1merGameScreen({
   onAvatarStateChange,
   avatarMediaUrls,
   joinChannel,
+  playMode,
 }: GameScreenProps) {
   const avatarsEnabled = useAvatarsEnabled()
-  const isPhoneMode = (joinChannel || '').toLowerCase() === 'web'
+  const isPhoneMode = resolveGameAccess('T1MER', { playMode, joinChannel }).playMode === 'mobile'
   const [gameState, setGameState] = useState<GameState>('idle')
   const [timer, setTimer] = useState(0)
   const [playerCode, setPlayerCode] = useState('')
@@ -301,7 +303,7 @@ export default function T1merGameScreen({
   if (isPhoneMode && isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
-        <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
+        <GameLandscapeLeftColumn gameId={gameId} joinChannel={joinChannel} logoElement={logoElement} playersElement={playersElement}>
           <LandscapeInfoInstruction>Los asistentes juegan desde su móvil (/play).</LandscapeInfoInstruction>
           <LandscapeInfoInstruction>Esta es la pantalla del evento para el monitor o proyector.</LandscapeInfoInstruction>
           <LandscapeInfoInstruction>Los enlaces están en Configurar juego.</LandscapeInfoInstruction>
@@ -331,6 +333,7 @@ export default function T1merGameScreen({
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeLeftColumn
           gameId={gameId}
+          joinChannel={joinChannel}
           logoElement={logoElement}
           playersElement={playersElement}
           avatarElement={
@@ -340,7 +343,7 @@ export default function T1merGameScreen({
           }
         >
           <LandscapeInfoInstruction>
-            Escanea el QR y pulsa JUGAR.
+            {joinChannel === 'instagram' ? 'Escanea el QR y pulsa JUGAR en Instagram.' : 'Escanea el QR y completa el formulario web.'}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
             Ingresa tu código y valida.

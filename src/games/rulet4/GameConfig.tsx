@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
+import { useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 
 export type Rulet4PanelConfig = {
   id: string
@@ -18,7 +19,7 @@ const DEFAULT_PANELS: Rulet4PanelConfig[] = [
   { id: '3', label: 'Verde', color: '#22C55E', count: 1 },
 ]
 
-export default function Rulet4GameConfig({ settings, onChange }: GameConfigProps) {
+export default function Rulet4GameConfig({ settings, onChange, registerSave }: GameConfigProps) {
   const [panels, setPanels] = useState<Rulet4PanelConfig[]>(
     (settings as Rulet4Settings | null)?.panels || DEFAULT_PANELS
   )
@@ -56,6 +57,8 @@ export default function Rulet4GameConfig({ settings, onChange }: GameConfigProps
     const newSettings: Rulet4Settings = { panels }
     onChange(newSettings)
   }
+
+  const embedded = useGameConfigSaveRegistration(registerSave, { save: async () => handleSave() })
 
   return (
     <div className="space-y-6">
@@ -136,12 +139,14 @@ export default function Rulet4GameConfig({ settings, onChange }: GameConfigProps
         Añadir tipo de panel
       </button>
 
-      <button
-        onClick={handleSave}
-        className="w-full p-3 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors font-medium"
-      >
-        Guardar configuración
-      </button>
+      {!embedded && (
+        <button
+          onClick={handleSave}
+          className="w-full p-3 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors font-medium"
+        >
+          Guardar configuración
+        </button>
+      )}
     </div>
   )
 }

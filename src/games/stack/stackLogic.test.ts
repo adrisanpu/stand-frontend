@@ -247,4 +247,11 @@ describe('STACK configuration contract', () => {
   ])('rejects invalid numeric rules: %s', (patch) => {
     expect(isStackConfig({ ...DEFAULT_STACK_CONFIG, ...patch })).toBe(false)
   })
+
+  it('accepts known skins and legacy configs without one, rejects unknown skins', () => {
+    const { skin: _skin, ...legacy } = DEFAULT_STACK_CONFIG
+    expect(isStackConfig(legacy)).toBe(true)
+    expect(isStackConfig({ ...DEFAULT_STACK_CONFIG, skin: 'baklava' })).toBe(true)
+    expect(isStackConfig({ ...DEFAULT_STACK_CONFIG, skin: 'donut' })).toBe(false)
+  })
 })

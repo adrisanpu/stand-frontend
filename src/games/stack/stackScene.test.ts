@@ -93,7 +93,7 @@ describe('STACK scene controller', () => {
     expect(frames.size).toBe(0)
     expect(pizzas()).toHaveLength(1)
     const pizza = pizzas()[0]
-    expect(pizza.name).toBe('stack-pizza')
+    expect(pizza.name).toBe('stack-piece')
     expect(pizza.children).toHaveLength(1)
     const mesh = pizza.children[0] as Mesh
     expect(mesh.geometry.getAttribute('position').count).toBe(384)
@@ -338,7 +338,7 @@ describe('STACK scene controller', () => {
     const disposeTexture = vi.spyOn(Texture.prototype, 'dispose')
     const geometries = new Set<BufferGeometry>()
     const attributes = new Set<unknown>()
-    const scene = setup()
+    const scene = setup({ ...DEFAULT_STACK_CONFIG, skin: 'pizza' })
     scene.start()
     step(0)
     for (let score = 0; score < 250; score++) {
@@ -405,8 +405,20 @@ describe('STACK scene controller', () => {
     expect(Math.min(...Array.from({ length: top.count }, (_, i) => uv.getX(top.start + i)))).toBeGreaterThan(0.8)
   })
 
+  it('renders baklava slices twice as tall without changing placements', () => {
+    const scene = setup({ ...DEFAULT_STACK_CONFIG, skin: 'baklava' })
+    scene.start({ ...DEFAULT_STACK_CONFIG, skin: 'baklava' })
+    step(0)
+    step(2)
+    scene.place()
+    expect(latest().placements[0]).toMatchObject({ axis: 'x', perfect: true })
+    const height = DEFAULT_STACK_CONFIG.layerHeight * 2
+    expect(pizzas().map((piece) => piece.scale.y)).toEqual(pizzas().map(() => height))
+    expect(pizzas().some((piece) => piece.position.y === height)).toBe(true)
+  })
+
   it('uses a shared procedural surface, warm directional lighting and no shadow rendering', () => {
-    const scene = setup()
+    const scene = setup({ ...DEFAULT_STACK_CONFIG, skin: 'baklava' })
     scene.start()
     const meshes = pizzas().map((pizza) => pizza.children[0] as Mesh)
     expect(meshes[0].material).toBe(meshes[1].material)

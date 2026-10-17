@@ -3,15 +3,15 @@ import { getEmpareja2CenterKind } from './centerKind'
 
 describe('getEmpareja2CenterKind', () => {
   it('phone mode + avatars → avatar (not pair panel)', () => {
-    expect(getEmpareja2CenterKind('web', true)).toBe('avatar')
+    expect(getEmpareja2CenterKind('mobile', true)).toBe('avatar')
   })
 
   it('phone mode + avatars off → links fallback', () => {
-    expect(getEmpareja2CenterKind('web', false)).toBe('links')
+    expect(getEmpareja2CenterKind('mobile', false)).toBe('links')
   })
 
-  it('instagram / event screen → pair panel', () => {
-    expect(getEmpareja2CenterKind('instagram', true)).toBe('pair')
-    expect(getEmpareja2CenterKind('instagram', false)).toBe('pair')
+  it('master mode → pair panel, independently of access channel', () => {
+    expect(getEmpareja2CenterKind('master', true)).toBe('pair')
+    expect(getEmpareja2CenterKind('master', false)).toBe('pair')
   })
 })
