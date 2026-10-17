@@ -4,6 +4,7 @@ import type { PublicGameResponse } from '../../api/publicApi'
 import { resolveGameAccess } from '../settings/gameAccess'
 import { normalizeGameType } from '../gameTypeMap'
 import { useParticipantLanguage } from './participantLanguage'
+import ParticipantPrizePromo from './ParticipantPrizePromo'
 
 type Props = {
   gameId: string
@@ -62,6 +63,8 @@ export default function AssignmentView({ gameId, gameMeta, onValidate }: Props) 
           ? 'Cuando os encontréis, validad los dos códigos desde el móvil y recoged vuestro premio.'
           : 'Cuando os encontréis, llevad vuestros códigos a la pantalla máster del evento para validar la pareja.')}
       </p>
+
+      <ParticipantPrizePromo catalog={gameMeta.prizeCatalog} slots={['validation']} />
 
       {(isMobile || !showCode) && <button
         type="button"

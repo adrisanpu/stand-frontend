@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
 import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import { localizeOperatorMessage } from '../operatorText'
 
 interface GameDataResponse {
   ok: boolean
@@ -38,6 +40,7 @@ const DEFAULT_SETTINGS: L3trasSettings = {
 }
 
 export default function L3trasGameConfig({ gameId, settings, onChange, registerSave }: GameConfigProps) {
+  const { t } = useOperatorLanguage()
   const [objectiveWord, setObjectiveWord] = useState<string>(
     (settings as L3trasSettings | null)?.objectiveWord || DEFAULT_SETTINGS.objectiveWord
   )
@@ -84,7 +87,7 @@ export default function L3trasGameConfig({ gameId, settings, onChange, registerS
   }
 
   const validate = () =>
-    !objectiveWord || objectiveWord.length === 0 ? 'La palabra objetivo no puede estar vacía' : null
+    !objectiveWord || objectiveWord.length === 0 ? t('La palabra objetivo no puede estar vacía', 'The target word cannot be empty') : null
 
   const persist = async () => {
     const invalid = validate()
@@ -120,23 +123,23 @@ export default function L3trasGameConfig({ gameId, settings, onChange, registerS
 
     if (gameId) {
       setSaveStatus('saving')
-      setSaveMessage('Guardando...')
+      setSaveMessage(t('Guardando...', 'Saving...'))
       try {
         await persist()
         setSaveStatus('success')
-        setSaveMessage('Configuración guardada correctamente.')
+        setSaveMessage(t('Configuración guardada correctamente.', 'Configuration saved successfully.'))
         setTimeout(() => {
           setSaveStatus('idle')
           setSaveMessage('')
         }, 3000)
       } catch (e: unknown) {
         setSaveStatus('error')
-        setSaveMessage(saveErrorMessage(e, 'Error al guardar en el servidor'))
+        setSaveMessage(saveErrorMessage(e, t('Error al guardar en el servidor', 'Error saving to the server')))
       }
     } else {
       await persist()
       setSaveStatus('success')
-      setSaveMessage('Configuración guardada.')
+      setSaveMessage(t('Configuración guardada.', 'Configuration saved.'))
       setTimeout(() => {
         setSaveStatus('idle')
         setSaveMessage('')
@@ -150,18 +153,18 @@ export default function L3trasGameConfig({ gameId, settings, onChange, registerS
         <div className="min-w-0 flex flex-col">
           <div className="mb-2 flex items-center gap-2">
             <label htmlFor="l3tras-objective-word" className="block text-sm font-medium text-gray-300">
-              Palabra objetivo
+              {t('Palabra objetivo', 'Target word')}
             </label>
             <span className="group relative inline-flex">
               <button
                 type="button"
-                aria-label="Información sobre palabra objetivo"
+                aria-label={t('Información sobre palabra objetivo', 'Information about the target word')}
                 className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25 text-[10px] font-semibold text-gray-300/90"
               >
                 i
               </button>
               <span className="pointer-events-none absolute left-1/2 top-0 z-20 hidden w-64 -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-lg border border-white/15 bg-[rgba(17,24,39,0.98)] p-2 text-xs text-gray-200 shadow-lg group-hover:block">
-                Solo letras A-Z; se guardan en mayusculas.
+                {t('Solo letras A-Z; se guardan en mayúsculas.', 'Letters A-Z only; saved in uppercase.')}
               </span>
             </span>
           </div>
@@ -178,18 +181,18 @@ export default function L3trasGameConfig({ gameId, settings, onChange, registerS
         <div className="min-w-0 flex flex-col">
           <div className="mb-2 flex items-center gap-2">
             <label htmlFor="l3tras-time-limit" className="block text-sm font-medium text-gray-300">
-              Tiempo para completar la palabra (segundos)
+              {t('Tiempo para completar la palabra (segundos)', 'Time to complete the word (seconds)')}
             </label>
             <span className="group relative inline-flex">
               <button
                 type="button"
-                aria-label="Información sobre tiempo de validación"
+                aria-label={t('Información sobre tiempo de validación', 'Information about the validation time')}
                 className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25 text-[10px] font-semibold text-gray-300/90"
               >
                 i
               </button>
               <span className="pointer-events-none absolute left-1/2 top-0 z-20 hidden w-72 -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-lg border border-white/15 bg-[rgba(17,24,39,0.98)] p-2 text-xs text-gray-200 shadow-lg group-hover:block">
-                Cuenta desde el primer codigo valido. Por defecto 60 s; entre {MIN_VALIDATION_TIME_LIMIT_SECONDS} y {MAX_VALIDATION_TIME_LIMIT_SECONDS} s. Si se agota, el grupo vuelve a empezar.
+                {t(`Cuenta desde el primer código válido. Por defecto 60 s; entre ${MIN_VALIDATION_TIME_LIMIT_SECONDS} y ${MAX_VALIDATION_TIME_LIMIT_SECONDS} s. Si se agota, el grupo vuelve a empezar.`, `Starts with the first valid code. Default is 60 s; between ${MIN_VALIDATION_TIME_LIMIT_SECONDS} and ${MAX_VALIDATION_TIME_LIMIT_SECONDS} s. If time runs out, the group starts over.`)}
               </span>
             </span>
           </div>
@@ -214,7 +217,7 @@ export default function L3trasGameConfig({ gameId, settings, onChange, registerS
         <p
           className={`text-sm ${saveStatus === 'error' ? 'text-red-400' : saveStatus === 'saving' ? 'text-gray-400' : 'text-[#10B981]'}`}
         >
-          {saveMessage}
+          {localizeOperatorMessage(saveMessage, t)}
         </p>
       )}
 
@@ -224,7 +227,7 @@ export default function L3trasGameConfig({ gameId, settings, onChange, registerS
           disabled={saveStatus === 'saving'}
           className="w-full p-3 rounded-xl bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.3)] hover:bg-[rgba(16,185,129,0.3)] transition-colors font-medium disabled:opacity-50"
         >
-          Guardar configuración
+          {t('Guardar configuración', 'Save configuration')}
         </button>
       )}
     </div>

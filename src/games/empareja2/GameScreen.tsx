@@ -14,6 +14,8 @@ import { useAvatarsEnabled } from '../../core/theme'
 import Empareja2OperatorScreen from './OperatorScreen'
 import { getEmpareja2CenterKind } from './centerKind'
 import { resolveGameAccess } from '../../core/settings/gameAccess'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import { localizeOperatorMessage } from '../operatorText'
 
 type GameState = 'idle' | 'validating' | 'valid' | 'invalid' | 'finished'
 
@@ -73,6 +75,7 @@ function PairCharacterSlot({
   filled: boolean
   slotLabel: string
 }) {
+  const { t } = useOperatorLanguage()
   const dim = SLOT_DIM[variant]
   const imgUrl = player?.characterImageUrl || null
   const profilePic =
@@ -106,7 +109,7 @@ function PairCharacterSlot({
           {profilePic ? (
             <img
               src={profilePic}
-              alt={handle ? `Foto de perfil de ${handle}` : 'Foto de perfil'}
+              alt={handle ? t(`Foto de perfil de ${handle}`, `Profile picture of ${handle}`) : t('Foto de perfil', 'Profile picture')}
               referrerPolicy="no-referrer"
               className="h-8 w-8 shrink-0 rounded-full border-2 border-[rgba(176,38,255,0.5)] object-cover shadow-md sm:h-9 sm:w-9"
             />
@@ -131,6 +134,7 @@ export default function Empareja2GameScreen({
   joinChannel,
   playMode,
 }: GameScreenProps) {
+  const { t } = useOperatorLanguage()
   const avatarsEnabled = useAvatarsEnabled()
   const centerKind = getEmpareja2CenterKind(resolveGameAccess('EMPAREJA2', { playMode, joinChannel }).playMode, avatarsEnabled)
   const isPhoneMode = centerKind !== 'pair'
@@ -158,12 +162,12 @@ export default function Empareja2GameScreen({
 
   const validateCodes = async () => {
     if (!code1 || !code2 || code1.length !== 4 || code2.length !== 4) {
-      setError('Ambos códigos deben tener 4 dígitos')
+      setError(t('Ambos códigos deben tener 4 dígitos', 'Both codes must have 4 digits'))
       return
     }
 
     if (!gameId) {
-      setError('No hay gameId disponible')
+      setError(t('No hay gameId disponible', 'No gameId available'))
       return
     }
 
@@ -184,7 +188,7 @@ export default function Empareja2GameScreen({
         setGameState('invalid')
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al validar los códigos')
+      setError(err instanceof Error ? err.message : t('Error al validar los códigos', 'Error validating the codes'))
       setGameState('invalid')
     }
   }
@@ -212,7 +216,7 @@ export default function Empareja2GameScreen({
       return (
         <div className="animate-fade-in grid grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 items-center">
           <div className="flex flex-col items-center justify-center animate-scale-in min-w-0">
-            <PairCharacterSlot variant={variant} player={p0} filled slotLabel="Jugador 1" />
+            <PairCharacterSlot variant={variant} player={p0} filled slotLabel={t('Jugador 1', 'Player 1')} />
           </div>
           <div className="flex flex-col items-center justify-center space-y-3 sm:space-y-4 text-center px-1">
             <span
@@ -222,12 +226,12 @@ export default function Empareja2GameScreen({
                   : 'text-2xl font-semibold text-green-400'
               }
             >
-              ¡Pareja Válida!
+              {t('¡Pareja Válida!', 'Valid match!')}
             </span>
-            <BackButton onClick={handleReset} aria-label="Validar otra pareja" />
+            <BackButton onClick={handleReset} aria-label={t('Validar otra pareja', 'Validate another match')} />
           </div>
           <div className="flex flex-col items-center justify-center animate-scale-in min-w-0" style={{ animationDelay: '0.2s' }}>
-            <PairCharacterSlot variant={variant} player={p1} filled slotLabel="Jugador 2" />
+            <PairCharacterSlot variant={variant} player={p1} filled slotLabel={t('Jugador 2', 'Player 2')} />
           </div>
         </div>
       )
@@ -243,12 +247,12 @@ export default function Empareja2GameScreen({
     return (
       <div className="space-y-4">
         {error && gameState === 'invalid' && showInvalidMessage && (
-          <div className="p-3 sm:p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>
+          <div className="p-3 sm:p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{localizeOperatorMessage(error, t)}</div>
         )}
 
         <div className="grid grid-cols-2 gap-4 justify-items-center">
-          <PairCharacterSlot variant={variant} filled={false} slotLabel="Jugador 1" />
-          <PairCharacterSlot variant={variant} filled={false} slotLabel="Jugador 2" />
+          <PairCharacterSlot variant={variant} filled={false} slotLabel={t('Jugador 1', 'Player 1')} />
+          <PairCharacterSlot variant={variant} filled={false} slotLabel={t('Jugador 2', 'Player 2')} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -260,8 +264,8 @@ export default function Empareja2GameScreen({
             max={9999}
             value={code1}
             disabled={inputDisabled}
-            aria-label="Código del jugador 1"
-            placeholder={CODE_INPUT_PLACEHOLDER}
+            aria-label={t('Código del jugador 1', 'Player 1 code')}
+            placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
             onChange={(e) => handleCodeChange(e.target.value, setCode1)}
             className={`w-full rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center font-mono focus:border-white/20 focus:outline-none disabled:opacity-60 ${ic}`}
           />
@@ -273,8 +277,8 @@ export default function Empareja2GameScreen({
             max={9999}
             value={code2}
             disabled={inputDisabled}
-            aria-label="Código del jugador 2"
-            placeholder={CODE_INPUT_PLACEHOLDER}
+            aria-label={t('Código del jugador 2', 'Player 2 code')}
+            placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
             onChange={(e) => handleCodeChange(e.target.value, setCode2)}
             className={`w-full rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center font-mono focus:border-white/20 focus:outline-none disabled:opacity-60 ${ic}`}
           />
@@ -300,7 +304,7 @@ export default function Empareja2GameScreen({
               ) : (
                 <ValidateCodesIcon className="w-6 h-6 shrink-0" />
               )}
-              {validating ? 'Validando…' : VALIDATE_LABEL}
+              {validating ? t('Validando…', 'Validating…') : t(VALIDATE_LABEL, 'Validate')}
             </div>
           </button>
         )}
@@ -328,6 +332,7 @@ export default function Empareja2GameScreen({
         <GameStateAvatar
           state="idle"
           mediaUrls={avatarMediaUrls}
+          t={t}
           className="w-full h-full min-h-[200px]"
         />
       )
@@ -342,28 +347,28 @@ export default function Empareja2GameScreen({
           {isPhoneMode ? (
             <>
               <LandscapeInfoInstruction>
-                Los asistentes juegan desde su móvil (/play).
+                {t('Los asistentes juegan desde su móvil (/play).', 'Attendees play on their phones (/play).')}
               </LandscapeInfoInstruction>
               <LandscapeInfoInstruction>
-                Esta es la pantalla del evento para el monitor o proyector.
+                {t('Esta es la pantalla del evento para el monitor o proyector.', 'This is the event screen for the monitor or projector.')}
               </LandscapeInfoInstruction>
               <LandscapeInfoInstruction>
-                Los enlaces están en Configurar juego.
+                {t('Los enlaces están en Configurar juego.', 'Links are in Game Settings.')}
               </LandscapeInfoInstruction>
             </>
           ) : (
             <>
               <LandscapeInfoInstruction>
-                {joinChannel === 'instagram' ? 'Escanea el QR y pulsa JUGAR en el chat.' : 'Escanea el QR y completa el formulario web.'}
+                {joinChannel === 'instagram' ? t('Escanea el QR y pulsa JUGAR en el chat.', 'Scan the QR code and tap PLAY in the chat.') : t('Escanea el QR y completa el formulario web.', 'Scan the QR code and complete the web form.')}
               </LandscapeInfoInstruction>
               <LandscapeInfoInstruction>
-                Recibe tu pareja asignada y tu código de validación.
+                {t('Recibe tu pareja asignada y tu código de validación.', 'Receive your assigned match and validation code.')}
               </LandscapeInfoInstruction>
               <LandscapeInfoInstruction>
-                Encuentra a tu pareja físicamente.
+                {t('Encuentra a tu pareja físicamente.', 'Find your match in person.')}
               </LandscapeInfoInstruction>
               <LandscapeInfoInstruction>
-                Cuando os encontréis, validad juntos vuestros códigos.
+                {t('Cuando os encontréis, validad juntos vuestros códigos.', 'When you meet, validate your codes together.')}
               </LandscapeInfoInstruction>
             </>
           )}
@@ -380,10 +385,10 @@ export default function Empareja2GameScreen({
                     <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                    <span className="text-xl font-semibold text-red-400">Pareja Inválida</span>
+                    <span className="text-xl font-semibold text-red-400">{t('Pareja Inválida', 'Invalid match')}</span>
                   </div>
                   {(validationResult.message || error) && (
-                    <p className="text-base text-red-300">{validationResult.message || error}</p>
+                    <p className="text-base text-red-300">{validationResult.message || (error && localizeOperatorMessage(error, t))}</p>
                   )}
                 </div>
               )}
@@ -420,10 +425,10 @@ export default function Empareja2GameScreen({
               <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-              <span className="text-lg font-semibold text-red-400">Pareja Inválida</span>
+              <span className="text-lg font-semibold text-red-400">{t('Pareja Inválida', 'Invalid match')}</span>
             </div>
             {(validationResult.message || error) && (
-              <p className="text-sm text-red-300">{validationResult.message || error}</p>
+              <p className="text-sm text-red-300">{validationResult.message || (error && localizeOperatorMessage(error, t))}</p>
             )}
           </div>
         )}

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
 import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import { localizeOperatorMessage } from '../operatorText'
 
 type ImpostorSettings = {
   maxPlayers?: number
@@ -17,6 +19,7 @@ type GameDataResponse = {
 const DEFAULT_WORDS = ['playa', 'montana', 'pizza', 'cine', 'futbol', 'musica']
 
 export default function ImpostorGameConfig({ gameId, settings, onChange, registerSave }: GameConfigProps) {
+  const { t } = useOperatorLanguage()
   const s = (settings || {}) as ImpostorSettings
   const [maxPlayers, setMaxPlayers] = useState<number>(s.maxPlayers ?? 8)
   const [wordsText, setWordsText] = useState<string>((s.words && s.words.length ? s.words : DEFAULT_WORDS).join('\n'))
@@ -62,12 +65,12 @@ export default function ImpostorGameConfig({ gameId, settings, onChange, registe
   const embedded = useGameConfigSaveRegistration(registerSave, { save: persist })
 
   const save = async () => {
-    if (gameId) setStatus('Guardando...')
+    if (gameId) setStatus(t('Guardando...', 'Saving...'))
     try {
       await persist()
-      setStatus(gameId ? 'Configuración guardada correctamente.' : 'Configuración guardada.')
+      setStatus(gameId ? t('Configuración guardada correctamente.', 'Configuration saved successfully.') : t('Configuración guardada.', 'Configuration saved.'))
     } catch (e: unknown) {
-      setStatus(saveErrorMessage(e, 'No se pudo guardar la configuración.'))
+      setStatus(saveErrorMessage(e, t('No se pudo guardar la configuración.', 'Could not save the configuration.')))
     }
   }
 
@@ -76,7 +79,7 @@ export default function ImpostorGameConfig({ gameId, settings, onChange, registe
       <div className="grid grid-cols-2 gap-4">
         <div className="min-w-0">
           <label htmlFor="impostor-max-players" className="block text-sm text-gray-300 mb-2">
-            Jugadores máximos (3-25)
+            {t('Jugadores máximos (3-25)', 'Maximum players (3-25)')}
           </label>
           <input
             id="impostor-max-players"
@@ -92,7 +95,7 @@ export default function ImpostorGameConfig({ gameId, settings, onChange, registe
 
       <div>
         <label htmlFor="impostor-words" className="block text-sm text-gray-300 mb-2">
-          Palabras (una por línea)
+          {t('Palabras (una por línea)', 'Words (one per line)')}
         </label>
         <textarea
           id="impostor-words"
@@ -103,14 +106,14 @@ export default function ImpostorGameConfig({ gameId, settings, onChange, registe
         />
       </div>
 
-      {status && <p className="text-sm text-gray-300">{status}</p>}
+      {status && <p className="text-sm text-gray-300">{localizeOperatorMessage(status, t)}</p>}
       {!embedded && (
         <button
           type="button"
           onClick={save}
           className="w-full p-3 rounded-xl bg-[rgba(124,58,237,0.25)] border border-[rgba(124,58,237,0.45)] hover:bg-[rgba(124,58,237,0.35)] transition-colors font-medium"
         >
-          Guardar configuración
+          {t('Guardar configuración', 'Save configuration')}
         </button>
       )}
     </div>

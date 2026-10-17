@@ -5,6 +5,8 @@ import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
 import BackButton from '../../core/widgets/BackButton'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import { localizeOperatorMessage } from '../operatorText'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
@@ -37,6 +39,7 @@ const CUPIDO_PRIMARY = '#E11D48'
 const CUPIDO_PRIMARY_RGB = '225, 29, 72'
 
 export default function CupidoGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+  const { t } = useOperatorLanguage()
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
@@ -53,11 +56,11 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
 
   const validateCodes = async () => {
     if (!code1 || !code2 || code1.length !== 4 || code2.length !== 4) {
-      setError('Ambos códigos deben tener 4 dígitos')
+      setError(t('Ambos códigos deben tener 4 dígitos', 'Both codes must have 4 digits'))
       return
     }
     if (!gameId) {
-      setError('No hay gameId disponible')
+      setError(t('No hay gameId disponible', 'No gameId available'))
       return
     }
     setGameState('validating')
@@ -72,7 +75,7 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
       setValidationResult(result)
       setGameState(result.valid ? 'valid' : 'invalid')
     } catch (err: any) {
-      setError(err.message || 'Error al validar los códigos')
+      setError(err.message || t('Error al validar los códigos', 'Error validating the codes'))
       setGameState('invalid')
     }
   }
@@ -105,37 +108,37 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
             Escanea el QR y pulsa JUGAR. Responde al quiz.
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Cupido te empareja con alguien afín.
+            {t('Cupido te empareja con alguien afín.', 'Cupid matches you with someone compatible.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Encuentra a tu pareja y validad códigos aquí.
+            {t('Encuentra a tu pareja y validad códigos aquí.', 'Find your match and validate your codes here.')}
           </LandscapeInfoInstruction>
         </GameLandscapeLeftColumn>
         <div className={GAME_LANDSCAPE_CENTER_CARD}>
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.08)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)` }}>
-            {statsLoading ? <span className="text-base text-gray-500">Cargando…</span> : (<><div className="flex items-center gap-2"><span className="text-xl" aria-hidden>👨</span><span className="text-base text-gray-400">Chicos</span><span className="text-lg font-semibold text-textMain">{maleCount}</span></div><div className="flex items-center gap-2"><span className="text-xl" aria-hidden>👩</span><span className="text-base text-gray-400">Chicas</span><span className="text-lg font-semibold text-textMain">{femaleCount}</span></div></>)}
-            <div className="flex items-center gap-2"><span className="text-base text-gray-400">Parejas emparejadas</span><span className="text-lg font-semibold" style={{ color: CUPIDO_PRIMARY }}>{statsLoading ? '—' : matchedCouples} ❤️</span></div>
+            {statsLoading ? <span className="text-base text-gray-500">{t('Cargando…', 'Loading…')}</span> : (<><div className="flex items-center gap-2"><span className="text-xl" aria-hidden>👨</span><span className="text-base text-gray-400">{t('Chicos', 'Men')}</span><span className="text-lg font-semibold text-textMain">{maleCount}</span></div><div className="flex items-center gap-2"><span className="text-xl" aria-hidden>👩</span><span className="text-base text-gray-400">{t('Chicas', 'Women')}</span><span className="text-lg font-semibold text-textMain">{femaleCount}</span></div></>)}
+            <div className="flex items-center gap-2"><span className="text-base text-gray-400">{t('Parejas emparejadas', 'Matched pairs')}</span><span className="text-lg font-semibold" style={{ color: CUPIDO_PRIMARY }}>{statsLoading ? '—' : matchedCouples} ❤️</span></div>
           </div>
           {(gameState === 'idle' || gameState === 'invalid') && (
             <div className="space-y-4">
-              <h3 className="text-base font-semibold text-textMain">Validador de Parejas</h3>
-              {error && gameState === 'invalid' && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
+              <h3 className="text-base font-semibold text-textMain">{t('Validador de Parejas', 'Match validator')}</h3>
+              {error && gameState === 'invalid' && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{localizeOperatorMessage(error, t)}</div>}
               <div className="grid grid-cols-2 gap-4">
-                <div><label htmlFor="cupido-code1" className="block text-sm font-medium text-gray-300 mb-2">Código Jugador 1</label><input id="cupido-code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} placeholder={CODE_INPUT_PLACEHOLDER} aria-label="Código del jugador 1" onChange={(e) => handleCodeChange(e.target.value, setCode1)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
-                <div><label htmlFor="cupido-code2" className="block text-sm font-medium text-gray-300 mb-2">Código Jugador 2</label><input id="cupido-code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} placeholder={CODE_INPUT_PLACEHOLDER} aria-label="Código del jugador 2" onChange={(e) => handleCodeChange(e.target.value, setCode2)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+                <div><label htmlFor="cupido-code1" className="block text-sm font-medium text-gray-300 mb-2">{t('Código Jugador 1', 'Player 1 code')}</label><input id="cupido-code1" type="number" inputMode="numeric" min={1000} max={9999} value={code1} placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')} aria-label={t('Código del jugador 1', 'Player 1 code')} onChange={(e) => handleCodeChange(e.target.value, setCode1)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
+                <div><label htmlFor="cupido-code2" className="block text-sm font-medium text-gray-300 mb-2">{t('Código Jugador 2', 'Player 2 code')}</label><input id="cupido-code2" type="number" inputMode="numeric" min={1000} max={9999} value={code2} placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')} aria-label={t('Código del jugador 2', 'Player 2 code')} onChange={(e) => handleCodeChange(e.target.value, setCode2)} className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none" /></div>
               </div>
-              <button type="button" onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl border font-semibold text-sm transition-colors hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)` }}><div className="flex items-center justify-center gap-3"><svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>{VALIDATE_LABEL}</div></button>
+              <button type="button" onClick={validateCodes} disabled={code1.length !== 4 || code2.length !== 4} className="w-full p-5 rounded-xl border font-semibold text-sm transition-colors hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.2)`, borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.3)` }}><div className="flex items-center justify-center gap-3"><svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>{t(VALIDATE_LABEL, 'Validate')}</div></button>
             </div>
           )}
-          {gameState === 'validating' && <div className="text-center py-10"><div className="flex items-center justify-center gap-4"><svg className="w-8 h-8 animate-spin" style={{ color: CUPIDO_PRIMARY }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><p className="text-2xl font-semibold" style={{ color: CUPIDO_PRIMARY }}>Validando códigos...</p></div></div>}
+          {gameState === 'validating' && <div className="text-center py-10"><div className="flex items-center justify-center gap-4"><svg className="w-8 h-8 animate-spin" style={{ color: CUPIDO_PRIMARY }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><p className="text-2xl font-semibold" style={{ color: CUPIDO_PRIMARY }}>{t('Validando códigos...', 'Validating codes...')}</p></div></div>}
           {gameState === 'valid' && validationResult?.valid && validationResult.players?.length === 2 && (
             <div className="grid grid-cols-3 gap-4 items-center">
-              <div className="flex flex-col items-center space-y-3">{(() => { const player = validationResult.players[0]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 flex items-center justify-center shadow-lg" style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>{imgUrl ? <img src={imgUrl} alt={player.characterName || 'Jugador 1'} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">Jugador 1</div>}</div>{player.instagramUsername && <p className="text-base font-semibold" style={{ color: CUPIDO_PRIMARY }}>{player.instagramUsername}</p>}</>); })()}</div>
-              <div className="flex flex-col items-center justify-center text-center"><div className="flex items-center gap-1 text-4xl" aria-hidden><span>❤️</span><span>🏹</span><span>❤️</span></div><span className="text-xl font-semibold text-green-400">¡Pareja válida!</span>{validationResult.message && <p className="text-sm text-green-300">{validationResult.message}</p>}</div>
-              <div className="flex flex-col items-center space-y-3">{(() => { const player = validationResult.players[1]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 flex items-center justify-center shadow-lg" style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>{imgUrl ? <img src={imgUrl} alt={player.characterName || 'Jugador 2'} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">Jugador 2</div>}</div>{player.instagramUsername && <p className="text-base font-semibold" style={{ color: CUPIDO_PRIMARY }}>{player.instagramUsername}</p>}</>); })()}</div>
+              <div className="flex flex-col items-center space-y-3">{(() => { const player = validationResult.players[0]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 flex items-center justify-center shadow-lg" style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>{imgUrl ? <img src={imgUrl} alt={player.characterName || t('Jugador 1', 'Player 1')} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">{t('Jugador 1', 'Player 1')}</div>}</div>{player.instagramUsername && <p className="text-base font-semibold" style={{ color: CUPIDO_PRIMARY }}>{player.instagramUsername}</p>}</>); })()}</div>
+              <div className="flex flex-col items-center justify-center text-center"><div className="flex items-center gap-1 text-4xl" aria-hidden><span>❤️</span><span>🏹</span><span>❤️</span></div><span className="text-xl font-semibold text-green-400">{t('¡Pareja válida!', 'Valid match!')}</span>{validationResult.message && <p className="text-sm text-green-300">{validationResult.message}</p>}</div>
+              <div className="flex flex-col items-center space-y-3">{(() => { const player = validationResult.players[1]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 flex items-center justify-center shadow-lg" style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>{imgUrl ? <img src={imgUrl} alt={player.characterName || t('Jugador 2', 'Player 2')} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">{t('Jugador 2', 'Player 2')}</div>}</div>{player.instagramUsername && <p className="text-base font-semibold" style={{ color: CUPIDO_PRIMARY }}>{player.instagramUsername}</p>}</>); })()}</div>
             </div>
           )}
-          {gameState === 'invalid' && validationResult && !validationResult.valid && <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center"><span className="text-4xl" aria-hidden>💔</span><span className="text-base font-semibold text-red-400">Pareja inválida</span>{(validationResult.message || error) && <p className="text-sm text-red-300 mt-2">{validationResult.message || error}</p>}</div>}
+          {gameState === 'invalid' && validationResult && !validationResult.valid && <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center"><span className="text-4xl" aria-hidden>💔</span><span className="text-base font-semibold text-red-400">{t('Pareja inválida', 'Invalid match')}</span>{(validationResult.message || error) && <p className="text-sm text-red-300 mt-2">{validationResult.message || (error && localizeOperatorMessage(error, t))}</p>}</div>}
         </div>
         <div className="flex flex-col gap-0 min-h-0 min-w-0 overflow-hidden items-center w-full">
           <div className="flex flex-col gap-1.5 p-0 flex-1 min-h-0 overflow-hidden items-center w-full min-w-0 bg-transparent border-0">
@@ -150,7 +153,7 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
       {!showJoinBlock && (
         <div className="flex justify-end mb-2 flex-shrink-0">
-          <BackButton onClick={handleReset} aria-label="Validar otra pareja" />
+          <BackButton onClick={handleReset} aria-label={t('Validar otra pareja', 'Validate another match')} />
         </div>
       )}
       <div className="flex flex-col flex-1 min-h-0 space-y-4 overflow-hidden">
@@ -163,24 +166,24 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
       >
         <div className="flex flex-wrap items-center gap-4">
           {statsLoading ? (
-            <span className="text-sm text-gray-500">Cargando…</span>
+            <span className="text-sm text-gray-500">{t('Cargando…', 'Loading…')}</span>
           ) : (
             <>
-              <div className="flex items-center gap-2" title="Chicos">
+              <div className="flex items-center gap-2" title={t('Chicos', 'Men')}>
                 <span className="text-xl" aria-hidden>👨</span>
-                <span className="text-sm text-gray-400">Chicos</span>
+                <span className="text-sm text-gray-400">{t('Chicos', 'Men')}</span>
                 <span className="text-lg font-semibold text-textMain">{maleCount}</span>
               </div>
-              <div className="flex items-center gap-2" title="Chicas">
+              <div className="flex items-center gap-2" title={t('Chicas', 'Women')}>
                 <span className="text-xl" aria-hidden>👩</span>
-                <span className="text-sm text-gray-400">Chicas</span>
+                <span className="text-sm text-gray-400">{t('Chicas', 'Women')}</span>
                 <span className="text-lg font-semibold text-textMain">{femaleCount}</span>
               </div>
             </>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-400">Parejas emparejadas</span>
+          <span className="text-sm text-gray-400">{t('Parejas emparejadas', 'Matched pairs')}</span>
           <span className="text-lg font-semibold" style={{ color: CUPIDO_PRIMARY }}>
             {statsLoading ? '—' : matchedCouples} ❤️
           </span>
@@ -190,16 +193,16 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
       {/* Validator: double code (like empareja2) */}
       {(gameState === 'idle' || gameState === 'invalid') && (
         <div className="space-y-4">
-          <h3 className="text-xl font-semibold text-textMain">Validador de Parejas</h3>
+          <h3 className="text-xl font-semibold text-textMain">{t('Validador de Parejas', 'Match validator')}</h3>
           {error && gameState === 'invalid' && (
             <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">
-              {error}
+              {error && localizeOperatorMessage(error, t)}
             </div>
           )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="cupido-code1" className="block text-base font-medium text-gray-300 mb-2">
-                Código Jugador 1
+                {t('Código Jugador 1', 'Player 1 code')}
               </label>
               <input
                 id="cupido-code1"
@@ -208,15 +211,15 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
                 min={1000}
                 max={9999}
                 value={code1}
-                placeholder={CODE_INPUT_PLACEHOLDER}
-                aria-label="Código del jugador 1"
+                placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
+                aria-label={t('Código del jugador 1', 'Player 1 code')}
                 onChange={(e) => handleCodeChange(e.target.value, setCode1)}
                 className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
             </div>
             <div>
               <label htmlFor="cupido-code2" className="block text-base font-medium text-gray-300 mb-2">
-                Código Jugador 2
+                {t('Código Jugador 2', 'Player 2 code')}
               </label>
               <input
                 id="cupido-code2"
@@ -225,8 +228,8 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
                 min={1000}
                 max={9999}
                 value={code2}
-                placeholder={CODE_INPUT_PLACEHOLDER}
-                aria-label="Código del jugador 2"
+                placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
+                aria-label={t('Código del jugador 2', 'Player 2 code')}
                 onChange={(e) => handleCodeChange(e.target.value, setCode2)}
                 className="w-full h-14 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-center text-lg font-mono focus:border-white/20 focus:outline-none"
               />
@@ -254,7 +257,7 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
               <svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              {VALIDATE_LABEL}
+              {t(VALIDATE_LABEL, 'Validate')}
             </div>
           </button>
         </div>
@@ -273,7 +276,7 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             <p className="text-2xl font-semibold" style={{ color: CUPIDO_PRIMARY }}>
-              Validando códigos...
+              {t('Validando códigos...', 'Validating codes...')}
             </p>
           </div>
         </div>
@@ -293,9 +296,9 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
                       style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}
                     >
                       {imgUrl ? (
-                        <img src={imgUrl} alt={player.characterName || 'Jugador 1'} className="max-w-full max-h-full w-auto h-auto object-contain" />
+                        <img src={imgUrl} alt={player.characterName || t('Jugador 1', 'Player 1')} className="max-w-full max-h-full w-auto h-auto object-contain" />
                       ) : (
-                        <div className="text-xs text-gray-500">Jugador 1</div>
+                        <div className="text-xs text-gray-500">{t('Jugador 1', 'Player 1')}</div>
                       )}
                     </div>
                     {player.instagramUsername && (
@@ -314,7 +317,7 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
                 <span>❤️</span>
               </div>
               <div className="flex items-center justify-center gap-2">
-                <span className={showJoinBlock ? 'text-xl font-semibold text-green-400' : 'text-2xl font-semibold text-green-400'}>¡Pareja válida!</span>
+                <span className={showJoinBlock ? 'text-xl font-semibold text-green-400' : 'text-2xl font-semibold text-green-400'}>{t('¡Pareja válida!', 'Valid match!')}</span>
               </div>
               {validationResult.message && <p className={showJoinBlock ? 'text-sm text-green-300' : 'text-lg text-green-300'}>{validationResult.message}</p>}
             </div>
@@ -329,9 +332,9 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
                       style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}
                     >
                       {imgUrl ? (
-                        <img src={imgUrl} alt={player.characterName || 'Jugador 2'} className="max-w-full max-h-full w-auto h-auto object-contain" />
+                        <img src={imgUrl} alt={player.characterName || t('Jugador 2', 'Player 2')} className="max-w-full max-h-full w-auto h-auto object-contain" />
                       ) : (
-                        <div className="text-xs text-gray-500">Jugador 2</div>
+                        <div className="text-xs text-gray-500">{t('Jugador 2', 'Player 2')}</div>
                       )}
                     </div>
                     {player.instagramUsername && (
@@ -351,10 +354,10 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
         <div className="p-4 rounded-xl bg-red-500/20 border border-red-500/30 text-center animate-fade-in">
           <div className="flex items-center justify-center gap-2 mb-2">
             <span className="text-4xl" aria-hidden>💔</span>
-            <span className="text-lg font-semibold text-red-400">Pareja inválida</span>
+            <span className="text-lg font-semibold text-red-400">{t('Pareja inválida', 'Invalid match')}</span>
           </div>
           {(validationResult.message || error) && (
-            <p className="text-sm text-red-300">{validationResult.message || error}</p>
+            <p className="text-sm text-red-300">{validationResult.message || (error && localizeOperatorMessage(error, t))}</p>
           )}
         </div>
       )}

@@ -13,6 +13,7 @@ type Props = {
 export default function ValidateView({ gameId, playerToken, onResult, onBack }: Props) {
   const { t } = useParticipantLanguage()
   const ownAssignment = loadAssignment(gameId)
+  const characters = ownAssignment && 'characterName' in ownAssignment ? ownAssignment : null
   const own = ownAssignment && 'validationCode' in ownAssignment ? ownAssignment.validationCode : undefined
   const code1 = own == null ? '' : String(own)
   const [code2, setCode2] = useState('')
@@ -55,14 +56,29 @@ export default function ValidateView({ gameId, playerToken, onResult, onBack }: 
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
+          {characters?.characterImageUrl && (
+            <img
+              src={characters.characterImageUrl}
+              alt={characters.characterName}
+              className="mx-auto h-16 w-16 rounded-xl bg-white/5 object-contain"
+            />
+          )}
           <p className="text-sm text-textSub">{t('Tu código')}</p>
           <p className="rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-center text-2xl font-mono">
             {code1 || t('No disponible')}
           </p>
         </div>
-        <label className="block space-y-1">
-          <span className="text-sm text-textSub">{t('Código de tu pareja')}</span>
+        <div className="space-y-1">
+          {characters?.partnerCharacterImageUrl && (
+            <img
+              src={characters.partnerCharacterImageUrl}
+              alt={characters.partnerCharacterName}
+              className="mx-auto h-16 w-16 rounded-xl bg-white/5 object-contain"
+            />
+          )}
+          <label htmlFor="partner-code" className="block text-sm text-textSub">{t('Código de tu pareja')}</label>
           <input
+            id="partner-code"
             type="text"
             inputMode="numeric"
             maxLength={4}
@@ -71,7 +87,7 @@ export default function ValidateView({ gameId, playerToken, onResult, onBack }: 
             className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-4 text-center text-2xl font-mono"
             placeholder="0000"
           />
-        </label>
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-300 text-center">{t(error)}</p>}

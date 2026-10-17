@@ -1,19 +1,22 @@
 import ScoreResultView from '../../core/participant/ScoreResultView'
 import { loadAssignment } from '../../core/participant/playerSession'
 import { useParticipantLanguage } from '../../core/participant/participantLanguage'
+import type { PrizeCatalog } from '../../core/prizes'
+import ParticipantPrizePromo from '../../core/participant/ParticipantPrizePromo'
 
 type Props = {
   gameId: string
   time: number
   difference: number
   rank: number | null
+  prizeCatalog?: PrizeCatalog
 }
 
 function formatDiff(ms: number): string {
   return `${(ms / 1000).toFixed(3)} s`
 }
 
-export default function T1merParticipantResult({ gameId, time, difference, rank }: Props) {
+export default function T1merParticipantResult({ gameId, time, difference, rank, prizeCatalog }: Props) {
   const { t } = useParticipantLanguage()
   const assignment = loadAssignment(gameId)
   const displayName =
@@ -30,6 +33,7 @@ export default function T1merParticipantResult({ gameId, time, difference, rank 
       rank={rank}
       notice={t('Solo un intento. Mira el ranking en la pantalla del evento.')}
     >
+      <ParticipantPrizePromo catalog={prizeCatalog} slots={['ranking']} />
       <div className="space-y-1">
         <p className="text-sm text-textSub">{t('Tu tiempo')}</p>
         <p className="text-3xl font-digital font-bold tabular-nums">{time.toFixed(3)} s</p>

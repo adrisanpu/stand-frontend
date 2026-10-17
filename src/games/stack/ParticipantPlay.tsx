@@ -8,6 +8,8 @@ import { isStackConfig, type StackConfig, type StackSnapshot } from './stackLogi
 import type { StackSceneController } from './stackScene'
 import { clearPendingStackResult, loadPendingStackResult, savePendingStackResult, type PendingStackResult } from './stackResultStorage'
 import './stack.css'
+import type { PrizeCatalog } from '../../core/prizes'
+import ParticipantPrizePromo from '../../core/participant/ParticipantPrizePromo'
 
 type Props = {
   gameId: string
@@ -16,13 +18,14 @@ type Props = {
   assignment: StackAssignment
   startSupported?: boolean
   finishSupported?: boolean
+  prizeCatalog?: PrizeCatalog
 }
 
 type SceneStatus = 'loading' | 'ready' | 'lost' | 'error'
 type StartStatus = 'idle' | 'pending' | 'retry' | 'started' | 'blocked'
 const INITIAL_SNAPSHOT: StackSnapshot = { state: 'IDLE', score: 0, perfect: false, placements: [] }
 
-export default function StackParticipantPlay({ gameId, playerToken, config, assignment, startSupported = false, finishSupported = false }: Props) {
+export default function StackParticipantPlay({ gameId, playerToken, config, assignment, startSupported = false, finishSupported = false, prizeCatalog }: Props) {
   const { t } = useParticipantLanguage()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<StackSceneController | null>(null)
@@ -321,6 +324,7 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
             ? t('Resultado validado y guardado en el ranking. Tu único intento ya está consumido.')
             : t('Resultado local pendiente de confirmación del servidor. Tu único intento ya está consumido.')}
         >
+          <ParticipantPrizePromo catalog={prizeCatalog} slots={['ranking']} />
           <div className="space-y-1">
             <p className="text-sm text-textSub">{t('Bloques apilados')}</p>
             <p className="text-3xl font-bold tabular-nums">{savedScore ?? localScore}</p>

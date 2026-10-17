@@ -5,6 +5,8 @@ import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoCo
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
 import BackButton from '../../core/widgets/BackButton'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import { localizeOperatorMessage } from '../operatorText'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
@@ -40,6 +42,7 @@ type ValidateResponse = {
 }
 
 export default function ImpostorGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+  const { t } = useOperatorLanguage()
   const [code, setCode] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
   const [state, setState] = useState<ImpostorStateResponse | null>(null)
@@ -104,11 +107,11 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
     setFeedback(null)
     try {
       const res = await api.post<ValidateResponse>('/v1/game/validate', { gameId, codes: [code] })
-      setFeedback(res.message ?? (res.valid ? 'Código validado.' : 'Código inválido.'))
+      setFeedback(res.message ?? (res.valid ? t('Código validado.', 'Code validated.') : t('Código inválido.', 'Invalid code.')))
       setCode('')
       await loadState()
     } catch (e: unknown) {
-      setFeedback(e instanceof Error ? e.message : 'No se pudo validar el código.')
+      setFeedback(e instanceof Error ? e.message : t('No se pudo validar el código.', 'Could not validate the code.'))
     } finally {
       setActionLoading(false)
     }
@@ -121,7 +124,7 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
       await api.post('/v1/game/impostor', { gameId, action })
       await loadState()
     } catch (e: unknown) {
-      setFeedback(e instanceof Error ? e.message : 'Acción no disponible.')
+      setFeedback(e instanceof Error ? e.message : t('Acción no disponible.', 'Action unavailable.'))
     } finally {
       setActionLoading(false)
     }
@@ -133,9 +136,9 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
     try {
       await api.post('/v1/game/impostor', { gameId, action: 'submit_vote', voterPlayerId, targetPlayerId })
       await loadState()
-      setFeedback('Voto registrado.')
+      setFeedback(t('Voto registrado.', 'Vote recorded.'))
     } catch (e: unknown) {
-      setFeedback(e instanceof Error ? e.message : 'No se pudo registrar el voto.')
+      setFeedback(e instanceof Error ? e.message : t('No se pudo registrar el voto.', 'Could not record the vote.'))
     } finally {
       setActionLoading(false)
     }
@@ -146,12 +149,12 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
   const phase = state?.phase ?? 'lobby'
   const primaryActionLabel =
     phase === 'lobby'
-      ? 'Empezar partida'
+      ? t('Empezar partida', 'Start game')
       : phase === 'word_round'
-        ? 'Siguiente turno'
+        ? t('Siguiente turno', 'Next turn')
         : phase === 'voting'
-          ? 'Registrar voto'
-          : 'Nueva ronda'
+          ? t('Registrar voto', 'Submit vote')
+          : t('Nueva ronda', 'New round')
   const primaryActionDisabled =
     actionLoading || (phase === 'voting' && (voterPlayerId == null || targetPlayerId == null))
 
@@ -178,28 +181,28 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
         {placeholders.map((p, idx) => (
           <div key={idx} className="aspect-square rounded-xl border border-white/10 bg-[rgba(255,255,255,0.04)] p-2 flex flex-col items-center justify-center text-center">
             {p?.instagramProfilePicUrl ? (
-              <img src={p.instagramProfilePicUrl} alt={p.instagramUsername || `Jugador ${idx + 1}`} className="w-10 h-10 rounded-full object-cover mb-1" />
+              <img src={p.instagramProfilePicUrl} alt={p.instagramUsername || t(`Jugador ${idx + 1}`, `Player ${idx + 1}`)} className="w-10 h-10 rounded-full object-cover mb-1" />
             ) : (
               <div className="w-10 h-10 rounded-full bg-white/10 mb-1" />
             )}
-            <span className="text-[11px] text-gray-300 truncate w-full">{p?.instagramUsername || 'Pendiente'}</span>
+            <span className="text-[11px] text-gray-300 truncate w-full">{p?.instagramUsername || t('Pendiente', 'Waiting')}</span>
           </div>
         ))}
       </div>
 
       {state?.phase === 'voting' && (
         <div className="space-y-3 p-3 rounded-xl bg-white/5 border border-white/10">
-          <p className="text-sm text-gray-300">Votación (uno a uno)</p>
+          <p className="text-sm text-gray-300">{t('Votación (uno a uno)', 'Voting (one at a time)')}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <select
               value={voterPlayerId ?? ''}
               onChange={(e) => setVoterPlayerId(Number(e.target.value))}
               className="h-10 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 px-2"
             >
-              <option value="">Jugador que vota</option>
+              <option value="">{t('Jugador que vota', 'Voting player')}</option>
               {players.map((p) => (
                 <option key={`voter-${p.playerId}`} value={p.playerId}>
-                  {p.instagramUsername || `Jugador ${p.playerId}`}
+                  {p.instagramUsername || t(`Jugador ${p.playerId}`, `Player ${p.playerId}`)}
                 </option>
               ))}
             </select>
@@ -208,10 +211,10 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
               onChange={(e) => setTargetPlayerId(Number(e.target.value))}
               className="h-10 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 px-2"
             >
-              <option value="">Sospechoso (impostor)</option>
+              <option value="">{t('Sospechoso (impostor)', 'Suspect (impostor)')}</option>
               {players.map((p) => (
                 <option key={`target-${p.playerId}`} value={p.playerId}>
-                  {p.instagramUsername || `Jugador ${p.playerId}`}
+                  {p.instagramUsername || t(`Jugador ${p.playerId}`, `Player ${p.playerId}`)}
                 </option>
               ))}
             </select>
@@ -221,9 +224,9 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
 
       {(state?.phase === 'result' || state?.phase === 'finished') && (
         <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-          <p className="text-sm text-gray-300">Resultado final</p>
+          <p className="text-sm text-gray-300">{t('Resultado final', 'Final result')}</p>
           <p className="text-lg font-semibold mt-1">
-            {state.winner === 'crew' ? 'Ganan los jugadores' : 'Gana el impostor'}
+            {state.winner === 'crew' ? t('Ganan los jugadores', 'The players win') : t('Gana el impostor', 'The impostor wins')}
           </p>
         </div>
       )}
@@ -244,16 +247,16 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
           <LandscapeInfoInstruction>
-            Escanea el QR y escribe al bot.
+            {t('Escanea el QR y escribe al bot.', 'Scan the QR code and message the bot.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Introduce el código y valida.
+            {t('Introduce el código y valida.', 'Enter the code and validate it.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Cada jugador dice una palabra.
+            {t('Cada jugador dice una palabra.', 'Each player says one word.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Votad al posible impostor.
+            {t('Votad al posible impostor.', 'Vote for the possible impostor.')}
           </LandscapeInfoInstruction>
         </GameLandscapeLeftColumn>
 
@@ -263,7 +266,7 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder={CODE_INPUT_PLACEHOLDER}
+                placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
                 className="flex-1 h-11 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 text-center"
               />
               <button
@@ -272,10 +275,10 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
                 disabled={actionLoading || code.length !== 4}
                 className="px-4 rounded-xl bg-[rgba(114,47,55,0.25)] border border-[rgba(114,47,55,0.5)] disabled:opacity-50"
               >
-                {VALIDATE_LABEL}
+                {t(VALIDATE_LABEL, 'Validate')}
               </button>
             </div>
-            {feedback && <p className="text-sm text-gray-300">{feedback}</p>}
+            {feedback && <p className="text-sm text-gray-300">{localizeOperatorMessage(feedback, t)}</p>}
           </div>
           {gameMainContent}
         </div>
@@ -293,7 +296,7 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden">
       {showBackButton && (
         <div className="flex justify-end mb-2 flex-shrink-0">
-          <BackButton onClick={() => setFeedback(null)} aria-label="Volver" />
+          <BackButton onClick={() => setFeedback(null)} aria-label={t('Volver', 'Back')} />
         </div>
       )}
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden gap-4">
@@ -302,7 +305,7 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
             <input
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              placeholder={CODE_INPUT_PLACEHOLDER}
+              placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
               className="flex-1 h-11 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 text-center"
             />
             <button
@@ -311,10 +314,10 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
               disabled={actionLoading || code.length !== 4}
               className="px-4 rounded-xl bg-[rgba(114,47,55,0.25)] border border-[rgba(114,47,55,0.5)] disabled:opacity-50"
             >
-              {VALIDATE_LABEL}
+              {t(VALIDATE_LABEL, 'Validate')}
             </button>
           </div>
-          {feedback && <p className="text-sm text-gray-300">{feedback}</p>}
+          {feedback && <p className="text-sm text-gray-300">{localizeOperatorMessage(feedback, t)}</p>}
           {gameMainContent}
         </div>
       </div>

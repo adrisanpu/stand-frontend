@@ -3,6 +3,7 @@ import QRCode from './QRCode'
 import { getJoinUrl } from '../lib/joinUrl'
 import { GamePanelFooter } from './GamePanelFooter'
 import { GameIdHint } from './GameJoinHints'
+import { useOperatorLanguage } from '../shell/operatorLanguage'
 
 type GameLandscapeInfoColumnProps = {
   gameId: string
@@ -20,6 +21,7 @@ export function LandscapeInfoInstruction({ children }: { children: ReactNode }) 
 }
 
 export default function GameLandscapeInfoColumn({ gameId, logoElement, children, avatarElement, joinChannel }: GameLandscapeInfoColumnProps) {
+  const { t } = useOperatorLanguage()
   return (
     <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0 h-full">
       <div className="flex-shrink-0 flex justify-center items-center w-full min-w-0 px-0.5 [&_img]:max-h-20 sm:[&_img]:max-h-24 lg:[&_img]:max-h-28">
@@ -37,11 +39,11 @@ export default function GameLandscapeInfoColumn({ gameId, logoElement, children,
             size={320}
             margin={8}
             containerClassName="w-full max-w-[min(100%,240px)] aspect-square mx-auto"
-            alt="QR para unirse"
+            alt={t('QR para unirse', 'QR code to join')}
             className="!border-0 !bg-white !p-2.5 sm:!p-3 rounded-2xl shadow-[0_0_24px_rgba(255,255,255,0.12)]"
           />
           <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-gray-300/90 text-center">
-            Escanea para jugar
+            {t('Escanea para jugar', 'Scan to play')}
           </p>
           <GameIdHint gameId={gameId} joinChannel={joinChannel} />
         </div>

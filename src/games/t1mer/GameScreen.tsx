@@ -16,6 +16,9 @@ import type { InputEventEnvelope } from '../../core/input/types'
 import { useAvatarsEnabled } from '../../core/theme'
 import { useWebOsPointerPrimary } from '../../core/input/useWebOsPointerPrimary'
 import { resolveGameAccess } from '../../core/settings/gameAccess'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import { localizeOperatorMessage } from '../operatorText'
+import { PrizeImage } from '../../core/widgets/PrizePresentation'
 
 type GameState = 'idle' | 'validated' | 'preparing' | 'playing' | 'hidden' | 'finished'
 
@@ -25,14 +28,19 @@ export default function T1merGameScreen({
   logoElement,
   playersElement,
   sidebarElement,
-  topX,
-  prizeLabel,
+  topX: legacyTopX,
+  prizeLabel: legacyPrizeLabel,
+  prizeCatalog,
   onCounterActiveChange,
   onAvatarStateChange,
   avatarMediaUrls,
   joinChannel,
   playMode,
 }: GameScreenProps) {
+  const { t } = useOperatorLanguage()
+  const topX = prizeCatalog !== undefined ? prizeCatalog.ranking?.topX : legacyTopX
+  const prizeLabel = prizeCatalog !== undefined ? prizeCatalog.ranking?.name : legacyPrizeLabel
+  const rankingPrize = prizeCatalog?.ranking
   const avatarsEnabled = useAvatarsEnabled()
   const isPhoneMode = resolveGameAccess('T1MER', { playMode, joinChannel }).playMode === 'mobile'
   const [gameState, setGameState] = useState<GameState>('idle')
@@ -125,10 +133,10 @@ export default function T1merGameScreen({
         setGameState('preparing')
       } else {
         // If valid is false, show the message from response
-        throw new Error(data.message || 'Código inválido')
+        throw new Error(data.message || t('Código inválido', 'Invalid code'))
       }
     } catch (err: any) {
-      setError(err.message || 'Error al validar el código')
+      setError(err.message || t('Error al validar el código', 'Error validating the code'))
     } finally {
       setIsValidating(false)
     }
@@ -177,7 +185,7 @@ export default function T1merGameScreen({
       }
     } catch (err: any) {
       console.error('Error submitting score:', err)
-      setError(err.message || 'Error al enviar la puntuación')
+      setError(err.message || t('Error al enviar la puntuación', 'Error submitting the score'))
     }
   }
 
@@ -277,6 +285,7 @@ export default function T1merGameScreen({
         <GameStateAvatar
           state="idle"
           mediaUrls={avatarMediaUrls}
+          t={t}
           className="w-full h-full min-h-[200px]"
         />
       )
@@ -304,9 +313,9 @@ export default function T1merGameScreen({
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeLeftColumn gameId={gameId} joinChannel={joinChannel} logoElement={logoElement} playersElement={playersElement}>
-          <LandscapeInfoInstruction>Los asistentes juegan desde su móvil (/play).</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Esta es la pantalla del evento para el monitor o proyector.</LandscapeInfoInstruction>
-          <LandscapeInfoInstruction>Los enlaces están en Configurar juego.</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>{t('Los asistentes juegan desde su móvil (/play).', 'Attendees play on their phones (/play).')}</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>{t('Esta es la pantalla del evento para el monitor o proyector.', 'This is the event screen for the monitor or projector.')}</LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>{t('Los enlaces están en Configurar juego.', 'Links are in Game Settings.')}</LandscapeInfoInstruction>
         </GameLandscapeLeftColumn>
         <div className={`${GAME_LANDSCAPE_CENTER_CARD} justify-center items-center min-h-0`}>
           {renderPhoneCenter()}
@@ -338,21 +347,21 @@ export default function T1merGameScreen({
           playersElement={playersElement}
           avatarElement={
             avatarsEnabled ? (
-              <GameStateAvatar state={avatarState} mediaUrls={avatarMediaUrls} />
+              <GameStateAvatar state={avatarState} mediaUrls={avatarMediaUrls} t={t} />
             ) : undefined
           }
         >
           <LandscapeInfoInstruction>
-            {joinChannel === 'instagram' ? 'Escanea el QR y pulsa JUGAR en Instagram.' : 'Escanea el QR y completa el formulario web.'}
+            {joinChannel === 'instagram' ? t('Escanea el QR y pulsa JUGAR en Instagram.', 'Scan the QR code and tap PLAY on Instagram.') : t('Escanea el QR y completa el formulario web.', 'Scan the QR code and complete the web form.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Ingresa tu código y valida.
+            {t('Ingresa tu código y valida.', 'Enter and validate your code.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            El temporizador se oculta a los 5 s.
+            {t('El temporizador se oculta a los 5 s.', 'The timer disappears after 5 seconds.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            Detén en 10 segundos.
+            {t('Detén en 10 segundos.', 'Stop at 10 seconds.')}
           </LandscapeInfoInstruction>
         </GameLandscapeLeftColumn>
         <div className={`${GAME_LANDSCAPE_CENTER_CARD} items-center`}>
@@ -364,7 +373,7 @@ export default function T1merGameScreen({
               </div>
               <div className="max-w-md mx-auto w-full space-y-4">
                 <div className="flex gap-3">
-                  <input id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder={CODE_INPUT_PLACEHOLDER} className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" />
+                  <input id="player-code-landscape" type="number" inputMode="numeric" min={1000} max={9999} value={playerCode} onChange={(e) => setPlayerCode(String(e.target.value))} placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')} className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20" />
                   <button ref={validateButtonRef} type="button" onClick={handleValidate} disabled={!playerCode.trim() || isValidating} className="inline-flex items-center justify-center gap-2 px-8 h-14 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg flex-shrink-0">
                     {isValidating ? (
                       <svg className="w-5 h-5 shrink-0 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,10 +384,10 @@ export default function T1merGameScreen({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     )}
-                    {isValidating ? 'Validando…' : VALIDATE_LABEL}
+                    {isValidating ? t('Validando…', 'Validating…') : t(VALIDATE_LABEL, 'Validate')}
                   </button>
                 </div>
-                {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
+                {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{localizeOperatorMessage(error, t)}</div>}
               </div>
             </div>
           )}
@@ -396,8 +405,8 @@ export default function T1merGameScreen({
                           src={profilePicUrl}
                           alt={
                             username
-                              ? `Foto de perfil de ${username.startsWith('@') ? username : `@${username}`}`
-                              : 'Foto de perfil'
+                              ? t(`Foto de perfil de ${username.startsWith('@') ? username : `@${username}`}`, `Profile picture of ${username.startsWith('@') ? username : `@${username}`}`)
+                              : t('Foto de perfil', 'Profile picture')
                           }
                           referrerPolicy="no-referrer"
                           className="h-14 w-14 shrink-0 rounded-full border-2 border-primary/40 object-cover shadow-md sm:h-16 sm:w-16"
@@ -410,7 +419,7 @@ export default function T1merGameScreen({
                           </p>
                         )}
                         <p className="text-xl leading-snug text-textSub sm:text-2xl">
-                          Detén el contador cuando llegue a{' '}
+                          {t('Detén el contador cuando llegue a', 'Stop the timer when it reaches')}{' '}
                           <span className="font-digital text-2xl text-primary sm:text-3xl">10:00.0</span>
                         </p>
                       </div>
@@ -419,11 +428,12 @@ export default function T1merGameScreen({
                   {gameState === 'finished' && result && (
                     <>
                       {resultRank != null && (
-                        <div className="text-xl sm:text-2xl font-semibold text-textMain leading-tight">Posición: {resultRank}</div>
+                        <div className="text-xl sm:text-2xl font-semibold text-textMain leading-tight">{t('Posición:', 'Rank:')} {resultRank}</div>
                       )}
-                      {topX != null && resultRank != null && resultRank <= topX && (
-                        <div className="text-base sm:text-lg font-semibold text-green-400 leading-snug">
-                          ¡Premio por entrar en el top {topX}!{prizeLabel ? ` ${prizeLabel}` : ''}
+                      {topX != null && resultRank != null && resultRank <= topX && (prizeCatalog === undefined || prizeLabel || rankingPrize?.imageUrl) && (
+                        <div className="text-base sm:text-lg font-semibold text-green-400 leading-snug flex items-center justify-center gap-2">
+                          <PrizeImage prize={rankingPrize} compact />
+                          {t(`¡Premio por entrar en el top ${topX}!`, `Prize for reaching the top ${topX}!`)}{prizeLabel ? ` ${prizeLabel}` : ''}
                         </div>
                       )}
                     </>
@@ -453,7 +463,7 @@ export default function T1merGameScreen({
                       onClick={handleStart}
                       className={t1merPrimaryButtonClass}
                     >
-                      <span className={t1merPrimaryButtonLabelClass}>EMPEZAR</span>
+                      <span className={t1merPrimaryButtonLabelClass}>{t('EMPEZAR', 'START')}</span>
                     </button>
                   )}
                   {(gameState === 'playing' || gameState === 'hidden') && (
@@ -463,12 +473,12 @@ export default function T1merGameScreen({
                       onClick={handleStop}
                       className={t1merPrimaryButtonClass}
                     >
-                      <span className={t1merPrimaryButtonLabelClass}>DETENER</span>
+                      <span className={t1merPrimaryButtonLabelClass}>{t('DETENER', 'STOP')}</span>
                     </button>
                   )}
                   {gameState === 'finished' && result && (
                     <div className="flex justify-center items-center min-h-[7.5rem] py-2">
-                      <BackButton ref={resetBackRef} onClick={handleReset} aria-label="Volver a validar" />
+                      <BackButton ref={resetBackRef} onClick={handleReset} aria-label={t('Volver a validar', 'Validate again')} />
                     </div>
                   )}
                 </div>
@@ -489,7 +499,7 @@ export default function T1merGameScreen({
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden min-w-0 w-full items-center">
       {!showJoinBlock && (
         <div className="flex-shrink-0 flex justify-end w-full mb-2">
-          <BackButton onClick={handleReset} aria-label="Volver" />
+          <BackButton onClick={handleReset} aria-label={t('Volver', 'Back')} />
         </div>
       )}
       <div className="flex flex-col overflow-hidden min-h-0 flex-1 w-full gap-3">
@@ -510,7 +520,7 @@ export default function T1merGameScreen({
                     max={9999}
                     value={playerCode}
                     onChange={(e) => setPlayerCode(String(e.target.value))}
-                    placeholder={CODE_INPUT_PLACEHOLDER}
+                    placeholder={t(CODE_INPUT_PLACEHOLDER, 'Enter code')}
                     className="flex-1 min-w-0 h-14 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-4 text-lg outline-none focus:border-white/20"
                   />
                   <button
@@ -529,10 +539,10 @@ export default function T1merGameScreen({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     )}
-                    {isValidating ? 'Validando…' : VALIDATE_LABEL}
+                    {isValidating ? t('Validando…', 'Validating…') : t(VALIDATE_LABEL, 'Validate')}
                   </button>
                 </div>
-                {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">{error}</div>}
+                {error && <div className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">{localizeOperatorMessage(error, t)}</div>}
               </div>
             </div>
           )}
@@ -550,8 +560,8 @@ export default function T1merGameScreen({
                           src={profilePicUrl}
                           alt={
                             username
-                              ? `Foto de perfil de ${username.startsWith('@') ? username : `@${username}`}`
-                              : 'Foto de perfil'
+                              ? t(`Foto de perfil de ${username.startsWith('@') ? username : `@${username}`}`, `Profile picture of ${username.startsWith('@') ? username : `@${username}`}`)
+                              : t('Foto de perfil', 'Profile picture')
                           }
                           referrerPolicy="no-referrer"
                           className="h-16 w-16 shrink-0 rounded-full border-2 border-primary/40 object-cover shadow-md sm:h-[4.5rem] sm:w-[4.5rem]"
@@ -564,7 +574,7 @@ export default function T1merGameScreen({
                           </p>
                         )}
                         <p className="text-lg leading-snug text-textSub sm:text-xl lg:text-2xl">
-                          Detén el contador cuando llegue a{' '}
+                          {t('Detén el contador cuando llegue a', 'Stop the timer when it reaches')}{' '}
                           <span className="font-digital text-2xl text-primary sm:text-3xl lg:text-4xl">10:00.0</span>
                         </p>
                       </div>
@@ -576,12 +586,13 @@ export default function T1merGameScreen({
                         <div
                           className="text-xl sm:text-2xl font-semibold text-textMain leading-tight"
                         >
-                          Posición: {resultRank}
+                          {t('Posición:', 'Rank:')} {resultRank}
                         </div>
                       )}
-                      {topX != null && resultRank != null && resultRank <= topX && (
-                        <div className="text-base sm:text-lg lg:text-xl font-semibold text-green-400 leading-snug">
-                          ¡Premio por entrar en el top {topX}!{prizeLabel ? ` ${prizeLabel}` : ''}
+                      {topX != null && resultRank != null && resultRank <= topX && (prizeCatalog === undefined || prizeLabel || rankingPrize?.imageUrl) && (
+                        <div className="text-base sm:text-lg lg:text-xl font-semibold text-green-400 leading-snug flex items-center justify-center gap-2">
+                          <PrizeImage prize={rankingPrize} compact />
+                          {t(`¡Premio por entrar en el top ${topX}!`, `Prize for reaching the top ${topX}!`)}{prizeLabel ? ` ${prizeLabel}` : ''}
                         </div>
                       )}
                     </>
@@ -611,7 +622,7 @@ export default function T1merGameScreen({
                       onClick={handleStart}
                       className={t1merPrimaryButtonClass}
                     >
-                      <span className={t1merPrimaryButtonLabelClass}>EMPEZAR</span>
+                      <span className={t1merPrimaryButtonLabelClass}>{t('EMPEZAR', 'START')}</span>
                     </button>
                   )}
                   {(gameState === 'playing' || gameState === 'hidden') && (
@@ -621,12 +632,12 @@ export default function T1merGameScreen({
                       onClick={handleStop}
                       className={t1merPrimaryButtonClass}
                     >
-                      <span className={t1merPrimaryButtonLabelClass}>DETENER</span>
+                      <span className={t1merPrimaryButtonLabelClass}>{t('DETENER', 'STOP')}</span>
                     </button>
                   )}
                   {gameState === 'finished' && result && (
                     <div className="flex justify-center items-center min-h-[7.5rem] py-2">
-                      <BackButton ref={resetBackRef} onClick={handleReset} aria-label="Volver a validar" />
+                      <BackButton ref={resetBackRef} onClick={handleReset} aria-label={t('Volver a validar', 'Validate again')} />
                     </div>
                   )}
                 </div>
@@ -639,7 +650,7 @@ export default function T1merGameScreen({
 
       {gameState === 'finished' && result && error && (
         <div className="flex-shrink-0 space-y-4">
-          <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>
+          <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{localizeOperatorMessage(error, t)}</div>
         </div>
       )}
     </div>

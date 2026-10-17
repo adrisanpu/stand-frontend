@@ -4,6 +4,7 @@ import { getJoinUrl } from '../lib/joinUrl'
 import { GamePanelFooter } from './GamePanelFooter'
 import { GameIdHint } from './GameJoinHints'
 import { GAME_PORTRAIT_HEADER_JOIN } from '../ui/gameScreenLayout'
+import { useOperatorLanguage } from '../shell/operatorLanguage'
 
 type GamePortraitHeaderJoinProps = {
   gameId: string
@@ -20,6 +21,7 @@ export default function GamePortraitHeaderJoin({
   qrSize = 128,
   joinChannel,
 }: GamePortraitHeaderJoinProps) {
+  const { t } = useOperatorLanguage()
   return (
     <div className={`${GAME_PORTRAIT_HEADER_JOIN} flex-shrink-0 w-full min-w-0`}>
       <div className="flex flex-row items-center gap-3 sm:gap-4 w-full min-w-0">
@@ -32,11 +34,11 @@ export default function GamePortraitHeaderJoin({
             size={qrSize}
             margin={6}
             containerClassName="w-full max-w-[min(100%,128px)] sm:max-w-[140px] aspect-square"
-            alt="QR para unirse al juego"
+            alt={t('QR para unirse al juego', 'QR code to join the game')}
             className="!border-0 !bg-white !p-2 rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.1)]"
           />
           <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-gray-300/90 text-center">
-            Escanea para jugar
+            {t('Escanea para jugar', 'Scan to play')}
           </p>
           <GameIdHint gameId={gameId} joinChannel={joinChannel} />
         </div>

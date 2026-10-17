@@ -20,11 +20,23 @@ import { getJoinInstructions } from '../ui/gameJoinInstructions'
 import { fetchUserMedia, resolveUserSelectedLogoUrl, type UserMediaResponse } from '../../api/userMedia'
 import { resolveGameAccess, type GameAccess } from '../settings/gameAccess'
 import MobileGameHome from '../widgets/MobileGameHome'
+import { OperatorLanguageProvider, useOperatorLanguage } from './operatorLanguage'
+import { usePolling } from '../../hooks/usePolling'
+import type { PrizeCatalog } from '../prizes'
 // Logo size on game screens (portrait and landscape) — larger across breakpoints
 // Landscape: slightly smaller so left column fits
 const GAME_SCREEN_LOGO_CLASS_LANDSCAPE = 'h-28 sm:h-32 lg:h-36 xl:h-40 2xl:h-44 w-auto object-contain max-w-full'
 
 export default function AppShell() {
+  return (
+    <OperatorLanguageProvider>
+      <AppContent />
+    </OperatorLanguageProvider>
+  )
+}
+
+function AppContent() {
+  const { language, t } = useOperatorLanguage()
   const { loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const [showSettings, setShowSettings] = useState(false)
@@ -39,6 +51,11 @@ export default function AppShell() {
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
   const [loadedAccess, setLoadedAccess] = useState<{ gameId: string; access: GameAccess } | null>(null)
   const [accessError, setAccessError] = useState<string | null>(null)
+  const [loadedPrizes, setLoadedPrizes] = useState<{ gameId: string; catalog?: PrizeCatalog } | null>(null)
+  const prizeCatalog = loadedPrizes?.gameId === gameId ? loadedPrizes.catalog : undefined
+  const metadataKey = JSON.stringify([gameId, gameType, gameConfigVersion])
+  const metadataSource = useRef({ key: metadataKey })
+  if (metadataSource.current.key !== metadataKey) metadataSource.current = { key: metadataKey }
   const access = loadedAccess?.gameId === gameId ? loadedAccess.access : null
   const joinChannel = access?.joinChannel
   const playMode = access?.playMode
@@ -156,29 +173,35 @@ export default function AppShell() {
   }, [gameId, gameDefinition?.id, gameConfigVersion])
 
   useEffect(() => {
-    if (!gameId) {
-      setLoadedAccess(null)
-      return
-    }
-    let cancelled = false
     setAccessError(null)
     setLoadedAccess(null)
-    ;(async () => {
-      try {
-        const data = await api.get<{ ok: boolean; game?: { joinChannel?: string; playMode?: string; gameType?: string } }>(
-          `/v1/game?gameId=${encodeURIComponent(gameId)}`
-        )
-        if (cancelled) return
-        if (!data.ok || !data.game) throw new Error('No se pudo cargar el acceso del juego.')
-        setLoadedAccess({ gameId, access: resolveGameAccess(data.game.gameType || gameType || '', data.game) })
-      } catch (cause) {
-        if (!cancelled) setAccessError(cause instanceof Error ? cause.message : 'No se pudo cargar el acceso del juego.')
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
+    setLoadedPrizes(null)
   }, [gameId, gameType, gameConfigVersion])
+
+  // Server metadata, not cached signed URLs, is authoritative. Refresh without remounting gameplay.
+  usePolling(async () => {
+    if (!gameId) return
+    const source = metadataSource.current
+    try {
+      const data = await api.get<{ ok: boolean; prizeCatalog?: PrizeCatalog; game?: { joinChannel?: string; playMode?: string; gameType?: string } }>(
+        `/v1/game?gameId=${encodeURIComponent(gameId)}`
+      )
+      if (metadataSource.current !== source) return
+      if (!data.ok || !data.game) throw new Error('No se pudo cargar el acceso del juego.')
+      const nextAccess = resolveGameAccess(data.game.gameType || gameType || '', data.game)
+      setLoadedAccess(previous => previous?.gameId === gameId
+        && previous.access.joinChannel === nextAccess.joinChannel
+        && previous.access.playMode === nextAccess.playMode
+        ? previous : { gameId, access: nextAccess })
+      setLoadedPrizes({ gameId, catalog: data.prizeCatalog })
+      setAccessError(null)
+    } catch (cause) {
+      if (metadataSource.current === source) {
+        setAccessError(cause instanceof Error ? cause.message : 'No se pudo cargar el acceso del juego.')
+      }
+      throw cause
+    }
+  }, [gameId, gameType, gameConfigVersion], { interval: gameId ? 60_000 : 0 })
 
   useEffect(() => {
     setAvatarState('idle')
@@ -237,21 +260,25 @@ export default function AppShell() {
   // Derive prize labels for minicontainers from game settings
   const gs = gameSettings as Record<string, unknown> | null
   const playersPrizeLabel =
+    prizeCatalog !== undefined ? prizeCatalog.validation?.name :
     gs && typeof gs.prizeValidation === 'string' && gs.prizeValidation.trim()
       ? gs.prizeValidation.trim()
       : undefined
   const rankingPrizeLabel =
+    prizeCatalog !== undefined ? prizeCatalog.ranking?.name :
     currentGame?.showRanking && gs && typeof gs.prizeTopX === 'string' && gs.prizeTopX.trim()
       ? gs.prizeTopX.trim()
       : undefined
   const rankingTopX =
+    prizeCatalog !== undefined ? prizeCatalog.ranking?.topX :
     currentGame?.showRanking && gs && typeof gs.topX === 'number' && gs.topX >= 1
       ? gs.topX
       : undefined
-  const maxPrizeValidationFromSettings = readMaxPrizeValidation(gs)
-  const maxPrizeRankingFromSettings = readMaxPrizeRanking(gs)
-  const maxPrizeRaffleFromSettings = readMaxPrizeRaffle(gs)
+  const maxPrizeValidationFromSettings = prizeCatalog !== undefined ? prizeCatalog.validation?.limit ?? undefined : readMaxPrizeValidation(gs)
+  const maxPrizeRankingFromSettings = prizeCatalog !== undefined ? prizeCatalog.ranking?.limit ?? undefined : readMaxPrizeRanking(gs)
+  const maxPrizeRaffleFromSettings = prizeCatalog !== undefined ? prizeCatalog.raffle?.limit ?? undefined : readMaxPrizeRaffle(gs)
   const rafflePrizeLabel =
+    prizeCatalog !== undefined ? prizeCatalog.raffle?.name :
     gs && typeof gs.prizeRaffle === 'string' && gs.prizeRaffle.trim() ? gs.prizeRaffle.trim() : undefined
 
   // Portrait: 5% air at top (logo), 10% at bottom; reduce bottom when content overflows so nothing is hidden
@@ -318,9 +345,9 @@ export default function AppShell() {
   if (userLoading) {
     return (
       <ThemeProvider game={currentGame}>
-        <div className="bg-club text-textMain font-sans min-h-screen flex items-center justify-center px-6">
+        <div lang={language} className="bg-club text-textMain font-sans min-h-screen flex items-center justify-center px-6">
           <div className="card w-full max-w-md p-8 text-center">
-            <p className="text-textMain">Cargando...</p>
+            <p className="text-textMain">{t('Cargando...', 'Loading...')}</p>
           </div>
         </div>
       </ThemeProvider>
@@ -329,13 +356,13 @@ export default function AppShell() {
 
   return (
     <ThemeProvider game={currentGame}>
-      <div className="bg-club text-textMain font-sans">
+      <div lang={language} className="bg-club text-textMain font-sans">
         {/* Settings Icon */}
         <button
           type="button"
           onClick={() => setShowSettings(true)}
           className={`fixed top-4 left-4 z-40 p-2 rounded-full bg-black/20 backdrop-blur-sm border border-white/10 hover:bg-black/30 transition-all duration-200 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 ${isPortrait ? 'min-w-[44px] min-h-[44px]' : 'min-w-[36px] min-h-[36px]'}`}
-          aria-label="Configuración"
+          aria-label={t('Configuración', 'Settings')}
         >
           <svg className={`${isPortrait ? 'w-6 h-6 lg:w-7 lg:h-7' : 'w-5 h-5'} text-white/70`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -347,8 +374,12 @@ export default function AppShell() {
           {gameId && gameName && currentGame ? (
             !access ? (
               <div className="h-dvh flex flex-col items-center justify-center gap-4 px-6">
-                <p role={accessError ? 'alert' : 'status'}>{accessError || 'Cargando acceso del juego...'}</p>
-                {accessError && <button type="button" onClick={() => setGameConfigVersion((v) => v + 1)}>Reintentar carga</button>}
+                <p role={accessError ? 'alert' : 'status'}>{accessError
+                  ? accessError === 'No se pudo cargar el acceso del juego.'
+                    ? t(accessError, 'Unable to load game access.')
+                    : accessError
+                  : t('Cargando acceso del juego...', 'Loading game access...')}</p>
+                {accessError && <button type="button" onClick={() => setGameConfigVersion((v) => v + 1)}>{t('Reintentar carga', 'Retry loading')}</button>}
               </div>
             ) : playMode === 'mobile' ? (
               <div className={isPortrait
@@ -360,15 +391,15 @@ export default function AppShell() {
                   joinChannel={access.joinChannel}
                   portrait={isPortrait}
                   logoSrc={customLogo ?? currentGame.assets?.logo}
-                  logoAlt={customLogo ? 'Logo del cliente' : currentGame.name}
+                  logoAlt={customLogo ? t('Logo del cliente', 'Client logo') : currentGame.name}
                   players={
-                    <Players gameName={gameName} gameId={gameId} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={10000} />
+                    <Players gameName={gameName} gameId={gameId} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={10000} />
                   }
                   raffle={features.raffles ? (
-                    <RaffleData gameId={gameId} gameName={gameName} compact={!isPortrait} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={10000} />
+                    <RaffleData gameId={gameId} gameName={gameName} compact={!isPortrait} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={10000} />
                   ) : undefined}
                   ranking={currentGame.showRanking ? (
-                    <Ranking gameId={gameId} gameType={gameType ?? undefined} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={10000} />
+                    <Ranking gameId={gameId} gameType={gameType ?? undefined} prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={10000} />
                   ) : undefined}
                 />
               </div>
@@ -390,12 +421,12 @@ export default function AppShell() {
                       customLogo || currentGame.assets?.logo ? (
                         <img
                           src={customLogo ?? currentGame.assets!.logo}
-                          alt={customLogo ? 'Logo del cliente' : currentGame.name}
+                          alt={customLogo ? t('Logo del cliente', 'Client logo') : currentGame.name}
                           className="max-h-20 sm:max-h-24 w-auto object-contain"
                         />
                       ) : null
                     }
-                    footerChildren={getJoinInstructions(currentGame.id, access)}
+                    footerChildren={getJoinInstructions(currentGame.id, access, t)}
                   />
                   {/* Main: con ranking, repartimos altura (juego : panel inferior) para que el ranking use el hueco */}
                   {currentGame.showRanking ? (
@@ -407,6 +438,7 @@ export default function AppShell() {
                           orientation="portrait"
                           topX={rankingTopX}
                           prizeLabel={rankingPrizeLabel}
+                          prizeCatalog={prizeCatalog}
                           onCounterActiveChange={setCounterActive}
                           onAvatarStateChange={setAvatarState}
                           avatarMediaUrls={avatarMediaUrls}
@@ -416,14 +448,14 @@ export default function AppShell() {
                       </div>
                       <div className="grow-[2] basis-0 shrink min-h-0 flex flex-col gap-3 min-w-0 overflow-hidden">
                         <div className="flex-shrink-0 w-full">
-                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         </div>
                         <div className="min-h-0 flex-1 flex flex-col min-w-0">
-                          <Ranking gameId={gameId} gameType={gameType ?? undefined} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Ranking gameId={gameId} gameType={gameType ?? undefined} prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         </div>
                         {features.raffles && (
                           <div className="flex-shrink-0 w-full">
-                            <RaffleData gameId={gameId} gameName={gameName} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                            <RaffleData gameId={gameId} gameName={gameName} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                           </div>
                         )}
                       </div>
@@ -437,6 +469,7 @@ export default function AppShell() {
                           orientation="portrait"
                           topX={rankingTopX}
                           prizeLabel={rankingPrizeLabel}
+                          prizeCatalog={prizeCatalog}
                           onCounterActiveChange={setCounterActive}
                           onAvatarStateChange={setAvatarState}
                           avatarMediaUrls={avatarMediaUrls}
@@ -446,11 +479,11 @@ export default function AppShell() {
                       </div>
                       <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
                         <div className="flex-1 min-w-[200px]">
-                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         </div>
                         {features.raffles && (
                           <div className="flex-1 min-w-[200px]">
-                            <RaffleData gameId={gameId} gameName={gameName} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                            <RaffleData gameId={gameId} gameName={gameName} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                           </div>
                         )}
                       </div>
@@ -482,6 +515,7 @@ export default function AppShell() {
                         orientation="landscape"
                         topX={rankingTopX}
                         prizeLabel={rankingPrizeLabel}
+                        prizeCatalog={prizeCatalog}
                         onCounterActiveChange={setCounterActive}
                         onAvatarStateChange={setAvatarState}
                         avatarMediaUrls={avatarMediaUrls}
@@ -492,30 +526,31 @@ export default function AppShell() {
                             <div className="flex justify-center items-center w-full min-w-0">
                               <img
                                 src={customLogo ?? currentGame.assets!.logo}
-                                alt={customLogo ? 'Logo del cliente' : currentGame.name}
+                                alt={customLogo ? t('Logo del cliente', 'Client logo') : currentGame.name}
                                 className={GAME_SCREEN_LOGO_CLASS_LANDSCAPE}
                               />
                             </div>
                           ) : null
                         }
                         playersElement={
-                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         }
                         sidebarElement={
                           <div className="flex flex-col gap-2 w-full min-w-0 min-h-0 flex-1 h-full overflow-y-auto self-stretch">
                             {currentGame.showRanking && (
                               <div className="min-h-0 flex-1 flex flex-col w-full overflow-hidden">
-                                <Ranking gameId={gameId} gameType={gameType ?? undefined} compact prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                                <Ranking gameId={gameId} gameType={gameType ?? undefined} compact prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                               </div>
                             )}
                             {features.raffles && (
                               <div className="flex-shrink-0 w-full min-h-[min(32vh,220px)] flex flex-col">
-                                <RaffleData gameId={gameId} gameName={gameName} compact prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                                <RaffleData gameId={gameId} gameName={gameName} compact prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                               </div>
                             )}
                             {avatarsEnabled && !currentGame.showRanking && (
                               <div className="min-h-[180px] flex-[1_1_180px] w-full overflow-hidden">
                                 <GameStateAvatar
+                                  t={t}
                                   state={avatarState}
                                   mediaUrls={avatarMediaUrls}
                                   className="card rounded-xl sm:rounded-2xl shadow-neon w-full h-full min-w-0 overflow-hidden p-2 sm:p-3"

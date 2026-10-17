@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import GameGate from './GameGate'
+import { OperatorLanguageProvider, OperatorLanguageSelector } from './operatorLanguage'
 
 // ---------------------------------------------------------------------------
 // Module mocks (vi.hoisted so mockGames is available when vi.mock runs)
@@ -92,6 +93,40 @@ describe('GameGate – catalog view', () => {
 // ---------------------------------------------------------------------------
 
 describe('GameGate – create/join view', () => {
+  it('translates catalog controls without clearing the entered game name', () => {
+    mockUseCurrentUser.mockReturnValue({ plan: 'event', user: { sub: 'u1' } })
+    render(
+      <OperatorLanguageProvider>
+        <OperatorLanguageSelector />
+        <GameGate onGameCreated={vi.fn()} />
+      </OperatorLanguageProvider>
+    )
+    fireEvent.click(screen.getByText('T1MER'))
+    fireEvent.change(screen.getByLabelText('Nombre de la partida'), { target: { value: 'MI_EVENTO' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
+    expect(screen.getByLabelText('Game name')).toHaveValue('MI_EVENTO')
+    expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Join' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Back to catalog' })).toBeInTheDocument()
+  })
+
+  it('translates an already visible validation error without changing the invalid name', () => {
+    mockUseCurrentUser.mockReturnValue({ plan: 'event', user: { sub: 'u1' } })
+    render(
+      <OperatorLanguageProvider>
+        <OperatorLanguageSelector />
+        <GameGate onGameCreated={vi.fn()} />
+      </OperatorLanguageProvider>
+    )
+    fireEvent.click(screen.getByText('T1MER'))
+    fireEvent.change(screen.getByLabelText('Nombre de la partida'), { target: { value: 'MI EVENTO' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear' }))
+    expect(screen.getByText('Nombre de partida inválido. Usa letras, números, _ - .')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
+    expect(screen.getByText('Invalid game name. Use letters, numbers, _ - .')).toBeInTheDocument()
+    expect(screen.getByLabelText('Game name')).toHaveValue('MI EVENTO')
+  })
+
   function renderAndSelect(plan = 'free', game = mockGames[0]) {
     mockUseCurrentUser.mockReturnValue({ plan, user: { sub: 'u1' } })
     renderGate()

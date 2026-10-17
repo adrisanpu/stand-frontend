@@ -10,6 +10,7 @@ import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { inputManager } from '../input/inputManager'
 import GameConfigPanel, { type GameConfigSavedPatch } from '../settings/GameConfigPanel'
+import { OperatorLanguageSelector, useOperatorLanguage } from './operatorLanguage'
 
 type SettingsMenuProps = {
   onClose: () => void
@@ -19,6 +20,43 @@ type SettingsMenuProps = {
   onLeaveGame?: () => void
   onExitApp?: () => void
   onConfigSaved?: () => void
+}
+
+function Countdown({ targetDate }: { targetDate: string }) {
+  const { t } = useOperatorLanguage()
+  const [timeLeft, setTimeLeft] = useState<string>('')
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      try {
+        const target = new Date(targetDate).getTime()
+        const difference = target - Date.now()
+
+        if (difference <= 0) {
+          setTimeLeft('expired')
+          return
+        }
+
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24))
+        const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
+        const seconds = Math.floor((difference % (1000 * 60)) / 1000)
+
+        if (days > 0) setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`)
+        else if (hours > 0) setTimeLeft(`${hours}h ${minutes}m ${seconds}s`)
+        else if (minutes > 0) setTimeLeft(`${minutes}m ${seconds}s`)
+        else setTimeLeft(`${seconds}s`)
+      } catch {
+        setTimeLeft('error')
+      }
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [targetDate])
+
+  return <span>{timeLeft === 'expired' ? t('Expirado', 'Expired') : timeLeft === 'error' ? t('Error', 'Error') : timeLeft}</span>
 }
 
 export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition, onLeaveGame, onExitApp, onConfigSaved }: SettingsMenuProps) {
@@ -36,6 +74,8 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [exportQuizError, setExportQuizError] = useState<string | null>(null)
   const [showGameConfig, setShowGameConfig] = useState(false)
   const [showOperatorPrizes, setShowOperatorPrizes] = useState(false)
+  const [prizeSaving, setPrizeSaving] = useState(false)
+  const prizeSavingRef = useRef(false)
   const [gameSettings, setGameSettings] = useState<any>(null)
   const gameSettingsRef = useRef(gameSettings)
   gameSettingsRef.current = gameSettings
@@ -46,8 +86,21 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [showUserInfo, setShowUserInfo] = useState(false)
   const [isStartingCheckout, setIsStartingCheckout] = useState(false)
   const { logout } = useAuth()
+  const { language, t } = useOperatorLanguage()
   const { user, loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
+
+  const translateKnownError = (message: string) => {
+    const translations: Record<string, string> = {
+    'No hay gameId disponible': t('No hay gameId disponible', 'No gameId is available'),
+    'No se recibió URL de pago': t('No se recibió URL de pago', 'No payment URL was received'),
+    'Error al iniciar el pago. Por favor, intenta de nuevo.': t('Error al iniciar el pago. Por favor, intenta de nuevo.', 'Error starting checkout. Please try again.'),
+    'Error al exportar los datos del quiz': t('Error al exportar los datos del quiz', 'Error exporting quiz data'),
+    'No se pudo copiar al portapapeles. Por favor, copia manualmente.': t('No se pudo copiar al portapapeles. Por favor, copia manualmente.', 'Could not copy to clipboard. Please copy it manually.'),
+    'Error al terminar la partida': t('Error al terminar la partida', 'Error ending the game'),
+    }
+    return Object.prototype.hasOwnProperty.call(translations, message) ? translations[message] : message
+  }
 
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
@@ -97,7 +150,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         return true
       }
       if (s.showOperatorPrizes) {
-        setShowOperatorPrizes(false)
+        if (!prizeSavingRef.current) setShowOperatorPrizes(false)
         return true
       }
       if (s.showGameConfig) {
@@ -208,7 +261,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       }
     } catch (error: any) {
       console.error('Error starting checkout:', error)
-      alert(error.message || 'Error al iniciar el pago. Por favor, intenta de nuevo.')
+      alert(translateKnownError(error.message || 'Error al iniciar el pago. Por favor, intenta de nuevo.'))
       setIsStartingCheckout(false)
     }
   }
@@ -244,7 +297,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Datos del Quiz - ${exportQuizData.gameId}`,
+          title: `${t('Datos del Quiz', 'Quiz data')} - ${exportQuizData.gameId}`,
           text: jsonString
         })
         return
@@ -336,10 +389,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
 
   if (showUserInfo) {
     const formatDate = (dateString: string | undefined) => {
-      if (!dateString) return 'N/A'
+      if (!dateString)       return t('N/A', 'N/A')
       try {
         const date = new Date(dateString)
-        return date.toLocaleDateString('es-ES', {
+        return date.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
@@ -352,53 +405,9 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     }
 
     const planLabels: Record<string, string> = {
-      free: 'Gratis',
-      event: 'Evento 24h',
+      free: t('Gratis', 'Free'),
+      event: t('Evento 24h', 'Event 24h'),
       enterprise: 'Enterprise'
-    }
-
-    // Countdown component for activeUntil
-    const Countdown = ({ targetDate }: { targetDate: string }) => {
-      const [timeLeft, setTimeLeft] = useState<string>('')
-
-      useEffect(() => {
-        const updateCountdown = () => {
-          try {
-            const target = new Date(targetDate).getTime()
-            const now = Date.now()
-            const difference = target - now
-
-            if (difference <= 0) {
-              setTimeLeft('Expirado')
-              return
-            }
-
-            const days = Math.floor(difference / (1000 * 60 * 60 * 24))
-            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-            const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
-            const seconds = Math.floor((difference % (1000 * 60)) / 1000)
-
-            if (days > 0) {
-              setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`)
-            } else if (hours > 0) {
-              setTimeLeft(`${hours}h ${minutes}m ${seconds}s`)
-            } else if (minutes > 0) {
-              setTimeLeft(`${minutes}m ${seconds}s`)
-            } else {
-              setTimeLeft(`${seconds}s`)
-            }
-          } catch {
-            setTimeLeft('Error')
-          }
-        }
-
-        updateCountdown()
-        const interval = setInterval(updateCountdown, 1000)
-
-        return () => clearInterval(interval)
-      }, [targetDate])
-
-      return <span>{timeLeft}</span>
     }
 
     return (
@@ -416,62 +425,65 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 type="button"
                 onClick={() => setShowUserInfo(false)}
                 className="p-2 rounded-full hover:bg-white/10 transition-colors shrink-0"
-                aria-label="Volver"
+                aria-label={t('Volver', 'Back')}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
               <h2 id="user-info-title" className="text-xl font-semibold truncate">
-                Información del Usuario
+                {t('Información del Usuario', 'User information')}
               </h2>
             </div>
+            <div className="flex items-center gap-2 shrink-0">
+            <OperatorLanguageSelector />
             <button
               type="button"
               onClick={onClose}
               className="p-2 rounded-full hover:bg-white/10 transition-colors shrink-0"
-              aria-label="Cerrar configuración"
+              aria-label={t('Cerrar configuración', 'Close settings')}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+            </div>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
             {userLoading ? (
               <div className="text-center py-8">
-                <p className="text-textSub">Cargando información...</p>
+                <p className="text-textSub">{t('Cargando información...', 'Loading information...')}</p>
               </div>
             ) : user ? (
               <div className="space-y-4">
                 <div className="p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
                   <div className="space-y-3">
                     <div>
-                      <div className="text-xs text-gray-400 mb-1">Email</div>
-                      <div className="text-textMain font-medium">{user.email || 'No disponible'}</div>
+                      <div className="text-xs text-gray-400 mb-1">{t('Email', 'Email')}</div>
+                      <div className="text-textMain font-medium">{user.email || t('No disponible', 'Not available')}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-400 mb-1">Plan</div>
+                      <div className="text-xs text-gray-400 mb-1">{t('Plan', 'Plan')}</div>
                       <div className="text-textMain font-medium">
                         {planLabels[user.plan] || user.plan.toUpperCase()}
                       </div>
                     </div>
                     {user.activeUntil && (
                       <div>
-                        <div className="text-xs text-gray-400 mb-1">Activo hasta</div>
+                        <div className="text-xs text-gray-400 mb-1">{t('Activo hasta', 'Active until')}</div>
                         <div className="text-textMain">
                           <Countdown targetDate={user.activeUntil} />
                         </div>
                       </div>
                     )}
                     <div>
-                      <div className="text-xs text-gray-400 mb-1">Cuenta creada</div>
+                      <div className="text-xs text-gray-400 mb-1">{t('Cuenta creada', 'Account created')}</div>
                       <div className="text-textMain text-sm">{formatDate(user.createdAt)}</div>
                     </div>
                     {user.updatedAt && user.updatedAt !== user.createdAt && (
                       <div>
-                        <div className="text-xs text-gray-400 mb-1">Última actualización</div>
+                        <div className="text-xs text-gray-400 mb-1">{t('Última actualización', 'Last updated')}</div>
                         <div className="text-textMain text-sm">{formatDate(user.updatedAt)}</div>
                       </div>
                     )}
@@ -480,7 +492,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-red-300">No se pudo cargar la información del usuario</p>
+                <p className="text-red-300">{t('No se pudo cargar la información del usuario', 'Could not load user information')}</p>
               </div>
             )}
 
@@ -488,7 +500,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             {plan === 'free' && (
               <div className="mt-2 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30">
                 <p className="text-sm text-blue-300 mb-3">
-                  Actualiza a Event 24h para desbloquear todas las funciones
+                  {t('Actualiza a Event 24h para desbloquear todas las funciones', 'Upgrade to Event 24h to unlock all features')}
                 </p>
                 <button
                   onClick={handleStartCheckout}
@@ -500,14 +512,14 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                       <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                      Procesando...
+                      {t('Procesando...', 'Processing...')}
                     </>
                   ) : (
                     <>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Activar 24h
+                      {t('Activar 24h', 'Activate 24h')}
                     </>
                   )}
                 </button>
@@ -525,7 +537,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
-              Cerrar sesión
+              {t('Cerrar sesión', 'Log out')}
             </button>
           </div>
         </div>
@@ -541,32 +553,37 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         aria-labelledby="operator-prizes-title"
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
-        <div className="absolute inset-0 bg-black/70" onClick={onClose} aria-hidden="true" />
+        <div className="absolute inset-0 bg-black/70" onClick={() => { if (!prizeSavingRef.current) onClose() }} aria-hidden="true" />
         <div className="relative card w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <div className="flex items-center justify-between gap-3 p-6 pb-4 flex-shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
-                onClick={() => setShowOperatorPrizes(false)}
+                onClick={() => { if (!prizeSavingRef.current) setShowOperatorPrizes(false) }}
+                disabled={prizeSaving}
                 className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
-                aria-label="Volver"
+                aria-label={t('Volver', 'Back')}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <h2 id="operator-prizes-title" className="text-xl font-semibold truncate">Premios</h2>
+              <h2 id="operator-prizes-title" className="text-xl font-semibold truncate">{t('Premios', 'Prizes')}</h2>
             </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <OperatorLanguageSelector />
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => { if (!prizeSavingRef.current) onClose() }}
+              disabled={prizeSaving}
               className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
-              aria-label="Cerrar"
+              aria-label={t('Cerrar', 'Close')}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+            </div>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6">
             <OperatorPrizeSettings
@@ -575,6 +592,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               settings={gameSettings}
               plan={plan}
               onPersist={handleOperatorPrizePersist}
+              onSavingChange={(value) => {
+                prizeSavingRef.current = value
+                setPrizeSaving(value)
+              }}
             />
           </div>
         </div>
@@ -599,25 +620,28 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 onClick={closeGameConfig}
                 disabled={gameConfigSaving}
                 className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0 disabled:opacity-40"
-                aria-label="Volver al juego"
+                aria-label={t('Volver al juego', 'Back to game')}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <h2 id="game-config-title" className="text-xl font-semibold truncate">Configurar juego</h2>
+              <h2 id="game-config-title" className="text-xl font-semibold truncate">{t('Configurar juego', 'Configure game')}</h2>
             </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <OperatorLanguageSelector />
             <button
               type="button"
               onClick={closeGameConfig}
               disabled={gameConfigSaving}
               className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40"
-              aria-label="Cerrar y volver al juego"
+              aria-label={t('Cerrar y volver al juego', 'Close and return to game')}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+            </div>
           </div>
           <GameConfigPanel
             gameId={gameId}
@@ -643,7 +667,9 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         <div className="absolute inset-0 bg-black/70" onClick={() => setShowExportQuiz(false)} aria-hidden="true" />
         <div className="relative card w-full max-w-sm p-6 max-h-[90vh] flex flex-col">
           <div className="flex items-center justify-between mb-6 flex-shrink-0">
-            <h2 id="export-quiz-title" className="text-xl font-semibold">Exportar Datos del Quiz</h2>
+            <h2 id="export-quiz-title" className="text-xl font-semibold">{t('Exportar Datos del Quiz', 'Export Quiz Data')}</h2>
+            <div className="flex items-center gap-2">
+              <OperatorLanguageSelector />
             <button
               onClick={() => {
                 setShowExportQuiz(false)
@@ -652,12 +678,13 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 setShowExportShareOptions(false)
               }}
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
-              aria-label="Cerrar"
+              aria-label={t('Cerrar', 'Close')}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+            </div>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto">
@@ -665,12 +692,12 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               {!showExportShareOptions ? (
                 <>
                   <p className="text-sm text-gray-300">
-                    Antes de terminar el juego, puedes exportar los datos del quiz para conservarlos.
+                    {t('Antes de terminar el juego, puedes exportar los datos del quiz para conservarlos.', 'Before ending the game, you can export the Quiz data to keep it.')}
                   </p>
                   {!features.exportResults && (
                     <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
                       <p className="text-yellow-300 text-sm">
-                        Disponible en el plan Event
+                        {t('Disponible en el plan Event', 'Available on the Event plan')}
                       </p>
                     </div>
                   )}
@@ -678,7 +705,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     onClick={handleExportQuizBeforeTerminate}
                     disabled={isExportingQuiz || !gameId || !features.exportResults}
                     className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={!features.exportResults ? 'Disponible en el plan Event' : undefined}
+                    title={!features.exportResults ? t('Disponible en el plan Event', 'Available on the Event plan') : undefined}
                   >
                     <div className="flex items-center justify-center gap-2">
                       {isExportingQuiz ? (
@@ -686,21 +713,21 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                           <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                           </svg>
-                          Exportando...
+                          {t('Exportando...', 'Exporting...')}
                         </>
                       ) : (
                         <>
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 8m4-4v12" />
                           </svg>
-                          Exportar Datos del Quiz
+                          {t('Exportar Datos del Quiz', 'Export Quiz Data')}
                         </>
                       )}
                     </div>
                   </button>
                   {exportQuizError && (
                     <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-                      {exportQuizError}
+                      {translateKnownError(exportQuizError)}
                     </div>
                   )}
                   <button
@@ -714,11 +741,11 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                           <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                           </svg>
-                          Terminando...
+                          {t('Terminando...', 'Ending...')}
                         </>
                       ) : (
                         <>
-                          Omitir y terminar juego
+                          {t('Omitir y terminar juego', 'Skip and end game')}
                         </>
                       )}
                     </div>
@@ -728,7 +755,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 <>
                   <div className="p-3 rounded-lg bg-green-500/20 border border-green-500/30">
                     <p className="text-green-300 text-sm">
-                      ✓ Datos del quiz exportados exitosamente
+                      {t('✓ Datos del quiz exportados exitosamente', '✓ Quiz data exported successfully')}
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -740,7 +767,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                         </svg>
-                        Compartir
+                        {t('Compartir', 'Share')}
                       </div>
                     </button>
                     <button
@@ -751,7 +778,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 8m4-4v12" />
                         </svg>
-                        Descargar
+                        {t('Descargar', 'Download')}
                       </div>
                     </button>
                   </div>
@@ -770,7 +797,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               }}
               className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
             >
-              Cancelar
+              {t('Cancelar', 'Cancel')}
             </button>
           </div>
         </div>
@@ -806,26 +833,29 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   setTerminateIrreversibleAck(false)
                 }}
                 className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
-                aria-label="Volver"
+                aria-label={t('Volver', 'Back')}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
               <h2 id="exit-confirm-title" className="text-xl font-semibold truncate">
-                Salir
+                {t('Salir', 'Exit')}
               </h2>
             </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <OperatorLanguageSelector />
             <button
               type="button"
               onClick={onClose}
               className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
-              aria-label="Cerrar"
+              aria-label={t('Cerrar', 'Close')}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+            </div>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto">
@@ -848,8 +878,8 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </svg>
                 </div>
                 <div className="text-left flex-1">
-                  <div className="font-medium">Salir del juego</div>
-                  <div className="text-sm text-gray-400">Volver a la selección de partida</div>
+                  <div className="font-medium">{t('Salir del juego', 'Leave game')}</div>
+                  <div className="text-sm text-gray-400">{t('Volver a la selección de partida', 'Return to game selection')}</div>
                 </div>
               </button>
 
@@ -878,14 +908,14 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     )}
                   </div>
                   <div className="text-left flex-1">
-                    <div className="font-medium">{isTerminating ? 'Terminando...' : 'Terminar el juego'}</div>
-                    <div className="text-sm text-gray-400">Desactivar la partida permanentemente</div>
+                    <div className="font-medium">{isTerminating ? t('Terminando...', 'Ending...') : t('Terminar el juego', 'End game')}</div>
+                    <div className="text-sm text-gray-400">{t('Desactivar la partida permanentemente', 'Permanently deactivate the game')}</div>
                   </div>
                 </button>
                 {terminateIrreversibleAck && (
                   <div className="p-3 rounded-lg bg-red-500/15 border border-red-500/30">
                     <p className="text-red-300/90 text-sm">
-                      Esta acción no se puede deshacer. Pulsa otra vez «Terminar el juego» para continuar.
+                      {t('Esta acción no se puede deshacer. Pulsa otra vez «Terminar el juego» para continuar.', 'This action cannot be undone. Press “End game” again to continue.')}
                     </p>
                   </div>
                 )}
@@ -893,7 +923,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
 
               {terminateError && (
                 <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-                  {terminateError}
+                  {translateKnownError(terminateError)}
                 </div>
               )}
             </div>
@@ -913,16 +943,19 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       <div className="absolute inset-0 bg-black/70" onClick={onClose} aria-hidden="true" />
       <div className="relative card w-full max-w-sm p-6 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between mb-6 flex-shrink-0">
-          <h2 id="settings-title" className="text-xl font-semibold">Configuración</h2>
+          <h2 id="settings-title" className="min-w-0 truncate text-xl font-semibold">{t('Configuración', 'Settings')}</h2>
+          <div className="flex shrink-0 items-center gap-2">
+            <OperatorLanguageSelector />
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            aria-label="Cerrar configuración"
+            aria-label={t('Cerrar configuración', 'Close settings')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+          </div>
         </div>
 
         <div ref={settingsMainListRef} className="space-y-3 flex-1 min-h-0 overflow-y-auto">
@@ -938,7 +971,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </svg>
               </div>
               <div className="text-left">
-                <div className="font-medium">Información del Usuario</div>
+                <div className="font-medium">{t('Información del Usuario', 'User information')}</div>
               </div>
               <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -959,7 +992,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </svg>
                 </div>
                 <div className="text-left flex-1 min-w-0">
-                  <div className="font-medium">Configurar aspecto</div>
+                  <div className="font-medium">{t('Configurar aspecto', 'Appearance settings')}</div>
                 </div>
                 <svg
                   className="w-4 h-4 text-gray-400 shrink-0"
@@ -986,7 +1019,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </svg>
                 </div>
                 <div className="text-left">
-                  <div className="font-medium">Salir de la aplicación</div>
+                  <div className="font-medium">{t('Salir de la aplicación', 'Exit application')}</div>
                 </div>
               </button>
             </>
@@ -1007,7 +1040,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     </svg>
                   </div>
                   <div className="text-left">
-                    <div className="font-medium">Configurar juego</div>
+                    <div className="font-medium">{t('Configurar juego', 'Configure game')}</div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1028,7 +1061,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                       ? 'hover:bg-[rgba(255,255,255,0.1)]' 
                       : 'opacity-50 cursor-not-allowed'
                   }`}
-                  title={plan === 'free' ? 'Disponible en el plan Event 24h' : undefined}
+                  title={plan === 'free' ? t('Disponible en el plan Event 24h', 'Available on the Event 24h plan') : undefined}
                 >
                   <div className="p-2 rounded-lg bg-green-500/20">
                     <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1036,7 +1069,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     </svg>
                   </div>
                   <div className="text-left">
-                    <div className="font-medium">Quiz</div>
+                    <div className="font-medium">{t('Quiz', 'Quiz')}</div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1057,7 +1090,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                       ? 'hover:bg-[rgba(255,255,255,0.1)]' 
                       : 'opacity-50 cursor-not-allowed'
                   }`}
-                  title={!features.raffles ? 'Disponible en el plan Event 24h' : undefined}
+                  title={!features.raffles ? t('Disponible en el plan Event 24h', 'Available on the Event 24h plan') : undefined}
                 >
                   <div className="p-2 rounded-lg bg-purple-500/20">
                     <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1065,7 +1098,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     </svg>
                   </div>
                   <div className="text-left">
-                    <div className="font-medium">Sorteo</div>
+                    <div className="font-medium">{t('Sorteo', 'Raffle')}</div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1086,7 +1119,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     </svg>
                   </div>
                   <div className="text-left">
-                    <div className="font-medium">Premios</div>
+                    <div className="font-medium">{t('Premios', 'Prizes')}</div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1108,7 +1141,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </svg>
                 </div>
                 <div className="text-left">
-                  <div className="font-medium">Salir</div>
+                  <div className="font-medium">{t('Salir', 'Exit')}</div>
                 </div>
                 <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

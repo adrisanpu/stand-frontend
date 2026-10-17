@@ -12,6 +12,7 @@ type GameStateAvatarProps = {
   state: AvatarState | string
   className?: string
   mediaUrls?: Partial<Record<'idle' | 'win' | 'lose', string | null>>
+  t?: (spanish: string, english?: string) => string
 }
 
 function mapStateToAvatarVariant(state: string): 'idle' | 'win' | 'lose' {
@@ -25,7 +26,7 @@ function mapStateToAvatarVariant(state: string): 'idle' | 'win' | 'lose' {
   return 'idle'
 }
 
-export default function GameStateAvatar({ state, className, mediaUrls }: GameStateAvatarProps) {
+export default function GameStateAvatar({ state, className, mediaUrls, t = (spanish) => spanish }: GameStateAvatarProps) {
   const variant = useMemo(() => mapStateToAvatarVariant(state), [state])
   const [failed, setFailed] = useState(false)
   const sourceUrl = mediaUrls?.[variant] ?? null
@@ -39,7 +40,7 @@ export default function GameStateAvatar({ state, className, mediaUrls }: GameSta
     return (
       <div className={className ?? 'w-full h-full'}>
         <div className="w-full h-full flex items-center justify-center rounded-lg bg-black/20">
-          <span className="text-xs text-white/70 font-medium">Avatar no disponible</span>
+          <span className="text-xs text-white/70 font-medium">{t('Avatar no disponible', 'Avatar unavailable')}</span>
         </div>
       </div>
     )
@@ -56,7 +57,7 @@ export default function GameStateAvatar({ state, className, mediaUrls }: GameSta
         onEnded={handleVideoEnded}
         onError={() => setFailed(true)}
         className="w-full h-full object-contain"
-        aria-label={`Avatar del estado ${state}`}
+        aria-label={`${t('Avatar del estado', 'Avatar for state')} ${state}`}
       >
         {sourceUrl && <source src={sourceUrl} type="video/mp4" />}
       </video>

@@ -8,6 +8,33 @@ Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas d
 
 ## Configurar juego
 
+### Prize images
+
+`Settings > Premios` stores independent `validation`, `ranking` and `raffle`
+entries in the game's `prizeCatalog`. Each entry has a name, nullable limit,
+optional ranking `topX` and optional image. In the editor, order controls as
+name -> image -> numeric parameters (including Top X where applicable).
+Allow PNG up to 5 MB, display a preview and provide replace/remove actions.
+File choices remain drafts until the server confirms **Guardar**; failed
+uploads or saves must not publish local success or discard the draft.
+
+Use `PrizePresentation` / `PrizeImage` for prize artwork with `object-contain`.
+Home widgets and existing prize announcements display the corresponding slot,
+not a shared image for all prizes. Participant registration advertises validation
+and ranking prizes above the fields, never raffle; results still display any
+awarded raffle prize and its existing redemption QR. Keep image-free legacy
+events usable. Store durable keys and refresh signed URLs through metadata reads;
+never persist a presigned URL as the authoritative reference.
+
+Place the operator **ES / EN** selector immediately before the close X in the
+settings header. Use `useOperatorLanguage()` from
+`src/core/shell/operatorLanguage.tsx` for operator UI text:
+`t('Texto en español', 'English text')`. The provider belongs to `AppShell`, not
+individual dialogs or games, so closing settings and switching languages preserve
+gameplay and unsaved drafts. Do not key components or refetch settings on language
+changes. Keep user-entered names, prizes and game content unchanged; participant
+`/play` uses its separate language context.
+
 Keep **Modo de juego** and **Acceso del participante** side by side in a two-column
 row, with one legend each. Options are **1 pantalla** / **∞ móviles** and
 **Instagram** / **Web**; unsupported choices stay visible but disabled.
@@ -21,9 +48,13 @@ label/count pair stays in two columns. Keep drafts and the single final
 
 For games supporting mobile play, the shared panel shows the participant
 `/play/:gameId` link and prize validator link with its QR immediately below the
-mode/access selectors, before game-specific rules. Use a compact row with the two
-links on the left and an 80px validator QR on the right, without extra headings
-or explanatory copy. Show these for both access
+mode/access selectors, before game-specific rules. Use three compact columns:
+participant QR with its link below, validator QR with its link below (both 80px),
+and **Datos del participante** with Email, Instagram and Phone checkboxes.
+Checked fields are required in `/play`; unchecked fields are hidden and omitted
+from registration requests. Save these settings with the shared footer, not in
+individual game configs. Existing events default to email enabled and Instagram
+and phone disabled when no explicit configuration exists. Show these for both access
 channels and all supported play modes; individual game configs must not duplicate
 them.
 
@@ -48,7 +79,11 @@ When `playMode === 'mobile'`, `AppShell` renders the shared `MobileGameHome`
 instead of the game's operator interaction panel (EMPAREJA2, T1MER and STACK).
 Landscape uses three columns: large logo with players and an expanded raffle
 below on the left, a large QR in the center, and the ranking filling the right
-column. Games without a ranking use two columns; raffle plan restrictions and
+column. The large QR panel displays **NO ESCANEAR, POR FAVOR.** in Spanish or
+**DO NOT SCAN THIS.** in English, centered above the QR in oversized bold white
+text with **NO** / **NOT** in red, following the selected interface language.
+Reserve vertical space for this heading when sizing the QR so both fit.
+Games without a ranking use two columns; raffle plan restrictions and
 prize settings remain unchanged. The logo card contains only the logo, without
 the manual icon or legal footer. No mobile participation explanation, participant
 link buttons or event-name/code text appears on this home. The QR still follows

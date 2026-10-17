@@ -4,6 +4,7 @@ import QRCode from './QRCode'
 import { getInstagramDmUrl } from '../lib/instagram'
 import { GamePanelFooter } from './GamePanelFooter'
 import { GAME_PORTRAIT_JOIN_PANEL } from '../ui/gameScreenLayout'
+import { useOperatorLanguage } from '../shell/operatorLanguage'
 
 type GamePortraitJoinPanelProps = {
   gameId: string
@@ -22,6 +23,7 @@ export default function GamePortraitJoinPanel({
   containerClassName,
   children,
 }: GamePortraitJoinPanelProps) {
+  const { t } = useOperatorLanguage()
   return (
     <div className={GAME_PORTRAIT_JOIN_PANEL}>
       <div className="flex justify-center items-center min-w-0 w-full">
@@ -29,13 +31,13 @@ export default function GamePortraitJoinPanel({
           data={getInstagramDmUrl(gameId)}
           size={qrSize}
           margin={qrMargin}
-          alt="QR Code para Instagram DM"
+          alt={t('QR Code para Instagram DM', 'QR code for Instagram DM')}
           className={qrClassName}
           containerClassName={containerClassName}
         />
       </div>
       <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-gray-300/90 text-center">
-        Escanea para jugar
+        {t('Escanea para jugar', 'Scan to play')}
       </p>
       <GamePanelFooter>{children}</GamePanelFooter>
     </div>

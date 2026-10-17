@@ -8,6 +8,8 @@ import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { useStandLogo } from '../theme'
 import { fetchUserMedia, resolveUserSelectedLogoUrl, type UserMediaResponse } from '../../api/userMedia'
 import { resolveGameAccess } from '../settings/gameAccess'
+import { useOperatorLanguage } from './operatorLanguage'
+import { catalogEnglish } from './operatorCatalogText'
 
 const GAME_RE = /^[A-Za-z0-9._-]{1,40}$/
 
@@ -24,12 +26,20 @@ interface UserGame {
 }
 
 export default function GameGate({ onGameCreated }: GameGateProps){
+  const { t } = useOperatorLanguage()
   const { plan, user } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const standLogo = useStandLogo()
   const [selectedGame, setSelectedGame] = useState<GameDefinition | null>(null)
   const [gameId, setGameId] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const errorEnglish: Record<string, string> = {
+    'Disponible en el plan Event': 'Available with the Event plan',
+    'Nombre de partida inválido. Usa letras, números, _ - .': 'Invalid game name. Use letters, numbers, _ - .',
+    'Respuesta inválida del servidor': 'Invalid server response',
+    'No se ha podido crear la partida. Prueba con otro nombre.': 'Unable to create the game. Try another name.',
+    'No se pudo unirse a la partida. Verifica el nombre e intenta nuevamente.': 'Unable to join the game. Check the name and try again.',
+  }
   const [loading, setLoading] = useState(false)
   const [joining, setJoining] = useState(false)
   const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
@@ -243,7 +253,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
             {headerLogoSrc ? (
               <img
                 src={headerLogoSrc}
-                alt={customLogo ? 'Logo personalizado' : 'Stand'}
+                alt={customLogo ? t('Logo personalizado', 'Custom logo') : 'Stand'}
                 className="h-32 w-auto object-contain"
                 onError={(e) => {
                   if (customLogo) return
@@ -316,7 +326,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        Volver al catálogo
+        {t('Volver al catálogo', 'Back to catalog')}
       </button>
 
       {/* Selected Game Info: [logo] | [description + tags] */}
@@ -343,31 +353,31 @@ export default function GameGate({ onGameCreated }: GameGateProps){
           <div className="flex flex-col gap-4 min-w-0 min-h-full">
             <div className="flex-1 min-h-0">
               <p className="text-sm sm:text-base text-textSub leading-relaxed text-center md:text-left">
-                {selectedGameDescription}
+                {t(selectedGameDescription, catalogEnglish[selectedGameDescription])}
               </p>
             </div>
             {selectedGameHasTags && selectedGame.tags && (
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 pt-3 border-t border-white/10 md:mt-auto">
                 {selectedGame.tags.playerMode && (
-                  <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.playerMode === 'multi' ? 'Multijugador' : 'Individual'}>
+                  <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.playerMode === 'multi' ? t('Multijugador', 'Multiplayer') : t('Individual', 'Single player')}>
                     {selectedGame.tags.playerMode === 'multi' ? (
                       <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     ) : (
                       <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                     )}
-                    {selectedGame.tags.playerMode === 'multi' ? 'Multijugador' : 'Individual'}
+                    {selectedGame.tags.playerMode === 'multi' ? t('Multijugador', 'Multiplayer') : t('Individual', 'Single player')}
                   </span>
                 )}
                 {selectedGame.tags.social !== undefined && (
-                  <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.social ? 'Implica socializar' : 'No implica socializar'}>
+                  <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.social ? t('Implica socializar', 'Social interaction') : t('No implica socializar', 'No social interaction')}>
                     <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                    {selectedGame.tags.social ? 'Social' : 'No social'}
+                    {selectedGame.tags.social ? 'Social' : t('No social', 'Not social')}
                   </span>
                 )}
                 {selectedGame.tags.competitive !== undefined && (
-                  <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.competitive ? 'Competitivo' : 'Casual'}>
+                  <span className="flex items-center gap-1.5 text-xs text-textSub" title={selectedGame.tags.competitive ? t('Competitivo', 'Competitive') : 'Casual'}>
                     <svg className="w-4 h-4 text-textMain flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                    {selectedGame.tags.competitive ? 'Competitivo' : 'Casual'}
+                    {selectedGame.tags.competitive ? t('Competitivo', 'Competitive') : 'Casual'}
                   </span>
                 )}
                 {selectedGame.tags.idealFor && selectedGame.tags.idealFor.length > 0 && (
@@ -376,9 +386,9 @@ export default function GameGate({ onGameCreated }: GameGateProps){
                       <span
                         key={key}
                         className="px-2 py-0.5 rounded bg-white/10 text-textSub"
-                        title="Ideal para"
+                        title={t('Ideal para', 'Ideal for')}
                       >
-                        {IDEAL_FOR_LABELS[key]}
+                        {t(IDEAL_FOR_LABELS[key], catalogEnglish[IDEAL_FOR_LABELS[key]])}
                       </span>
                     ))}
                   </span>
@@ -391,7 +401,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
 
       {/* Game ID Input with Dropdown */}
       <div className="space-y-2 relative">
-        <label htmlFor="game-id" className="text-sm text-gray-300">Nombre de la partida</label>
+        <label htmlFor="game-id" className="text-sm text-gray-300">{t('Nombre de la partida', 'Game name')}</label>
         <div className="relative">
           <input
             ref={inputRef}
@@ -407,7 +417,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
                 setShowDropdown(true)
               }
             }}
-            placeholder="ej. TORNEO_1"
+            placeholder={t('ej. TORNEO_1', 'e.g. TOURNAMENT_1')}
             autoComplete="off"
             data-form-type="other"
             className="w-full h-11 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 pr-10 outline-none focus:border-white/20 uppercase"
@@ -436,7 +446,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
               className="absolute z-50 w-full mt-1 max-h-60 overflow-auto rounded-xl bg-[rgba(20,20,30,0.95)] border border-white/20 shadow-xl backdrop-blur-sm"
             >
               {loadingGames ? (
-                <div className="p-3 text-center text-sm text-gray-400">Cargando partidas...</div>
+                <div className="p-3 text-center text-sm text-gray-400">{t('Cargando partidas...', 'Loading games...')}</div>
               ) : (
                 <div className="py-1">
                   {userGames.map((game) => (
@@ -456,20 +466,20 @@ export default function GameGate({ onGameCreated }: GameGateProps){
         </div>
         <p className="text-xs text-gray-400">
           {userGames.length > 0 
-            ? `Tienes ${userGames.length} partida${userGames.length > 1 ? 's' : ''} creada${userGames.length > 1 ? 's' : ''}. Selecciona una o escribe un nombre nuevo.`
-            : 'Caracteres permitidos: letras, números, _ - .'}
+            ? t(`Tienes ${userGames.length} partida${userGames.length > 1 ? 's' : ''} creada${userGames.length > 1 ? 's' : ''}. Selecciona una o escribe un nombre nuevo.`, `You have ${userGames.length} game${userGames.length > 1 ? 's' : ''}. Select one or enter a new name.`)
+            : t('Caracteres permitidos: letras, números, _ - .', 'Allowed characters: letters, numbers, _ - .')}
         </p>
       </div>
 
       {error && (
-        <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{error}</div>
+        <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">{t(error, errorEnglish[error])}</div>
       )}
 
       {/* Player limit info for FREE plan */}
       {features.maxPlayers !== Infinity && (
         <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
           <p className="text-yellow-300 text-sm">
-            Plan Gratis: Máximo {features.maxPlayers} jugadores por partida
+            {t(`Plan Gratis: Máximo ${features.maxPlayers} jugadores por partida`, `Free plan: Maximum ${features.maxPlayers} players per game`)}
           </p>
         </div>
       )}
@@ -481,23 +491,23 @@ export default function GameGate({ onGameCreated }: GameGateProps){
             onClick={handleCreate}
             disabled={loading || !gameId.trim() || !canCreateGame || selectedGame.underDevelopment}
             className="flex-1 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium relative"
-            title={selectedGame.underDevelopment ? 'Juego en desarrollo' : !canCreateGame ? 'Disponible en el plan Event' : undefined}
+            title={selectedGame.underDevelopment ? t('Juego en desarrollo', 'Game under development') : !canCreateGame ? t('Disponible en el plan Event', 'Available with the Event plan') : undefined}
           >
-            {loading ? 'Creando...' : 'Crear'}
+            {loading ? t('Creando...', 'Creating...') : t('Crear', 'Create')}
           </button>
           <button
             onClick={handleJoin}
             disabled={joining || !gameId.trim()}
             className="flex-1 p-4 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
-            {joining ? 'Buscando...' : 'Unirse'}
+            {joining ? t('Buscando...', 'Searching...') : t('Unirse', 'Join')}
           </button>
         </div>
         {selectedGame.underDevelopment && (
-          <p className="text-xs text-amber-400 text-center">En desarrollo (solo unirse)</p>
+          <p className="text-xs text-amber-400 text-center">{t('En desarrollo (solo unirse)', 'Under development (join only)')}</p>
         )}
         {!canCreateGame && !selectedGame.underDevelopment && (
-          <p className="text-xs text-yellow-400 text-center">Disponible en el plan Event</p>
+          <p className="text-xs text-yellow-400 text-center">{t('Disponible en el plan Event', 'Available with the Event plan')}</p>
         )}
       </div>
     </div>

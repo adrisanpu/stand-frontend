@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 
 export type Rulet4PanelConfig = {
   id: string
@@ -20,6 +21,7 @@ const DEFAULT_PANELS: Rulet4PanelConfig[] = [
 ]
 
 export default function Rulet4GameConfig({ settings, onChange, registerSave }: GameConfigProps) {
+  const { t } = useOperatorLanguage()
   const [panels, setPanels] = useState<Rulet4PanelConfig[]>(
     (settings as Rulet4Settings | null)?.panels || DEFAULT_PANELS
   )
@@ -69,12 +71,12 @@ export default function Rulet4GameConfig({ settings, onChange, registerSave }: G
             className="p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-3"
           >
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-300">Panel {index + 1}</span>
+              <span className="text-sm font-medium text-gray-300">{t(`Panel ${index + 1}`, `Panel ${index + 1}`)}</span>
               {panels.length > 1 && (
                 <button
                   onClick={() => handleDeletePanel(panel.id)}
                   className="p-1.5 rounded-lg bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
-                  aria-label="Eliminar panel"
+                  aria-label={t('Eliminar panel', 'Delete panel')}
                 >
                   <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -85,18 +87,18 @@ export default function Rulet4GameConfig({ settings, onChange, registerSave }: G
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Etiqueta</label>
+                <label className="block text-xs text-gray-400 mb-1">{t('Etiqueta', 'Label')}</label>
                 <input
                   type="text"
                   value={panel.label}
                   onChange={(e) => handlePanelChange(panel.id, 'label', e.target.value)}
                   className="w-full h-9 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm focus:border-white/20 focus:outline-none"
-                  placeholder="Nombre del premio"
+                  placeholder={t('Nombre del premio', 'Prize name')}
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Cantidad</label>
+                <label className="block text-xs text-gray-400 mb-1">{t('Cantidad', 'Quantity')}</label>
                 <input
                   type="number"
                   min="1"
@@ -108,7 +110,7 @@ export default function Rulet4GameConfig({ settings, onChange, registerSave }: G
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Color (opcional)</label>
+              <label className="block text-xs text-gray-400 mb-1">{t('Color (opcional)', 'Color (optional)')}</label>
               <div className="flex gap-2 items-center">
                 <input
                   type="color"
@@ -136,7 +138,7 @@ export default function Rulet4GameConfig({ settings, onChange, registerSave }: G
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
-        Añadir tipo de panel
+        {t('Añadir tipo de panel', 'Add panel type')}
       </button>
 
       {!embedded && (
@@ -144,10 +146,9 @@ export default function Rulet4GameConfig({ settings, onChange, registerSave }: G
           onClick={handleSave}
           className="w-full p-3 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors font-medium"
         >
-          Guardar configuración
+          {t('Guardar configuración', 'Save configuration')}
         </button>
       )}
     </div>
   )
 }
-

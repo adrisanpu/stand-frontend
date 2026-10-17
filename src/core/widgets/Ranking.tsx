@@ -3,6 +3,9 @@ import { api } from '../../api/api'
 import { normalizeGameType } from '../gameTypeMap'
 import { usePolling } from '../../hooks/usePolling'
 import ProfileAvatar from './ProfileAvatar'
+import { useOperatorLanguage } from '../shell/operatorLanguage'
+import type { GamePrize } from '../prizes'
+import { PrizeImage } from './PrizePresentation'
 
 export interface RankingEntry {
   rank?: number
@@ -27,13 +30,14 @@ interface RankingProps {
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and show fewer items
   prizeLabel?: string // e.g. "🎁 Merchandising" — shown below title when set
+  prize?: GamePrize
   topX?: number // e.g. 3 — "Premio top 3: {prizeLabel}"
   maxPrizeRanking?: number // límite mostrado como current/max junto al premio
   gameType?: string // when "T1MER", show only position + username (truncated), no timer/score
 }
 
-function truncateUsername(username: string | undefined, maxLen: number): string {
-  const raw = username || 'Anónimo'
+function truncateUsername(username: string | undefined, maxLen: number, anonymous: string): string {
+  const raw = username || anonymous
   if (raw.length <= maxLen) return raw
   return raw.slice(0, maxLen) + '...'
 }
@@ -46,11 +50,16 @@ export default function Ranking({
   gameId,
   refreshInterval = 10000,
   compact = false,
-  prizeLabel,
-  topX,
-  maxPrizeRanking,
+  prizeLabel: legacyPrizeLabel,
+  prize,
+  topX: legacyTopX,
+  maxPrizeRanking: legacyMax,
   gameType,
 }: RankingProps) {
+  const { t } = useOperatorLanguage()
+  const prizeLabel = prize ? prize.name : legacyPrizeLabel
+  const topX = prize ? prize.topX : legacyTopX
+  const maxPrizeRanking = prize ? prize.limit ?? undefined : legacyMax
   const isT1mer = normalizeGameType(gameType) === 'T1MER'
   const isStack = normalizeGameType(gameType) === 'STACK'
   const [ranking, setRanking] = useState<RankingEntry[] | null>(null)
@@ -76,8 +85,8 @@ export default function Ranking({
       <div
         className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 h-full ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden flex-1' : 'p-3 sm:p-4 lg:p-6 flex-1'}`}
       >
-        <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>Ranking</h2>
-        <p className="text-textSub text-xs sm:text-sm">Cargando...</p>
+        <h2 className={`font-bold text-textMain mb-1 sm:mb-2 ${compact ? 'text-sm' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>{t('Ranking', 'Leaderboard')}</h2>
+        <p className="text-textSub text-xs sm:text-sm">{t('Cargando...', 'Loading...')}</p>
       </div>
     )
   }
@@ -90,15 +99,16 @@ export default function Ranking({
       className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 h-full ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden flex-1' : 'p-3 sm:p-4 lg:p-6 flex-1 overflow-hidden'}`}
     >
       <h2 className={`font-bold text-textMain flex items-center gap-2 flex-shrink-0 ${compact ? 'text-sm mb-1' : 'text-lg sm:text-xl mb-2 sm:mb-4'}`}>
-        Ranking
-        {isStale && <span className="text-[10px] font-normal text-yellow-500">● sin señal</span>}
+        {t('Ranking', 'Leaderboard')}
+        {isStale && <span className="text-[10px] font-normal text-yellow-500">● {t('sin señal', 'offline')}</span>}
       </h2>
-      {prizeLabel && (
+      {(prizeLabel || prize?.imageUrl) && (
         <div
-          className={`text-textSub flex-shrink-0 mb-1 flex items-baseline justify-between gap-2 min-w-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}
+          className={`text-textSub flex-shrink-0 mb-1 flex items-center justify-between gap-2 min-w-0 ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}
         >
+          <PrizeImage prize={prize} compact />
           <span className="min-w-0 truncate">
-            {topX != null ? `Premio top ${topX}: ${prizeLabel}` : `Premio: ${prizeLabel}`}
+            {topX != null ? `${t('Premio top', 'Top prize')} ${topX}: ${prizeLabel}` : `${t('Premio', 'Prize')}: ${prizeLabel}`}
           </span>
           {showPrizeFraction && (
             <span className="flex-shrink-0 text-[10px] sm:text-xs tabular-nums">
@@ -111,7 +121,7 @@ export default function Ranking({
         className={`min-h-0 overflow-y-auto flex-1 ${compact ? 'space-y-0.5 min-w-0' : 'space-y-1 sm:space-y-2'}`}
       >
         {displayList.length === 0 ? (
-          <p className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>No hay puntuaciones aún</p>
+          <p className={`text-textSub ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}>{t('No hay puntuaciones aún', 'No scores yet')}</p>
         ) : (
           displayList.map((entry, index) => {
             const rank = entry.rank || index + 1
@@ -133,9 +143,9 @@ export default function Ranking({
                   </span>
                   <ProfileAvatar profilePicUrl={entry.profilePicUrl} username={entry.username} size={compact ? 'sm' : 'md'} />
                   <span className={`text-textMain font-medium min-w-0 flex items-baseline gap-1.5 overflow-hidden ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`} title={entry.username || undefined}>
-                    <span className="truncate">{isT1mer ? truncateUsername(entry.username, T1MER_USERNAME_MAX_LEN) : (entry.username || 'Anónimo')}</span>
+                    <span className="truncate">{isT1mer ? truncateUsername(entry.username, T1MER_USERNAME_MAX_LEN, t('Anónimo', 'Anonymous')) : (entry.username || t('Anónimo', 'Anonymous'))}</span>
                     {isPrizeRow && (
-                      <span className="flex-shrink-0 text-[10px] sm:text-xs text-primary" aria-label="Premio">
+                      <span className="flex-shrink-0 text-[10px] sm:text-xs text-primary" aria-label={t('Premio', 'Prize')}>
                         🎁
                       </span>
                     )}
@@ -144,7 +154,7 @@ export default function Ranking({
                 <div className="text-right flex-shrink-0 ml-2">
                   <div className="text-textMain font-semibold text-[14px]">
                     {isStack && typeof entry.score === 'number'
-                      ? `${entry.score} bloques`
+                      ? `${entry.score} ${t('bloques', 'blocks')}`
                       : entry.timer !== undefined && typeof entry.timer === 'number'
                       ? `${entry.timer.toFixed(3)}s`
                       : 'N/A'}
@@ -161,7 +171,7 @@ export default function Ranking({
         )}
         {ranking.length > displayList.length && (
           <p className={`text-textSub ${compact ? 'text-[10px]' : 'text-xs'} pt-0.5`}>
-            +{ranking.length - displayList.length} más
+            +{ranking.length - displayList.length} {t('más', 'more')}
           </p>
         )}
       </div>

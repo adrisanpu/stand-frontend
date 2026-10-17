@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { publicApi } from './publicApi'
+import { PublicApiError, publicApi } from './publicApi'
 import { DEFAULT_STACK_CONFIG } from '../games/stack/stackLogic'
 
 describe('publicApi STACK start contract', () => {
@@ -13,6 +13,7 @@ describe('publicApi STACK start contract', () => {
     const request = vi.fn().mockResolvedValue({
       ok: true, json: async () => result,
     })
+
     vi.stubGlobal('fetch', request)
     expect(await publicApi.startStackAttempt({
       gameId: 'GAME1234', playerToken: 'token', attemptId: 'request-1',
@@ -47,5 +48,51 @@ describe('publicApi STACK start contract', () => {
     expect(request).toHaveBeenCalledWith(expect.stringContaining('/v1/public/score'), expect.objectContaining({
       method: 'POST', body: JSON.stringify({ ...body, action: 'finish' }),
     }))
+  })
+})
+
+describe('public email verification contract', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('requests a challenge and preserves server timestamps', async () => {
+    const challenge = {
+      ok: true, challengeId: 'challenge', emailMasked: 'p***@example.com',
+      expiresAt: '2026-10-17T12:10:00Z', resendAvailableAt: '2026-10-17T12:01:00Z',
+    }
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify(challenge)))
+    vi.stubGlobal('fetch', request)
+    const registration = { gameId: 'GAME', email: 'player@example.com', consent: true, language: 'en' as const }
+    expect(await publicApi.requestEmailCode(registration)).toEqual(challenge)
+    expect(request).toHaveBeenCalledWith(expect.stringMatching(/\/v1\/public\/email\/request$/), expect.objectContaining({
+      method: 'POST', body: JSON.stringify(registration),
+    }))
+  })
+
+  it('sends only the challenge and string code for final verified join', async () => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, playerToken: 'token' })))
+    vi.stubGlobal('fetch', request)
+    await publicApi.join({ gameId: 'GAME', challengeId: 'challenge', code: '001234' })
+    expect(request).toHaveBeenCalledWith(expect.stringMatching(/\/v1\/public\/join$/), expect.objectContaining({
+      method: 'POST', body: '{"gameId":"GAME","challengeId":"challenge","code":"001234"}',
+    }))
+  })
+
+  it.each([true, false])('retains error codes and Retry-After seconds (header: %s)', async (header) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ error: 'EmailRateLimited', message: 'Wait', retryAfter: 75 }),
+      { status: 429, headers: header ? { 'Retry-After': '90' } : {} },
+    )))
+    const error = await publicApi.requestEmailCode({ gameId: 'GAME', consent: true }).catch((err: unknown) => err)
+    expect(error).toBeInstanceOf(PublicApiError)
+    expect(error).toMatchObject({ code: 'EmailRateLimited', status: 429, retryAfter: header ? 90 : 75 })
+  })
+
+  it('reads an explicit code field and ignores invalid retry delays', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ code: 'VerificationExpired', message: 'Expired' }),
+      { status: 400, headers: { 'Retry-After': 'invalid' } },
+    )))
+    await expect(publicApi.join({ gameId: 'GAME', challengeId: 'challenge', code: '000000' }))
+      .rejects.toMatchObject({ code: 'VerificationExpired', retryAfter: undefined })
   })
 })
