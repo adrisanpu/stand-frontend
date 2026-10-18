@@ -55,8 +55,8 @@ export default function MobileGameHome({
       >
         <h2 lang={language} className="shrink-0 text-center text-4xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-wide text-white">
           {language === 'es'
-            ? <><span className="text-red-500">NO</span> ESCANEAR, POR FAVOR.</>
-            : <>DO <span className="text-red-500">NOT</span> SCAN THIS.</>}
+            ? <><span className="text-red-500">ESCANEA</span> PARA JUGAR.</>
+            : <><span className="text-red-500">SCAN</span> TO PLAY.</>}
         </h2>
         <QRCode
           data={getJoinUrl(gameId, joinChannel)}

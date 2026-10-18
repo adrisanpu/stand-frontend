@@ -9,7 +9,6 @@ type GameLandscapeInfoColumnProps = {
   gameId: string
   logoElement: ReactNode
   children: ReactNode
-  avatarElement?: ReactNode
   joinChannel?: string | null
 }
 
@@ -20,7 +19,7 @@ export function LandscapeInfoInstruction({ children }: { children: ReactNode }) 
   )
 }
 
-export default function GameLandscapeInfoColumn({ gameId, logoElement, children, avatarElement, joinChannel }: GameLandscapeInfoColumnProps) {
+export default function GameLandscapeInfoColumn({ gameId, logoElement, children, joinChannel }: GameLandscapeInfoColumnProps) {
   const { t } = useOperatorLanguage()
   return (
     <div className="card flex flex-col gap-2 p-4 sm:p-5 overflow-hidden min-h-0 h-full">
@@ -28,11 +27,6 @@ export default function GameLandscapeInfoColumn({ gameId, logoElement, children,
         {logoElement}
       </div>
       <div className="flex-1 min-h-0 relative flex flex-col justify-center items-center w-full min-w-0">
-        {avatarElement ? (
-          <div className="absolute inset-0 card rounded-xl sm:rounded-2xl shadow-neon overflow-hidden">
-            <div className="absolute inset-0">{avatarElement}</div>
-          </div>
-        ) : null}
         <div className="relative z-10 flex flex-col items-center justify-center gap-1.5 w-full min-w-0 px-0.5">
           <QRCode
             data={getJoinUrl(gameId, joinChannel)}

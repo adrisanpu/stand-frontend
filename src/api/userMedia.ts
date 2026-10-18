@@ -1,8 +1,7 @@
 import { api } from './api'
 import type { ParticipantAppearance } from '../core/theme/appearance'
 
-export type AvatarState = 'idle' | 'win' | 'lose'
-export type MediaKind = 'logo' | 'avatar'
+export type MediaKind = 'logo'
 
 export type UserMediaItem = {
   id: string
@@ -13,7 +12,6 @@ export type UserMediaItem = {
   sizeBytes: number
   key: string
   createdAt?: string | null
-  state?: AvatarState
   url?: string | null
 }
 
@@ -27,11 +25,6 @@ export type UserMediaResponse = {
     /** Presigned URLs for platform defaults (oscuro → dark, claro → light). */
     defaults?: Partial<Record<'dark' | 'light', UserMediaItem | null>>
   }
-  avatar: {
-    items: UserMediaItem[]
-    selectedByState: Record<AvatarState, string | null>
-    selected: Record<AvatarState, UserMediaItem | null>
-  }
 }
 
 type UploadRequest = {
@@ -39,14 +32,12 @@ type UploadRequest = {
   fileName: string
   contentType: string
   sizeBytes: number
-  state?: AvatarState
   name?: string
 }
 
 type UploadUrlEntry = {
   id: string
   kind: MediaKind
-  state?: AvatarState
   key: string
   url: string
   expiresIn: number
@@ -102,10 +93,6 @@ export async function saveAppearance(appearance: ParticipantAppearance): Promise
   await api.put('/v1/user/media', { kind: 'appearance', appearance })
 }
 
-export async function selectAvatar(mediaId: string, state: AvatarState): Promise<void> {
-  await api.put('/v1/user/media', { kind: 'avatar', mediaId, state })
-}
-
 export async function deleteUserMedia(kind: MediaKind, mediaId: string): Promise<void> {
   await api.delete('/v1/user/media', { kind, mediaId })
 }
@@ -124,21 +111,4 @@ export async function uploadLogo(file: File, name?: string): Promise<void> {
   await uploadBinaryToPresignedUrl(entry.url, file)
   await api.post('/v1/user/media', { items: [entry.meta] })
   await selectLogo(entry.id)
-}
-
-export async function uploadAvatar(file: File, state: AvatarState, name?: string): Promise<void> {
-  const [entry] = await getUploadUrls([
-    {
-      kind: 'avatar',
-      fileName: file.name,
-      contentType: file.type,
-      sizeBytes: file.size,
-      state,
-      name,
-    },
-  ])
-  if (!entry) throw new Error('No upload URL received for avatar')
-  await uploadBinaryToPresignedUrl(entry.url, file)
-  await api.post('/v1/user/media', { items: [entry.meta] })
-  await selectAvatar(entry.id, state)
 }

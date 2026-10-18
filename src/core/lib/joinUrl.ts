@@ -1,5 +1,3 @@
-import { getInstagramDmUrl } from './instagram'
-
 /** Participant join URL for web-first campaigns. */
 export function getWebPlayUrl(gameId: string): string {
   const base = typeof window !== 'undefined' ? window.location.origin : 'https://playstand.app'
@@ -11,10 +9,7 @@ export function getRedeemUrl(gameId: string): string {
   return `${base}/redeem/${encodeURIComponent(gameId.trim())}`
 }
 
-/** QR target: web play or Instagram DM depending on campaign join channel. */
-export function getJoinUrl(gameId: string, joinChannel?: string | null): string {
-  if ((joinChannel || 'web').toLowerCase() === 'instagram') {
-    return getInstagramDmUrl(gameId)
-  }
+/** QR target for all supported participant access. */
+export function getJoinUrl(gameId: string, _joinChannel?: string | null): string {
   return getWebPlayUrl(gameId)
 }

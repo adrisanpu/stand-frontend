@@ -1,8 +1,5 @@
-import { useState } from 'react'
 import { loadAssignment } from './playerSession'
 import type { PublicGameResponse } from '../../api/publicApi'
-import { resolveGameAccess } from '../settings/gameAccess'
-import { normalizeGameType } from '../gameTypeMap'
 import { useParticipantLanguage } from './participantLanguage'
 import ParticipantPrizePromo from './ParticipantPrizePromo'
 import ProfileAvatar from '../widgets/ProfileAvatar'
@@ -18,8 +15,6 @@ type Props = {
 export default function AssignmentView({ gameId, gameMeta, onValidate, showPrizePromo = true }: Props) {
   const { t } = useParticipantLanguage()
   const assignment = loadAssignment(gameId)
-  const [showCode, setShowCode] = useState(false)
-  const isMobile = resolveGameAccess(normalizeGameType(gameMeta.gameType), gameMeta).playMode === 'mobile'
   if (!assignment || !('characterName' in assignment)) {
     return <p className="text-center text-textSub">{t('Sesión no encontrada. Vuelve a registrarte.')}</p>
   }
@@ -61,26 +56,19 @@ export default function AssignmentView({ gameId, gameMeta, onValidate, showPrize
         )}
       </div>
 
-      {!isMobile && showCode && <div className="rounded-xl border border-[rgba(var(--color-primary-rgb),0.35)] bg-[rgba(var(--color-primary-rgb),0.1)] p-4" role="status">
-        <p className="text-sm text-textSub">{t('Tu código')}</p>
-        <p className="text-4xl font-mono font-bold tracking-widest">{assignment.validationCode}</p>
-      </div>}
-
       <p className="text-sm text-textSub">
-        {t(isMobile
-          ? 'Cuando os encontréis, validad los dos códigos desde el móvil y recoged vuestro premio.'
-          : 'Cuando os encontréis, llevad vuestros códigos a la pantalla máster del evento para validar la pareja.')}
+        {t('Cuando os encontréis, validad los dos códigos desde el móvil y recoged vuestro premio.')}
       </p>
 
       {showPrizePromo && <ParticipantPrizePromo catalog={gameMeta.prizeCatalog} slots={['validation']} />}
 
-      {(isMobile || !showCode) && <button
+      <button
         type="button"
-        onClick={isMobile ? onValidate : () => setShowCode(true)}
+        onClick={onValidate}
         className="w-full rounded-xl py-3 font-semibold text-accent bg-[rgba(var(--color-accent-rgb),0.2)] border border-[rgba(var(--color-accent-rgb),0.35)]"
       >
         {t('Validar pareja')}
-      </button>}
+      </button>
 
     </div>
   )

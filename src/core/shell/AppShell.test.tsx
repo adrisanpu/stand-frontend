@@ -16,8 +16,6 @@ vi.mock('../../auth/useCurrentUser', () => ({
 vi.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ logout: vi.fn() }) }))
 vi.mock('../theme', () => ({
   ThemeProvider: ({ children }: { children: ReactNode }) => children,
-  useAvatarsEnabled: () => false,
-  getAvatarsEnabled: () => false,
   useStandLogo: () => '/stand.png',
 }))
 vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn() } }))
@@ -50,7 +48,7 @@ function media(selected = false): UserMediaResponse {
       items: selected ? [logo] : [], selectedId: selected ? logo.id : null, selected: selected ? logo : null,
       defaults: { dark: { ...logo, id: 'platform', url: '/platform.png' } },
     },
-    avatar: { items: [], selectedByState: { idle: null, win: null, lose: null }, selected: { idle: null, win: null, lose: null } },
+
   }
 }
 
@@ -101,8 +99,7 @@ describe('game home identity and configuration', () => {
     }))
     vi.mocked(api.get).mockResolvedValue({ ok: true, game: { gameType: 'T1MER', playMode: 'master', joinChannel: 'web' } })
     render(<AppShell />)
-    const game = await screen.findByTestId('game-screen')
-    expect(game).not.toHaveAttribute('data-prizes')
+    await screen.findByLabelText('QR de acceso al juego')
     const players = JSON.parse(screen.getByTestId('players').getAttribute('data-props')!)
     expect(players.prize).toBeUndefined()
     expect(players.prizeLabel).toBe('Entrada local')
@@ -128,8 +125,7 @@ describe('game home identity and configuration', () => {
     }
     vi.mocked(api.get).mockResolvedValue({ ok: true, game: { gameType: 'T1MER', playMode: 'master', joinChannel: 'web' }, prizeCatalog })
     render(<AppShell />)
-    const game = await screen.findByTestId('game-screen')
-    expect(JSON.parse(game.getAttribute('data-prizes')!)).toEqual(prizeCatalog)
+    await screen.findByLabelText('QR de acceso al juego')
     for (const [widget, slot] of [['players', 'validation'], ['ranking', 'ranking'], ['raffle', 'raffle']] as const) {
       const props = JSON.parse(screen.getByTestId(widget).getAttribute('data-props')!)
       expect(props.prize).toEqual(prizeCatalog[slot])
@@ -137,7 +133,7 @@ describe('game home identity and configuration', () => {
     }
   })
 
-  it('refreshes signed URLs and authoritative removal without remounting gameplay or using cached URLs', async () => {
+  it('refreshes signed URLs and authoritative removal without remounting the mobile home', async () => {
     vi.useFakeTimers()
     localStorage.setItem('gameType', 'T1MER')
     localStorage.setItem('T1MER_settings_ABC123', JSON.stringify({
@@ -154,17 +150,17 @@ describe('game home identity and configuration', () => {
     }
     vi.mocked(api.get).mockResolvedValue({ ok: true, game, prizeCatalog: initialCatalog })
     await act(async () => { render(<AppShell />) })
-    const gameplay = screen.getByTestId('game-screen')
+    const home = screen.getByLabelText('QR de acceso al juego')
     expect(screen.getByTestId('players').getAttribute('data-props')).toContain('/first.png')
     vi.mocked(api.get).mockResolvedValue({ ok: true, game, prizeCatalog: {
       ...initialCatalog, validation: { ...initialCatalog.validation, imageUrl: '/fresh.png' },
     } })
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
-    expect(screen.getByTestId('game-screen')).toBe(gameplay)
+    expect(screen.getByLabelText('QR de acceso al juego')).toBe(home)
     expect(screen.getByTestId('players').getAttribute('data-props')).toContain('/fresh.png')
     vi.mocked(api.get).mockResolvedValue({ ok: true, game, prizeCatalog: {} })
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
-    expect(screen.getByTestId('game-screen')).toBe(gameplay)
+    expect(screen.getByLabelText('QR de acceso al juego')).toBe(home)
     for (const [widget, limitProp] of [
       ['players', 'maxPrizeValidationLimit'], ['ranking', 'maxPrizeRanking'], ['raffle', 'maxPrizeRaffle'],
     ]) {
@@ -174,7 +170,6 @@ describe('game home identity and configuration', () => {
       expect(props[limitProp]).toBeUndefined()
       expect(props.topX).toBeUndefined()
     }
-    expect(screen.getByTestId('game-screen')).toHaveAttribute('data-prizes', '{}')
     expect(vi.mocked(api.get)).toHaveBeenCalledTimes(3)
   })
 
@@ -185,7 +180,7 @@ describe('game home identity and configuration', () => {
     expect(logo).toHaveAttribute('src', '/images/semaforo-logo.png')
     expect(document.querySelector('img[src="/platform.png"]')).toBeNull()
     expect(screen.getByRole('img', { name: 'Stand' })).toHaveAttribute('src', '/images/logo-stand-footer.png')
-    await waitFor(() => expect(observeLayout).toHaveBeenCalled())
+    expect(screen.getByLabelText('QR de acceso al juego')).toBeInTheDocument()
   })
 
   it.each([true, false])('keeps the selected client logo (portrait=%s)', async (portrait) => {
@@ -197,23 +192,24 @@ describe('game home identity and configuration', () => {
 
   it('opens configuration even without a game-specific config component', async () => {
     render(<AppShell />)
-    await screen.findByTestId('game-screen')
+    await screen.findByLabelText('QR de acceso al juego')
     fireEvent.click(screen.getByRole('button', { name: 'Configuración' }))
     fireEvent.click(screen.getByRole('button', { name: 'Configurar juego' }))
     expect(screen.getByRole('dialog', { name: 'Configurar juego' })).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByRole('button', { name: '1 pantalla' })).toBeEnabled())
-    expect(screen.getByRole('button', { name: '∞ móviles' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Web' })).toBeDisabled()
+    await waitFor(() => expect(screen.getByText('∞ móviles')).toBeInTheDocument())
+    expect(screen.getByText('Web')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '1 pantalla' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Instagram' })).not.toBeInTheDocument()
   })
 
-  it('passes independent mode and channel through the landscape home', async () => {
+  it('normalizes legacy access to the mobile event home and Web QR', async () => {
     state.portrait = false
     localStorage.setItem('gameType', 'T1MER')
     vi.mocked(api.get).mockResolvedValue({ ok: true, game: { gameType: 'T1MER', playMode: 'master', joinChannel: 'web' } })
     render(<AppShell />)
-    const game = await screen.findByTestId('game-screen')
-    expect(game).toHaveAttribute('data-mode', 'master')
-    expect(game).toHaveAttribute('data-channel', 'web')
+    await screen.findByLabelText('QR de acceso al juego')
+    expect(screen.getByTestId('qr')).toHaveAttribute('data-url', getJoinUrl('ABC123', 'web'))
+    expect(screen.queryByTestId('game-screen')).not.toBeInTheDocument()
   })
 
   it('does not launch a default gameplay mode when access cannot be loaded', async () => {
@@ -222,10 +218,10 @@ describe('game home identity and configuration', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión')
     expect(screen.queryByTestId('game-screen')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar carga' }))
-    expect(await screen.findByTestId('game-screen')).toHaveAttribute('data-mode', 'master')
+    expect(await screen.findByLabelText('QR de acceso al juego')).toBeInTheDocument()
   })
 
-  it.each(['EMPAREJA2', 'T1MER', 'STACK'].flatMap(gameType =>
+  it.each(['EMPAREJA2', 'T1MER', 'STACK', 'L3TRAS', 'RULET4', 'CUPIDO', 'SEMAFORO', 'INFOCARDS', 'IMPOSTOR'].flatMap(gameType =>
     (['web', 'instagram'] as const).flatMap(joinChannel =>
       [true, false].map(portrait => ({ gameType, joinChannel, portrait }))
     )
@@ -245,15 +241,15 @@ describe('game home identity and configuration', () => {
     expect(screen.getByTestId('raffle')).toHaveAttribute('data-compact', String(!portrait))
     const center = screen.getByLabelText('QR de acceso al juego')
     expect(center).toHaveClass('justify-evenly', 'p-4', 'gap-4', 'sm:p-6', 'sm:gap-6')
-    const headline = screen.getByRole('heading', { name: 'NO ESCANEAR, POR FAVOR.' })
+    const headline = screen.getByRole('heading', { name: 'ESCANEA PARA JUGAR.' })
     expect(headline).toHaveAttribute('lang', 'es')
     expect(headline).toHaveClass('text-white', 'text-4xl', 'sm:text-5xl', 'lg:text-6xl')
-    expect(screen.getByText('NO')).toHaveClass('text-red-500')
+    expect(screen.getByText('ESCANEA')).toHaveClass('text-red-500')
     expect(center.firstElementChild).toBe(headline)
     expect(headline.nextElementSibling).toBe(screen.getByTestId('qr'))
     expect(center).toHaveClass('flex-col', 'items-center')
     expect(center).toContainElement(screen.getByTestId('qr'))
-    expect(screen.getByTestId('qr')).toHaveAttribute('data-url', getJoinUrl('ABC123', joinChannel))
+    expect(screen.getByTestId('qr')).toHaveAttribute('data-url', getJoinUrl('ABC123', 'web'))
     expect(screen.queryByTestId('game-screen')).not.toBeInTheDocument()
     expect(screen.queryByText('Participación desde el móvil')).not.toBeInTheDocument()
     expect(screen.queryByText(/Juega STACK desde el móvil/)).not.toBeInTheDocument()
@@ -261,10 +257,12 @@ describe('game home identity and configuration', () => {
     expect(screen.queryByRole('button', { name: 'Copiar enlace participante' })).not.toBeInTheDocument()
     if (gameType === 'EMPAREJA2') {
       expect(screen.queryByLabelText('Ranking del evento')).not.toBeInTheDocument()
-    } else {
+    } else if (gameType === 'T1MER' || gameType === 'STACK') {
       const right = screen.getByLabelText('Ranking del evento')
       expect(right).toContainElement(screen.getByTestId('ranking'))
       expect(right).not.toContainElement(screen.getByTestId('raffle'))
+    } else {
+      expect(screen.queryByLabelText('Ranking del evento')).not.toBeInTheDocument()
     }
   })
 

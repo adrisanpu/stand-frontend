@@ -18,8 +18,6 @@ vi.mock('../../api/userMedia', async (original) => ({
 }))
 vi.mock('../theme', () => ({
   ThemeProvider: ({ children }: { children: ReactNode }) => children,
-  useAvatarsEnabled: () => false,
-  getAvatarsEnabled: () => false,
   useStandLogo: () => '/stand.png',
 }))
 vi.mock('../../games', () => ({
@@ -47,7 +45,6 @@ beforeEach(() => {
   vi.mocked(fetchUserMedia).mockResolvedValue({
     ok: true,
     logo: { items: [], selectedId: null, selected: null, defaults: {} },
-    avatar: { items: [], selectedByState: { idle: null, win: null, lose: null }, selected: { idle: null, win: null, lose: null } },
   })
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
 })
@@ -56,8 +53,8 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 it('places ES/EN beside close and translates the home without refetching or changing event data', async () => {
   render(<AppShell />)
   await screen.findByText('12')
-  expect(screen.getByRole('heading', { name: 'NO ESCANEAR, POR FAVOR.' })).toHaveAttribute('lang', 'es')
-  expect(screen.getByText('NO')).toHaveClass('text-red-500')
+  expect(screen.getByRole('heading', { name: 'ESCANEA PARA JUGAR.' })).toHaveAttribute('lang', 'es')
+  expect(screen.getByText('ESCANEA')).toHaveClass('text-red-500')
   expect(screen.getByText('Jugadores')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Configuración' }))
   const selector = screen.getByRole('combobox', { name: 'Idioma' })
@@ -66,8 +63,8 @@ it('places ES/EN beside close and translates the home without refetching or chan
   const requests = vi.mocked(api.get).mock.calls.length
   fireEvent.change(selector, { target: { value: 'en' } })
   expect(screen.getByText('Players')).toBeInTheDocument()
-  expect(screen.getByRole('heading', { name: 'DO NOT SCAN THIS.' })).toHaveAttribute('lang', 'en')
-  expect(screen.getByText('NOT')).toHaveClass('text-red-500')
+  expect(screen.getByRole('heading', { name: 'SCAN TO PLAY.' })).toHaveAttribute('lang', 'en')
+  expect(screen.getByText('SCAN')).toHaveClass('text-red-500')
   expect(screen.getByText('12')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Settings' }).closest('[lang]')).toHaveAttribute('lang', 'en')
   expect(api.get).toHaveBeenCalledTimes(requests)
@@ -78,20 +75,22 @@ it('places ES/EN beside close and translates the home without refetching or chan
   expect(screen.getByRole('combobox', { name: 'Language' })).toHaveValue('en')
   fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), { target: { value: 'es' } })
   expect(screen.getByText('Jugadores')).toBeInTheDocument()
-  expect(screen.getByRole('heading', { name: 'NO ESCANEAR, POR FAVOR.' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'ESCANEA PARA JUGAR.' })).toBeInTheDocument()
 })
 
-it('keeps active game component state when switching language', async () => {
+it('normalizes legacy master access and preserves the mobile Web home while switching language', async () => {
   vi.mocked(api.get).mockResolvedValue({
     ok: true, playerCount: 12,
     game: { gameType: 'EMPAREJA2', playMode: 'master', joinChannel: 'web' },
   })
   render(<AppShell />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Intentos: 0' }))
+  await screen.findByLabelText('QR de acceso al juego')
+  const qr = screen.getByRole('img', { name: 'Escanea para unirte al juego' })
+  expect(qr.getAttribute('src')).toContain(encodeURIComponent(`${window.location.origin}/play/ABC123`))
   fireEvent.click(screen.getByRole('button', { name: 'Configuración' }))
   fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
-  expect(screen.getByRole('button', { name: 'Attempts: 1' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'SCAN TO PLAY.' })).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Scan to join the game' })).toBe(qr)
   fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Attempts: 1' }))
-  expect(screen.getByRole('button', { name: 'Attempts: 2' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'SCAN TO PLAY.' })).toBeInTheDocument()
 })

@@ -52,7 +52,7 @@ type ValidationResponse = {
   }
   players: Array<{
     playerId: number
-    instagramUsername: string
+    username?: string
     type?: SemaforoPlayerType
     characterId?: number
     characterName?: string
@@ -89,7 +89,7 @@ function buildCrossQuizRounds(res: ValidationResponse): CrossQuizRound[] {
   return shuffleArray(rounds)
 }
 
-export default function SemaforoGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function SemaforoGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement }: GameScreenProps) {
   const { t } = useOperatorLanguage()
   const [stats] = useState<SemaforoStats>({ redCount: 0, yellowCount: 0, greenCount: 0 })
   const [statsLoading] = useState(false)
@@ -265,23 +265,6 @@ export default function SemaforoGameScreen({ gameId, orientation, logoElement, p
   const greenCount = stats.greenCount ?? 0
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
-  const avatarState =
-    gameState === 'cross_quiz'
-      ? 'playing'
-      : gameState === 'cross_quiz_result'
-        ? 'result'
-        : gameState === 'cross_quiz_win' || gameState === 'cross_quiz_lose'
-          ? 'finished'
-          : gameState === 'valid'
-            ? 'ready'
-            : gameState === 'invalid'
-              ? 'lose'
-              : gameState
-
-  useEffect(() => {
-    onAvatarStateChange?.(avatarState)
-  }, [avatarState, onAvatarStateChange])
-
   const showJoinBlock = !([
     'valid',
     'cross_quiz',
@@ -351,14 +334,14 @@ export default function SemaforoGameScreen({ gameId, orientation, logoElement, p
         <div className="animate-fade-in">
           <div className="grid grid-cols-3 gap-4 items-center">
             <div className="flex flex-col items-center space-y-3 animate-scale-in">
-              {(() => { const player = validationResult.players[0]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(34,197,94,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || t('Jugador 1', 'Player 1')} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">{t('Jugador 1', 'Player 1')}</div>}</div>{player.instagramUsername && <p className="text-base font-semibold text-green-500">{player.instagramUsername}</p>}</>); })()}
+              {(() => { const player = validationResult.players[0]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(34,197,94,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || t('Jugador 1', 'Player 1')} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">{t('Jugador 1', 'Player 1')}</div>}</div>{player.username && <p className="text-base font-semibold text-green-500">{player.username}</p>}</>); })()}
             </div>
             <div className="flex flex-col items-center justify-center space-y-2 text-center">
               <span className="text-xl font-semibold text-green-400">{t('¡Pareja válida!', 'Valid match!')}</span>
               {validationResult.message && <p className="text-sm text-green-300">{validationResult.message}</p>}
             </div>
             <div className="flex flex-col items-center space-y-3 animate-scale-in" style={{ animationDelay: '0.2s' }}>
-              {(() => { const player = validationResult.players[1]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(34,197,94,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || t('Jugador 2', 'Player 2')} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">{t('Jugador 2', 'Player 2')}</div>}</div>{player.instagramUsername && <p className="text-base font-semibold text-green-500">{player.instagramUsername}</p>}</>); })()}
+              {(() => { const player = validationResult.players[1]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 border-[rgba(34,197,94,0.4)] flex items-center justify-center shadow-lg">{imgUrl ? <img src={imgUrl} alt={player.characterName || t('Jugador 2', 'Player 2')} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">{t('Jugador 2', 'Player 2')}</div>}</div>{player.username && <p className="text-base font-semibold text-green-500">{player.username}</p>}</>); })()}
             </div>
           </div>
         </div>
@@ -369,8 +352,8 @@ export default function SemaforoGameScreen({ gameId, orientation, logoElement, p
         const players = validationResult.players
         const q = game?.quizQuestions?.[round.questionId]
         if (!q || !players) return null
-        const guesserName = players[round.guesserIndex].instagramUsername ?? t(`Jugador ${round.guesserIndex + 1}`, `Player ${round.guesserIndex + 1}`)
-        const targetName = players[round.targetIndex].instagramUsername ?? t(`Jugador ${round.targetIndex + 1}`, `Player ${round.targetIndex + 1}`)
+        const guesserName = players[round.guesserIndex].username ?? t(`Jugador ${round.guesserIndex + 1}`, `Player ${round.guesserIndex + 1}`)
+        const targetName = players[round.targetIndex].username ?? t(`Jugador ${round.targetIndex + 1}`, `Player ${round.targetIndex + 1}`)
         return (
           <div className="animate-fade-in p-6 rounded-xl border border-[rgba(34,197,94,0.3)] bg-[rgba(34,197,94,0.08)] space-y-4 min-h-[320px] flex flex-col">
             <div className="flex items-center justify-between">

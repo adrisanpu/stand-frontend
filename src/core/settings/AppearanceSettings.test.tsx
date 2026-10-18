@@ -17,11 +17,6 @@ beforeEach(() => {
     ok: true,
     appearance: { colors: { primary: '#ff0000', accent: '#00ff00' }, themeMode: 'light' },
     logo: { items: [], selectedId: null, selected: null },
-    avatar: {
-      items: [],
-      selectedByState: { idle: null, win: null, lose: null },
-      selected: { idle: null, win: null, lose: null },
-    },
   })
 })
 afterEach(cleanup)
@@ -33,6 +28,7 @@ it.each(['Guardar Cambios', 'Restaurar por Defecto'])('reports failure for %s be
   expect(await screen.findAllByDisplayValue('#ff0000')).toHaveLength(2)
   expect(screen.getAllByDisplayValue('#00ff00')).toHaveLength(2)
   expect(screen.getByRole('button', { name: 'Guardar Cambios' })).toHaveClass('bg-primary/20', 'border-primary/30', 'hover:bg-primary/30')
+  expect(screen.queryByText('Avatares por estado')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Restaurar por Defecto' })).toHaveClass('bg-red-500/20', 'border-red-500/30')
   fireEvent.click(screen.getByRole('button', { name: button }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Servidor no disponible')

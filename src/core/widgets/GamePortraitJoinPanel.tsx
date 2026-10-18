@@ -1,7 +1,7 @@
 /** @deprecated Portrait join moved to AppShell (`GamePortraitHeaderJoin`). Kept until infocards carousel migration is confirmed unused. */
 import type { ReactNode } from 'react'
 import QRCode from './QRCode'
-import { getInstagramDmUrl } from '../lib/instagram'
+import { getWebPlayUrl } from '../lib/joinUrl'
 import { GamePanelFooter } from './GamePanelFooter'
 import { GAME_PORTRAIT_JOIN_PANEL } from '../ui/gameScreenLayout'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
@@ -28,10 +28,10 @@ export default function GamePortraitJoinPanel({
     <div className={GAME_PORTRAIT_JOIN_PANEL}>
       <div className="flex justify-center items-center min-w-0 w-full">
         <QRCode
-          data={getInstagramDmUrl(gameId)}
+          data={getWebPlayUrl(gameId)}
           size={qrSize}
           margin={qrMargin}
-          alt={t('QR Code para Instagram DM', 'QR code for Instagram DM')}
+          alt={t('QR de participación web', 'Web participation QR code')}
           className={qrClassName}
           containerClassName={containerClassName}
         />

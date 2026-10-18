@@ -71,7 +71,7 @@ Every new `GameScreen` must reuse the same structural layout as existing games:
 - Landscape must be **3 columns**:
   - Left: `GameLandscapeInfoColumn` with logo + instructions + QR/context.
   - Center: main game panel using `GAME_LANDSCAPE_CENTER_CARD`.
-  - Right: `sidebarElement` passed by `AppShell` (players, raffle, avatar, ranking when applicable).
+  - Right: `sidebarElement` passed by `AppShell` (players, raffle, ranking when applicable).
 - Landscape grid must use `GAME_LANDSCAPE_THREE_COL_GRID` from `src/core/ui/gameScreenLayout.ts`.
 - Portrait must include the QR + instructions block using `GAME_PORTRAIT_QR_INSTRUCTIONS_GRID`.
 - Do not create custom grids when shared tokens/components already exist.

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
-import GameStateAvatar from '../../core/widgets/GameStateAvatar'
 import BackButton from '../../core/widgets/BackButton'
 import MobileParticipantsPanel from '../../core/widgets/MobileParticipantsPanel'
 import { api } from '../../api/api'
@@ -13,7 +12,6 @@ import {
 } from '../../core/ui/gameScreenLayout'
 import { useGameInput } from '../../core/input/useGameInput'
 import type { InputEventEnvelope } from '../../core/input/types'
-import { useAvatarsEnabled } from '../../core/theme'
 import { useWebOsPointerPrimary } from '../../core/input/useWebOsPointerPrimary'
 import { resolveGameAccess } from '../../core/settings/gameAccess'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
@@ -32,8 +30,6 @@ export default function T1merGameScreen({
   prizeLabel: legacyPrizeLabel,
   prizeCatalog,
   onCounterActiveChange,
-  onAvatarStateChange,
-  avatarMediaUrls,
   joinChannel,
   playMode,
 }: GameScreenProps) {
@@ -41,7 +37,6 @@ export default function T1merGameScreen({
   const topX = prizeCatalog !== undefined ? prizeCatalog.ranking?.topX : legacyTopX
   const prizeLabel = prizeCatalog !== undefined ? prizeCatalog.ranking?.name : legacyPrizeLabel
   const rankingPrize = prizeCatalog?.ranking
-  const avatarsEnabled = useAvatarsEnabled()
   const isPhoneMode = resolveGameAccess('T1MER', { playMode, joinChannel }).playMode === 'mobile'
   const [gameState, setGameState] = useState<GameState>('idle')
   const [timer, setTimer] = useState(0)
@@ -265,31 +260,9 @@ export default function T1merGameScreen({
   })
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
-  const avatarState: string = isPhoneMode
-    ? 'idle'
-    : gameState === 'preparing'
-      ? 'ready'
-      : gameState === 'hidden'
-        ? 'playing'
-        : gameState
-
-  useEffect(() => {
-    onAvatarStateChange?.(avatarState)
-  }, [avatarState, onAvatarStateChange])
-
   const gameName = localStorage.getItem('gameName') || gameId || 'T1MER'
 
   const renderPhoneCenter = () => {
-    if (avatarsEnabled) {
-      return (
-        <GameStateAvatar
-          state="idle"
-          mediaUrls={avatarMediaUrls}
-          t={t}
-          className="w-full h-full min-h-[200px]"
-        />
-      )
-    }
     return <MobileParticipantsPanel gameId={gameId!} gameName={gameName} />
   }
 
@@ -345,14 +318,9 @@ export default function T1merGameScreen({
           joinChannel={joinChannel}
           logoElement={logoElement}
           playersElement={playersElement}
-          avatarElement={
-            avatarsEnabled ? (
-              <GameStateAvatar state={avatarState} mediaUrls={avatarMediaUrls} t={t} />
-            ) : undefined
-          }
         >
           <LandscapeInfoInstruction>
-            {joinChannel === 'instagram' ? t('Escanea el QR y pulsa JUGAR en Instagram.', 'Scan the QR code and tap PLAY on Instagram.') : t('Escanea el QR y completa el formulario web.', 'Scan the QR code and complete the web form.')}
+            {t('Escanea el QR y completa el formulario web desde tu móvil.', 'Scan the QR code and complete the web form on your phone.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
             {t('Ingresa tu código y valida.', 'Enter and validate your code.')}

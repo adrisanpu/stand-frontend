@@ -5,7 +5,6 @@ type GameLandscapeLeftColumnProps = {
   gameId: string
   logoElement: ReactNode
   children: ReactNode
-  avatarElement?: ReactNode
   playersElement?: ReactNode
   joinChannel?: string | null
 }
@@ -15,9 +14,8 @@ export default function GameLandscapeLeftColumn({
   gameId,
   logoElement,
   children,
-  avatarElement,
   playersElement,
-  joinChannel = 'instagram',
+  joinChannel = 'web',
 }: GameLandscapeLeftColumnProps) {
   return (
     <div className="flex flex-col gap-2 h-full min-h-0 min-w-0 overflow-hidden">
@@ -25,7 +23,6 @@ export default function GameLandscapeLeftColumn({
         <GameLandscapeInfoColumn
           gameId={gameId}
           logoElement={logoElement}
-          avatarElement={avatarElement}
           joinChannel={joinChannel}
         >
           {children}

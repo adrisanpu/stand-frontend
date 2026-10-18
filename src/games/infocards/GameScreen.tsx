@@ -53,7 +53,7 @@ function getCardLayouts(gameId: string): Record<string, CardLayoutPosition> {
   return {}
 }
 
-export default function InfocardsGameScreen({ gameId, orientation, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function InfocardsGameScreen({ gameId, orientation, playersElement, sidebarElement }: GameScreenProps) {
   const { t } = useOperatorLanguage()
   const [cards, setCards] = useState<InfoCard[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -79,10 +79,6 @@ export default function InfocardsGameScreen({ gameId, orientation, playersElemen
   useEffect(() => {
     fetchCards()
   }, [fetchCards])
-
-  useEffect(() => {
-    onAvatarStateChange?.('idle')
-  }, [onAvatarStateChange])
 
   const joinCardVirtual: InfoCard = {
     id: INFOCARDS_JOIN_CARD_ID,
@@ -210,7 +206,7 @@ export default function InfocardsGameScreen({ gameId, orientation, playersElemen
     <div key={INFOCARDS_JOIN_CARD_ID} className={baseClass} style={cardStyle}>
       <div className="flex flex-col items-center justify-center flex-1 min-h-0 overflow-hidden px-4 text-center">
         <p className="text-base sm:text-lg text-textSub leading-relaxed">
-          {t('Escanea el QR de arriba y pulsa JUGAR en el chat de Instagram para unirte.', 'Scan the QR code above and tap PLAY in the Instagram chat to join.')}
+          {t('Escanea el QR de arriba y completa el formulario web desde tu móvil para unirte.', 'Scan the QR code above and complete the web form on your phone to join.')}
         </p>
       </div>
     </div>

@@ -32,7 +32,7 @@ export function GamePanelFooter({ children }: GamePanelFooterProps) {
         <p className="text-[9px] sm:text-[10px] leading-snug text-center text-gray-400/80 max-w-full px-1">
           {t(
             GAME_DATA_NOTICE_PANEL,
-            'By participating, you agree to the processing of your data (email, Instagram username, and quiz answers, if applicable).'
+            'By participating, you agree to the processing of your registration and participation data, including quiz answers if applicable.'
           )}{' '}
           <a
             href={language === 'en' ? '/pages/privacy.html' : PRIVACY_POLICY_URL}

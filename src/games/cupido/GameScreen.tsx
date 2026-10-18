@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
@@ -26,7 +26,7 @@ type ValidationResponse = {
   pairId: string | null
   players: Array<{
     playerId: number
-    instagramUsername: string
+    username?: string
     characterId?: number
     characterName?: string
     characterImageUrl?: string | null
@@ -38,7 +38,7 @@ type ValidationResponse = {
 const CUPIDO_PRIMARY = '#E11D48'
 const CUPIDO_PRIMARY_RGB = '225, 29, 72'
 
-export default function CupidoGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function CupidoGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement }: GameScreenProps) {
   const { t } = useOperatorLanguage()
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
@@ -95,11 +95,6 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
   const showJoinBlock = gameState !== 'valid'
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
-  const avatarState = gameState === 'valid' ? 'win' : gameState === 'invalid' ? 'lose' : gameState
-
-  useEffect(() => {
-    onAvatarStateChange?.(avatarState)
-  }, [avatarState, onAvatarStateChange])
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
@@ -133,9 +128,9 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
           {gameState === 'validating' && <div className="text-center py-10"><div className="flex items-center justify-center gap-4"><svg className="w-8 h-8 animate-spin" style={{ color: CUPIDO_PRIMARY }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><p className="text-2xl font-semibold" style={{ color: CUPIDO_PRIMARY }}>{t('Validando códigos...', 'Validating codes...')}</p></div></div>}
           {gameState === 'valid' && validationResult?.valid && validationResult.players?.length === 2 && (
             <div className="grid grid-cols-3 gap-4 items-center">
-              <div className="flex flex-col items-center space-y-3">{(() => { const player = validationResult.players[0]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 flex items-center justify-center shadow-lg" style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>{imgUrl ? <img src={imgUrl} alt={player.characterName || t('Jugador 1', 'Player 1')} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">{t('Jugador 1', 'Player 1')}</div>}</div>{player.instagramUsername && <p className="text-base font-semibold" style={{ color: CUPIDO_PRIMARY }}>{player.instagramUsername}</p>}</>); })()}</div>
+              <div className="flex flex-col items-center space-y-3">{(() => { const player = validationResult.players[0]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 flex items-center justify-center shadow-lg" style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>{imgUrl ? <img src={imgUrl} alt={player.characterName || t('Jugador 1', 'Player 1')} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">{t('Jugador 1', 'Player 1')}</div>}</div>{player.username && <p className="text-base font-semibold" style={{ color: CUPIDO_PRIMARY }}>{player.username}</p>}</>); })()}</div>
               <div className="flex flex-col items-center justify-center text-center"><div className="flex items-center gap-1 text-4xl" aria-hidden><span>❤️</span><span>🏹</span><span>❤️</span></div><span className="text-xl font-semibold text-green-400">{t('¡Pareja válida!', 'Valid match!')}</span>{validationResult.message && <p className="text-sm text-green-300">{validationResult.message}</p>}</div>
-              <div className="flex flex-col items-center space-y-3">{(() => { const player = validationResult.players[1]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 flex items-center justify-center shadow-lg" style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>{imgUrl ? <img src={imgUrl} alt={player.characterName || t('Jugador 2', 'Player 2')} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">{t('Jugador 2', 'Player 2')}</div>}</div>{player.instagramUsername && <p className="text-base font-semibold" style={{ color: CUPIDO_PRIMARY }}>{player.instagramUsername}</p>}</>); })()}</div>
+              <div className="flex flex-col items-center space-y-3">{(() => { const player = validationResult.players[1]; const imgUrl = player.characterImageUrl ?? null; return (<><div className="aspect-square w-full max-w-[180px] rounded-xl overflow-hidden bg-[rgba(255,255,255,0.04)] border-2 flex items-center justify-center shadow-lg" style={{ borderColor: `rgba(${CUPIDO_PRIMARY_RGB}, 0.4)` }}>{imgUrl ? <img src={imgUrl} alt={player.characterName || t('Jugador 2', 'Player 2')} className="max-w-full max-h-full w-auto h-auto object-contain" /> : <div className="text-xs text-gray-500">{t('Jugador 2', 'Player 2')}</div>}</div>{player.username && <p className="text-base font-semibold" style={{ color: CUPIDO_PRIMARY }}>{player.username}</p>}</>); })()}</div>
             </div>
           )}
           {gameState === 'invalid' && validationResult && !validationResult.valid && <div className="p-5 rounded-xl bg-red-500/20 border border-red-500/30 text-center"><span className="text-4xl" aria-hidden>💔</span><span className="text-base font-semibold text-red-400">{t('Pareja inválida', 'Invalid match')}</span>{(validationResult.message || error) && <p className="text-sm text-red-300 mt-2">{validationResult.message || (error && localizeOperatorMessage(error, t))}</p>}</div>}
@@ -301,9 +296,9 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
                         <div className="text-xs text-gray-500">{t('Jugador 1', 'Player 1')}</div>
                       )}
                     </div>
-                    {player.instagramUsername && (
+                    {player.username && (
                       <p className={`font-semibold ${showJoinBlock ? 'text-base' : 'text-xl'}`} style={{ color: CUPIDO_PRIMARY }}>
-                        {player.instagramUsername}
+                        {player.username}
                       </p>
                     )}
                   </>
@@ -337,9 +332,9 @@ export default function CupidoGameScreen({ gameId, orientation, logoElement, pla
                         <div className="text-xs text-gray-500">{t('Jugador 2', 'Player 2')}</div>
                       )}
                     </div>
-                    {player.instagramUsername && (
+                    {player.username && (
                       <p className={`font-semibold ${showJoinBlock ? 'text-base' : 'text-xl'}`} style={{ color: CUPIDO_PRIMARY }}>
-                        {player.instagramUsername}
+                        {player.username}
                       </p>
                     )}
                   </>
