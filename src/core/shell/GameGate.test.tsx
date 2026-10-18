@@ -26,6 +26,14 @@ const { mockGames } = vi.hoisted(() => ({
       assets: {},
       tags: {},
     },
+    {
+      id: 'IMPOSTOR',
+      name: 'IMPOSTOR',
+      description: 'Encuentra al impostor',
+      underDevelopment: false,
+      assets: {},
+      tags: {},
+    },
   ],
 }))
 
@@ -219,5 +227,31 @@ describe('GameGate – create/join view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Crear' }))
 
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith('TORNEOTEST', 'GID1', 'T1MER'))
+  })
+
+  it('creates IMPOSTOR with mobile gameplay and Web participant access', async () => {
+    const { api } = await import('../../api/api')
+    vi.mocked(api.post).mockResolvedValueOnce({
+      message: 'Created',
+      game: { gameId: 'IMP123', gameName: 'TEST_IMPO', gameType: 'IMPOSTOR' },
+    })
+
+    const onCreated = vi.fn()
+    mockUseCurrentUser.mockReturnValue({ plan: 'event', user: { sub: 'u1' } })
+    renderGate(onCreated)
+    fireEvent.click(screen.getByText('IMPOSTOR'))
+    fireEvent.change(screen.getByLabelText(/Nombre de la partida/i), {
+      target: { value: 'TEST_IMPO' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear' }))
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith('TEST_IMPO', 'IMP123', 'IMPOSTOR'))
+    expect(api.post).toHaveBeenCalledTimes(1)
+    expect(api.post).toHaveBeenCalledWith('/v1/game', {
+      gameName: 'TEST_IMPO',
+      gameType: 'IMPOSTOR',
+      playMode: 'mobile',
+      joinChannel: 'web',
+    })
   })
 })
