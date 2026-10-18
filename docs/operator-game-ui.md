@@ -2,6 +2,24 @@
 
 Conventions for `GameScreen` layouts, spacing to the viewport, code validation, and validate actions. **Reference game: t1mer.**
 
+## RULET4: 3D prize wheel
+
+Both orientations use the same Three.js vertical prize wheel, with a shallow
+viewing angle, a metal rim, raised hub and animated pointer. Configured panel
+colors, labels, counts and segment order remain unchanged. A normal spin takes
+three seconds, decelerating into the selected segment. With reduced motion,
+the wheel stays still until the final orientation is revealed.
+
+WebGL 2 is required; there is no 2D fallback. Loading, context loss and rendering
+errors disable new spins and display a visible status or retry action. Context
+loss and page visibility changes suspend an active animation without choosing
+another prize. Retrying the scene preserves the selected prize in the current
+screen; it does not persist an unfinished spin across a page reload.
+The result is announced and sent through the existing score endpoint only after
+the final frame renders, once per spin. Returning to code entry cancels pending
+animation callbacks. Verify legibility and GPU performance on the event device,
+especially for many segments or long prize names.
+
 ## Catalog: detalle al elegir un juego (`GameGate`)
 
 Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas desde `md`**: columna 1 con el **logo grande centrado** (`max-h-44`–`max-h-60` según breakpoint); columna 2 en **columna flex** con la **descripción** arriba (`descriptionLong` o `description`) y **tags** abajo (separador `border-t`, `flex-wrap`). En móvil todo se apila en un orden: logo → texto → tags. Sin `assets.logo`, mostrar iniciales del nombre en un contenedor cuadrado como en la rejilla del catálogo.
@@ -107,10 +125,8 @@ gameplay and unsaved drafts. Do not key components or refetch settings on langua
 changes. Keep user-entered names, prizes and game content unchanged; participant
 `/play` uses its separate language context.
 
-Keep **Modo de juego** and **Acceso del participante** side by side in a two-column
-row, with one legend each. Options are **1 pantalla** / **∞ móviles** and
-**Instagram** / **Web**; unsupported choices stay visible but disabled.
-On narrow screens, stack the options inside each selector, not the selectors themselves.
+All games use **∞ móviles** for gameplay and **Web** for participant access;
+master-screen and Instagram game-access options are not available.
 Use two columns for short rule parameters (STACK speeds/tolerance, L3TRAS word/time,
 INFOCARDS generation counts); a lone short field such as IMPOSTOR's player limit
 occupies one column. Long text, word editors and descriptions retain their full
@@ -118,25 +134,26 @@ editing width; EMPAREJA2's difficulty slider stays wide and RULET4's existing
 label/count pair stays in two columns. Keep drafts and the single final
 **Guardar y aplicar cambios** action in the shared panel.
 
-For games supporting mobile play, the shared panel shows the participant
+The shared panel shows the participant
 `/play/:gameId` link and prize validator link with its QR immediately below the
-mode/access selectors, before game-specific rules. Use three compact columns:
+fixed mobile/Web access summary, before game-specific rules. Use three compact columns:
 participant QR with its link below, validator QR with its link below (both 80px),
-and **Datos del participante** with Email, Instagram and Phone checkboxes.
+and **Datos del participante** with Email and Phone checkboxes.
 Checked fields are required in `/play`; unchecked fields are hidden and omitted
 from registration requests. Save these settings with the shared footer, not in
-individual game configs. Existing events default to email enabled and Instagram
-and phone disabled when no explicit configuration exists. Show these for both access
-channels and all supported play modes; individual game configs must not duplicate
-them. Web registration also offers an optional profile photo for every participant,
-independent of the configured contact fields; uploaded photos appear in rankings
-and participant `/play`.
+individual game configs. Existing events default to email enabled and phone
+disabled when no explicit configuration exists. Individual game configs
+must not duplicate these settings. Web registration always asks for a display
+username and also offers an optional
+profile photo for every participant, independent of the configured contact fields;
+uploaded photos appear in rankings and participant `/play`. Instagram is neither
+contact data nor an access channel.
 
 ## Screen edge → content (AppShell)
 
 Do not reimplement outer page padding inside `GameScreen`; the shell already insets content.
-The table below and the game interaction layout guidelines apply to master mode;
-mobile-client mode uses the event home described in the next section.
+The event home is the operator dashboard for all games; participant gameplay
+and validation run on mobile at `/play`.
 
 | Mode | Where | Classes / behavior |
 |------|--------|-------------------|
@@ -153,10 +170,10 @@ On `/home`, check the saved Appearance media before displaying game content.
 Prefer the user-selected client logo; only use the game's default logo when no
 client logo is selected. Do not briefly show the game logo while this initial
 lookup is pending, or substitute the platform Stand logo for the game's logo.
-Apply the same priority in portrait, landscape, master and mobile modes.
+Apply the same logo priority in portrait and landscape.
 
-When `playMode === 'mobile'`, `AppShell` renders the shared `MobileGameHome`
-instead of the game's operator interaction panel (EMPAREJA2, T1MER and STACK).
+`AppShell` uses the shared `MobileGameHome` for all games instead of an
+operator gameplay panel.
 Landscape uses three columns: large logo with players and an expanded raffle
 below on the left, a large QR in the center, and the ranking filling the right
 column. The large QR panel displays **NO ESCANEAR, POR FAVOR.** in Spanish or
@@ -169,15 +186,13 @@ and QR, and below the QR. Keep base padding and gap equal (1rem, or 1.5rem from
 Games without a ranking use two columns; raffle plan restrictions and
 prize settings remain unchanged. The logo card contains only the logo, without
 the manual icon or legal footer. No mobile participation explanation, participant
-link buttons or event-name/code text appears on this home. The QR still follows
-the configured access channel, including Instagram. The mobile landscape stage
+link buttons or event-name/code text appears on this home. The QR always links to Web participant registration. The mobile landscape stage
 uses `4dvw` horizontal margins and a `7dvh` top inset, and reserves at least
 `max(7dvh, 4rem)` below the panels for the fixed Stand footer logo.
 
 Portrait stacks the logo, QR, players, raffle and ranking in that order in a
 scrollable page with `px-6 sm:px-8` horizontal margins and an `8dvh` top inset.
-This presentation does not change the participant
-registration/consent screens or master-mode layouts.
+This presentation does not change the participant registration/consent screens.
 
 ## Landscape game grid (three columns)
 
@@ -186,7 +201,7 @@ Use the shared token so column weights and gutters match t1mer:
 - Import `GAME_LANDSCAPE_THREE_COL_GRID` from [`src/core/ui/gameScreenLayout.ts`](../src/core/ui/gameScreenLayout.ts).
 - Equivalent classes: `grid grid-cols-[25%_40%_25%] gap-4 items-stretch h-full min-h-0`.
 
-Left: `GameLandscapeLeftColumn` — info panel (`GameLandscapeInfoColumn`: logo, QR, optional avatar, manual/legal footer) + `playersElement` below. Pass instructions as `children` for the modal. Center: main game. Right: `sidebarElement` only (Ranking `flex-1` if `showRanking`, RaffleData, GameStateAvatar fallback) — **no Players**.
+Left: `GameLandscapeLeftColumn` — info panel (`GameLandscapeInfoColumn`: logo, QR, manual/legal footer) + `playersElement` below. Pass instructions as `children` for the modal. Center: main game. Right: `sidebarElement` only (Ranking `flex-1` if `showRanking`, RaffleData) — **no Players**.
 
 `AppShell` passes `playersElement` and `sidebarElement` separately. Infocards (two-col): `playersElement` stays on the right sidebar above `sidebarElement`.
 
@@ -204,7 +219,7 @@ Do not use the older `minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)` + `g
 
 - `GAME_LANDSCAPE_TWO_COL_GRID`: `grid-cols-[minmax(0,1fr)_minmax(180px,260px)] gap-4` (same gutter as three-col).
 - Main area: prefer `p-6 sm:p-8` on the outer `card` for parity with the center column of other games.
-- Right sidebar: `playersElement` on top, then `sidebarElement` (ranking, raffle, avatar) — no left info column.
+- Right sidebar: `playersElement` on top, then `sidebarElement` (ranking, raffle) — no left info column.
 
 ## Portrait: header join + game card
 
@@ -213,7 +228,6 @@ Portrait join UI lives in **AppShell**, not inside each `GameScreen`:
 - [`GamePortraitHeaderJoin`](../src/core/widgets/GamePortraitHeaderJoin.tsx) — row: logo (`max-h-20`–`max-h-24`) | QR (~128px) + “Escanea para jugar” + [`GameIdHint`](../src/core/widgets/GameJoinHints.tsx).
 - Layout token: `GAME_PORTRAIT_HEADER_JOIN` in [`gameScreenLayout.ts`](../src/core/ui/gameScreenLayout.ts).
 - Instructions: [`getJoinInstructions(gameId)`](../src/core/ui/gameJoinInstructions.tsx) passed as `footerChildren` (same modal/footer as landscape via `GamePanelFooter`).
-- **Avatar:** disabled in portrait for now (landscape only).
 - Inside `.card`, `GameScreen` renders **only** game interaction/animations — mirror landscape center column (`GAME_LANDSCAPE_CENTER_CARD` utilities where applicable). Do **not** import `GamePortraitJoinPanel` in new work (`GamePortraitJoinPanel` is deprecated).
 
 ## Join panel footer, instructions modal, and legal notice

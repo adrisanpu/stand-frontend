@@ -11,7 +11,6 @@ type RaffleProps = {
 type RaffleResponse = {
   gameId: string
   winners: string[]
-  raffleRequiredFollows?: string[]
 }
 
 interface AutoRaffleConfig {
@@ -52,7 +51,6 @@ function translateRaffleError(message: string, t: (spanish: string, english?: st
     'El número de ganadores debe ser al menos 1': t('El número de ganadores debe ser al menos 1', 'The number of winners must be at least 1'),
     'Formato de respuesta inválido': t('Formato de respuesta inválido', 'Invalid response format'),
     'Error al ejecutar el sorteo': t('Error al ejecutar el sorteo', 'Error running the raffle'),
-    'Error al guardar las cuentas': t('Error al guardar las cuentas', 'Error saving accounts'),
   }
   return Object.prototype.hasOwnProperty.call(knownErrors, message) ? knownErrors[message] : message
 }
@@ -64,39 +62,10 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [winners, setWinners] = useState<string[] | null>(null)
-  const [requiredFollows, setRequiredFollows] = useState<string[]>([])
-  const [newHandle, setNewHandle] = useState('')
-  const [savingFollows, setSavingFollows] = useState(false)
 
   // Auto raffle: solo activar/desactivar e intervalo. El resto (número de ganadores, aplicable a) se toma de los inputs del sorteo manual.
   const [autoRaffleEnabled, setAutoRaffleEnabled] = useState<boolean>(false)
   const [autoRaffleInterval, setAutoRaffleInterval] = useState<number>(30) // minutes
-
-  // Load game raffleRequiredFollows on mount (by gameId for owner)
-  useEffect(() => {
-    if (!gameId) return
-    let cancelled = false
-    const load = async () => {
-      try {
-        const data = await api.get<{
-          ok: boolean
-          raffleRequiredFollows?: string[]
-        }>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
-        if (cancelled) return
-        if (data?.raffleRequiredFollows && Array.isArray(data.raffleRequiredFollows)) {
-          setRequiredFollows(
-            data.raffleRequiredFollows
-              .map((h) => String(h).trim().toLowerCase().replace(/^@/, ''))
-              .filter((h) => h),
-          )
-        }
-      } catch (_) {
-        // may 401 if not owner; ignore
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [gameId])
 
   const applicableOnlyValidated = eligibilityMode !== 'all'
 
@@ -153,40 +122,6 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
     } else if (value === '') {
       setAutoRaffleInterval(1)
     }
-  }
-
-  const saveRequiredFollowsList = async (list: string[]) => {
-    if (!gameId) return
-    setSavingFollows(true)
-    try {
-      await api.put('/v1/game', {
-        gameId,
-        settings: { raffle: { requiredFollows: list } },
-      })
-    } catch (err: any) {
-      setError(err.message || 'Error al guardar las cuentas')
-    } finally {
-      setSavingFollows(false)
-    }
-  }
-
-  const addRequiredFollow = async () => {
-    const h = newHandle.trim().toLowerCase().replace(/^@/, '')
-    if (!h) return
-    if (requiredFollows.includes(h)) {
-      setNewHandle('')
-      return
-    }
-    const next = [...requiredFollows, h]
-    setRequiredFollows(next)
-    setNewHandle('')
-    await saveRequiredFollowsList(next)
-  }
-
-  const removeRequiredFollow = async (handle: string) => {
-    const next = requiredFollows.filter((x) => x !== handle)
-    setRequiredFollows(next)
-    await saveRequiredFollowsList(next)
   }
 
   const runRaffle = async () => {
@@ -416,61 +351,6 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                     <option value="quiz">{t('Quiz completado', 'Quiz completed')}</option>
                     <option value="validated">{t('Validados', 'Validated')}</option>
                   </select>
-                </div>
-              </div>
-
-              {/* Requisitos para ganar */}
-              <div className="mb-5">
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  {t('Requisitos para ganar', 'Requirements to win')}
-                </label>
-                <p className="text-sm font-medium text-gray-300 mb-2">{t('Seguir a:', 'Follow:')}</p>
-                <div className="flex flex-wrap gap-2 mb-2 min-h-[2rem]">
-                  {requiredFollows.length === 0 && (
-                    <span className="text-xs text-gray-500">{t('Ninguna cuenta configurada', 'No accounts configured')}</span>
-                  )}
-                  {requiredFollows.map((handle) => (
-                    <span
-                      key={handle}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[rgba(255,255,255,0.08)] border border-white/10 text-xs"
-                    >
-                      @{handle}
-                      <button
-                        type="button"
-                        onClick={() => void removeRequiredFollow(handle)}
-                        disabled={savingFollows}
-                        className="ml-0.5 p-0.5 rounded hover:bg-white/20 text-gray-400 hover:text-white disabled:opacity-40 disabled:pointer-events-none"
-                        aria-label={`${t('Quitar', 'Remove')} @${handle}`}
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder={t('usuario (sin @)', 'username (without @)')}
-                    value={newHandle}
-                    onChange={(e) => setNewHandle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        void addRequiredFollow()
-                      }
-                    }}
-                    className="flex-1 min-w-0 h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm placeholder-gray-500 focus:border-white/20 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void addRequiredFollow()}
-                    disabled={savingFollows || !gameId}
-                    className="px-3 h-10 rounded-lg bg-primary/10 border border-primary/30 hover:bg-primary/20 text-sm font-medium flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {savingFollows ? t('Guardando…', 'Saving…') : t('Añadir', 'Add')}
-                  </button>
                 </div>
               </div>
 

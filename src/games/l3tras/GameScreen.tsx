@@ -18,7 +18,7 @@ type GameState = 'idle' | 'checking' | 'success'
 
 type L3trasSlotCell = {
   letter: string
-  instagramUsername?: string
+  username?: string
   profilePicUrl?: string | null
 } | null
 
@@ -27,7 +27,7 @@ type ValidationResponse = {
   gameId: string
   players?: Array<{
     playerId: number
-    instagramUsername?: string
+    username?: string
     letter?: string
     profilePicUrl?: string
     [key: string]: unknown
@@ -51,12 +51,6 @@ function pickLetter(result: ValidationResponse): string | null {
   const r = result.results?.[0]?.letter
   if (typeof r === 'string' && r.length === 1) return r.toUpperCase()
   return null
-}
-
-function formatIgHandle(username: string) {
-  const u = username.trim()
-  if (!u) return ''
-  return u.startsWith('@') ? u : `@${u}`
 }
 
 function L3trasPieTimer({ remainingMs, totalMs }: { remainingMs: number; totalMs: number }) {
@@ -85,7 +79,7 @@ function L3trasPieTimer({ remainingMs, totalMs }: { remainingMs: number; totalMs
   )
 }
 
-export default function L3trasGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function L3trasGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement }: GameScreenProps) {
   const { t } = useOperatorLanguage()
   const [gameState, setGameState] = useState<GameState>('idle')
   const [settings, setSettings] = useState<L3trasSettings | null>(null)
@@ -312,7 +306,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
       const picRaw = typeof p0?.profilePicUrl === 'string' ? p0.profilePicUrl.trim() : ''
       const cellMeta = {
         letter,
-        instagramUsername: typeof p0?.instagramUsername === 'string' ? p0.instagramUsername : undefined,
+        username: typeof p0?.username === 'string' ? p0.username : undefined,
         profilePicUrl: picRaw || null,
       }
 
@@ -380,10 +374,7 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
     >
       {slots.map((cell, i) => {
         const ch = cell?.letter ?? ''
-        const handle =
-          cell?.instagramUsername != null && String(cell.instagramUsername).trim() !== ''
-            ? formatIgHandle(String(cell.instagramUsername))
-            : ''
+        const handle = cell?.username?.trim() ?? ''
         const pic =
           typeof cell?.profilePicUrl === 'string' && cell.profilePicUrl.trim() !== '' ? cell.profilePicUrl.trim() : ''
         const showContributor = Boolean(cell && (pic || handle))
@@ -589,12 +580,6 @@ export default function L3trasGameScreen({ gameId, orientation, logoElement, pla
   }
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
-  const avatarState =
-    gameState === 'checking' ? 'validating' : gameState === 'success' ? 'finished' : gameState
-
-  useEffect(() => {
-    onAvatarStateChange?.(avatarState)
-  }, [avatarState, onAvatarStateChange])
   if (isLandscape) {
     return (
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>

@@ -16,10 +16,9 @@ interface RaffleWinner {
 
 interface GameDataRaffleWinner {
   wonAt: string
-  validationCode: number
-  instagramUsername: string
+  validationCode?: number
+  username?: string | null
   playerId: number
-  instagramPSID: string
   prizeDelivered?: boolean
 }
 
@@ -29,7 +28,6 @@ interface GameDataResponse {
   playerCount?: number
   validatedCount?: number
   raffleWinners?: GameDataRaffleWinner[]
-  raffleRequiredFollows?: string[]
   quiz?: { enabled: boolean; questionsCount: number }
 }
 
@@ -170,7 +168,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
 
     const mappedWinners: RaffleWinner[] = (data.raffleWinners ?? [])
       .map(w => ({
-        username: w.instagramUsername,
+        username: w.username?.trim() || `${t('Jugador', 'Player')} ${w.playerId}`,
         timestamp: w.wonAt,
         raffleId: w.playerId.toString(),
         prizeDelivered: w.prizeDelivered ?? false,
@@ -181,7 +179,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
       })
     setWinners(mappedWinners)
     setLoading(false)
-  }, [gameId, gameName])
+  }, [gameId, gameName, t])
 
   const { isStale } = usePolling(fetchData, [gameId, gameName], { interval: refreshInterval })
 

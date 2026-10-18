@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { PublicApiError, publicApi, type EmailChallengeResponse, type EmailRegistration, type PlayerAssignment, type PublicGameResponse } from '../../api/publicApi'
 import { savePlayerSession } from './playerSession'
 import { PARTICIPANT_PRIVACY_NOTICE, PRIVACY_POLICY_URL } from '../ui/gameLegalCopy'
-import { resolveGameAccess } from '../settings/gameAccess'
-import { normalizeGameType } from '../gameTypeMap'
 import { useParticipantLanguage } from './participantLanguage'
 import { resolveParticipantFields } from '../lib/participantFields'
 
@@ -36,8 +34,6 @@ const verificationErrors: Record<string, string> = {
   invalid_email: 'Introduce un email válido.',
   invalid_username: 'Usa un nombre de usuario de hasta 100 caracteres sin caracteres de control.',
   missing_username: 'El nombre de usuario es obligatorio.',
-  missing_instagram: 'El usuario de Instagram es obligatorio.',
-  invalid_instagram: 'Introduce un usuario de Instagram válido.',
   missing_phone: 'El teléfono es obligatorio.',
   invalid_phone: 'Introduce un teléfono válido.',
   player_limit_reached: 'El juego ha alcanzado el límite de participantes. Consulta al equipo del evento.',
@@ -48,13 +44,10 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   const { language, t } = useParticipantLanguage()
   const pf = resolveParticipantFields(gameMeta.participantFields)
   const emailRequired = pf.email.required
-  const igRequired = pf.instagram.required
   const phoneRequired = pf.phone.required
-  const usernameRequired = !igRequired
 
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
-  const [instagram, setInstagram] = useState('')
   const [phone, setPhone] = useState('')
   const [consent, setConsent] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -76,7 +69,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     setInvalidChallenge(false)
     setError(null)
     setRetryAt(0)
-  }, [gameId, emailRequired, igRequired, phoneRequired])
+  }, [gameId, emailRequired, phoneRequired])
 
   useEffect(() => {
     if (!challenge && !retryAt) return
@@ -141,16 +134,12 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       setError('El email es obligatorio.')
       return
     }
-    if (igRequired && !instagram.trim()) {
-      setError('El usuario de Instagram es obligatorio.')
-      return
-    }
     if (phoneRequired && !phone.trim()) {
       setError('El teléfono es obligatorio.')
       return
     }
     const trimmedUsername = username.trim()
-    if (usernameRequired && !trimmedUsername) {
+    if (!trimmedUsername) {
       setError(verificationErrors.missing_username)
       return
     }
@@ -159,7 +148,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       const codePoint = character.codePointAt(0)!
       return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)
     })
-    if (usernameRequired && (usernameCharacters.length > 100 || hasControlCharacter)) {
+    if (usernameCharacters.length > 100 || hasControlCharacter) {
       setError(verificationErrors.invalid_username)
       return
     }
@@ -180,8 +169,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       const registration = {
         gameId,
         ...(emailRequired ? { email: email.trim() } : {}),
-        ...(usernameRequired ? { username: trimmedUsername } : {}),
-        ...(igRequired ? { instagram: instagram.trim() } : {}),
+        username: trimmedUsername,
         ...(phoneRequired ? { phone: phone.trim() } : {}),
         consent,
       }
@@ -224,9 +212,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       {!challenge && <>
       <div className="text-center space-y-3">
         <p className="text-sm text-textSub">
-          {t(resolveGameAccess(normalizeGameType(gameMeta.gameType), gameMeta).playMode === 'mobile'
-            ? 'Regístrate para jugar desde tu móvil'
-            : 'Regístrate para jugar en la pantalla máster')}
+          {t('Regístrate para jugar desde tu móvil')}
         </p>
       </div>
 
@@ -247,7 +233,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         />
       </div>}
 
-      {usernameRequired && <div>
+      <div>
         <label className="block text-sm mb-1" htmlFor="join-username">
           {t('Nombre de usuario')} *
         </label>
@@ -260,22 +246,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
           onChange={(e) => setUsername(e.target.value)}
           className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3"
         />
-      </div>}
-
-      {igRequired && <div>
-        <label className="block text-sm mb-1" htmlFor="join-ig">
-          Instagram *
-        </label>
-        <input
-          id="join-ig"
-          type="text"
-          value={instagram}
-          onChange={(e) => setInstagram(e.target.value)}
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-          placeholder={t('@usuario')}
-          required
-        />
-      </div>}
+      </div>
 
       {phoneRequired && <div>
         <label className="block text-sm mb-1" htmlFor="join-phone">{t('Teléfono')} *</label>

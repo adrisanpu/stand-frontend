@@ -8,6 +8,7 @@ import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import { localizeOperatorMessage } from '../operatorText'
+import Rulet4Wheel, { type WheelSpin } from './Rulet4Wheel'
 import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
@@ -21,7 +22,7 @@ type GameState =
   | 'result'     // showing selected panel
   | 'finished'   // optional; auto-reset logic
 
-export default function Rulet4GameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function Rulet4GameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement }: GameScreenProps) {
   const { t } = useOperatorLanguage()
   const [gameState, setGameState] = useState<GameState>('idle')
   const [playerCode, setPlayerCode] = useState('')
@@ -30,12 +31,22 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isValidating, setIsValidating] = useState(false)
-  const [rotation, setRotation] = useState(0)
   const [winningPanel, setWinningPanel] = useState<Rulet4PanelConfig | null>(null)
-  const [winningIndex, setWinningIndex] = useState<number | null>(null)
   const [settings, setSettings] = useState<Rulet4Settings | null>(null)
-  const wheelRef = useRef<SVGSVGElement>(null)
+  const [sceneReady, setSceneReady] = useState(false)
+  const [spin, setSpin] = useState<WheelSpin | null>(null)
+  const pendingSpinRef = useRef<{ id: number; panel: Rulet4PanelConfig; index: number } | null>(null)
+  const spinIdRef = useRef(0)
+  const validationRef = useRef<object>({})
   const hasSpunRef = useRef(false)
+
+  useEffect(() => {
+    handleReset()
+    return () => {
+      pendingSpinRef.current = null
+      validationRef.current = {}
+    }
+  }, [gameId])
 
   // Load settings from localStorage
   useEffect(() => {
@@ -73,6 +84,8 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     setIsValidating(true)
     setGameState('validating')
     setError(null)
+    const validation = {}
+    validationRef.current = validation
 
     try {
       const data = await api.post<{
@@ -86,6 +99,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
         gameId: gameId,
         codes: [String(playerCode).trim()]
       })
+      if (validation !== validationRef.current) return
       
       if (data.valid && data.playerId) {
         setPlayerId(data.playerId)
@@ -99,14 +113,16 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
         throw new Error(data.message || t('Código inválido', 'Invalid code'))
       }
     } catch (err: any) {
+      if (validation !== validationRef.current) return
       setError(err.message || t('Error al validar el código', 'Error validating the code'))
       setGameState('idle')
     } finally {
-      setIsValidating(false)
+      if (validation === validationRef.current) setIsValidating(false)
     }
   }
 
   const handleSpin = () => {
+    if (gameState !== 'ready' || !sceneReady || hasSpunRef.current || pendingSpinRef.current) return
     if (segments.length === 0) {
       setError(t('La ruleta no tiene paneles configurados', 'The roulette has no panels configured'))
       return
@@ -115,41 +131,20 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     // Randomly select winning segment from the already randomized segments array
     const randomIndex = Math.floor(Math.random() * segments.length)
     const selectedPanel = segments[randomIndex]
-    setWinningPanel(selectedPanel)
-    setWinningIndex(randomIndex)
-
-    // Calculate rotation using the segments from state
-    const totalSegments = segments.length
-    const segmentAngle = 360 / totalSegments
-    const spins = 5 // full spins
-    const baseRotation = spins * 360
-    // Align selected segment to top (12 o'clock)
-    // In SVG, -90 degrees is at the top (12 o'clock)
-    // Segment center angle in visual coordinates (0 at top): randomIndex * segmentAngle + segmentAngle / 2
-    // To align to top, we need to rotate backwards by this amount
-    const segmentCenterAngle = randomIndex * segmentAngle + segmentAngle / 2
-    // Rotate backwards to align center with top, then add spins
-    // The negative sign rotates backwards, aligning the segment center to the top marker
-    const targetRotation = baseRotation - segmentCenterAngle
-
+    const id = ++spinIdRef.current
+    pendingSpinRef.current = { id, panel: selectedPanel, index: randomIndex }
+    hasSpunRef.current = true
     setGameState('spinning')
-    setRotation(0)
+    setSpin({ id, index: randomIndex })
+  }
 
-    // Animate rotation
-    requestAnimationFrame(() => {
-      setRotation(targetRotation)
-    })
-
-    // After animation completes (3 seconds), show result
-    setTimeout(() => {
-      setGameState('result')
-      hasSpunRef.current = true
-      
-      // Submit score immediately
-      if (playerId && gameId) {
-        submitScore(selectedPanel, randomIndex)
-      }
-    }, 3000)
+  const handleSpinComplete = (id: number) => {
+    const pending = pendingSpinRef.current
+    if (!pending || pending.id !== id) return
+    pendingSpinRef.current = null
+    setWinningPanel(pending.panel)
+    setGameState('result')
+    void submitScore(pending.panel, pending.index)
   }
 
   const submitScore = async (panel: Rulet4PanelConfig, index: number) => {
@@ -172,15 +167,17 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
   }
 
   const handleReset = () => {
+    validationRef.current = {}
+    setIsValidating(false)
     setGameState('idle')
     setPlayerCode('')
     setPlayerId(null)
     setUsername(null)
     setProfilePicUrl(null)
     setError(null)
-    setRotation(0)
+    pendingSpinRef.current = null
+    setSpin(null)
     setWinningPanel(null)
-    setWinningIndex(null)
     hasSpunRef.current = false
   }
 
@@ -220,19 +217,9 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     }
   }, [settings])
 
-  const totalSegments = segments.length
-  const segmentAngle = totalSegments > 0 ? 360 / totalSegments : 0
-
   const showJoinBlock = !(['ready', 'spinning', 'result'] as GameState[]).includes(gameState)
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
-  const avatarState =
-    gameState === 'spinning' ? 'playing' : gameState === 'ready' ? 'ready' : gameState
-
-  useEffect(() => {
-    onAvatarStateChange?.(avatarState)
-  }, [avatarState, onAvatarStateChange])
-
   const hasProfilePic = profilePicUrl != null && profilePicUrl !== ''
 
   const profileAvatarColumn = hasProfilePic ? (
@@ -289,6 +276,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
 
     return (
       <div
+        role="status"
         className={`${outerPad} rounded-xl bg-[rgba(250,204,21,0.15)] border border-[rgba(250,204,21,0.3)]`}
       >
         {hasProfilePic ? (
@@ -333,6 +321,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
 
     return (
       <div
+        role="status"
         className={`${outerPad} rounded-xl bg-[rgba(250,204,21,0.15)] border border-[rgba(250,204,21,0.3)]`}
       >
         {hasProfilePic ? (
@@ -355,7 +344,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
             {t('Escanea el QR y pulsa JUGAR.', 'Scan the QR code and tap PLAY.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            {t('Recibe tu código por DM.', 'Get your code by DM.')}
+            {t('Recibe tu código al registrarte en el formulario web.', 'Get your code when you register on the web form.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
             {t('Ingresa y valida tu código.', 'Enter and validate your code.')}
@@ -427,53 +416,15 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
           {segments.length > 0 && (
             <div className="space-y-6">
               <div className="flex flex-col items-center">
-                <div className="relative z-10 mb-2">
-                  <div className="w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[28px] border-t-[#FACC15]"></div>
-                </div>
                 <div className="relative w-[min(520px,85vw)] h-[min(520px,85vw)] max-w-[520px] max-h-[520px]">
-                  <svg
-                    ref={wheelRef}
-                    width="100%"
-                    height="100%"
-                    viewBox="0 0 400 400"
-                    className="absolute inset-0"
-                    style={{
-                      transform: `rotate(${rotation}deg)`,
-                      transition: gameState === 'spinning' ? 'transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none',
-                      opacity: (gameState === 'idle' || gameState === 'validating') ? 0.5 : 1,
-                    }}
-                  >
-                    <circle cx="200" cy="200" r="200" fill="transparent" stroke="rgba(250,204,21,0.3)" strokeWidth="4" />
-                    {segments.map((segment, index) => {
-                      const startAngle = (index * segmentAngle - 90) * Math.PI / 180
-                      const endAngle = ((index + 1) * segmentAngle - 90) * Math.PI / 180
-                      const isWinning = gameState === 'result' && winningIndex === index
-                      const centerX = 200, centerY = 200, radius = 200
-                      const x1 = centerX + radius * Math.cos(startAngle)
-                      const y1 = centerY + radius * Math.sin(startAngle)
-                      const x2 = centerX + radius * Math.cos(endAngle)
-                      const y2 = centerY + radius * Math.sin(endAngle)
-                      const largeArcFlag = segmentAngle > 180 ? 1 : 0
-                      const pathData = [`M ${centerX} ${centerY}`, `L ${x1} ${y1}`, `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`, 'Z'].join(' ')
-                      const textAngle = (startAngle + endAngle) / 2
-                      const textRadius = radius * 0.7
-                      const textX = centerX + textRadius * Math.cos(textAngle)
-                      const textY = centerY + textRadius * Math.sin(textAngle)
-                      return (
-                        <g key={`${segment.id}-${index}`}>
-                          <path d={pathData} fill={segment.color || '#DC2626'} stroke={isWinning ? '#FACC15' : 'rgba(255,255,255,0.2)'} strokeWidth={isWinning ? 4 : 1} style={{ filter: isWinning ? 'drop-shadow(0 0 10px rgba(250,204,21,0.8))' : 'none' }} />
-                          <text x={textX} y={textY} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="20" fontWeight="600" className="pointer-events-none select-none" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }} transform={`rotate(${(textAngle * 180 / Math.PI) + 90} ${textX} ${textY})`}>{segment.label}</text>
-                        </g>
-                      )
-                    })}
-                  </svg>
+                  <Rulet4Wheel segments={segments} spin={spin} completed={gameState === 'result'} dimmed={showJoinBlock} onReadyChange={setSceneReady} onComplete={handleSpinComplete} />
                 </div>
               </div>
               <div className="text-center flex justify-center items-center min-h-[76px]">
                 {gameState === 'result' ? (
                   <BackButton onClick={handleReset} aria-label={t('Volver a introducir código', 'Back to enter code')} className="scale-125" />
                 ) : (
-                  <button type="button" onClick={handleSpin} disabled={gameState !== 'ready' || hasSpunRef.current} className="px-10 py-5 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-2xl">{t('GIRAR RULETA', 'SPIN THE WHEEL')}</button>
+                  <button type="button" onClick={handleSpin} disabled={gameState !== 'ready' || !sceneReady || hasSpunRef.current} className="px-10 py-5 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-2xl">{t('GIRAR RULETA', 'SPIN THE WHEEL')}</button>
                 )}
               </div>
             </div>
@@ -576,86 +527,9 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
         <div className={showJoinBlock ? 'space-y-6' : 'flex-1 flex flex-col min-h-0 space-y-6'}>
           {/* Roulette Container */}
           <div className="flex flex-col items-center flex-1 min-h-0 justify-center">
-            {/* Top Marker */}
-            <div className="relative z-10 mb-2">
-              <div className="w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[28px] border-t-[#FACC15]"></div>
-            </div>
-
             {/* Wheel - larger when expanded (portrait) */}
             <div className={`relative ${showJoinBlock ? 'w-[min(520px,85vw)] h-[min(520px,85vw)] max-w-[520px] max-h-[520px]' : 'w-[min(600px,90vw)] h-[min(600px,90vw)] max-w-[600px] max-h-[600px]'}`}>
-              <svg
-                ref={wheelRef}
-                width="100%"
-                height="100%"
-                viewBox="0 0 400 400"
-                className="absolute inset-0"
-                style={{
-                  transform: `rotate(${rotation}deg)`,
-                  transition: gameState === 'spinning' ? 'transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none',
-                  opacity: (gameState === 'idle' || gameState === 'validating') ? 0.5 : 1,
-                }}
-              >
-                <circle cx="200" cy="200" r="200" fill="transparent" stroke="rgba(250,204,21,0.3)" strokeWidth="4" />
-                {segments.map((segment, index) => {
-                  const startAngle = (index * segmentAngle - 90) * Math.PI / 180
-                  const endAngle = ((index + 1) * segmentAngle - 90) * Math.PI / 180
-                  const isWinning = gameState === 'result' && winningIndex === index
-                  const centerX = 200
-                  const centerY = 200
-                  const radius = 200
-
-                  // Calculate path for segment
-                  const x1 = centerX + radius * Math.cos(startAngle)
-                  const y1 = centerY + radius * Math.sin(startAngle)
-                  const x2 = centerX + radius * Math.cos(endAngle)
-                  const y2 = centerY + radius * Math.sin(endAngle)
-
-                  const largeArcFlag = segmentAngle > 180 ? 1 : 0
-
-                  const pathData = [
-                    `M ${centerX} ${centerY}`,
-                    `L ${x1} ${y1}`,
-                    `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
-                    'Z'
-                  ].join(' ')
-
-                  // Text position (middle of segment arc)
-                  const textAngle = (startAngle + endAngle) / 2
-                  const textRadius = radius * 0.7
-                  const textX = centerX + textRadius * Math.cos(textAngle)
-                  const textY = centerY + textRadius * Math.sin(textAngle)
-
-                  return (
-                    <g key={`${segment.id}-${index}`}>
-                      <path
-                        d={pathData}
-                        fill={segment.color || '#DC2626'}
-                        stroke={isWinning ? '#FACC15' : 'rgba(255,255,255,0.2)'}
-                        strokeWidth={isWinning ? 4 : 1}
-                        style={{
-                          filter: isWinning ? 'drop-shadow(0 0 10px rgba(250,204,21,0.8))' : 'none',
-                        }}
-                      />
-                      <text
-                        x={textX}
-                        y={textY}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill="white"
-                        fontSize="20"
-                        fontWeight="600"
-                        className="pointer-events-none select-none"
-                        style={{
-                          textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
-                        }}
-                        transform={`rotate(${(textAngle * 180 / Math.PI) + 90} ${textX} ${textY})`}
-                      >
-                        {segment.label}
-                      </text>
-                    </g>
-                  )
-                })}
-              </svg>
+              <Rulet4Wheel segments={segments} spin={spin} completed={gameState === 'result'} dimmed={showJoinBlock} onReadyChange={setSceneReady} onComplete={handleSpinComplete} />
             </div>
           </div>
 
@@ -667,7 +541,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
               <button
                 type="button"
                 onClick={handleSpin}
-                disabled={gameState !== 'ready' || hasSpunRef.current}
+                disabled={gameState !== 'ready' || !sceneReady || hasSpunRef.current}
                 className="px-10 py-5 rounded-xl bg-[rgba(250,204,21,0.2)] border border-[rgba(250,204,21,0.3)] hover:bg-[rgba(250,204,21,0.3)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold text-2xl"
               >
                 {t('GIRAR RULETA', 'SPIN THE WHEEL')}

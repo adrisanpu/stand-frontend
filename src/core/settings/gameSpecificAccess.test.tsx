@@ -10,7 +10,7 @@ vi.mock('../widgets/QRCode', () => ({ default: () => null }))
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(api.get).mockResolvedValue({
-    ok: true, game: { playMode: 'mobile', joinChannel: 'instagram', participantFields: { email: { required: true } } },
+    ok: true, game: { playMode: 'master', joinChannel: 'instagram', participantFields: { email: { required: true } } },
     settings: { empareja2: { numPairs: 4 } }, empareja2CatalogPairCount: 10,
   })
   vi.mocked(api.put).mockResolvedValue({ ok: true })
@@ -42,7 +42,7 @@ describe.each([
 
   it('does not overwrite separately saved access when saving rules', async () => {
     const onChange = vi.fn()
-    render(<Config gameId="ABC123" gameName="Event" settings={{}} access={{ playMode: 'mobile', joinChannel: 'instagram' }} onChange={onChange} />)
+    render(<Config gameId="ABC123" gameName="Event" settings={{}} access={{ playMode: 'mobile', joinChannel: 'web' }} onChange={onChange} />)
     const save = screen.getByRole('button', { name: 'Guardar configuración' })
     await waitFor(() => expect(save).toBeEnabled())
     fireEvent.click(save)

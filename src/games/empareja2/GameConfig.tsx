@@ -8,7 +8,6 @@ import { localizeOperatorMessage } from '../operatorText'
 export type Empareja2Settings = {
   numPairs?: number
   emailRequired?: boolean
-  instagramRequired?: boolean
 }
 
 interface GameDataResponse {
@@ -17,7 +16,7 @@ interface GameDataResponse {
     gameId: string
     gameName: string
     gameType: string
-    participantFields?: { email?: { required?: boolean }; instagram?: { required?: boolean } }
+    participantFields?: { email?: { required?: boolean } }
   }
   settings?: { empareja2?: { numPairs?: number } }
   empareja2CatalogPairCount?: number
@@ -32,7 +31,6 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
   )
   const [catalogPairCount, setCatalogPairCount] = useState<number | null>(null)
   const [emailRequired, setEmailRequired] = useState(true)
-  const [instagramRequired, setInstagramRequired] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string>('')
   const [loaded, setLoaded] = useState(!gameId)
@@ -58,7 +56,6 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
         if (backend?.numPairs != null) setNumPairsInput(String(backend.numPairs))
         const pf = data.game?.participantFields
         if (pf?.email?.required != null) setEmailRequired(Boolean(pf.email.required))
-        if (pf?.instagram?.required != null) setInstagramRequired(Boolean(pf.instagram.required))
         setLoaded(true)
       } catch (cause) {
         if (!cancelled) setLoadError(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración.')
@@ -81,14 +78,13 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
 
     const newSettings: Empareja2Settings = {
       numPairs: numPairsClamped,
-      ...(!registerSave ? { emailRequired, instagramRequired } : {}),
+      ...(!registerSave ? { emailRequired } : {}),
     }
     if (gameId) {
       await api.put('/v1/game', {
         gameId,
         ...(!registerSave ? { participantFields: {
           email: { required: emailRequired },
-          instagram: { required: instagramRequired },
         } } : {}),
         settings: {
           empareja2: {
@@ -196,10 +192,6 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
           <label className="flex items-center gap-2 text-sm text-gray-300">
             <input type="checkbox" checked={emailRequired} onChange={(e) => setEmailRequired(e.target.checked)} />
             {t('Email obligatorio (CRM / contacto)', 'Email required (CRM / contact)')}
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-300">
-            <input type="checkbox" checked={instagramRequired} onChange={(e) => setInstagramRequired(e.target.checked)} />
-            {t('Instagram obligatorio', 'Instagram required')}
           </label>
         </div>}
       </div>

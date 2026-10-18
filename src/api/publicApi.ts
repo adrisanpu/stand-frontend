@@ -35,7 +35,6 @@ async function publicRequest<T>(endpoint: string, options: RequestInit = {}): Pr
 
 export type ParticipantFieldsConfig = {
   email?: { required?: boolean }
-  instagram?: { required?: boolean }
   phone?: { required?: boolean }
 }
 
@@ -112,7 +111,22 @@ export type StackAssignment = {
   rank?: number | null
 }
 
-export type PlayerAssignment = Empareja2Assignment | T1merAssignment | StackAssignment
+export type ImpostorParticipantState = {
+  phase: 'lobby' | 'word_round' | 'voting' | 'result' | 'finished'
+  round: number
+  inRound: boolean
+  role: 'impostor' | 'crew' | null
+  word: string | null
+  currentTurn: { isMine: boolean; name: string } | null
+  winner: 'impostor' | 'crew' | null
+  won: boolean | null
+}
+
+export type ImpostorAssignment = T1merAssignment & {
+  impostor?: ImpostorParticipantState
+}
+
+export type PlayerAssignment = Empareja2Assignment | T1merAssignment | StackAssignment | ImpostorAssignment
 
 export function isStackAssignment(assignment: PlayerAssignment): assignment is StackAssignment {
   return 'gameType' in assignment && assignment.gameType === 'STACK'
@@ -195,9 +209,7 @@ async function uploadParticipantPhoto(file: File, playerToken: string): Promise<
 export type EmailRegistration = {
   gameId: string
   email?: string
-  /** Required for registration unless Instagram is requested by the game. */
-  username?: string
-  instagram?: string
+  username: string
   phone?: string
   consent: boolean
   language?: 'es' | 'en'
@@ -213,7 +225,7 @@ export type EmailChallengeResponse = {
 
 export type JoinRequest =
   | (Omit<EmailRegistration, 'language'> & { challengeId?: never; code?: never })
-  | { gameId: string; challengeId: string; code: string; consent?: boolean; email?: never; username?: never; instagram?: never; phone?: never }
+  | { gameId: string; challengeId: string; code: string; consent?: boolean; email?: never; username?: never; phone?: never }
 
 export type ValidateResponse = {
   valid: boolean
@@ -221,7 +233,7 @@ export type ValidateResponse = {
   message?: string
   players?: Array<{
     playerId: number
-    instagramUsername?: string
+    username?: string
     characterName?: string
     characterImageUrl?: string | null
   }>
@@ -278,9 +290,6 @@ export const publicApi = {
     publicRequest<JoinResponse>('/v1/public/join', { method: 'POST', body: JSON.stringify(body) }),
 
   uploadParticipantPhoto,
-
-  exchangeAccess: (body: { gameId: string; accessToken: string }) =>
-    publicRequest<PlayerResponse>('/v1/public/access', { method: 'POST', body: JSON.stringify(body) }),
 
   validate: (body: { gameId: string; playerToken: string; codes: string[] }) =>
     publicRequest<ValidateResponse>('/v1/public/validate', { method: 'POST', body: JSON.stringify(body) }),

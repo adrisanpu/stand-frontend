@@ -3,7 +3,7 @@ import { api } from '../../api/api'
 import type { ParticipantFieldsConfig } from '../../api/publicApi'
 import { resolveParticipantFields } from '../lib/participantFields'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
-import { GAME_ACCESS_CAPABILITIES, resolveGameAccess, type GameAccess } from './gameAccess'
+import { resolveGameAccess, type GameAccess } from './gameAccess'
 
 export type GameAccessLoadStatus = 'loading' | 'ready' | 'error'
 
@@ -93,34 +93,21 @@ type FieldsProps = {
 
 export function GameAccessFields({ gameType, access, disabled = false, onChange }: FieldsProps) {
   const { t } = useOperatorLanguage()
-  const capabilities = GAME_ACCESS_CAPABILITIES[gameType.toUpperCase()]
+  void onChange
+  const supported = Boolean(gameType && access)
   return (
     <div className="grid grid-cols-2 gap-3">
-      <fieldset disabled={!access || disabled} className="min-w-0">
+      <fieldset disabled className="min-w-0">
         <legend className="text-sm font-medium mb-2">{t('Modo de juego', 'Game mode')}</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {(['master', 'mobile'] as const).map((mode) => (
-            <button key={mode} type="button" aria-pressed={access?.playMode === mode}
-              disabled={!capabilities?.playModes.includes(mode)}
-              onClick={() => { if (access) onChange({ ...access, playMode: mode }) }}
-              className={`min-w-0 rounded-xl px-2 py-3 text-sm border disabled:opacity-40 disabled:cursor-not-allowed ${access?.playMode === mode ? 'bg-primary/20 border-primary' : 'bg-white/5 border-white/10'}`}>
-              {mode === 'master' ? t('1 pantalla', '1 screen') : t('∞ móviles', '∞ mobile devices')}
-            </button>
-          ))}
-        </div>
+        <p className={`min-w-0 rounded-xl px-2 py-3 text-center text-sm border ${supported ? 'bg-primary/20 border-primary' : 'bg-white/5 border-white/10'} ${disabled ? 'opacity-50' : ''}`}>
+          {t('∞ móviles', '∞ mobile devices')}
+        </p>
       </fieldset>
-      <fieldset disabled={!access || disabled} className="min-w-0">
+      <fieldset disabled className="min-w-0">
         <legend className="text-sm font-medium mb-2">{t('Acceso del participante', 'Participant access')}</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {(['instagram', 'web'] as const).map((channel) => (
-            <button key={channel} type="button" aria-pressed={access?.joinChannel === channel}
-              disabled={!capabilities?.joinChannels.includes(channel)}
-              onClick={() => { if (access) onChange({ ...access, joinChannel: channel }) }}
-              className={`min-w-0 rounded-xl px-2 py-3 text-sm border disabled:opacity-40 disabled:cursor-not-allowed ${access?.joinChannel === channel ? 'bg-primary/20 border-primary' : 'bg-white/5 border-white/10'}`}>
-              {channel === 'instagram' ? 'Instagram' : 'Web'}
-            </button>
-          ))}
-        </div>
+        <p className={`min-w-0 rounded-xl px-2 py-3 text-center text-sm border ${supported ? 'bg-primary/20 border-primary' : 'bg-white/5 border-white/10'} ${disabled ? 'opacity-50' : ''}`}>
+          Web
+        </p>
       </fieldset>
     </div>
   )

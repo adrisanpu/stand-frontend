@@ -108,8 +108,8 @@ it.each([true, false])('overlaps the raffle card without hiding winner controls 
     ok: true,
     game: { gameType: 'EMPAREJA2' },
     raffleWinners: [
-      { playerId: 1, instagramUsername: 'Alice', prizeDelivered: true },
-      { playerId: 2, instagramUsername: 'Bob', prizeDelivered: false },
+      { playerId: 1, username: 'Alice', prizeDelivered: true },
+      { playerId: 2, username: 'Bob', prizeDelivered: false },
     ],
   })
   vi.mocked(api.put).mockResolvedValue({ ok: true })

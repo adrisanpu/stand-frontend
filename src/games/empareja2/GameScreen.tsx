@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
-import GameStateAvatar from '../../core/widgets/GameStateAvatar'
 import BackButton from '../../core/widgets/BackButton'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
@@ -10,9 +9,7 @@ import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
 } from '../../core/ui/gameScreenLayout'
-import { useAvatarsEnabled } from '../../core/theme'
 import Empareja2OperatorScreen from './OperatorScreen'
-import { getEmpareja2CenterKind } from './centerKind'
 import { resolveGameAccess } from '../../core/settings/gameAccess'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import { localizeOperatorMessage } from '../operatorText'
@@ -25,7 +22,7 @@ type ValidationResponse = {
   pairId: string | null
   players: Array<{
     playerId: number
-    instagramUsername: string
+    username?: string
     characterId: number
     characterName: string
     characterImageUrl?: string | null
@@ -50,10 +47,6 @@ const INPUT_ROW_CLASS: Record<PanelVariant, string> = {
 const VALIDATE_BTN_PADDING: Record<PanelVariant, string> = {
   landscape: 'p-5 text-sm',
   portrait: 'p-4 text-base',
-}
-
-function formatIgHandle(username: string) {
-  return username.startsWith('@') ? username : `@${username}`
 }
 
 function ValidateCodesIcon({ className }: { className?: string }) {
@@ -82,10 +75,7 @@ function PairCharacterSlot({
     typeof player?.profilePicUrl === 'string' && player.profilePicUrl.trim() !== ''
       ? player.profilePicUrl.trim()
       : null
-  const handle =
-    player?.instagramUsername != null && player.instagramUsername !== ''
-      ? formatIgHandle(player.instagramUsername)
-      : null
+  const handle = player?.username?.trim() || null
 
   return (
     <div
@@ -129,15 +119,11 @@ export default function Empareja2GameScreen({
   logoElement,
   playersElement,
   sidebarElement,
-  onAvatarStateChange,
-  avatarMediaUrls,
   joinChannel,
   playMode,
 }: GameScreenProps) {
   const { t } = useOperatorLanguage()
-  const avatarsEnabled = useAvatarsEnabled()
-  const centerKind = getEmpareja2CenterKind(resolveGameAccess('EMPAREJA2', { playMode, joinChannel }).playMode, avatarsEnabled)
-  const isPhoneMode = centerKind !== 'pair'
+  const isPhoneMode = resolveGameAccess('EMPAREJA2', { playMode, joinChannel }).playMode === 'mobile'
   const [gameState, setGameState] = useState<GameState>('idle')
   const [code1, setCode1] = useState('')
   const [code2, setCode2] = useState('')
@@ -313,30 +299,9 @@ export default function Empareja2GameScreen({
   }
 
   const isLandscape = orientation === 'landscape' && logoElement != null && sidebarElement != null
-  const avatarState = isPhoneMode
-    ? 'idle'
-    : gameState === 'valid'
-      ? 'win'
-      : gameState === 'invalid'
-        ? 'lose'
-        : gameState
   const gameName = localStorage.getItem('gameName') || gameId
 
-  useEffect(() => {
-    onAvatarStateChange?.(avatarState)
-  }, [avatarState, onAvatarStateChange])
-
   const renderPhoneCenter = () => {
-    if (centerKind === 'avatar') {
-      return (
-        <GameStateAvatar
-          state="idle"
-          mediaUrls={avatarMediaUrls}
-          t={t}
-          className="w-full h-full min-h-[200px]"
-        />
-      )
-    }
     return <Empareja2OperatorScreen gameId={gameId} gameName={gameName} />
   }
 
@@ -359,7 +324,7 @@ export default function Empareja2GameScreen({
           ) : (
             <>
               <LandscapeInfoInstruction>
-                {joinChannel === 'instagram' ? t('Escanea el QR y pulsa JUGAR en el chat.', 'Scan the QR code and tap PLAY in the chat.') : t('Escanea el QR y completa el formulario web.', 'Scan the QR code and complete the web form.')}
+                {t('Escanea el QR y completa el formulario web desde tu móvil.', 'Scan the QR code and complete the web form on your phone.')}
               </LandscapeInfoInstruction>
               <LandscapeInfoInstruction>
                 {t('Recibe tu pareja asignada y tu código de validación.', 'Receive your assigned match and validation code.')}

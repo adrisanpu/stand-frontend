@@ -12,27 +12,22 @@ export function getJoinInstructions(gameId: string, access?: GameAccess, t: Tran
     return (
       <>
         <LandscapeInfoInstruction>
-          {access.joinChannel === 'instagram'
-            ? t('Escanea el QR y pulsa JUGAR en Instagram.', 'Scan the QR code and tap PLAY on Instagram.')
-            : t('Escanea el QR y completa el formulario web.', 'Scan the QR code and complete the web form.')}
+          {t('Escanea el QR y completa el formulario web desde tu móvil.', 'Scan the QR code and complete the web form on your phone.')}
         </LandscapeInfoInstruction>
-        {access.joinChannel === 'instagram' && access.playMode === 'mobile' && (
-          <LandscapeInfoInstruction>{t('Recibirás un enlace personal por DM para jugar desde tu móvil.', 'You will receive a personal link by DM to play on your phone.')}</LandscapeInfoInstruction>
-        )}
         {key === 'EMPAREJA2' ? (
           <>
             <LandscapeInfoInstruction>{t('Recibe tu personaje y código, y encuentra a tu pareja.', 'Get your character and code, then find your partner.')}</LandscapeInfoInstruction>
             <LandscapeInfoInstruction>
               {access.playMode === 'mobile'
                 ? t('Validad los dos códigos desde el móvil.', 'Validate both codes on your phone.')
-                : t('Introducid los dos códigos en la pantalla máster para validar.', 'Enter both codes on the master screen to validate them.')}
+                : t('Validad los dos códigos desde el móvil.', 'Validate both codes on your phone.')}
             </LandscapeInfoInstruction>
           </>
         ) : key === 'T1MER' ? (
           <LandscapeInfoInstruction>
             {access.playMode === 'mobile'
               ? t('Juega el timer en el móvil: detén el temporizador cerca de 10 segundos.', 'Play the timer on your phone: stop it close to 10 seconds.')
-              : t('Introduce tu código en la pantalla máster y detén el temporizador cerca de 10 segundos.', 'Enter your code on the master screen and stop the timer close to 10 seconds.')}
+              : t('Juega el timer en el móvil: detén el temporizador cerca de 10 segundos.', 'Play the timer on your phone: stop it close to 10 seconds.')}
           </LandscapeInfoInstruction>
         ) : (
           <LandscapeInfoInstruction>{t('Apila bloques desde el móvil. Tu único intento se consume al pulsar EMPEZAR.', 'Stack blocks on your phone. Your only attempt is used when you tap START.')}</LandscapeInfoInstruction>
@@ -54,13 +49,13 @@ export function getJoinInstructions(gameId: string, access?: GameAccess, t: Tran
       ['Tu posición aparece en el ranking de esta pantalla.', 'Your position appears on this screen’s leaderboard.'],
     ],
     RULET4: [
-      ['Escanea el QR y pulsa JUGAR en el chat de Instagram.', 'Scan the QR code and tap PLAY in the Instagram chat.'],
-      ['Recibe tu código de jugador por DM.', 'Receive your player code by DM.'],
+      ['Escanea el QR y completa el formulario web desde tu móvil.', 'Scan the QR code and complete the web form on your phone.'],
+      ['Recibe tu código de jugador en el formulario web.', 'Get your player code in the web form.'],
       ['Ingresa y valida tu código.', 'Enter and validate your code.'],
       ['Tienes una tirada de la ruleta.', 'You get one spin of the wheel.'],
     ],
     L3TRAS: [
-      ['Escanea el QR y pulsa JUGAR en el chat de Instagram.', 'Scan the QR code and tap PLAY in the Instagram chat.'],
+      ['Escanea el QR y completa el formulario web desde tu móvil.', 'Scan the QR code and complete the web form on your phone.'],
       ['Cada jugador recibirá un código de validación asociado a una letra.', 'Each player receives a validation code associated with a letter.'],
       ['Reuníos; cada participante tendrá su propio código.', 'Gather together; each participant will have their own code.'],
       ['Formad la palabra objetivo antes que el resto.', 'Form the target word before everyone else.'],
@@ -72,24 +67,25 @@ export function getJoinInstructions(gameId: string, access?: GameAccess, t: Tran
       ['Validad los dos códigos desde el móvil; el resultado aparece aquí.', 'Validate both codes on your phone; the result appears here.'],
     ],
     CUPIDO: [
-      ['Escanea el QR y pulsa JUGAR en el chat de Instagram.', 'Scan the QR code and tap PLAY in the Instagram chat.'],
+      ['Escanea el QR y completa el formulario web desde tu móvil.', 'Scan the QR code and complete the web form on your phone.'],
       ['Cupido te empareja con alguien de gustos afines (pareja o amigos).', 'Cupid matches you with someone who shares your interests (as a couple or friends).'],
       ['Encuentra a tu pareja y validad juntos vuestros códigos aquí.', 'Find your match and validate your codes together here.'],
     ],
     SEMAFORO: [
-      ['Escanea el QR y pulsa JUGAR en el chat de Instagram.', 'Scan the QR code and tap PLAY in the Instagram chat.'],
+      ['Escanea el QR y completa el formulario web desde tu móvil.', 'Scan the QR code and complete the web form on your phone.'],
       ['Te asignamos a un grupo: Casado, Puede ser o Soltero.', 'You will be assigned to a group: Married, Maybe, or Single.'],
       ['Aquí ves cuánta gente hay en cada grupo.', 'Here you can see how many people are in each group.'],
       ['Cuando os encontréis, validad juntos vuestros códigos aquí.', 'When you meet, validate your codes together here.'],
     ],
     INFOCARDS: [
-      ['Escanea el QR y pulsa JUGAR en el chat de Instagram para unirte.', 'Scan the QR code and tap PLAY in the Instagram chat to join.'],
-      ['En el chat podrás hacer un pequeño quiz y demostrar lo aprendido.', 'In the chat, you can take a short quiz and show what you have learned.'],
+      ['Escanea el QR y completa el formulario web desde tu móvil para unirte.', 'Scan the QR code and complete the web form on your phone to join.'],
+      ['Sigue las instrucciones del evento para hacer el quiz y demostrar lo aprendido.', 'Follow the event instructions to take the quiz and show what you have learned.'],
       ['Participa en los sorteos.', 'Take part in the raffles.'],
     ],
     IMPOSTOR: [
-      ['Escanea el QR y entra en la partida desde Instagram.', 'Scan the QR code and join the game from Instagram.'],
+      ['Escanea el QR y completa el formulario web desde tu móvil.', 'Scan the QR code and complete the web form on your phone.'],
       ['Valida tu código para aparecer en la lista de jugadores.', 'Validate your code to appear in the player list.'],
+      ['Mira tu rol y tu palabra en el móvil sin enseñarlos.', 'Check your role and word on your phone without showing them.'],
       ['Di una palabra en voz alta cuando llegue tu turno.', 'Say a word out loud when it is your turn.'],
       ['Vota quién crees que es el impostor.', 'Vote for who you think is the impostor.'],
     ],

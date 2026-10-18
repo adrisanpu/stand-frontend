@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from './api'
-import { saveAppearance, uploadAvatar, uploadLogo } from './userMedia'
+import { saveAppearance, uploadLogo } from './userMedia'
 
 vi.mock('./api', () => ({
   api: { post: vi.fn(), put: vi.fn() },
@@ -22,14 +22,11 @@ describe('user media uploads', () => {
     await expect(saveAppearance(appearance)).rejects.toThrow('No se pudo guardar')
   })
 
-  it.each(['logo', 'avatar'] as const)('uploads %s with the presigned PUT contract before registering and selecting', async (kind) => {
-    const file = new File(['media'], kind === 'logo' ? 'logo.png' : 'avatar.mp4', {
-      type: kind === 'logo' ? 'image/png' : 'video/mp4',
-    })
+  it('uploads a logo with the presigned PUT contract before registering and selecting it', async () => {
+    const file = new File(['media'], 'logo.png', { type: 'image/png' })
     const meta = {
-      id: 'media-id', kind, key: 'users/user/media', name: 'media',
+      id: 'media-id', kind: 'logo', key: 'users/user/media', name: 'media',
       fileName: file.name, contentType: file.type, sizeBytes: file.size,
-      ...(kind === 'avatar' ? { state: 'win' } : {}),
     }
     vi.mocked(api.post).mockResolvedValueOnce({
       ok: true,
@@ -42,13 +39,12 @@ describe('user media uploads', () => {
     })
     vi.stubGlobal('fetch', fetch)
 
-    if (kind === 'logo') await uploadLogo(file)
-    else await uploadAvatar(file, 'win')
+    await uploadLogo(file)
 
     expect(api.post).toHaveBeenNthCalledWith(1, '/v1/user/media?action=upload-url', {
       files: [{
-        kind, fileName: file.name, contentType: file.type, sizeBytes: file.size,
-        name: undefined, ...(kind === 'avatar' ? { state: 'win' } : {}),
+        kind: 'logo', fileName: file.name, contentType: file.type, sizeBytes: file.size,
+        name: undefined,
       }],
     })
     expect(fetch).toHaveBeenCalledTimes(1)
@@ -58,9 +54,7 @@ describe('user media uploads', () => {
       body: file,
     })
     expect(api.post).toHaveBeenNthCalledWith(2, '/v1/user/media', { items: [meta] })
-    expect(api.put).toHaveBeenCalledWith('/v1/user/media', {
-      kind, mediaId: meta.id, ...(kind === 'avatar' ? { state: 'win' } : {}),
-    })
+    expect(api.put).toHaveBeenCalledWith('/v1/user/media', { kind: 'logo', mediaId: meta.id })
   })
 
   it('does not register or select a logo when storage rejects the upload', async () => {

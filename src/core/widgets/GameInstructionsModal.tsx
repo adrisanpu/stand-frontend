@@ -54,7 +54,7 @@ export default function GameInstructionsModal({ open, onClose, children }: GameI
           <p className="text-[11px] sm:text-xs leading-snug text-gray-400">
             {t(
               GAME_DATA_NOTICE_MODAL,
-              'By scanning the QR code and participating, you agree that Stand (the service provider) and the event organizer may process your personal data—including your Instagram username, participation data, and quiz answers, if any—to manage the game experience, scores, and raffles. You may exercise your rights of access, rectification, and erasure as described in the privacy policy.'
+              'By scanning the QR code and participating, you agree that Stand (the service provider) and the event organizer may process your registration and participation data, including quiz answers if any, to manage the game experience, scores, and raffles. You may exercise your rights of access, rectification, and erasure as described in the privacy policy.'
             )}
           </p>
           <a

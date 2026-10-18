@@ -28,8 +28,8 @@ type SaveState =
 export const GAME_CONFIG_SAVE_LABEL = 'Guardar y aplicar cambios'
 
 /**
- * Shared "Configurar juego" body: playMode/joinChannel selectors, the optional game-specific
- * config component and a single footer button that persists everything together.
+ * Shared "Configurar juego" body: fixed mobile/Web access, optional game-specific config and one
+ * footer button that persists everything together.
  */
 export default function GameConfigPanel({ gameId, gameDefinition, settings, onSettingsChange, onSaved, onSavingChange }: Props) {
   const { t } = useOperatorLanguage()
@@ -184,7 +184,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
               </div>
               <fieldset disabled={accessDraft.status !== 'ready'} className="min-w-0 space-y-2">
                 <legend className="mb-2 font-medium">{t('Datos del participante', 'Participant information')}</legend>
-                {([['email', 'Email'], ['instagram', 'Instagram'], ['phone', 'Teléfono']] as const).map(([field, label]) => (
+                {([['email', 'Email'], ['phone', 'Teléfono']] as const).map(([field, label]) => (
                   <label key={field} className="flex items-center gap-2">
                     <input type="checkbox" checked={accessDraft.participantFields[field].required}
                       onChange={(event) => accessDraft.setParticipantFields({

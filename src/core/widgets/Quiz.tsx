@@ -33,8 +33,6 @@ type QuizDataResponse = {
   }>
   players: Array<{
     playerId: number
-    instagramPSID: string
-    instagramUsername: string
     quizCompleted: boolean
     quizCurrentQuestion: string | null
     quizAnswers: Record<string, string>

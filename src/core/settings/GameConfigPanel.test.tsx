@@ -56,7 +56,7 @@ describe('mobile event links', () => {
     )
   })
 
-  it.each(cases)('shows one set below selectors for $id / $playMode / $joinChannel', async ({ id, Config, playMode, joinChannel }) => {
+  it.each(cases)('shows one event link set for $id / $playMode / $joinChannel', async ({ id, Config, playMode, joinChannel }) => {
     vi.mocked(api.get).mockResolvedValue(gameResponse({
       playMode, joinChannel, type: { STACK: DEFAULT_STACK_CONFIG },
     }))
@@ -80,44 +80,44 @@ describe('mobile event links', () => {
     const section = screen.getByRole('region', { name: 'Enlaces del evento' })
     expect(section).toHaveClass('grid', 'grid-cols-3')
     expect(section.children).toHaveLength(3)
-    expect(screen.getAllByRole('checkbox')).toHaveLength(3)
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
     expect(screen.queryByText('Enlaces del evento')).not.toBeInTheDocument()
-    const selectors = screen.getByRole('group', { name: 'Acceso del participante' }).parentElement!
-    expect(selectors.nextElementSibling).toBe(section)
+    expect(screen.getByText('∞ móviles')).toBeInTheDocument()
+    expect(screen.getByText('Web')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Instagram' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '1 pantalla' })).not.toBeInTheDocument()
+    const accessInfo = screen.getByRole('group', { name: 'Acceso del participante' }).parentElement!.parentElement!
+    expect(accessInfo).toContainElement(section)
     if (id !== 'T1MER') {
       const rules = id === 'STACK' ? screen.getByLabelText('Velocidad inicial') : screen.getByText('Dificultad para encontrar a tu pareja')
       expect(section.compareDocumentPosition(rules) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
     }
   })
 
-  it.each(Object.keys(GAME_ACCESS_CAPABILITIES).filter((id) =>
-    !GAME_ACCESS_CAPABILITIES[id].playModes.includes('mobile'),
-  ))('omits mobile links for %s', async (id) => {
+  it.each(Object.keys(GAME_ACCESS_CAPABILITIES))('shows mobile links for %s', async (id) => {
     mount(definition(id))
     await waitFor(() => expect(footer()).toBeEnabled())
-    expect(screen.queryByRole('region', { name: 'Enlaces del evento' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('img', { name: 'QR validador de premios' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Enlaces del evento' })).toBeInTheDocument()
   })
 })
 
 describe('unified game configuration save', () => {
   it.each(['EMPAREJA2', 'T1MER', 'STACK'])('loads and saves all participant fields centrally for %s', async (id) => {
-    const participantFields = {
-      email: { required: false }, instagram: { required: true }, phone: { required: true },
-    }
+    const participantFields = { email: { required: false }, phone: { required: true } }
     vi.mocked(api.get).mockResolvedValue(gameResponse({
       playMode: 'mobile', joinChannel: 'web', participantFields,
     }))
     const { onSaved } = mount(definition(id, id === 'EMPAREJA2' ? Empareja2Config : id === 'T1MER' ? T1merConfig : undefined))
     await waitFor(() => expect(footer()).toBeEnabled())
     expect(screen.getByLabelText('Email')).not.toBeChecked()
-    expect(screen.getByLabelText('Instagram')).toBeChecked()
+    expect(screen.queryByLabelText('Instagram')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Teléfono')).toBeChecked()
-    expect(screen.getAllByRole('checkbox')).toHaveLength(3)
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
     fireEvent.click(footer())
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ participantFields })))
     expect(api.put).toHaveBeenCalledWith('/v1/game', {
-      gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web', participantFields,
+      gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web',
+      participantFields,
     })
     const writes = vi.mocked(api.put).mock.calls.filter(([, body]) => 'participantFields' in (body as Record<string, unknown>))
     expect(writes).toHaveLength(1)
@@ -214,9 +214,6 @@ describe('unified game configuration save', () => {
     const { onSaved, onSettingsChange } = mount(definition('T1MER', T1merConfig))
     await waitFor(() => expect(footer()).toBeEnabled())
     await waitFor(() => expect(screen.queryByText('Cargando configuración...')).not.toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: '∞ móviles' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Web' }))
-    fireEvent.click(screen.getByLabelText('Instagram'))
     fireEvent.click(screen.getByLabelText('Teléfono'))
     fireEvent.click(screen.getByLabelText('Email'))
     expect(screen.getByText('Participante')).toBeInTheDocument()
@@ -228,11 +225,11 @@ describe('unified game configuration save', () => {
     expect(api.put).toHaveBeenCalledTimes(1)
     expect(api.put).toHaveBeenCalledWith('/v1/game', {
       gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web',
-      participantFields: { email: { required: false }, instagram: { required: true }, phone: { required: true } },
+      participantFields: { email: { required: false }, phone: { required: true } },
     })
     expect(onSaved).toHaveBeenCalledWith({
       playMode: 'mobile', joinChannel: 'web',
-      participantFields: { email: { required: false }, instagram: { required: true }, phone: { required: true } },
+      participantFields: { email: { required: false }, phone: { required: true } },
     })
     expect(onSettingsChange).not.toHaveBeenCalled()
   })
@@ -241,7 +238,9 @@ describe('unified game configuration save', () => {
     const { onSaved } = mount(definition('CUPIDO'))
     await waitFor(() => expect(footer()).toBeEnabled())
     fireEvent.click(footer())
-    await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ playMode: 'master', joinChannel: 'instagram' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({
+      playMode: 'mobile', joinChannel: 'web',
+    })))
     expect(api.put).toHaveBeenCalledTimes(1)
   })
 
@@ -317,7 +316,7 @@ describe('unified game configuration save', () => {
     expect(api.put).toHaveBeenCalledTimes(1)
     await act(async () => { resolvePut({ ok: true }) })
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(onSaved.mock.calls[0][0]).toMatchObject({ objectiveWord: 'STAND', playMode: 'master', joinChannel: 'instagram' })
+    expect(onSaved.mock.calls[0][0]).toMatchObject({ objectiveWord: 'STAND', playMode: 'mobile', joinChannel: 'web' })
     expect(onSavingChange).toHaveBeenLastCalledWith(false)
   })
 
@@ -329,7 +328,7 @@ describe('unified game configuration save', () => {
     await waitFor(() => expect(footer()).toBeEnabled())
     fireEvent.click(footer())
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(onSaved.mock.calls[0][0]).toMatchObject({ cardLayouts: { c1: 'left' }, playMode: 'master' })
+    expect(onSaved.mock.calls[0][0]).toMatchObject({ cardLayouts: { c1: 'left' }, playMode: 'mobile', joinChannel: 'web' })
     expect(api.put).toHaveBeenCalledTimes(1)
   })
 

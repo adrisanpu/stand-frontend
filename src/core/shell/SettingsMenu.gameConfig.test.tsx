@@ -77,14 +77,18 @@ describe('SettingsMenu Configurar juego', () => {
     expect(api.put).not.toHaveBeenCalled()
     fireEvent.click(footer())
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
-    expect(api.put).toHaveBeenCalledWith('/v1/game', { gameId: 'ABC123', playMode: 'master', joinChannel: 'instagram' })
+    expect(api.put).toHaveBeenCalledWith('/v1/game', {
+      gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web',
+      participantFields: { email: { required: true }, phone: { required: false } },
+    })
     expect(api.put).toHaveBeenCalledWith('/v1/game', {
       gameId: 'ABC123',
       settings: { l3tras: { objectiveWord: 'PIZZA', validationTimeLimitSeconds: 60 } },
     })
     expect(onConfigSaved).toHaveBeenCalledTimes(1)
     expect(JSON.parse(localStorage.getItem('L3TRAS_settings_ABC123') ?? '{}')).toEqual({
-      objectiveWord: 'PIZZA', validationTimeLimitSeconds: 60, playMode: 'master', joinChannel: 'instagram',
+      objectiveWord: 'PIZZA', validationTimeLimitSeconds: 60, playMode: 'mobile', joinChannel: 'web',
+      participantFields: { email: { required: true }, phone: { required: false } },
     })
   })
 

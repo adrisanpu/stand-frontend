@@ -4,13 +4,13 @@ import type { PrizeCatalog } from './prizes'
 
 export interface GameScreenProps {
   gameId: string
-  /** When 'landscape', the game may render a 3-column layout (logo+code+QR | validation+animation | sidebar) */
+  /** When 'landscape', the game may render a 3-column layout (logo+code+QR | validation | sidebar) */
   orientation?: 'portrait' | 'landscape'
   /** For landscape: node to place in column 1 (e.g. logo) */
   logoElement?: React.ReactNode
   /** For landscape: node to place in column 1 below the info panel (e.g. Players) */
   playersElement?: React.ReactNode
-  /** For landscape: node to place in column 3 (Ranking, RaffleData, avatar fallback) */
+  /** For landscape: node to place in column 3 (ranking and raffle data) */
   sidebarElement?: React.ReactNode
   /** Optional: top X positions that get a prize (e.g. 3); used to show "Premio por top X" in result screen */
   topX?: number
@@ -19,10 +19,6 @@ export interface GameScreenProps {
   prizeCatalog?: PrizeCatalog
   /** When the in-game counter/timer is running, call with true to pause API polling (score, ranking, game) and avoid lag */
   onCounterActiveChange?: (active: boolean) => void
-  /** Optional: report current avatar state so shell widgets can render synced animations */
-  onAvatarStateChange?: (state: string) => void
-  /** Optional: presigned avatar video URLs per state (used by games that embed GameStateAvatar) */
-  avatarMediaUrls?: Partial<Record<'idle' | 'win' | 'lose', string | null>>
   /** Participant registration channel, independent of where gameplay runs. */
   joinChannel?: string | null
   playMode?: PlayMode

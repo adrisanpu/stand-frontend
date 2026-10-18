@@ -1,11 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
-import { ThemeProvider, useAvatarsEnabled, getAvatarsEnabled } from '../theme'
+import { ThemeProvider } from '../theme'
 import GameGate from './GameGate'
 import SettingsMenu from './SettingsMenu'
 import Ranking from '../widgets/Ranking'
 import Players from '../widgets/Players'
 import RaffleData from '../widgets/RaffleData'
-import GameStateAvatar from '../widgets/GameStateAvatar'
 import { getGameById } from '../../games'
 import type { GameDefinition } from '../types'
 import { useCurrentUser } from '../../auth/useCurrentUser'
@@ -44,11 +43,9 @@ function AppContent() {
   const [gameName, setGameName] = useState<string | null>(null)
   const [gameType, setGameType] = useState<string | null>(null)
   const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
-  const avatarsEnabled = useAvatarsEnabled()
   const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
   const [mediaLoading, setMediaLoading] = useState(true)
   const customLogo = userMedia ? resolveUserSelectedLogoUrl(userMedia) : null
-  const [avatarMediaUrls, setAvatarMediaUrls] = useState<Partial<Record<'idle' | 'win' | 'lose', string | null>>>({})
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
   const [loadedAccess, setLoadedAccess] = useState<{ gameId: string; access: GameAccess } | null>(null)
   const [accessError, setAccessError] = useState<string | null>(null)
@@ -62,7 +59,6 @@ function AppContent() {
   const playMode = access?.playMode
   const [gameSettings, setGameSettings] = useState<Record<string, unknown> | null>(null)
   const [counterActive, setCounterActive] = useState(false)
-  const [avatarState, setAvatarState] = useState('idle')
   const portraitContentRef = useRef<HTMLDivElement>(null)
   const landscapeContentRef = useRef<HTMLDivElement>(null)
   const [portraitPaddingTopDvh, setPortraitPaddingTopDvh] = useState(5)
@@ -70,7 +66,7 @@ function AppContent() {
   const [landscapeScale, setLandscapeScale] = useState(1)
   const [landscapeContentSize, setLandscapeContentSize] = useState<{ width: number; height: number } | null>(null)
 
-  // Load custom logo and avatar media from backend.
+  // Load custom logo from backend.
   useEffect(() => {
     let cancelled = false
     const load = async () => {
@@ -79,15 +75,6 @@ function AppContent() {
         if (cancelled) return
         if (!media.ok) throw new Error('Unable to load appearance media')
         setUserMedia(media)
-        if (getAvatarsEnabled()) {
-          setAvatarMediaUrls({
-            idle: media.avatar.selected?.idle?.url ?? null,
-            win: media.avatar.selected?.win?.url ?? null,
-            lose: media.avatar.selected?.lose?.url ?? null,
-          })
-        } else {
-          setAvatarMediaUrls({})
-        }
       } catch (error) {
         if (cancelled) return
         console.error('Unable to load appearance media:', error)
@@ -214,10 +201,6 @@ function AppContent() {
     }
   }, [gameId, gameType, gameConfigVersion], { interval: gameId ? 60_000 : 0 })
 
-  useEffect(() => {
-    setAvatarState('idle')
-  }, [gameId, gameConfigVersion])
-
   const handleGameCreated = (name: string, id: string, type?: string) => {
     setGameName(name)
     setGameId(id)
@@ -231,7 +214,6 @@ function AppContent() {
     setGameType(null)
     setGameDefinition(null)
     setShowSettings(false)
-    setAvatarState('idle')
   }
 
   const backShellRef = useRef({ showSettings: false, inGame: false })
@@ -453,8 +435,6 @@ function AppContent() {
                           prizeLabel={rankingPrizeLabel}
                           prizeCatalog={prizeCatalog}
                           onCounterActiveChange={setCounterActive}
-                          onAvatarStateChange={setAvatarState}
-                          avatarMediaUrls={avatarMediaUrls}
                           joinChannel={joinChannel}
                           playMode={playMode}
                         />
@@ -484,8 +464,6 @@ function AppContent() {
                           prizeLabel={rankingPrizeLabel}
                           prizeCatalog={prizeCatalog}
                           onCounterActiveChange={setCounterActive}
-                          onAvatarStateChange={setAvatarState}
-                          avatarMediaUrls={avatarMediaUrls}
                           joinChannel={joinChannel}
                           playMode={playMode}
                         />
@@ -530,8 +508,6 @@ function AppContent() {
                         prizeLabel={rankingPrizeLabel}
                         prizeCatalog={prizeCatalog}
                         onCounterActiveChange={setCounterActive}
-                        onAvatarStateChange={setAvatarState}
-                        avatarMediaUrls={avatarMediaUrls}
                         joinChannel={joinChannel}
                         playMode={playMode}
                         logoElement={
@@ -558,16 +534,6 @@ function AppContent() {
                             {features.raffles && (
                               <div className="flex-shrink-0 w-full min-h-[min(32vh,220px)] flex flex-col">
                                 <RaffleData gameId={gameId} gameName={gameName} compact prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
-                              </div>
-                            )}
-                            {avatarsEnabled && !currentGame.showRanking && (
-                              <div className="min-h-[180px] flex-[1_1_180px] w-full overflow-hidden">
-                                <GameStateAvatar
-                                  t={t}
-                                  state={avatarState}
-                                  mediaUrls={avatarMediaUrls}
-                                  className="card rounded-xl sm:rounded-2xl shadow-neon w-full h-full min-w-0 overflow-hidden p-2 sm:p-3"
-                                />
                               </div>
                             )}
                           </div>

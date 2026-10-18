@@ -11,14 +11,13 @@ interface GameDataResponse {
     gameId: string
     gameName: string
     gameType: string
-    participantFields?: { email?: { required?: boolean }; instagram?: { required?: boolean } }
+    participantFields?: { email?: { required?: boolean } }
   }
 }
 
 export default function T1merGameConfig({ gameId, gameName: _gameName, onChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   const [emailRequired, setEmailRequired] = useState(true)
-  const [instagramRequired, setInstagramRequired] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState('')
   const [loaded, setLoaded] = useState(!gameId)
@@ -36,7 +35,6 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange,
         if (!data.ok || !data.game) throw new Error('No se pudo cargar la configuración.')
         const pf = data.game?.participantFields
         if (pf?.email?.required != null) setEmailRequired(Boolean(pf.email.required))
-        if (pf?.instagram?.required != null) setInstagramRequired(Boolean(pf.instagram.required))
         setLoaded(true)
       } catch (cause) {
         if (!cancelled) setLoadError(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración.')
@@ -53,13 +51,12 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange,
     const invalid = validate()
     if (invalid) throw new Error(invalid)
     if (registerSave) return
-    const settings = { emailRequired, instagramRequired }
+    const settings = { emailRequired }
     if (gameId) {
       await api.put('/v1/game', {
         gameId,
         participantFields: {
           email: { required: emailRequired },
-          instagram: { required: instagramRequired },
         },
       })
     }
@@ -110,14 +107,6 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange,
           <label className="flex items-center gap-2 text-sm text-gray-300">
             <input type="checkbox" checked={emailRequired} onChange={(e) => setEmailRequired(e.target.checked)} />
             {t('Email obligatorio (CRM / contacto)', 'Email required (CRM / contact)')}
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-300">
-            <input
-              type="checkbox"
-              checked={instagramRequired}
-              onChange={(e) => setInstagramRequired(e.target.checked)}
-            />
-            {t('Instagram obligatorio', 'Instagram required')}
           </label>
         </div>
       </div>}

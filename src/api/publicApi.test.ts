@@ -61,7 +61,7 @@ describe('public email verification contract', () => {
     }
     const request = vi.fn().mockResolvedValue(new Response(JSON.stringify(challenge)))
     vi.stubGlobal('fetch', request)
-    const registration = { gameId: 'GAME', email: 'player@example.com', consent: true, language: 'en' as const }
+    const registration = { gameId: 'GAME', email: 'player@example.com', username: 'Player', consent: true, language: 'en' as const }
     expect(await publicApi.requestEmailCode(registration)).toEqual(challenge)
     expect(request).toHaveBeenCalledWith(expect.stringMatching(/\/v1\/public\/email\/request$/), expect.objectContaining({
       method: 'POST', body: JSON.stringify(registration),
@@ -82,7 +82,7 @@ describe('public email verification contract', () => {
       JSON.stringify({ error: 'EmailRateLimited', message: 'Wait', retryAfter: 75 }),
       { status: 429, headers: header ? { 'Retry-After': '90' } : {} },
     )))
-    const error = await publicApi.requestEmailCode({ gameId: 'GAME', consent: true }).catch((err: unknown) => err)
+    const error = await publicApi.requestEmailCode({ gameId: 'GAME', username: 'Player', consent: true }).catch((err: unknown) => err)
     expect(error).toBeInstanceOf(PublicApiError)
     expect(error).toMatchObject({ code: 'EmailRateLimited', status: 429, retryAfter: header ? 90 : 75 })
   })

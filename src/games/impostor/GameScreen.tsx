@@ -16,8 +16,8 @@ type Phase = 'lobby' | 'word_round' | 'voting' | 'result' | 'finished'
 
 type LobbyPlayer = {
   playerId: number
-  instagramUsername?: string
-  instagramProfilePicUrl?: string
+  username?: string | null
+  profilePicUrl?: string | null
 }
 
 type ImpostorStateResponse = {
@@ -41,7 +41,7 @@ type ValidateResponse = {
   message?: string
 }
 
-export default function ImpostorGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement, onAvatarStateChange }: GameScreenProps) {
+export default function ImpostorGameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement }: GameScreenProps) {
   const { t } = useOperatorLanguage()
   const [code, setCode] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
@@ -88,18 +88,6 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
       void postAction('start_round')
     }
   }, [state, players.length, autoStarted])
-
-  useEffect(() => {
-    const avatarState =
-      state?.phase === 'result' || state?.phase === 'finished'
-        ? state.winner === 'impostor'
-          ? 'lose'
-          : 'win'
-        : state?.phase === 'word_round' || state?.phase === 'voting'
-          ? 'playing'
-          : 'idle'
-    onAvatarStateChange?.(avatarState)
-  }, [state, onAvatarStateChange])
 
   const validate = async () => {
     if (!gameId || code.length !== 4) return
@@ -180,12 +168,12 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
         {placeholders.map((p, idx) => (
           <div key={idx} className="aspect-square rounded-xl border border-white/10 bg-[rgba(255,255,255,0.04)] p-2 flex flex-col items-center justify-center text-center">
-            {p?.instagramProfilePicUrl ? (
-              <img src={p.instagramProfilePicUrl} alt={p.instagramUsername || t(`Jugador ${idx + 1}`, `Player ${idx + 1}`)} className="w-10 h-10 rounded-full object-cover mb-1" />
+            {p?.profilePicUrl ? (
+              <img src={p.profilePicUrl} alt={p.username || t(`Jugador ${idx + 1}`, `Player ${idx + 1}`)} className="w-10 h-10 rounded-full object-cover mb-1" />
             ) : (
               <div className="w-10 h-10 rounded-full bg-white/10 mb-1" />
             )}
-            <span className="text-[11px] text-gray-300 truncate w-full">{p?.instagramUsername || t('Pendiente', 'Waiting')}</span>
+            <span className="text-[11px] text-gray-300 truncate w-full">{p?.username || t('Pendiente', 'Waiting')}</span>
           </div>
         ))}
       </div>
@@ -202,7 +190,7 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
               <option value="">{t('Jugador que vota', 'Voting player')}</option>
               {players.map((p) => (
                 <option key={`voter-${p.playerId}`} value={p.playerId}>
-                  {p.instagramUsername || t(`Jugador ${p.playerId}`, `Player ${p.playerId}`)}
+                  {p.username || t(`Jugador ${p.playerId}`, `Player ${p.playerId}`)}
                 </option>
               ))}
             </select>
@@ -214,7 +202,7 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
               <option value="">{t('Sospechoso (impostor)', 'Suspect (impostor)')}</option>
               {players.map((p) => (
                 <option key={`target-${p.playerId}`} value={p.playerId}>
-                  {p.instagramUsername || t(`Jugador ${p.playerId}`, `Player ${p.playerId}`)}
+                  {p.username || t(`Jugador ${p.playerId}`, `Player ${p.playerId}`)}
                 </option>
               ))}
             </select>
@@ -247,10 +235,13 @@ export default function ImpostorGameScreen({ gameId, orientation, logoElement, p
       <div className={GAME_LANDSCAPE_THREE_COL_GRID}>
         <GameLandscapeLeftColumn gameId={gameId} logoElement={logoElement} playersElement={playersElement}>
           <LandscapeInfoInstruction>
-            {t('Escanea el QR y escribe al bot.', 'Scan the QR code and message the bot.')}
+            {t('Escanea el QR y regístrate en la web.', 'Scan the QR code and register on the web.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
-            {t('Introduce el código y valida.', 'Enter the code and validate it.')}
+            {t('Introduce el código de cada jugador y valida.', 'Enter each player’s code and validate it.')}
+          </LandscapeInfoInstruction>
+          <LandscapeInfoInstruction>
+            {t('Cada jugador ve su rol y palabra en el móvil.', 'Each player sees their role and word on their phone.')}
           </LandscapeInfoInstruction>
           <LandscapeInfoInstruction>
             {t('Cada jugador dice una palabra.', 'Each player says one word.')}
