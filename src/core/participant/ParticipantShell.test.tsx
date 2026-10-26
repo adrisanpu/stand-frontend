@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PublicApiError, publicApi, type StackAssignment, type PublicGameResponse, type PlayerResponse, type PlayerAssignment } from '../../api/publicApi'
 import { DEFAULT_STACK_CONFIG } from '../../games/stack/stackLogic'
+import { DEFAULT_RULET4_CONFIG } from '../../games/rulet4/rulet4Logic'
 import { StrictMode } from 'react'
 import ParticipantShell from './ParticipantShell'
 import { loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
@@ -33,6 +34,28 @@ function renderParticipant(strict = false) {
 }
 
 describe('ParticipantShell STACK integration', () => {
+  it('restores a RULET4 session and shows the server result instead of the generic registered screen', async () => {
+    vi.mocked(publicApi.getGame).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'RULET4', isActive: true,
+      playMode: 'mobile', joinChannel: 'web', playerCount: 1, validatedCount: 0,
+      recentPairs: [], joinUrl: '', rulet4Config: DEFAULT_RULET4_CONFIG,
+    })
+    const roulettePlayer = {
+      gameType: 'RULET4' as const, playerId: 1, displayName: 'Ana',
+      result: {
+        panel: DEFAULT_RULET4_CONFIG.panels[2], index: 8, configSnapshot: DEFAULT_RULET4_CONFIG,
+        spunAt: '2026-10-26T12:00:00Z',
+      },
+    }
+    savePlayerSession('GAME1234', 'token', roulettePlayer)
+    vi.mocked(publicApi.getPlayer).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'RULET4', playerToken: 'token',
+      assignment: roulettePlayer, prizes: [],
+    })
+    renderParticipant()
+    expect(await screen.findByText('Verde')).toBeInTheDocument()
+    expect(screen.queryByText('¡Ya estás dentro!')).not.toBeInTheDocument()
+  })
   it('keeps the validation prize visible while the participant looks for their partner', async () => {
     vi.mocked(publicApi.getGame).mockResolvedValue({
       ok: true, gameId: 'GAME1234', gameType: 'EMPAREJA2', isActive: true,

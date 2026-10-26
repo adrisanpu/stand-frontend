@@ -1,6 +1,7 @@
 import type { StackConfig, StackPlacement } from '../games/stack/stackLogic'
 import type { ParticipantAppearance } from '../core/theme/appearance'
 import type { GamePrize, PrizeCatalog } from '../core/prizes'
+import { isRulet4Result, type Rulet4Settings, type Rulet4Result, type Rulet4Assignment } from '../games/rulet4/rulet4Logic'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -64,6 +65,7 @@ export type PublicGameResponse = {
   recentPairs: Array<{ label: string; characterNames: string[]; validatedAt: string }>
   ranking?: PublicRankingEntry[]
   stackConfig?: StackConfig
+  rulet4Config?: Rulet4Settings
   stackStartSnapshot?: boolean
   stackFinishSupported?: boolean
   joinUrl: string
@@ -126,7 +128,7 @@ export type ImpostorAssignment = T1merAssignment & {
   impostor?: ImpostorParticipantState
 }
 
-export type PlayerAssignment = Empareja2Assignment | T1merAssignment | StackAssignment | ImpostorAssignment
+export type PlayerAssignment = Empareja2Assignment | T1merAssignment | StackAssignment | ImpostorAssignment | Rulet4Assignment
 
 export function isStackAssignment(assignment: PlayerAssignment): assignment is StackAssignment {
   return 'gameType' in assignment && assignment.gameType === 'STACK'
@@ -280,6 +282,14 @@ export type PublicScoreResponse = {
 }
 
 export const publicApi = {
+  async spinRulet4(gameId: string, playerToken: string): Promise<Rulet4Result> {
+    const response = await publicRequest<{ ok?: boolean; result?: unknown }>('/v1/public/rulet4/spin', {
+      method: 'POST',
+      body: JSON.stringify({ gameId, playerToken }),
+    })
+    if (response.ok !== true || !isRulet4Result(response.result)) throw new Error('Invalid RULET4 result')
+    return response.result
+  },
   getGame: (gameId: string) =>
     publicRequest<PublicGameResponse>(`/v1/public/game?gameId=${encodeURIComponent(gameId)}`),
 
