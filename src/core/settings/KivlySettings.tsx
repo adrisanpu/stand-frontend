@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { kivlyApi, type KivlyConnection, type KivlySettings as Settings, type KivlyReward } from '../../api/kivlyApi'
+import { kivlyApi, type KivlyConnection, type KivlyReward, type KivlySettings as Settings } from '../../api/kivlyApi'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 
 export function useKivlyDraft(gameId: string, active: boolean) {
@@ -16,7 +16,7 @@ export function useKivlyDraft(gameId: string, active: boolean) {
 
   useEffect(() => {
     const current = ++generation.current
-    setStatus('loading')
+    setStatus(active ? 'loading' : 'ready')
     if (active) {
       void kivlyApi.getAccountConnection().then((account) => {
         if (generation.current !== current) return
@@ -32,8 +32,6 @@ export function useKivlyDraft(gameId: string, active: boolean) {
       }).catch(() => {
         if (generation.current === current) setStatus('error')
       })
-    } else {
-      setStatus('ready')
     }
     return () => { generation.current += 1 }
   }, [gameId, active, revision])
@@ -66,9 +64,8 @@ export function useKivlyRewardDraft(gameId: string, enabled: boolean) {
     setSaved('')
     setRewards([])
     if (enabled) {
-      void Promise.all([kivlyApi.get(gameId), kivlyApi.listRewards(gameId)]).then(([state, catalog]) => {
+      void Promise.all([kivlyApi.getReward(gameId), kivlyApi.listRewards(gameId)]).then(([reward, catalog]) => {
         if (cancelled) return
-        const reward = state.reward
         setRewards(reward && !catalog.some((item) => item.id === reward.id) ? [...catalog, reward] : catalog)
         setSelected(reward?.id ?? '')
         setSaved(reward?.id ?? '')
@@ -77,14 +74,16 @@ export function useKivlyRewardDraft(gameId: string, enabled: boolean) {
     }
     return () => { cancelled = true }
   }, [gameId, enabled, revision])
-  return { rewards, selected, setSelected, status, reload: () => setRevision((value) => value + 1),
+  return {
+    rewards, selected, setSelected, status, reload: () => setRevision((value) => value + 1),
     persist: async () => {
       if (!enabled) return
       if (status !== 'ready') throw new Error('No se pudo cargar el premio Kivly.')
       if (selected === saved) return
       await kivlyApi.saveReward(gameId, selected || null)
       setSaved(selected)
-    } }
+    },
+  }
 }
 
 export function KivlyRewardSettings({ draft }: { draft: ReturnType<typeof useKivlyRewardDraft> }) {

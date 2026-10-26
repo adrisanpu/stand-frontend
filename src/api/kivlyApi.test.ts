@@ -2,30 +2,49 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from './api'
 import { kivlyApi } from './kivlyApi'
 
-vi.mock('./api', () => ({ api: { get: vi.fn(), put: vi.fn() } }))
+vi.mock('./api', () => ({ api: { get: vi.fn(), put: vi.fn(), delete: vi.fn() } }))
 beforeEach(() => { vi.clearAllMocks() })
 
 describe('Kivly account location', () => {
-  it('loads the game reward catalog and saves a selection through its dedicated contract', async () => {
-    const rewards = [{ id: 'reward1', name: 'Coffee' }]
-    vi.mocked(api.get).mockResolvedValue({ ok: true, rewards })
-    expect(await kivlyApi.listRewards('GAME1')).toEqual(rewards)
-    expect(api.get).toHaveBeenCalledWith('/v1/game/kivly/rewards?gameId=GAME1')
+  it('connects and saves club details through the account contract', async () => {
     vi.mocked(api.put).mockResolvedValue({ ok: true })
-    await kivlyApi.saveReward('GAME1', 'reward1')
-    expect(api.put).toHaveBeenCalledWith('/v1/game/kivly', { gameId: 'GAME1', rewardId: 'reward1' })
-    await kivlyApi.saveReward('GAME1', null)
-    expect(api.put).toHaveBeenLastCalledWith('/v1/game/kivly', { gameId: 'GAME1', rewardId: null })
+    expect(await kivlyApi.connectAccount('client-id', 'client-secret')).toBe(false)
+    expect(api.put).toHaveBeenCalledWith('/v1/kivly', { clientId: 'client-id', clientSecret: 'client-secret' })
+    const clubSettings = { clubName: 'Club', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms' }
+    await kivlyApi.saveClubSettings(clubSettings)
+    expect(api.put).toHaveBeenLastCalledWith('/v1/kivly', { clubSettings })
   })
 
-  it.each([undefined, {}, [{ id: 'reward1' }], [{ id: '', name: 'Coffee' }]])('rejects malformed catalogs: %j', async (rewards) => {
-    vi.mocked(api.get).mockResolvedValue({ ok: true, rewards })
-    await expect(kivlyApi.listRewards('GAME1')).rejects.toThrow('Invalid Kivly rewards response')
+  describe('Kivly STACK rewards', () => {
+    it('loads the saved reward and active reward catalog', async () => {
+      vi.mocked(api.get)
+        .mockResolvedValueOnce({ ok: true, reward: { id: 'reward-1', name: 'Coffee' } })
+        .mockResolvedValueOnce({ ok: true, rewards: [{ id: 'reward-1', name: 'Coffee' }] })
+      expect(await kivlyApi.getReward('GAME 1')).toEqual({ id: 'reward-1', name: 'Coffee' })
+      expect(await kivlyApi.listRewards('GAME 1')).toEqual([{ id: 'reward-1', name: 'Coffee' }])
+      expect(api.get).toHaveBeenNthCalledWith(1, '/v1/game/kivly?gameId=GAME%201')
+      expect(api.get).toHaveBeenNthCalledWith(2, '/v1/game/kivly/rewards?gameId=GAME%201')
+    })
+
+    it('rejects malformed rewards and unconfirmed selection changes', async () => {
+      vi.mocked(api.get).mockResolvedValueOnce({ ok: true, rewards: [{}] })
+      await expect(kivlyApi.listRewards('GAME1')).rejects.toThrow('Invalid Kivly rewards response')
+      vi.mocked(api.put).mockResolvedValue({ ok: false })
+      await expect(kivlyApi.saveReward('GAME1', 'reward-1')).rejects.toThrow('Kivly reward not confirmed')
+    })
   })
 
-  it('does not accept an unconfirmed reward save', async () => {
+  it('disconnects and exposes credential cleanup warnings', async () => {
+    vi.mocked(api.delete).mockResolvedValue({ ok: true, warning: 'KivlySecretCleanupRequired' })
+    expect(await kivlyApi.disconnectAccount()).toBe(true)
+    expect(api.delete).toHaveBeenCalledWith('/v1/kivly')
+  })
+
+  it('does not accept unconfirmed connection or club changes', async () => {
     vi.mocked(api.put).mockResolvedValue({ ok: false })
-    await expect(kivlyApi.saveReward('GAME1', 'reward1')).rejects.toThrow('Kivly reward not confirmed')
+    await expect(kivlyApi.connectAccount('id', 'secret')).rejects.toThrow('Kivly connection not confirmed')
+    await expect(kivlyApi.saveClubSettings({ clubName: '', privacyUrl: '', termsUrl: '' }))
+      .rejects.toThrow('Kivly club settings not confirmed')
   })
 
   it('returns the authorized location and saved ID', async () => {
@@ -52,12 +71,4 @@ describe('Kivly account location', () => {
     expect(await kivlyApi.getAccountConnection()).toEqual(connection)
   })
 
-  it('accepts game settings using the connection without a separate approval flag', async () => {
-    const state = {
-      ok: true, connection: { connected: true },
-      settings: { enabled: true, clubName: 'Club', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms' },
-    }
-    vi.mocked(api.get).mockResolvedValue(state)
-    expect(await kivlyApi.get('GAME1')).toEqual(state)
-  })
 })

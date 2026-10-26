@@ -43,6 +43,75 @@ const catalog: PrizeCatalog = {
   raffle: { name: 'Sorteo secreto', limit: 1, imageUrl: '/prizes/raffle.png' },
 }
 
+describe('Kivly club registration', () => {
+  const loyalty = {
+    clubName: 'Test club', privacyUrl: 'https://club.test/privacy',
+    termsUrl: 'https://club.test/terms', consentVersion: 'version-1',
+  }
+
+  function fillRegistration() {
+    fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: 'Ana Test' } })
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'ana@club.test' } })
+    fireEvent.click(screen.getAllByRole('checkbox')[0])
+  }
+
+  it('requires separate, explicit club consent and binds it to the email challenge', async () => {
+    const onJoined = vi.fn()
+    render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty }} onJoined={onJoined} />)
+    fillRegistration()
+    const clubConsent = screen.getAllByRole('checkbox')[1]
+    expect(clubConsent).not.toBeChecked()
+    expect(screen.getByRole('link', { name: 'Condiciones del club' })).toHaveAttribute('href', loyalty.termsUrl)
+    fireEvent.submit(screen.getByLabelText('Email *').closest('form')!)
+    expect(screen.getByRole('alert')).toHaveTextContent('Debes aceptar las condiciones del club')
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    fireEvent.click(clubConsent)
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    await screen.findByLabelText('Código de verificación')
+    expect(publicApi.requestEmailCode).toHaveBeenCalledWith({
+      gameId: 'ABC123', email: 'ana@club.test', username: 'Ana Test',
+      consent: true, loyaltyConsentVersion: 'version-1', language: 'es',
+    })
+    expect(onJoined).not.toHaveBeenCalled()
+    expect(savePlayerSession).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+    await waitFor(() => expect(onJoined).toHaveBeenCalledWith('token'))
+    expect(publicApi.join).toHaveBeenCalledWith({ gameId: 'ABC123', challengeId: 'challenge-1', code: '012345' })
+  })
+
+  it('discards the challenge and requires consent again when club terms change', async () => {
+    const { rerender } = render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty }} onJoined={vi.fn()} />)
+    fillRegistration()
+    fireEvent.click(screen.getAllByRole('checkbox')[1])
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    await screen.findByLabelText('Código de verificación')
+    rerender(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty: { ...loyalty, consentVersion: 'version-2' } }} onJoined={vi.fn()} />)
+    expect(screen.queryByLabelText('Código de verificación')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('checkbox')[1]).not.toBeChecked()
+    expect(screen.getByLabelText('Nombre completo *')).toHaveValue('Ana Test')
+    expect(publicApi.join).not.toHaveBeenCalled()
+  })
+
+  it.each(['KivlyRegistrationBusy', 'KivlyReconciliationRequired', 'KivlyUnavailable'])(
+    'does not grant access after %s and keeps verification details for recovery', async (code) => {
+      const onJoined = vi.fn()
+      vi.mocked(publicApi.join).mockRejectedValueOnce(new PublicApiError('Private upstream details', 409, code))
+      render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty }} onJoined={onJoined} />)
+      fillRegistration()
+      fireEvent.click(screen.getAllByRole('checkbox')[1])
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+      fireEvent.change(await screen.findByLabelText('Código de verificación'), { target: { value: '012345' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+      expect(await screen.findByRole('alert')).not.toHaveTextContent('Private upstream details')
+      expect(onJoined).not.toHaveBeenCalled()
+      expect(savePlayerSession).not.toHaveBeenCalled()
+      expect(screen.getByLabelText('Código de verificación')).toHaveValue('012345')
+      expect(publicApi.requestEmailCode).toHaveBeenCalledOnce()
+    },
+  )
+})
+
 describe('participant prize promotion', () => {
   it('shows validation and ranking before registration fields, never the raffle', () => {
     render(<>

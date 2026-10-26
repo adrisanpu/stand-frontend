@@ -26,42 +26,25 @@ Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas d
 
 ## Configurar juego
 
-### Kivly: registro en STACK
+### Kivly: connection and registration
 
-Inicio > Configuracion > Integraciones centraliza la conexion y los datos del
-club del organizador, compartidos por sus juegos. Conectar/cambiar credenciales
-y desconectar son acciones inmediatas. Las credenciales se borran del formulario
-al enviarlas o cancelar; no se guardan en el navegador. Desconectar pide
-confirmacion y desactiva el requisito compartido.
+Home settings > **Integraciones** owns the organizer-wide connection and club
+details. Connecting/changing credentials and disconnecting are immediate actions;
+credentials are cleared on submission/cancellation and never stored in browser
+storage. The first release enables club registration only for STACK. Disconnect
+requires confirmation and affects all the organizer's STACK games.
+STACK settings show only a read-only logo/status and an explicit retry on errors.
+An unavailable indicator must not block saving unrelated game rules.
 
-Una conexion con nombre y URLs legales validos habilita el registro del club y
-fuerza email obligatorio, sin una lista de ubicaciones aprobadas. Los enlaces
-de ejemplo conservan el modo demo sin altas reales. El menu del juego muestra
-el logo y estado Kivly; un error de carga bloquea el guardado y muestra una
-accion para comprobar el estado, nunca valores por defecto aparentemente validos.
-
-En `/play`, el consentimiento del club es explicito y separado del de Stand.
-La version aceptada viaja con la solicitud del codigo de email; solo el backend
-registra/vincula al cliente tras verificarlo. Las sesiones antiguas sin membresia
-vuelven al formulario. Los resultados inciertos se notifican sin repetir un alta.
-Todos los formularios `/play` piden nombre completo primero y email obligatorio.
-El nombre se usa tambien en rankings. Configurar juego permite mostrar telefono,
-siempre opcional: solo se envia a Kivly al crear una ficha nueva; no se actualizan
-clientes existentes.
-
-STACK conectado ofrece un selector de premio existente, guardado con los cambios
-del juego. Todos los participantes que terminan reciben el mismo, sin umbral de
-puntos. Tras confirmar el resultado, una tarjeta compacta con la paleta activa
-muestra el premio y solo los botones Apple/Google Wallet que devuelva Kivly.
-No se pide plataforma al registrarse ni se crean enlaces artificiales. Si no hay
-tarjeta, se indica; un fallo de premio no oculta ni invalida el resultado.
-La accion de comprobar consulta el estado sin repetir asignaciones inciertas.
-No hay creacion de premios ni envio de tarjetas por email.
-
-La guia de contrato, recuperacion y escenarios condensados esta en
-`stand-backend\docs\KIVLY_INTEGRATION.md` (repositorio hermano).
-Las pruebas simuladas de API y ajustes cubren el contrato sin aprobacion manual;
-no sustituyen la prueba real del formulario y la membresia en el panel de Kivly.
+When public metadata includes `loyalty`, `/play` asks for separate club consent
+and sends its version with the email-code request. Access opens only after the
+backend confirms verified registration. Changed terms require fresh consent;
+uncertain registration displays an error without granting access. STACK game
+settings can select one existing Kivly reward. Once the server confirms a saved
+finish, participants can check assignment status and use only Wallet links
+returned by Kivly. The feature does not generate rewards or passes, redeem
+rewards, or mark them used; uncertain assignments are not automatically replayed.
+This reward extension is pending review and has not been live-verified.
 
 Action buttons inside settings panels (save/apply, generate Quiz/cards, export,
 share, download and image selection) use the active palette's primary color,
@@ -175,13 +158,13 @@ The shared panel shows the participant
 `/play/:gameId` link and prize validator link with its QR immediately below the
 fixed mobile/Web access summary, before game-specific rules. Use three compact columns:
 participant QR with its link below, validator QR with its link below (both 80px),
-and **Datos del participante** with Email and Phone checkboxes.
-Checked fields are required in `/play`; unchecked fields are hidden and omitted
-from registration requests. Save these settings with the shared footer, not in
-individual game configs. Existing events default to email enabled and phone
-disabled when no explicit configuration exists. Individual game configs
-must not duplicate these settings. Web registration always asks for a display
-username and also offers an optional
+and **Datos del participante** with required full name/email and one checkbox
+to show an optional phone. Save phone visibility with the shared footer, not in
+individual game configs. Email is always verified, including legacy disabled-email
+settings. Legacy required-phone settings make phone visible but not mandatory;
+an explicit `phone.enabled` takes precedence. Hidden/blank phones are omitted.
+Individual game configs must not duplicate these settings. Web registration
+asks for full name first, then email, and also offers an optional
 profile photo for every participant, independent of the configured contact fields;
 uploaded photos appear in rankings and participant `/play`. Instagram is neither
 contact data nor an access channel.

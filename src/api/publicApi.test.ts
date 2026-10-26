@@ -1,6 +1,50 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PublicApiError, publicApi } from './publicApi'
 import { DEFAULT_STACK_CONFIG } from '../games/stack/stackLogic'
+import { DEFAULT_RULET4_CONFIG } from '../games/rulet4/rulet4Logic'
+
+describe('RULET4 spin contract', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+  const result = {
+    panel: DEFAULT_RULET4_CONFIG.panels[2], index: 8, configSnapshot: DEFAULT_RULET4_CONFIG,
+    spunAt: '2026-10-26T12:00:00Z',
+  }
+
+  it('sends only participant credentials, never a client-selected prize', async () => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, result })))
+    vi.stubGlobal('fetch', request)
+    expect(await publicApi.spinRulet4('ABC123', 'token')).toEqual(result)
+    expect(request).toHaveBeenCalledWith(expect.stringContaining('/v1/public/rulet4/spin'), expect.objectContaining({
+      method: 'POST', body: '{"gameId":"ABC123","playerToken":"token"}',
+    }))
+  })
+
+  it.each([
+    { ...result, index: -1 },
+    { ...result, index: 9 },
+    { ...result, panel: DEFAULT_RULET4_CONFIG.panels[0] },
+    { ...result, configSnapshot: { panels: [] } },
+    { ...result, spunAt: 'invalid' },
+  ])('rejects invalid or mismatched server result %#', async (invalid) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, result: invalid }))))
+    await expect(publicApi.spinRulet4('ABC123', 'token')).rejects.toThrow('Invalid RULET4 result')
+  })
+})
+
+describe('Kivly registration errors', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('retains the safe error code and retry delay without exposing external messages', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: 'KivlyRateLimited', message: 'External response must not be displayed',
+    }), { status: 429, headers: { 'Retry-After': '30' } })))
+    await expect(publicApi.join({ gameId: 'GAME1234', challengeId: 'challenge', code: '123456' }))
+      .rejects.toMatchObject({
+        status: 429, code: 'KivlyRateLimited', retryAfter: 30,
+        message: 'No se pudo confirmar tu registro en el club. Consulta al equipo del evento.',
+      })
+  })
+})
 
 describe('Kivly completion reward contract', () => {
   afterEach(() => { vi.unstubAllGlobals() })

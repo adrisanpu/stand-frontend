@@ -94,7 +94,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const { language, t } = useOperatorLanguage()
   const { user, loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
-  const kivly = useKivlyDraft(gameId ?? '', !!gameId)
+  const kivly = useKivlyDraft(gameId ?? '', !!gameId && (gameDefinition?.id ?? gameType)?.toUpperCase() === 'STACK')
 
   const translateKnownError = (message: string) => {
     const translations: Record<string, string> = {

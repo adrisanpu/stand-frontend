@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
 import BackButton from '../../core/widgets/BackButton'
-import type { Rulet4Settings, Rulet4PanelConfig } from './GameConfig'
+import { isRulet4Config, isRulet4Result, rulet4Segments, type Rulet4PanelConfig } from './rulet4Logic'
 import { api } from '../../api/api'
 import { CODE_INPUT_PLACEHOLDER, VALIDATE_LABEL } from '../../core/ui/gameValidationCopy'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
@@ -13,42 +13,6 @@ import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
 } from '../../core/ui/gameScreenLayout'
-
-type Rulet4SpinResult = {
-  index: number
-  panel: Rulet4PanelConfig
-  configSnapshot: Rulet4Settings
-}
-
-function isRulet4Settings(value: unknown): value is Rulet4Settings {
-  if (!value || typeof value !== 'object' || !Array.isArray((value as Rulet4Settings).panels)) return false
-  const panels = (value as Rulet4Settings).panels
-  if (panels.length < 1 || panels.length > 32) return false
-  const ids = new Set<string>()
-  let total = 0
-  for (const panel of panels) {
-    if (!panel || typeof panel.id !== 'string' || typeof panel.label !== 'string'
-      || !Number.isInteger(panel.count) || panel.count < 1 || panel.count > 360
-      || (panel.color !== undefined && typeof panel.color !== 'string')) return false
-    if (ids.has(panel.id)) return false
-    ids.add(panel.id)
-    total += panel.count
-  }
-  return total <= 360
-}
-
-function isSpinResult(value: unknown): value is Rulet4SpinResult {
-  if (!value || typeof value !== 'object') return false
-  const result = value as Rulet4SpinResult
-  return Number.isInteger(result.index) && result.index >= 0
-    && !!result.panel && typeof result.panel.id === 'string'
-    && typeof result.panel.label === 'string'
-    && isRulet4Settings(result.configSnapshot)
-}
-
-function buildSegments(settings: Rulet4Settings) {
-  return settings.panels.flatMap((panel) => Array.from({ length: panel.count }, () => panel))
-}
 
 type GameState =
   | 'idle'       // player code input
@@ -60,6 +24,8 @@ type GameState =
 
 export default function Rulet4GameScreen({ gameId, orientation, logoElement, playersElement, sidebarElement }: GameScreenProps) {
   const { t } = useOperatorLanguage()
+  const translateRef = useRef(t)
+  translateRef.current = t
   const [gameState, setGameState] = useState<GameState>('idle')
   const [playerCode, setPlayerCode] = useState('')
   const [playerId, setPlayerId] = useState<string | null>(null)
@@ -68,7 +34,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
   const [error, setError] = useState<string | null>(null)
   const [isValidating, setIsValidating] = useState(false)
   const [winningPanel, setWinningPanel] = useState<Rulet4PanelConfig | null>(null)
-  const [settings, setSettings] = useState<Rulet4Settings | null>(null)
+  const [segments, setSegments] = useState<Rulet4PanelConfig[]>([])
   const [sceneReady, setSceneReady] = useState(false)
   const [spin, setSpin] = useState<WheelSpin | null>(null)
   const pendingSpinRef = useRef<{ id: number; panel: Rulet4PanelConfig; index: number } | null>(null)
@@ -84,22 +50,18 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     }
   }, [gameId])
 
-  // The saved server configuration defines both the wheel and its weighted result indexes.
   useEffect(() => {
     let cancelled = false
-    setSettings(null)
-    if (!gameId) return
-    void api.get<{ game?: { type?: { RULET4?: unknown } } }>(
-      `/v1/game?gameId=${encodeURIComponent(gameId)}`
-    ).then((data) => {
-      if (cancelled) return
-      const config = data.game?.type?.RULET4
-      if (!isRulet4Settings(config)) throw new Error('No se pudo cargar la configuración de RULET4.')
-      setSettings(config)
-      setError(null)
-    }).catch((cause: unknown) => {
-      if (!cancelled) setError(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración de RULET4.')
-    })
+    setSegments([])
+    void api.get<{ game?: { type?: { RULET4?: unknown } } }>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
+      .then((data) => {
+        if (cancelled) return
+        if (!isRulet4Config(data.game?.type?.RULET4)) throw new Error(translateRef.current('Configuración RULET4 no válida.', 'Invalid RULET4 configuration.'))
+        setSegments(rulet4Segments(data.game.type.RULET4))
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : translateRef.current('No se pudo cargar RULET4.', 'Could not load RULET4.'))
+      })
     return () => { cancelled = true }
   }, [gameId])
 
@@ -140,9 +102,9 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
       } else {
         throw new Error(data.message || t('Código inválido', 'Invalid code'))
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (validation !== validationRef.current) return
-      setError(err.message || t('Error al validar el código', 'Error validating the code'))
+      setError(err instanceof Error ? err.message : t('Error al validar el código', 'Error validating the code'))
       setGameState('idle')
     } finally {
       if (validation === validationRef.current) setIsValidating(false)
@@ -150,35 +112,31 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
   }
 
   const handleSpin = async () => {
-    if (gameState !== 'ready' || !sceneReady || hasSpunRef.current || pendingSpinRef.current || !playerId) return
+    if (gameState !== 'ready' || !sceneReady || !playerId || hasSpunRef.current || pendingSpinRef.current) return
     if (segments.length === 0) {
       setError(t('La ruleta no tiene paneles configurados', 'The roulette has no panels configured'))
       return
     }
 
     hasSpunRef.current = true
-    setGameState('spinning')
     setError(null)
-    const request = {}
-    validationRef.current = request
+    setGameState('spinning')
+    const generation = validationRef.current
     try {
-      const data = await api.post<{ ok: boolean; result?: unknown }>('/v1/game/score', { gameId, playerId })
-      if (request !== validationRef.current) return
-      const result = data.result
-      if (!data.ok || !isSpinResult(result)) throw new Error(t('El servidor no devolvió un resultado válido.', 'The server did not return a valid result.'))
-      const nextSegments = buildSegments(result.configSnapshot)
-      if (result.index >= nextSegments.length || nextSegments[result.index].id !== result.panel.id) {
-        throw new Error(t('El resultado no coincide con la configuración de la ruleta.', 'The result does not match the wheel configuration.'))
-      }
-      setSettings(result.configSnapshot)
+      const response = await api.post<{ ok?: boolean; result?: unknown }>('/v1/game/score', { gameId, playerId })
+      if (generation !== validationRef.current) return
+      if (response.ok !== true || !isRulet4Result(response.result)) throw new Error(t('Resultado RULET4 no válido.', 'Invalid RULET4 result.'))
+      const result = response.result
       const id = ++spinIdRef.current
+      const nextSegments = rulet4Segments(result.configSnapshot)
+      setSegments((previous) => JSON.stringify(previous) === JSON.stringify(nextSegments) ? previous : nextSegments)
       pendingSpinRef.current = { id, panel: result.panel, index: result.index }
       setSpin({ id, index: result.index })
-    } catch (cause: unknown) {
-      if (request !== validationRef.current) return
+    } catch (cause) {
+      if (generation !== validationRef.current) return
       hasSpunRef.current = false
       setGameState('ready')
-      setError(cause instanceof Error ? cause.message : t('No se pudo obtener el resultado de la ruleta.', 'Could not get the wheel result.'))
+      setError(cause instanceof Error ? cause.message : t('No se pudo confirmar el giro. Reintenta para recuperar el mismo resultado.', 'Could not confirm the spin. Retry to recover the same result.'))
     }
   }
 
@@ -204,8 +162,6 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     setWinningPanel(null)
     hasSpunRef.current = false
   }
-
-  const segments = useMemo(() => settings ? buildSegments(settings) : [], [settings])
 
   const showJoinBlock = !(['ready', 'spinning', 'result'] as GameState[]).includes(gameState)
 
@@ -400,11 +356,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
                 </div>
               )}
             {gameState === 'ready' && renderWelcomeBanner('landscape', false)}
-            {gameState === 'ready' && error && (
-              <div role="alert" className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
-                {localizeOperatorMessage(error, t)}
-              </div>
-            )}
+            {gameState === 'ready' && error && <p role="alert" className="text-red-300">{error}</p>}
             {gameState === 'spinning' && renderWelcomeBanner('landscape', true)}
             {gameState === 'result' && renderResultBanner('landscape')}
           </div>
@@ -509,11 +461,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
 
         {/* Welcome Message - After validation */}
         {gameState === 'ready' && renderWelcomeBanner('portrait', false)}
-        {gameState === 'ready' && error && (
-          <div role="alert" className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">
-            {localizeOperatorMessage(error, t)}
-          </div>
-        )}
+        {gameState === 'ready' && error && <p role="alert" className="text-red-300">{error}</p>}
 
         {/* Spinning State - Show in welcome message box */}
         {gameState === 'spinning' && renderWelcomeBanner('portrait', true)}

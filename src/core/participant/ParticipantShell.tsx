@@ -15,6 +15,8 @@ import T1merParticipantPlay from '../../games/t1mer/ParticipantPlay'
 import T1merParticipantResult from '../../games/t1mer/ParticipantResult'
 import StackParticipantPlay from '../../games/stack/ParticipantPlay'
 import ImpostorParticipantPlay from '../../games/impostor/ParticipantPlay'
+import Rulet4ParticipantPlay from '../../games/rulet4/ParticipantPlay'
+import { isRulet4Assignment, type Rulet4Assignment } from '../../games/rulet4/rulet4Logic'
 import { ParticipantLanguageProvider, ParticipantLanguageSelector, useParticipantLanguage } from './participantLanguage'
 
 type Empareja2Step = 'loading' | 'unsupported' | 'join' | 'assignment' | 'validate' | 'result'
@@ -58,6 +60,7 @@ function ParticipantContent() {
   activeGameId.current = gameId
   const [stackAssignment, setStackAssignment] = useState<StackAssignment | null>(null)
   const [impostorAssignment, setImpostorAssignment] = useState<ImpostorAssignment | null>(null)
+  const [rulet4Assignment, setRulet4Assignment] = useState<Rulet4Assignment | null>(null)
   const [t1merResult, setT1merResult] = useState<{
     time: number
     difference: number
@@ -108,6 +111,15 @@ function ParticipantContent() {
   const applyAssignment = useCallback((meta: PublicGameResponse, token: string, assignment: PlayerAssignment | null) => {
     const gt = normalizeGameType(meta.gameType)
     if (!assignment) throw new Error('No se pudo recuperar tu participante. Solicita un nuevo enlace de participación.')
+    if (gt === 'RULET4') {
+      if (!isRulet4Assignment(assignment)) throw new Error('No se pudo recuperar tu participante.')
+      savePlayerSession(gameId, token, assignment)
+      setPlayerToken(token)
+      setRulet4Assignment(assignment)
+      setStep('play')
+      return
+    }
+    if (isRulet4Assignment(assignment)) throw new Error('No se pudo recuperar tu participante.')
     if (gt === 'STACK' && !isStackAssignment(assignment)) throw new Error('No se pudo recuperar tu participante.')
     if (gt === 'EMPAREJA2' && !('characterName' in assignment)) throw new Error('No se pudo recuperar tu participante.')
     if (gt === 'T1MER' && (!('displayName' in assignment) || isStackAssignment(assignment))) {
@@ -142,6 +154,7 @@ function ParticipantContent() {
     setPhotoUploadWarning(false)
     setStackAssignment(null)
     setImpostorAssignment(null)
+    setRulet4Assignment(null)
     ;(async () => {
       if (!gameId) {
         setStep('unsupported')
@@ -275,8 +288,13 @@ function ParticipantContent() {
             </div>
           )}
 
+          {gameType === 'RULET4' && step === 'play' && rulet4Assignment && playerToken && (
+            <Rulet4ParticipantPlay key={`${gameId}:${rulet4Assignment.playerId}`} gameId={gameId}
+              playerToken={playerToken} config={currentGameMeta?.rulet4Config} assignment={rulet4Assignment} />
+          )}
+
           {gameType === 'STACK' && step === 'play' && stackAssignment && playerToken && (
-            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} showPrizePromo={false} kivlyRewardEnabled={!!currentGameMeta?.loyalty} />
+            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} showPrizePromo={false} kivlyRewardEnabled={Boolean(gameMeta?.kivlyReward)} />
           )}
 
           {gameType === 'IMPOSTOR' && step === 'play' && impostorAssignment && playerToken && (

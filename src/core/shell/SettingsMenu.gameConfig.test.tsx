@@ -49,9 +49,17 @@ describe('SettingsMenu Configurar juego', () => {
       connected: true,
       locationId: 'location', locations: [{ id: 'location', name: 'Club' }],
     })
-    render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />)
+    render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="STACK" gameDefinition={{ ...l3tras, id: 'STACK' }} />)
     expect(await screen.findByRole('img', { name: 'Kivly conectado' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Integraciones' })).not.toBeInTheDocument()
+    account.mockRestore()
+  })
+
+  it('does not load or show Kivly integration for other games', async () => {
+    const account = vi.spyOn(kivlyApi, 'getAccountConnection')
+    render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />)
+    expect(account).not.toHaveBeenCalled()
+    expect(screen.queryByRole('img', { name: 'Kivly conectado' })).not.toBeInTheDocument()
     account.mockRestore()
   })
 

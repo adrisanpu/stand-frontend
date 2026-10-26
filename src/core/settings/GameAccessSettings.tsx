@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/api'
-import type { KivlySettings } from '../../api/kivlyApi'
 import type { ParticipantFieldsConfig } from '../../api/publicApi'
 import { resolveParticipantFields } from '../lib/participantFields'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
@@ -17,7 +16,7 @@ export type GameAccessDraft = {
   participantFields: ReturnType<typeof resolveParticipantFields>
   setParticipantFields: (fields: ReturnType<typeof resolveParticipantFields>) => void
   /** Validates and persists the current draft. Rejects with an Error on failure. */
-  persist: (includeParticipantFields?: boolean, kivly?: KivlySettings) => Promise<GameAccess>
+  persist: (includeParticipantFields?: boolean) => Promise<GameAccess>
 }
 
 type Translator = ReturnType<typeof useOperatorLanguage>['t']
@@ -70,16 +69,14 @@ export function useGameAccessDraft(gameId: string, gameType: string, onLoaded?: 
 
   const reload = useCallback(() => setLoadVersion((v) => v + 1), [])
 
-  const persist = async (includeParticipantFields = false, kivly?: KivlySettings) => {
+  const persist = async (includeParticipantFields = false) => {
     if (!access) {
       throw new Error(loadError || 'El modo y acceso aún no se han cargado.')
     }
     const valid = resolveGameAccess(gameType, access)
     const result = await api.put<{ ok?: boolean }>('/v1/game', {
       gameId, ...valid,
-      ...(includeParticipantFields ? { participantFields: kivly?.enabled
-        ? { ...participantFields, email: { required: true } } : participantFields } : {}),
-      ...(kivly ? { kivly } : {}),
+      ...(includeParticipantFields ? { participantFields } : {}),
     })
     if (result?.ok === false) throw new Error('No se pudo guardar el acceso del juego.')
     return valid

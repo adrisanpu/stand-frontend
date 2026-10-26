@@ -19,21 +19,29 @@ export type KivlyAccountConnection = KivlyConnection & {
   clubSettings?: KivlyClubSettings | null
 }
 
-type KivlyState = {
-  ok: true
-  connection: KivlyConnection
-  settings: KivlySettings
-  reward?: KivlyReward | null
-}
-
 export type KivlyReward = { id: string; name: string }
 
 export const kivlyApi = {
+  async getReward(gameId: string): Promise<KivlyReward | null> {
+    const data = await api.get<{ ok: boolean; reward?: KivlyReward | null }>(
+      `/v1/game/kivly?gameId=${encodeURIComponent(gameId)}`,
+    )
+    if (data?.ok !== true || (data.reward != null
+      && (typeof data.reward.id !== 'string' || !data.reward.id
+        || typeof data.reward.name !== 'string' || !data.reward.name))) {
+      throw new Error('Invalid Kivly reward response')
+    }
+    return data.reward ?? null
+  },
   async listRewards(gameId: string): Promise<KivlyReward[]> {
-    const data = await api.get<{ ok: boolean; rewards: KivlyReward[] }>(`/v1/game/kivly/rewards?gameId=${encodeURIComponent(gameId)}`)
+    const data = await api.get<{ ok: boolean; rewards: KivlyReward[] }>(
+      `/v1/game/kivly/rewards?gameId=${encodeURIComponent(gameId)}`,
+    )
     if (data?.ok !== true || !Array.isArray(data.rewards)
       || !data.rewards.every((reward) => typeof reward?.id === 'string' && !!reward.id
-        && typeof reward.name === 'string' && !!reward.name)) throw new Error('Invalid Kivly rewards response')
+        && typeof reward.name === 'string' && !!reward.name)) {
+      throw new Error('Invalid Kivly rewards response')
+    }
     return data.rewards
   },
   async saveReward(gameId: string, rewardId: string | null) {
@@ -69,28 +77,6 @@ export const kivlyApi = {
   },
   async disconnectAccount() {
     const result = await api.delete<{ ok: boolean; warning?: string }>('/v1/kivly')
-    if (result?.ok !== true) throw new Error('Kivly disconnection not confirmed')
-    return result.warning === 'KivlySecretCleanupRequired'
-  },
-  async get(gameId: string): Promise<KivlyState> {
-    const data = await api.get<KivlyState>(`/v1/game/kivly?gameId=${encodeURIComponent(gameId)}`)
-    if (data?.ok !== true || typeof data.connection?.connected !== 'boolean'
-      || typeof data.settings?.enabled !== 'boolean'
-      || !(['clubName', 'privacyUrl', 'termsUrl'] as const).every((key) =>
-        typeof data.settings[key] === 'string')) {
-      throw new Error('Invalid Kivly response')
-    }
-    if (data.reward != null && (typeof data.reward.id !== 'string' || !data.reward.id
-      || typeof data.reward.name !== 'string' || !data.reward.name)) throw new Error('Invalid Kivly reward response')
-    return data
-  },
-  async connect(gameId: string, clientId: string, clientSecret: string) {
-    const result = await api.put<{ ok: boolean; warning?: string }>('/v1/game/kivly', { gameId, clientId, clientSecret })
-    if (result?.ok !== true) throw new Error('Kivly connection not confirmed')
-    return result.warning === 'KivlySecretCleanupRequired'
-  },
-  async disconnect(gameId: string) {
-    const result = await api.delete<{ ok: boolean; warning?: string }>(`/v1/game/kivly?gameId=${encodeURIComponent(gameId)}`)
     if (result?.ok !== true) throw new Error('Kivly disconnection not confirmed')
     return result.warning === 'KivlySecretCleanupRequired'
   },

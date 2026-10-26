@@ -2,6 +2,11 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 
 type Language = 'es' | 'en'
 const translations: Record<string, string> = {
+  'No se pudo cargar la ruleta. Recarga la página.': 'Could not load the wheel. Reload the page.',
+  'No se pudo confirmar el giro. Reintenta para recuperar el mismo resultado.': 'Could not confirm the spin. Retry to recover the same result.',
+  'Tu resultado': 'Your result',
+  'Girar ruleta': 'Spin the wheel',
+  'Girando...': 'Spinning...',
   'Acepto registrarme en el club': 'I agree to register with the club',
   'Acepto las condiciones y la política de privacidad del club. El registro es necesario para jugar.': 'I accept the club terms and privacy policy. Registration is required to play.',
   'Condiciones del club': 'Club terms',
@@ -132,13 +137,6 @@ const translations: Record<string, string> = {
   'Nombre completo': 'Full name',
   'El nombre completo es obligatorio.': 'Full name is required.',
   'Usa un nombre completo de hasta 100 caracteres sin caracteres de control.': 'Use a full name of up to 100 characters without control characters.',
-  'Tu premio del club': 'Your club reward',
-  'Confirmando tu premio...': 'Confirming your reward...',
-  'No se pudo comprobar tu premio. Tu resultado está guardado.': 'Could not check your reward. Your result is saved.',
-  'Premio asignado a tu cuenta del club.': 'Reward assigned to your club account.',
-  'Tarjeta no disponible todavía.': 'Wallet pass not available yet.',
-  'Tu premio está pendiente de comprobación. Consulta al equipo del evento; no se volverá a asignar automáticamente.': 'Your reward is pending confirmation. Contact the event team; it will not be assigned again automatically.',
-  'Comprobar premio': 'Check reward',
   'Teléfono (opcional)': 'Phone (optional)',
   'Si añades tu teléfono, también se compartirá con el club al crear tu ficha.': 'If you add your phone number, it will also be shared with the club when creating your profile.',
   'El nombre de usuario es obligatorio.': 'Username is required.',
@@ -179,6 +177,13 @@ const translations: Record<string, string> = {
   'Ganan los jugadores': 'The players win',
   'Gana el impostor': 'The impostor wins',
   '¡Has ganado!': 'You won!',
+  'Tu premio del club': 'Your club reward',
+  'Confirmando tu premio...': 'Confirming your reward...',
+  'No se pudo comprobar tu premio. Tu resultado está guardado.': 'Could not check your reward. Your result is saved.',
+  'Premio asignado a tu cuenta del club.': 'Reward assigned to your club account.',
+  'Tarjeta no disponible todavía.': 'Wallet pass not available yet.',
+  'Tu premio está pendiente de comprobación. Consulta al equipo del evento; no se volverá a asignar automáticamente.': 'Your reward is pending verification. Ask the event team; it will not be assigned again automatically.',
+  'Comprobar premio': 'Check reward',
   'Has perdido': 'You lost',
 }
 

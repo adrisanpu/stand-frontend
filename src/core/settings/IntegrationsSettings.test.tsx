@@ -85,4 +85,34 @@ describe('IntegrationsSettings', () => {
     })
     expect(kivlyApi.connectAccount).not.toHaveBeenCalled()
   })
+
+  it('clears edited credentials when cancelling', async () => {
+    vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
+      connected: true, locationId: 'location-1', locations: [{ id: 'location-1', name: 'Club' }],
+    })
+    render(<IntegrationsSettings onBack={vi.fn()} onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Cambiar credenciales' }))
+    fireEvent.change(screen.getByLabelText('client_id'), { target: { value: 'new-id' } })
+    fireEvent.change(screen.getByLabelText('client_secret'), { target: { value: 'new-secret' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar credenciales' }))
+    expect(screen.getByLabelText('client_id')).toHaveValue('')
+    expect(screen.getByLabelText('client_secret')).toHaveValue('')
+    expect(kivlyApi.connectAccount).not.toHaveBeenCalled()
+  })
+
+  it('requires confirmation before disconnecting the shared account', async () => {
+    vi.mocked(kivlyApi.getAccountConnection)
+      .mockResolvedValueOnce({
+        connected: true, locationId: 'location-1', locations: [{ id: 'location-1', name: 'Club' }],
+      })
+      .mockResolvedValueOnce({ connected: false, locationId: null, locations: [] })
+    vi.mocked(kivlyApi.disconnectAccount).mockResolvedValue(false)
+    render(<IntegrationsSettings onBack={vi.fn()} onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Activar integración Kivly' }))
+    expect(kivlyApi.disconnectAccount).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar desconexión' }))
+    expect(await screen.findByText('Desconectado')).toBeInTheDocument()
+    expect(kivlyApi.disconnectAccount).toHaveBeenCalledOnce()
+  })
 })

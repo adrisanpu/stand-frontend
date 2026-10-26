@@ -226,7 +226,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
         <button
           type="button"
           onClick={() => void handleSave()}
-          disabled={saving || accessDraft.status !== 'ready' || kivly.status !== 'ready'
+          disabled={saving || accessDraft.status !== 'ready'
             || (hasKivlyReward && kivlyReward.status !== 'ready')}
           className="w-full rounded-xl p-3 font-medium bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >

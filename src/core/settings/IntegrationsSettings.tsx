@@ -136,7 +136,7 @@ export default function IntegrationsSettings({ onBack, onClose }: Props) {
           <section aria-label="Kivly" className="space-y-2">
             <img src="/images/kivly-logo.svg" alt="Kivly" className="h-7 w-auto" />
             <p className="text-xs text-textSub">
-              {t('Una conexión y un club para tus juegos. Claves guardadas solo en el servidor.', 'One connection and club for your games. Credentials stored only on the server.')}
+              {t('Una conexión y un club para tus juegos STACK. Claves guardadas solo en el servidor.', 'One connection and club for your STACK games. Credentials stored only on the server.')}
             </p>
             {loading ? <p role="status">{t('Comprobando conexión...', 'Checking connection...')}</p> : connection ? (
               <>
@@ -178,7 +178,11 @@ export default function IntegrationsSettings({ onBack, onClose }: Props) {
                 <button type="button" className={buttonClass} onClick={() => void updateConnection()}>
                   {connection?.connected ? t('Actualizar credenciales', 'Update credentials') : t('Conectar Kivly', 'Connect Kivly')}
                 </button>
-                {connection?.connected && <button type="button" className="ml-3 text-sm underline" onClick={() => setEditingCredentials(false)}>{t('Cancelar', 'Cancel')}</button>}
+                {connection?.connected && <button type="button" className="ml-3 text-sm underline" onClick={() => {
+                  setEditingCredentials(false)
+                  setClientId('')
+                  setClientSecret('')
+                }}>{t('Cancelar', 'Cancel')}</button>}
               </fieldset>
             )}
             {connection?.connected && !editingCredentials && <button type="button" disabled={busy} className="text-sm underline disabled:opacity-50" onClick={() => setEditingCredentials(true)}>{t('Cambiar credenciales', 'Change credentials')}</button>}
@@ -201,12 +205,12 @@ export default function IntegrationsSettings({ onBack, onClose }: Props) {
                   </label>)}
                   {hasDemoKivlyLinks({ ...club, enabled: false }) && <p className="text-xs text-amber-300">{t('Demo: estos enlaces no permiten altas reales.', 'Demo: these links cannot enable real registrations.')}</p>}
                   <button type="button" className={buttonClass} onClick={() => void saveClub()}>{t('Guardar club', 'Save club')}</button>
-                  <p className="text-xs text-textSub">{t('Se aplica automáticamente en todos tus juegos. Los jugadores aceptarán las condiciones actualizadas antes de jugar.', 'Applied automatically across all your games. Players accept updated terms before playing.')}</p>
+                  <p className="text-xs text-textSub">{t('Se aplica automáticamente en tus juegos STACK. Los jugadores aceptarán las condiciones actualizadas antes de jugar.', 'Applied automatically to your STACK games. Players accept updated terms before playing.')}</p>
                 </fieldset>
               </details>}
             </>}
             {confirmDisconnect && <div className="space-y-2 text-sm">
-              <p>{t('Desconectar afecta a todos tus juegos y no revoca las credenciales en Kivly.', 'Disconnecting affects all your games and does not revoke credentials in Kivly.')}</p>
+              <p>{t('Desconectar afecta a todos tus juegos STACK y no revoca las credenciales en Kivly.', 'Disconnecting affects all your STACK games and does not revoke credentials in Kivly.')}</p>
               <button type="button" disabled={busy} className="text-red-300 underline disabled:opacity-50" onClick={() => void updateConnection(true)}>{t('Confirmar desconexión', 'Confirm disconnection')}</button>
               <button type="button" disabled={busy} className="ml-3 underline disabled:opacity-50" onClick={() => setConfirmDisconnect(false)}>{t('Cancelar', 'Cancel')}</button>
             </div>}

@@ -12,10 +12,12 @@ type Props = {
   dimmed: boolean
   onReadyChange: (ready: boolean) => void
   onComplete: (id: number) => void
+  language?: 'es' | 'en'
 }
 
-export default function Rulet4Wheel({ segments, spin, completed, dimmed, onReadyChange, onComplete }: Props) {
-  const { t } = useOperatorLanguage()
+export default function Rulet4Wheel({ segments, spin, completed, dimmed, onReadyChange, onComplete, language }: Props) {
+  const { t: operatorTranslate } = useOperatorLanguage()
+  const t = (spanish: string, english: string) => language === 'en' ? english : language === 'es' ? spanish : operatorTranslate(spanish, english)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<Rulet4SceneController | null>(null)
   const propsRef = useRef({ spin, onReadyChange, onComplete })
