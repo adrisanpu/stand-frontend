@@ -23,20 +23,22 @@ async function publicRequest<T>(endpoint: string, options: RequestInit = {}): Pr
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    const msg = (data as { error?: string; message?: string; reason?: string }).message
+    const code = (data as { code?: string; error?: string }).code ?? (data as { error?: string }).error
+    const msg = typeof code === 'string' && code.startsWith('Kivly')
+      ? 'No se pudo confirmar tu registro en el club. Consulta al equipo del evento.'
+      : (data as { error?: string; message?: string; reason?: string }).message
       || (data as { error?: string }).error
       || (data as { reason?: string }).reason
       || `HTTP ${response.status}`
     const retryAfter = Number(response.headers?.get('Retry-After') ?? (data as { retryAfter?: number }).retryAfter)
-    throw new PublicApiError(msg, response.status, (data as { code?: string; error?: string }).code
-      ?? (data as { error?: string }).error, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined)
+    throw new PublicApiError(msg, response.status, code, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined)
   }
   return data as T
 }
 
 export type ParticipantFieldsConfig = {
   email?: { required?: boolean }
-  phone?: { required?: boolean }
+  phone?: { required?: boolean; enabled?: boolean }
 }
 
 export type PublicRankingEntry = {
@@ -59,6 +61,12 @@ export type PublicGameResponse = {
   playMode?: 'master' | 'mobile'
   joinChannel?: string
   participantFields?: ParticipantFieldsConfig
+  loyalty?: {
+    clubName: string
+    privacyUrl: string
+    termsUrl: string
+    consentVersion: string
+  }
   prizeCatalog?: PrizeCatalog
   playerCount: number
   validatedCount: number
@@ -214,6 +222,7 @@ export type EmailRegistration = {
   username: string
   phone?: string
   consent: boolean
+  loyaltyConsentVersion?: string
   language?: 'es' | 'en'
 }
 

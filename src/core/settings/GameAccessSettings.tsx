@@ -75,7 +75,8 @@ export function useGameAccessDraft(gameId: string, gameType: string, onLoaded?: 
     }
     const valid = resolveGameAccess(gameType, access)
     const result = await api.put<{ ok?: boolean }>('/v1/game', {
-      gameId, ...valid, ...(includeParticipantFields ? { participantFields } : {}),
+      gameId, ...valid,
+      ...(includeParticipantFields ? { participantFields } : {}),
     })
     if (result?.ok === false) throw new Error('No se pudo guardar el acceso del juego.')
     return valid

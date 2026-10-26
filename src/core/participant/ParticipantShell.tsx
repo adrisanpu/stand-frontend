@@ -183,7 +183,7 @@ function ParticipantContent() {
             if (cancelled) return
             if (sessionError instanceof PublicApiError
               && [401, 403, 404].includes(sessionError.status)
-              && ['InvalidPlayerToken', 'PlayerNotFound'].includes(sessionError.code ?? '')) {
+              && ['InvalidPlayerToken', 'PlayerNotFound', 'KivlyMembershipRequired', 'KivlyConsentRequired'].includes(sessionError.code ?? '')) {
               clearPlayerSession(gameId)
               setPlayerToken(null)
               setT1merResult(null)

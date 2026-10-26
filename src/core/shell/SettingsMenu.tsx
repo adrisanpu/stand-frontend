@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import Raffle from '../widgets/Raffle'
 import Quiz from '../widgets/Quiz'
 import AppearanceSettings from '../settings/AppearanceSettings'
+import IntegrationsSettings from '../settings/IntegrationsSettings'
 import GamePlayersSettings from '../settings/GamePlayersSettings'
+import { useKivlyDraft } from '../settings/KivlySettings'
 import OperatorPrizeSettings from '../settings/OperatorPrizeSettings'
 import type { GameDefinition } from '../types'
 import { api } from '../../api/api'
@@ -85,12 +87,14 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const gameConfigSavingRef = useRef(false)
   gameConfigSavingRef.current = gameConfigSaving
   const [showAppearanceSettings, setShowAppearanceSettings] = useState(false)
+  const [showIntegrations, setShowIntegrations] = useState(false)
   const [showUserInfo, setShowUserInfo] = useState(false)
   const [isStartingCheckout, setIsStartingCheckout] = useState(false)
   const { logout } = useAuth()
   const { language, t } = useOperatorLanguage()
   const { user, loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
+  const kivly = useKivlyDraft(gameId ?? '', !!gameId)
 
   const translateKnownError = (message: string) => {
     const translations: Record<string, string> = {
@@ -119,6 +123,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     showGamePlayers: false,
     showOperatorPrizes: false,
     showAppearanceSettings: false,
+    showIntegrations: false,
     showUserInfo: false,
   })
   modalSnapRef.current = {
@@ -131,6 +136,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     showGamePlayers,
     showOperatorPrizes,
     showAppearanceSettings,
+    showIntegrations,
     showUserInfo,
   }
 
@@ -167,6 +173,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       }
       if (s.showUserInfo) {
         setShowUserInfo(false)
+        return true
+      }
+      if (s.showIntegrations) {
+        setShowIntegrations(false)
         return true
       }
       if (s.showAppearanceSettings) {
@@ -397,6 +407,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         gameDefinition={gameDefinition}
       />
     )
+  }
+
+  if (showIntegrations) {
+    return <IntegrationsSettings onBack={() => setShowIntegrations(false)} onClose={onClose} />
   }
 
   if (showUserInfo) {
@@ -995,6 +1009,22 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
           {!gameType && (
             <>
               <button
+                onClick={() => setShowIntegrations(true)}
+                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              >
+                <div className="p-2 rounded-lg bg-indigo-500/20">
+                  <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71m2.25 5.82a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+                  </svg>
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                  <div className="font-medium">{t('Integraciones', 'Integrations')}</div>
+                </div>
+                <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button
                 onClick={() => setShowAppearanceSettings(true)}
                 className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
               >
@@ -1053,6 +1083,11 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </div>
                   <div className="text-left">
                     <div className="font-medium">{t('Configurar juego', 'Configure game')}</div>
+                    {kivly.connection?.connected && <img
+                      src="/images/kivly-logo.svg"
+                      alt={t('Kivly conectado', 'Kivly connected')}
+                      className="mt-1 h-4 w-auto"
+                    />}
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

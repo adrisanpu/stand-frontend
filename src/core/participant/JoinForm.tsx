@@ -12,6 +12,13 @@ type Props = {
 }
 
 const verificationErrors: Record<string, string> = {
+  KivlyConsentRequired: 'Debes aceptar las condiciones del club para jugar. Si han cambiado, recarga la página.',
+  KivlyMembershipRequired: 'Completa el registro en el club antes de jugar.',
+  KivlyRegistrationBusy: 'Se está confirmando tu alta en el club. Espera y reintenta con el mismo código.',
+  KivlyReconciliationRequired: 'Tu alta está pendiente de comprobación. Consulta al equipo del evento; no vuelvas a registrarte.',
+  KivlyRateLimited: 'El club está recibiendo demasiadas solicitudes. Espera y reintenta con el mismo código.',
+  KivlyUnavailable: 'No se pudo confirmar el alta en el club. Reintenta con el mismo código.',
+  KivlyRequestFailed: 'No se pudo confirmar el alta en el club. Reintenta con el mismo código.',
   VerificationRequired: 'Solicita un código para verificar tu email.',
   InvalidVerificationCode: 'El código no es correcto. Inténtalo de nuevo.',
   VerificationExpired: 'El código ha caducado. Solicita uno nuevo.',
@@ -32,8 +39,8 @@ const verificationErrors: Record<string, string> = {
   unsupported_game_type: 'El registro web no está disponible para este juego. Consulta al equipo del evento.',
   missing_email: 'El email es obligatorio.',
   invalid_email: 'Introduce un email válido.',
-  invalid_username: 'Usa un nombre de usuario de hasta 100 caracteres sin caracteres de control.',
-  missing_username: 'El nombre de usuario es obligatorio.',
+  invalid_username: 'Usa un nombre completo de hasta 100 caracteres sin caracteres de control.',
+  missing_username: 'El nombre completo es obligatorio.',
   missing_phone: 'El teléfono es obligatorio.',
   invalid_phone: 'Introduce un teléfono válido.',
   player_limit_reached: 'El juego ha alcanzado el límite de participantes. Consulta al equipo del evento.',
@@ -43,13 +50,13 @@ const invalidChallenges = new Set(['VerificationRequired', 'VerificationExpired'
 export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   const { language, t } = useParticipantLanguage()
   const pf = resolveParticipantFields(gameMeta.participantFields)
-  const emailRequired = pf.email.required
-  const phoneRequired = pf.phone.required
+  const phoneEnabled = pf.phone.enabled
 
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [phone, setPhone] = useState('')
   const [consent, setConsent] = useState(false)
+  const [clubConsent, setClubConsent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [challenge, setChallenge] = useState<(EmailChallengeResponse & { registration: EmailRegistration }) | null>(null)
@@ -69,7 +76,8 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     setInvalidChallenge(false)
     setError(null)
     setRetryAt(0)
-  }, [gameId, emailRequired, phoneRequired])
+    setClubConsent(false)
+  }, [gameId, phoneEnabled, gameMeta.loyalty?.consentVersion])
 
   useEffect(() => {
     if (!challenge && !retryAt) return
@@ -88,7 +96,9 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
 
   const showError = (err: unknown) => {
     if (err instanceof PublicApiError) {
-      setError(verificationErrors[err.code ?? ''] ?? 'No se pudo completar el registro. Inténtalo de nuevo más tarde.')
+      setError(verificationErrors[err.code ?? ''] ?? (err.code?.startsWith('Kivly')
+        ? 'No se pudo confirmar tu registro en el club. Consulta al equipo del evento.'
+        : 'No se pudo completar el registro. Inténtalo de nuevo más tarde.'))
       if (invalidChallenges.has(err.code ?? '')) setInvalidChallenge(true)
       if (err.status === 429 && err.retryAfter) {
         setRetryAt(Date.now() + err.retryAfter * 1000)
@@ -105,7 +115,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   }
 
   const resend = async () => {
-    if (!challenge || busy.current || cooldown > 0 || !consent) return
+    if (!challenge || busy.current || cooldown > 0 || !consent || (gameMeta.loyalty && !clubConsent)) return
     busy.current = true
     setLoading(true)
     setError(null)
@@ -130,12 +140,8 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     e.preventDefault()
     if (busy.current) return
     setError(null)
-    if (emailRequired && !email.trim()) {
+    if (!email.trim()) {
       setError('El email es obligatorio.')
-      return
-    }
-    if (phoneRequired && !phone.trim()) {
-      setError('El teléfono es obligatorio.')
       return
     }
     const trimmedUsername = username.trim()
@@ -156,24 +162,29 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       setError('Debes aceptar la política de privacidad.')
       return
     }
+    if (gameMeta.loyalty && !clubConsent) {
+      setError(verificationErrors.KivlyConsentRequired)
+      return
+    }
     if (challenge && (expired || invalidChallenge)) return
     if (challenge && !/^[0-9]{6}$/.test(code)) {
       setError('Introduce un código de 6 dígitos.')
       return
     }
-    if (!challenge && emailRequired && cooldown > 0) return
+    if (!challenge && cooldown > 0) return
     busy.current = true
     setLoading(true)
     const version = generation.current
     try {
       const registration = {
         gameId,
-        ...(emailRequired ? { email: email.trim() } : {}),
+        email: email.trim(),
         username: trimmedUsername,
-        ...(phoneRequired ? { phone: phone.trim() } : {}),
+        ...(phoneEnabled && phone.trim() ? { phone: phone.trim() } : {}),
         consent,
+        ...(gameMeta.loyalty ? { loyaltyConsentVersion: gameMeta.loyalty.consentVersion } : {}),
       }
-      if (emailRequired && !challenge) {
+      if (!challenge) {
         const next = await requestCode(registration)
         if (version !== generation.current) return
         setChallenge(next)
@@ -183,9 +194,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         setNow(Date.now())
         return
       }
-      const res = await publicApi.join(challenge
-        ? { gameId, challengeId: challenge.challengeId, code }
-        : registration)
+      const res = await publicApi.join({ gameId, challengeId: challenge.challengeId, code })
       if (version !== generation.current) return
       let assignment = res.assignment
       if (photo) {
@@ -217,7 +226,21 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       </div>
 
       <fieldset disabled={loading || !!challenge} className="space-y-4">
-      {emailRequired && <div>
+      <div>
+        <label className="block text-sm mb-1" htmlFor="join-username">
+          {t('Nombre completo')} *
+        </label>
+        <input
+          id="join-username"
+          type="text"
+          autoComplete="name"
+          required
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3"
+        />
+      </div>
+      <div>
         <label className="block text-sm mb-1" htmlFor="join-email">
           Email *
         </label>
@@ -229,31 +252,16 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
           onChange={(e) => setEmail(e.target.value)}
           className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3"
           placeholder={t('tu@email.com')}
-          required={emailRequired}
-        />
-      </div>}
-
-      <div>
-        <label className="block text-sm mb-1" htmlFor="join-username">
-          {t('Nombre de usuario')} *
-        </label>
-        <input
-          id="join-username"
-          type="text"
-          autoComplete="nickname"
           required
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3"
         />
       </div>
 
-      {phoneRequired && <div>
-        <label className="block text-sm mb-1" htmlFor="join-phone">{t('Teléfono')} *</label>
+      {phoneEnabled && <div>
+        <label className="block text-sm mb-1" htmlFor="join-phone">{t('Teléfono (opcional)')}</label>
         <input id="join-phone" type="tel" autoComplete="tel" value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-          required />
+          maxLength={64} />
       </div>}
       <div>
         <label className="block text-sm mb-1" htmlFor="join-photo">
@@ -290,6 +298,15 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
           </a>
         </span>
       </label>
+      {gameMeta.loyalty && <label className="flex gap-2 text-xs text-textSub items-start">
+        <input type="checkbox" checked={clubConsent} onChange={(event) => setClubConsent(event.target.checked)} className="mt-1" required />
+        <span>{t('Acepto registrarme en el club')} <strong>{gameMeta.loyalty.clubName}</strong>.{' '}
+          {t('Acepto las condiciones y la política de privacidad del club. El registro es necesario para jugar.')}{' '}
+          {phoneEnabled && <>{t('Si añades tu teléfono, también se compartirá con el club al crear tu ficha.')}{' '}</>}
+          <a href={gameMeta.loyalty.termsUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Condiciones del club')}</a>{' · '}
+          <a href={gameMeta.loyalty.privacyUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Privacidad del club')}</a>
+        </span>
+      </label>}
       </>}
 
       {challenge && <div className="space-y-3">
@@ -319,17 +336,17 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       </div>}
 
       {error && <p role="alert" className="text-sm text-red-300">{t(error)}</p>}
-      {!challenge && emailRequired && cooldown > 0 && <p role="status" className="text-sm text-textSub">
+      {!challenge && cooldown > 0 && <p role="status" className="text-sm text-textSub">
         {t('Puedes solicitar otro código en')}: {cooldown}s
       </p>}
 
       <button
         type="submit"
-        disabled={loading || (challenge ? expired || invalidChallenge || !consent : emailRequired && cooldown > 0)}
+        disabled={loading || (challenge ? expired || invalidChallenge || !consent : cooldown > 0)}
         className="w-full rounded-xl py-3 font-semibold text-primary bg-[rgba(var(--color-primary-rgb),0.25)] border border-[rgba(var(--color-primary-rgb),0.4)] disabled:opacity-50"
       >
-        {t(loading ? (emailRequired && !challenge ? 'Enviando código...' : 'Registrando...')
-          : challenge ? 'Verificar y empezar' : emailRequired ? 'Enviar código' : 'Empezar')}
+        {t(loading ? (!challenge ? 'Enviando código...' : 'Registrando...')
+          : challenge ? 'Verificar y empezar' : 'Enviar código')}
       </button>
       </>
     </form>

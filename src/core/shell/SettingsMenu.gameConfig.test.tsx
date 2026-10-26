@@ -1,12 +1,18 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../api/api'
+import { kivlyApi } from '../../api/kivlyApi'
 import type { GameDefinition } from '../types'
 import L3trasConfig from '../../games/l3tras/GameConfig'
 import SettingsMenu from './SettingsMenu'
 import { OperatorLanguageProvider } from './operatorLanguage'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
+vi.mock('../../api/kivlyApi', () => ({
+  kivlyApi: { getAccountConnection: async () => ({
+    connected: false, locationId: null, locations: [],
+  }) },
+}))
 vi.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ logout: vi.fn() }) }))
 vi.mock('../../auth/useCurrentUser', () => ({ useCurrentUser: () => ({ user: null, loading: false, plan: 'event' }) }))
 vi.mock('../widgets/Raffle', () => ({ default: () => null }))
@@ -38,6 +44,22 @@ function openConfig() {
 const footer = () => screen.getByRole('button', { name: 'Guardar y aplicar cambios' })
 
 describe('SettingsMenu Configurar juego', () => {
+  it('shows the connected Kivly logo on the game configuration menu entry', async () => {
+    const account = vi.spyOn(kivlyApi, 'getAccountConnection').mockResolvedValueOnce({
+      connected: true,
+      locationId: 'location', locations: [{ id: 'location', name: 'Club' }],
+    })
+    render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />)
+    expect(await screen.findByRole('img', { name: 'Kivly conectado' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Integraciones' })).not.toBeInTheDocument()
+    account.mockRestore()
+  })
+
+  it('shows Integraciones from the home settings menu', () => {
+    render(<SettingsMenu onClose={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Integraciones' })).toBeInTheDocument()
+  })
+
   it('preserves menu icon colors while theming action buttons inside submenus', async () => {
     render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />)
     const quiz = screen.getByRole('button', { name: /Quiz/ })
@@ -80,7 +102,7 @@ describe('SettingsMenu Configurar juego', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
     expect(api.put).toHaveBeenCalledWith('/v1/game', {
       gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web',
-      participantFields: { email: { required: true }, phone: { required: false } },
+      participantFields: { email: { required: true }, phone: { required: false, enabled: false } },
     })
     expect(api.put).toHaveBeenCalledWith('/v1/game', {
       gameId: 'ABC123',
@@ -89,7 +111,7 @@ describe('SettingsMenu Configurar juego', () => {
     expect(onConfigSaved).toHaveBeenCalledTimes(1)
     expect(JSON.parse(localStorage.getItem('L3TRAS_settings_ABC123') ?? '{}')).toEqual({
       objectiveWord: 'PIZZA', validationTimeLimitSeconds: 60, playMode: 'mobile', joinChannel: 'web',
-      participantFields: { email: { required: true }, phone: { required: false } },
+      participantFields: { email: { required: true }, phone: { required: false, enabled: false } },
     })
   })
 
