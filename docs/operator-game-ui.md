@@ -31,8 +31,9 @@ Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas d
 Home settings > **Integraciones** owns the organizer-wide connection and club
 details. Connecting/changing credentials and disconnecting are immediate actions;
 credentials are cleared on submission/cancellation and never stored in browser
-storage. Disconnect requires confirmation and affects all the organizer's games.
-Game settings show only a read-only logo/status and an explicit retry on errors.
+storage. The first release enables club registration only for STACK. Disconnect
+requires confirmation and affects all the organizer's STACK games.
+STACK settings show only a read-only logo/status and an explicit retry on errors.
 An unavailable indicator must not block saving unrelated game rules.
 
 When public metadata includes `loyalty`, `/play` asks for separate club consent

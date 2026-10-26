@@ -107,6 +107,13 @@ describe('mobile event links', () => {
 })
 
 describe('unified game configuration save', () => {
+  it.each(['EMPAREJA2', 'T1MER', 'RULET4'])('does not load club registration for %s', async (id) => {
+    mount(definition(id))
+    await waitFor(() => expect(footer()).toBeEnabled())
+    expect(kivlyApi.getAccountConnection).not.toHaveBeenCalled()
+    expect(screen.queryByRole('region', { name: 'Kivly' })).not.toBeInTheDocument()
+  })
+
   it('shows the connection without introducing reward controls or writes', async () => {
     const clubSettings = { clubName: 'Club', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms' }
     vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({

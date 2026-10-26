@@ -35,7 +35,8 @@ export const GAME_CONFIG_SAVE_LABEL = 'Guardar y aplicar cambios'
 export default function GameConfigPanel({ gameId, gameDefinition, settings, onSettingsChange, onSaved, onSavingChange }: Props) {
   const { t } = useOperatorLanguage()
   const accessDraft = useGameAccessDraft(gameId, gameDefinition.id)
-  const kivly = useKivlyDraft(gameId, true)
+  const supportsKivly = gameDefinition.id.toUpperCase() === 'STACK'
+  const kivly = useKivlyDraft(gameId, supportsKivly)
   const participantFields = accessDraft.participantFields
   const GameConfigComponent = gameDefinition.GameConfigComponent
   const rulesSaveRef = useRef<GameConfigSaveRegistration | null>(null)
@@ -199,7 +200,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
             </section>
           )}
         </fieldset>
-        <KivlySettings key={gameId} draft={kivly} />
+        {supportsKivly && <KivlySettings key={gameId} draft={kivly} />}
         {GameConfigComponent && (
           <fieldset disabled={saving} className="min-w-0">
             <GameConfigComponent

@@ -146,11 +146,11 @@ Final email registration sends only `{ gameId, challengeId, code }` to `/v1/publ
 
 ### Kivly: connection and player registration
 
-Home settings > **Integraciones** connects one Kivly location per organizer and stores shared club details through `/v1/kivly`. Credentials are sent only to the authenticated backend, cleared from the form and never stored in the browser. Disconnecting requires confirmation and affects all the organizer's games.
+Home settings > **Integraciones** connects one Kivly location per organizer and stores shared club details through `/v1/kivly`. This first release enables club registration only for **STACK**; other games do not require Kivly membership. Credentials are sent only to the authenticated backend, cleared from the form and never stored in the browser. Disconnecting requires confirmation and affects all the organizer's STACK games.
 
 When the backend publishes `loyalty` metadata, `/play` requires separate, explicit club consent. Its `consentVersion` is bound to the email challenge. The backend registers or reuses the customer only after email verification; unresolved registration blocks access without claiming success. Changed terms discard the challenge and require consent again. Legacy sessions rejected for missing club membership/consent return to registration.
 
-Game settings show only the Kivly connection indicator; a failed indicator does not block unrelated rule changes. Phone is shared with Kivly only when supplied for a new customer, never to overwrite an existing one. Reward creation, selection, assignment and Wallet UI are deliberately excluded from this feature. A real authorized test is still required to confirm customer registration in the target Kivly location.
+STACK settings show only the Kivly connection indicator; a failed indicator does not block unrelated rule changes. Phone is shared with Kivly only when supplied for a new customer, never to overwrite an existing one. Reward creation, selection, assignment and Wallet UI are deliberately excluded from this feature. A real authorized test is still required to confirm customer registration in the target Kivly location.
 
 After valid, active game metadata is loaded, an explicitly rejected saved participant session (`InvalidPlayerToken` or `PlayerNotFound`, HTTP 401/403/404) is cleared only for that game and returns to Web registration, requiring a new email code when configured. Network failures, throttling, server errors, unknown rejections and invalid game metadata retain the saved session and existing error/retry behavior.
 
