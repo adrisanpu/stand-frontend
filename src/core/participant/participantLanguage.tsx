@@ -2,6 +2,11 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 
 type Language = 'es' | 'en'
 const translations: Record<string, string> = {
+  'No se pudo cargar la ruleta. Recarga la página.': 'Could not load the wheel. Reload the page.',
+  'No se pudo confirmar el giro. Reintenta para recuperar el mismo resultado.': 'Could not confirm the spin. Retry to recover the same result.',
+  'Tu resultado': 'Your result',
+  'Girar ruleta': 'Spin the wheel',
+  'Girando...': 'Spinning...',
   'Enviar código': 'Send code',
   'Enviando código...': 'Sending code...',
   'Código enviado a': 'Code sent to',

@@ -129,6 +129,14 @@ Saving **Configurar aspecto** persists primary/accent colors and dark/light mode
 
 Participant `/play` panels have an **ES / EN** selector overlaid inside the upper-right corner (Spanish initially), with an accessible label but no visible language label. It translates interface text, instructions, local validation messages and accessibility labels immediately, without resetting forms, gameplay, or the participant session. Character/player names, event names and unrecognized server error messages remain unchanged. The registration privacy link opens the existing policy in the selected language. Selection lasts while the participant page remains mounted; other operator screens are unaffected.
 
+RULET4 configuration is loaded from and saved to `type.RULET4` through the game API.
+Legacy browser-only settings are offered for migration on explicit save only when
+no server configuration exists. Spins use server-selected, persisted results on
+both the operator screen and `/play`; the wheel animates the returned snapshot
+and index. A lost response can be retried without generating a second result.
+Reloading a participant session restores its result. This release leaves the
+general participant registration contract unchanged and does not include Kivly.
+
 The participant registration form shows the selected client logo centered at the top, falling back to the game's logo when none is configured, instead of displaying the event name.
 
 Web registration requires email verification whenever `participantFields.email.required` resolves to true (including legacy defaults). **Enviar código / Send code** sends the enabled registration fields, consent and participant language (`es`/`en`) to `POST /v1/public/email/request`. The pending step retains the details and consent in memory, shows the masked email, and accepts a six-digit code including leading zeros, paste and one-time-code autofill. Codes expire after 10 minutes with at most 5 attempts; the server remains authoritative. Resend uses the captured registration details and current consent, waits for the server's `resendAvailableAt` (normally 60 seconds), and respects rate-limit retry delays. **Cambiar datos / Change details** discards the local challenge before editing.
