@@ -6,6 +6,7 @@ import { GameAccessFields, translateGameAccessMessage, useGameAccessDraft } from
 import { GAME_ACCESS_CAPABILITIES, resolveGameAccess, type GameAccess } from './gameAccess'
 import { saveErrorMessage } from './gameConfigSave'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
+import KivlySettings, { useKivlyDraft } from './KivlySettings'
 
 export type GameConfigSavedPatch = Record<string, unknown> & GameAccess
 
@@ -34,6 +35,9 @@ export const GAME_CONFIG_SAVE_LABEL = 'Guardar y aplicar cambios'
 export default function GameConfigPanel({ gameId, gameDefinition, settings, onSettingsChange, onSaved, onSavingChange }: Props) {
   const { t } = useOperatorLanguage()
   const accessDraft = useGameAccessDraft(gameId, gameDefinition.id)
+  const supportsKivly = gameDefinition.id.toUpperCase() === 'STACK'
+  const kivly = useKivlyDraft(gameId, supportsKivly)
+  const participantFields = accessDraft.participantFields
   const GameConfigComponent = gameDefinition.GameConfigComponent
   const rulesSaveRef = useRef<GameConfigSaveRegistration | null>(null)
   const savingRef = useRef(false)
@@ -140,7 +144,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
     }
     const patch: GameConfigSavedPatch = {
       ...pendingPatchRef.current, ...access,
-      ...(supportsMobile ? { participantFields: accessDraft.participantFields } : {}),
+      ...(supportsMobile ? { participantFields } : {}),
     }
     pendingPatchRef.current = {}
     setSaving(false)
@@ -184,19 +188,19 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
               </div>
               <fieldset disabled={accessDraft.status !== 'ready'} className="min-w-0 space-y-2">
                 <legend className="mb-2 font-medium">{t('Datos del participante', 'Participant information')}</legend>
-                {([['email', 'Email'], ['phone', 'Teléfono']] as const).map(([field, label]) => (
-                  <label key={field} className="flex items-center gap-2">
-                    <input type="checkbox" checked={accessDraft.participantFields[field].required}
-                      onChange={(event) => accessDraft.setParticipantFields({
-                        ...accessDraft.participantFields, [field]: { required: event.target.checked },
-                      })} />
-                    {label === 'Teléfono' ? t(label, 'Phone') : label}
-                  </label>
-                ))}
+                <p>{t('Nombre completo y email obligatorios', 'Full name and email required')}</p>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={participantFields.phone.enabled}
+                    onChange={(event) => accessDraft.setParticipantFields({
+                      ...participantFields, phone: { required: false, enabled: event.target.checked },
+                    })} />
+                  {t('Mostrar teléfono (opcional)', 'Show phone (optional)')}
+                </label>
               </fieldset>
             </section>
           )}
         </fieldset>
+        {supportsKivly && <KivlySettings key={gameId} draft={kivly} />}
         {GameConfigComponent && (
           <fieldset disabled={saving} className="min-w-0">
             <GameConfigComponent

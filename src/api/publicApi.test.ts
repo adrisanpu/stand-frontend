@@ -31,6 +31,21 @@ describe('RULET4 spin contract', () => {
   })
 })
 
+describe('Kivly registration errors', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('retains the safe error code and retry delay without exposing external messages', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: 'KivlyRateLimited', message: 'External response must not be displayed',
+    }), { status: 429, headers: { 'Retry-After': '30' } })))
+    await expect(publicApi.join({ gameId: 'GAME1234', challengeId: 'challenge', code: '123456' }))
+      .rejects.toMatchObject({
+        status: 429, code: 'KivlyRateLimited', retryAfter: 30,
+        message: 'No se pudo confirmar tu registro en el club. Consulta al equipo del evento.',
+      })
+  })
+})
+
 describe('publicApi STACK start contract', () => {
   afterEach(() => { vi.unstubAllGlobals() })
 

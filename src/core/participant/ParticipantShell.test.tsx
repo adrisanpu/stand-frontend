@@ -115,11 +115,19 @@ describe('ParticipantShell STACK integration', () => {
     const { container } = renderParticipant()
     const photo = new File([new Uint8Array([1, 2, 3])], 'profile.png', { type: 'image/png' })
     fireEvent.change(await screen.findByLabelText('Foto de perfil (opcional)'), { target: { files: [photo] } })
-    fireEvent.change(screen.getByLabelText(/Nombre de usuario/), { target: { value: 'Ana' } })
+    fireEvent.change(screen.getByLabelText(/Nombre completo/), { target: { value: 'Ana' } })
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'ana@club.test' } })
+    vi.mocked(publicApi.requestEmailCode).mockResolvedValueOnce({
+      ok: true, challengeId: 'photo-challenge', emailMasked: 'a***@club.test',
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
+      resendAvailableAt: new Date(Date.now() + 60000).toISOString(),
+    })
     fireEvent.click(screen.getByRole('checkbox'))
-    fireEvent.click(screen.getByRole('button', { name: 'Empezar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    fireEvent.change(await screen.findByLabelText('Código de verificación'), { target: { value: '012345' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('No se pudo guardar la foto')
+    expect(await screen.findByText(/No se pudo guardar la foto/)).toBeInTheDocument()
     expect(screen.getByText('Jugando como')).toBeInTheDocument()
     expect(container.querySelector('.rounded-full')).toHaveTextContent('A')
     expect(publicApi.uploadParticipantPhoto).toHaveBeenCalledWith(photo, 'player-token')
@@ -242,7 +250,7 @@ describe('ParticipantShell STACK integration', () => {
     expect(loadAssignment('GAME1234')).toEqual(consumed)
   })
 
-  it.each(['InvalidPlayerToken', 'PlayerNotFound'])('clears a rejected saved session (%s) and requires a new verified join', async (code) => {
+  it.each(['InvalidPlayerToken', 'PlayerNotFound', 'KivlyMembershipRequired', 'KivlyConsentRequired'])('clears a rejected saved session (%s) and requires a new verified join', async (code) => {
     savePlayerSession('GAME1234', 'expired-token', assignment)
     savePlayerSession('OTHERGAME', 'other-token', assignment)
     vi.mocked(publicApi.getPlayer).mockRejectedValueOnce(new PublicApiError(code, 403, code))
@@ -261,7 +269,7 @@ describe('ParticipantShell STACK integration', () => {
     expect(loadPlayerToken('OTHERGAME')).toBe('other-token')
     expect(screen.queryByText(/Escena STACK/)).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
-    fireEvent.change(screen.getByLabelText(/Nombre de usuario/), { target: { value: 'Player' } })
+    fireEvent.change(screen.getByLabelText(/Nombre completo/), { target: { value: 'Player' } })
     fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
     const input = await screen.findByLabelText('Código de verificación')
@@ -588,7 +596,7 @@ describe('ParticipantShell STACK integration', () => {
     renderParticipant()
     expect(await screen.findByText('Regístrate para jugar desde tu móvil')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/Email/), { target: { value: 'ana@example.test' } })
-    fireEvent.change(screen.getByLabelText(/Nombre de usuario/), { target: { value: 'Ana' } })
+    fireEvent.change(screen.getByLabelText(/Nombre completo/), { target: { value: 'Ana' } })
     fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
     const code = await screen.findByLabelText('Código de verificación')
@@ -832,7 +840,7 @@ describe('ParticipantShell STACK integration', () => {
       })
       renderParticipant()
       expect(await screen.findByLabelText('Email *')).toBeInTheDocument()
-      expect(screen.getByLabelText('Nombre de usuario *')).toBeInTheDocument()
+      expect(screen.getByLabelText('Nombre completo *')).toBeInTheDocument()
       expect(screen.queryByText('Participa desde Instagram')).not.toBeInTheDocument()
       expect(screen.queryByText('Juego no disponible')).not.toBeInTheDocument()
     },

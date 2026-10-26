@@ -26,6 +26,22 @@ Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas d
 
 ## Configurar juego
 
+### Kivly: connection and registration
+
+Home settings > **Integraciones** owns the organizer-wide connection and club
+details. Connecting/changing credentials and disconnecting are immediate actions;
+credentials are cleared on submission/cancellation and never stored in browser
+storage. The first release enables club registration only for STACK. Disconnect
+requires confirmation and affects all the organizer's STACK games.
+STACK settings show only a read-only logo/status and an explicit retry on errors.
+An unavailable indicator must not block saving unrelated game rules.
+
+When public metadata includes `loyalty`, `/play` asks for separate club consent
+and sends its version with the email-code request. Access opens only after the
+backend confirms verified registration. Changed terms require fresh consent;
+uncertain registration displays an error without granting access. This feature
+does not include reward selection, generation, assignment or Wallet buttons.
+
 Action buttons inside settings panels (save/apply, generate Quiz/cards, export,
 share, download and image selection) use the active palette's primary color,
 including hover and border states. Keep destructive actions red. Preserve the
@@ -138,13 +154,13 @@ The shared panel shows the participant
 `/play/:gameId` link and prize validator link with its QR immediately below the
 fixed mobile/Web access summary, before game-specific rules. Use three compact columns:
 participant QR with its link below, validator QR with its link below (both 80px),
-and **Datos del participante** with Email and Phone checkboxes.
-Checked fields are required in `/play`; unchecked fields are hidden and omitted
-from registration requests. Save these settings with the shared footer, not in
-individual game configs. Existing events default to email enabled and phone
-disabled when no explicit configuration exists. Individual game configs
-must not duplicate these settings. Web registration always asks for a display
-username and also offers an optional
+and **Datos del participante** with required full name/email and one checkbox
+to show an optional phone. Save phone visibility with the shared footer, not in
+individual game configs. Email is always verified, including legacy disabled-email
+settings. Legacy required-phone settings make phone visible but not mandatory;
+an explicit `phone.enabled` takes precedence. Hidden/blank phones are omitted.
+Individual game configs must not duplicate these settings. Web registration
+asks for full name first, then email, and also offers an optional
 profile photo for every participant, independent of the configured contact fields;
 uploaded photos appear in rankings and participant `/play`. Instagram is neither
 contact data nor an access channel.

@@ -49,6 +49,9 @@ async function request<T>(
   }
 
   if (!response.ok) {
+    if (/^\/v1\/(?:game\/)?kivly(?:[/?]|$)/.test(endpoint)) {
+      throw Object.assign(new Error(`Kivly API error: ${response.status}`), { status: response.status })
+    }
     let errorText = await response.text()
     try {
       errorText = JSON.stringify(JSON.parse(errorText))

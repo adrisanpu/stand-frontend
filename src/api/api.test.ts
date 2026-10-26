@@ -18,4 +18,16 @@ describe('API error responses', () => {
       'API error: 502 upstream unavailable'
     )
   })
+
+  it('does not expose or log Kivly response bodies', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response('External response must remain private', { status: 502 })
+    ))
+    await expect(api.get('/v1/kivly')).rejects.toMatchObject({
+      status: 502, message: 'Kivly API error: 502',
+    })
+    expect(log).not.toHaveBeenCalled()
+  })
 })
