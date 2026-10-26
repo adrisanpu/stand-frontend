@@ -36,6 +36,21 @@ async function publicRequest<T>(endpoint: string, options: RequestInit = {}): Pr
   return data as T
 }
 
+function isSafeWalletUrl(value: string | null | undefined): boolean {
+  if (value == null) return true
+  try {
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase()
+    return url.protocol === 'https:' && !url.username && !url.password
+      && (!url.port || url.port === '443')
+      && (host === 'pay.google.com' || host === 'wallet.google.com'
+        || host === 'getkivly.com' || host.endsWith('.getkivly.com')
+        || host === 'kivly.com' || host.endsWith('.kivly.com'))
+  } catch {
+    return false
+  }
+}
+
 export type ParticipantFieldsConfig = {
   email?: { required?: boolean }
   phone?: { required?: boolean; enabled?: boolean }
@@ -74,6 +89,7 @@ export type PublicGameResponse = {
   ranking?: PublicRankingEntry[]
   stackConfig?: StackConfig
   rulet4Config?: Rulet4Settings
+  kivlyReward?: { name: string }
   stackStartSnapshot?: boolean
   stackFinishSupported?: boolean
   joinUrl: string
@@ -119,6 +135,13 @@ export type StackAssignment = {
   attempt: StackAttempt | null
   score?: number
   rank?: number | null
+}
+
+export type KivlyCompletionReward = {
+  status: 'none' | 'pending' | 'confirmed'
+  name?: string
+  appleWalletUrl?: string | null
+  googleWalletUrl?: string | null
 }
 
 export type ImpostorParticipantState = {
@@ -291,6 +314,20 @@ export type PublicScoreResponse = {
 }
 
 export const publicApi = {
+  async completionReward(gameId: string, playerToken: string): Promise<KivlyCompletionReward> {
+    const data = await publicRequest<{ ok: boolean; reward: KivlyCompletionReward }>('/v1/public/kivly/reward', {
+      method: 'POST',
+      body: JSON.stringify({ gameId, playerToken }),
+    })
+    if (data?.ok !== true || !data.reward
+      || !['none', 'pending', 'confirmed'].includes(data.reward.status)
+      || (data.reward.status !== 'none' && typeof data.reward.name !== 'string')
+      || !isSafeWalletUrl(data.reward.appleWalletUrl)
+      || !isSafeWalletUrl(data.reward.googleWalletUrl)) {
+      throw new Error('Invalid Kivly completion reward response')
+    }
+    return data.reward
+  },
   async spinRulet4(gameId: string, playerToken: string): Promise<Rulet4Result> {
     const response = await publicRequest<{ ok?: boolean; result?: unknown }>('/v1/public/rulet4/spin', {
       method: 'POST',

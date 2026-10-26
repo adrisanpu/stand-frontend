@@ -16,7 +16,9 @@ import { GAME_ACCESS_CAPABILITIES } from './gameAccess'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }))
 vi.mock('../../api/kivlyApi', () => ({
-  kivlyApi: { getAccountConnection: vi.fn() },
+  kivlyApi: {
+    getAccountConnection: vi.fn(), getReward: vi.fn(), listRewards: vi.fn(), saveReward: vi.fn(),
+  },
 }))
 
 const colors = { primary: '#000', accent: '#000', background: '#000', surface: '#000', textMain: '#fff', textSub: '#fff' }
@@ -31,6 +33,9 @@ function gameResponse(game: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({ connected: false, locationId: null, locations: [] })
+  vi.mocked(kivlyApi.getReward).mockResolvedValue(null)
+  vi.mocked(kivlyApi.listRewards).mockResolvedValue([])
+  vi.mocked(kivlyApi.saveReward).mockResolvedValue(undefined)
   vi.mocked(api.get).mockImplementation(async (url: string) => {
     if (url.startsWith('/v1/game/infocards')) return { ok: true, cards: [{ id: 'c1', title: 'Hola', body: 'Texto', order: 0 }] }
     return gameResponse()
@@ -114,20 +119,38 @@ describe('unified game configuration save', () => {
     expect(screen.queryByRole('region', { name: 'Kivly' })).not.toBeInTheDocument()
   })
 
-  it('shows the connection without introducing reward controls or writes', async () => {
+  it('shows the connection and preserves an unchanged reward selection', async () => {
     const clubSettings = { clubName: 'Club', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms' }
     vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
       connected: true, locationId: 'location1', locations: [{ id: 'location1', name: 'Club' }], clubSettings,
     })
     const { onSaved } = mount(definition('STACK'))
     expect(await screen.findByText('Conectado')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Premio Kivly al terminar')).not.toBeInTheDocument()
+    expect(await screen.findByLabelText('Premio Kivly al terminar')).toBeInTheDocument()
+    expect(kivlyApi.listRewards).toHaveBeenCalledWith('ABC123')
     fireEvent.click(footer())
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
       participantFields: { email: { required: true }, phone: { required: false, enabled: false } },
     }))
     expect(vi.mocked(api.put).mock.calls.every(([path]) => !path.includes('kivly'))).toBe(true)
+  })
+
+  it('saves the selected STACK reward with the unified game configuration action', async () => {
+    const clubSettings = { clubName: 'Club', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms' }
+    vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
+      connected: true, locationId: 'location1', locations: [{ id: 'location1', name: 'Club' }], clubSettings,
+    })
+    vi.mocked(kivlyApi.getReward).mockResolvedValue({ id: 'reward-1', name: 'Coffee' })
+    vi.mocked(kivlyApi.listRewards).mockResolvedValue([
+      { id: 'reward-1', name: 'Coffee' }, { id: 'reward-2', name: 'Tea' },
+    ])
+    const { onSaved } = mount(definition('STACK'))
+    await waitFor(() => expect(footer()).toBeEnabled())
+    fireEvent.change(screen.getByLabelText('Premio Kivly al terminar'), { target: { value: 'reward-2' } })
+    fireEvent.click(footer())
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(kivlyApi.saveReward).toHaveBeenCalledWith('ABC123', 'reward-2')
   })
 
   it('allows saving game rules when the read-only Kivly indicator cannot load', async () => {

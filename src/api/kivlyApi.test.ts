@@ -15,6 +15,25 @@ describe('Kivly account location', () => {
     expect(api.put).toHaveBeenLastCalledWith('/v1/kivly', { clubSettings })
   })
 
+  describe('Kivly STACK rewards', () => {
+    it('loads the saved reward and active reward catalog', async () => {
+      vi.mocked(api.get)
+        .mockResolvedValueOnce({ ok: true, reward: { id: 'reward-1', name: 'Coffee' } })
+        .mockResolvedValueOnce({ ok: true, rewards: [{ id: 'reward-1', name: 'Coffee' }] })
+      expect(await kivlyApi.getReward('GAME 1')).toEqual({ id: 'reward-1', name: 'Coffee' })
+      expect(await kivlyApi.listRewards('GAME 1')).toEqual([{ id: 'reward-1', name: 'Coffee' }])
+      expect(api.get).toHaveBeenNthCalledWith(1, '/v1/game/kivly?gameId=GAME%201')
+      expect(api.get).toHaveBeenNthCalledWith(2, '/v1/game/kivly/rewards?gameId=GAME%201')
+    })
+
+    it('rejects malformed rewards and unconfirmed selection changes', async () => {
+      vi.mocked(api.get).mockResolvedValueOnce({ ok: true, rewards: [{}] })
+      await expect(kivlyApi.listRewards('GAME1')).rejects.toThrow('Invalid Kivly rewards response')
+      vi.mocked(api.put).mockResolvedValue({ ok: false })
+      await expect(kivlyApi.saveReward('GAME1', 'reward-1')).rejects.toThrow('Kivly reward not confirmed')
+    })
+  })
+
   it('disconnects and exposes credential cleanup warnings', async () => {
     vi.mocked(api.delete).mockResolvedValue({ ok: true, warning: 'KivlySecretCleanupRequired' })
     expect(await kivlyApi.disconnectAccount()).toBe(true)

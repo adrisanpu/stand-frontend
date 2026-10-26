@@ -64,7 +64,7 @@ export default function Rulet4GameConfig({ gameId, onChange, registerSave }: Gam
   }
 
   const handlePanelChange = (id: string, field: keyof Rulet4PanelConfig, value: string | number) => {
-    setPanels(panels.map(p => 
+    setPanels(panels.map(p =>
       p.id === id ? { ...p, [field]: value } : p
     ))
   }

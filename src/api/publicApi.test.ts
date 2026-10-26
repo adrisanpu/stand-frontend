@@ -46,6 +46,30 @@ describe('Kivly registration errors', () => {
   })
 })
 
+describe('Kivly completion reward contract', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('uses the player token and retains the server-provided Wallet URLs', async () => {
+    const reward = { status: 'confirmed', name: 'Coffee', appleWalletUrl: null, googleWalletUrl: 'https://pay.google.com/gp/v/save/test' }
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, reward })))
+    vi.stubGlobal('fetch', request)
+    expect(await publicApi.completionReward('GAME1234', 'player-token')).toEqual(reward)
+    expect(request).toHaveBeenCalledWith(expect.stringContaining('/v1/public/kivly/reward'), expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ gameId: 'GAME1234', playerToken: 'player-token' }),
+    }))
+  })
+
+  it.each([
+    { status: 'success' },
+    { status: 'confirmed' },
+    { status: 'confirmed', name: 'Coffee', appleWalletUrl: 'javascript:alert(1)' },
+    { status: 'pending', name: 'Coffee', googleWalletUrl: 'http://pay.google.com/pass' },
+  ])('rejects malformed or unsafe reward output: %j', async (reward) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, reward }))))
+    await expect(publicApi.completionReward('GAME1234', 'token')).rejects.toThrow()
+  })
+})
+
 describe('publicApi STACK start contract', () => {
   afterEach(() => { vi.unstubAllGlobals() })
 

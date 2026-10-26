@@ -177,6 +177,13 @@ const translations: Record<string, string> = {
   'Ganan los jugadores': 'The players win',
   'Gana el impostor': 'The impostor wins',
   '¡Has ganado!': 'You won!',
+  'Tu premio del club': 'Your club reward',
+  'Confirmando tu premio...': 'Confirming your reward...',
+  'No se pudo comprobar tu premio. Tu resultado está guardado.': 'Could not check your reward. Your result is saved.',
+  'Premio asignado a tu cuenta del club.': 'Reward assigned to your club account.',
+  'Tarjeta no disponible todavía.': 'Wallet pass not available yet.',
+  'Tu premio está pendiente de comprobación. Consulta al equipo del evento; no se volverá a asignar automáticamente.': 'Your reward is pending verification. Ask the event team; it will not be assigned again automatically.',
+  'Comprobar premio': 'Check reward',
   'Has perdido': 'You lost',
 }
 

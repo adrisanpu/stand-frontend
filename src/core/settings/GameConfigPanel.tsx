@@ -6,7 +6,7 @@ import { GameAccessFields, translateGameAccessMessage, useGameAccessDraft } from
 import { GAME_ACCESS_CAPABILITIES, resolveGameAccess, type GameAccess } from './gameAccess'
 import { saveErrorMessage } from './gameConfigSave'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
-import KivlySettings, { useKivlyDraft } from './KivlySettings'
+import KivlySettings, { KivlyRewardSettings, useKivlyDraft, useKivlyRewardDraft } from './KivlySettings'
 
 export type GameConfigSavedPatch = Record<string, unknown> & GameAccess
 
@@ -35,8 +35,10 @@ export const GAME_CONFIG_SAVE_LABEL = 'Guardar y aplicar cambios'
 export default function GameConfigPanel({ gameId, gameDefinition, settings, onSettingsChange, onSaved, onSavingChange }: Props) {
   const { t } = useOperatorLanguage()
   const accessDraft = useGameAccessDraft(gameId, gameDefinition.id)
-  const supportsKivly = gameDefinition.id.toUpperCase() === 'STACK'
-  const kivly = useKivlyDraft(gameId, supportsKivly)
+  const isStack = gameDefinition.id.toUpperCase() === 'STACK'
+  const kivly = useKivlyDraft(gameId, isStack)
+  const hasKivlyReward = isStack && kivly.settings?.enabled === true
+  const kivlyReward = useKivlyRewardDraft(gameId, hasKivlyReward)
   const participantFields = accessDraft.participantFields
   const GameConfigComponent = gameDefinition.GameConfigComponent
   const rulesSaveRef = useRef<GameConfigSaveRegistration | null>(null)
@@ -129,6 +131,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
       } catch (cause) {
         throw new Error(`No se pudo guardar el modo y acceso: ${saveErrorMessage(cause, 'error desconocido.')}`)
       }
+      await kivlyReward.persist()
       if (rules) {
         try {
           await rules.save()
@@ -200,7 +203,8 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
             </section>
           )}
         </fieldset>
-        {supportsKivly && <KivlySettings key={gameId} draft={kivly} />}
+        {isStack && <KivlySettings key={gameId} draft={kivly} />}
+        {hasKivlyReward && <fieldset disabled={saving}><KivlyRewardSettings draft={kivlyReward} /></fieldset>}
         {GameConfigComponent && (
           <fieldset disabled={saving} className="min-w-0">
             <GameConfigComponent
@@ -222,7 +226,8 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
         <button
           type="button"
           onClick={() => void handleSave()}
-          disabled={saving || accessDraft.status !== 'ready'}
+          disabled={saving || accessDraft.status !== 'ready'
+            || (hasKivlyReward && kivlyReward.status !== 'ready')}
           className="w-full rounded-xl p-3 font-medium bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? t('Guardando...', 'Saving...') : t(GAME_CONFIG_SAVE_LABEL, 'Save and apply changes')}

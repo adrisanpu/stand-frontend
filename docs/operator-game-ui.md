@@ -39,8 +39,12 @@ An unavailable indicator must not block saving unrelated game rules.
 When public metadata includes `loyalty`, `/play` asks for separate club consent
 and sends its version with the email-code request. Access opens only after the
 backend confirms verified registration. Changed terms require fresh consent;
-uncertain registration displays an error without granting access. This feature
-does not include reward selection, generation, assignment or Wallet buttons.
+uncertain registration displays an error without granting access. STACK game
+settings can select one existing Kivly reward. Once the server confirms a saved
+finish, participants can check assignment status and use only Wallet links
+returned by Kivly. The feature does not generate rewards or passes, redeem
+rewards, or mark them used; uncertain assignments are not automatically replayed.
+This reward extension is pending review and has not been live-verified.
 
 Action buttons inside settings panels (save/apply, generate Quiz/cards, export,
 share, download and image selection) use the active palette's primary color,
