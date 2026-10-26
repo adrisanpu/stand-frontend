@@ -22,20 +22,22 @@ async function publicRequest<T>(endpoint: string, options: RequestInit = {}): Pr
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    const msg = (data as { error?: string; message?: string; reason?: string }).message
+    const code = (data as { code?: string; error?: string }).code ?? (data as { error?: string }).error
+    const msg = typeof code === 'string' && code.startsWith('Kivly')
+      ? 'No se pudo confirmar tu registro en el club. Consulta al equipo del evento.'
+      : (data as { error?: string; message?: string; reason?: string }).message
       || (data as { error?: string }).error
       || (data as { reason?: string }).reason
       || `HTTP ${response.status}`
     const retryAfter = Number(response.headers?.get('Retry-After') ?? (data as { retryAfter?: number }).retryAfter)
-    throw new PublicApiError(msg, response.status, (data as { code?: string; error?: string }).code
-      ?? (data as { error?: string }).error, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined)
+    throw new PublicApiError(msg, response.status, code, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined)
   }
   return data as T
 }
 
 export type ParticipantFieldsConfig = {
   email?: { required?: boolean }
-  phone?: { required?: boolean }
+  phone?: { required?: boolean; enabled?: boolean }
 }
 
 export type PublicRankingEntry = {
@@ -58,6 +60,12 @@ export type PublicGameResponse = {
   playMode?: 'master' | 'mobile'
   joinChannel?: string
   participantFields?: ParticipantFieldsConfig
+  loyalty?: {
+    clubName: string
+    privacyUrl: string
+    termsUrl: string
+    consentVersion: string
+  }
   prizeCatalog?: PrizeCatalog
   playerCount: number
   validatedCount: number
@@ -66,6 +74,7 @@ export type PublicGameResponse = {
   stackConfig?: StackConfig
   stackStartSnapshot?: boolean
   stackFinishSupported?: boolean
+  kivlyReward?: { name: string }
   joinUrl: string
 }
 
@@ -155,6 +164,13 @@ export type StackFinishResponse = {
   rank: number | null
 }
 
+export type KivlyCompletionReward = {
+  status: 'none' | 'pending' | 'confirmed'
+  name?: string
+  appleWalletUrl?: string | null
+  googleWalletUrl?: string | null
+}
+
 export type JoinResponse = {
   ok: boolean
   gameId: string
@@ -212,6 +228,7 @@ export type EmailRegistration = {
   username: string
   phone?: string
   consent: boolean
+  loyaltyConsentVersion?: string
   language?: 'es' | 'en'
 }
 
@@ -280,6 +297,18 @@ export type PublicScoreResponse = {
 }
 
 export const publicApi = {
+  async completionReward(gameId: string, playerToken: string): Promise<KivlyCompletionReward> {
+    const data = await publicRequest<{ ok: boolean; reward: KivlyCompletionReward }>('/v1/public/kivly/reward', {
+      method: 'POST', body: JSON.stringify({ gameId, playerToken }),
+    })
+    if (data.ok !== true || !data.reward || !['none', 'pending', 'confirmed'].includes(data.reward.status)
+      || (data.reward.status !== 'none' && typeof data.reward.name !== 'string')
+      || ![data.reward.appleWalletUrl, data.reward.googleWalletUrl].every((value) =>
+        value == null || (typeof value === 'string' && value.startsWith('https://')))) {
+      throw new Error('Invalid Kivly completion reward response')
+    }
+    return data.reward
+  },
   getGame: (gameId: string) =>
     publicRequest<PublicGameResponse>(`/v1/public/game?gameId=${encodeURIComponent(gameId)}`),
 

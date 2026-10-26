@@ -95,56 +95,49 @@ describe('participant prize promotion', () => {
 describe('participant registration fields', () => {
   it.each(Array.from({ length: 4 }, (_, mask) => ({
     email: Boolean(mask & 1), phone: Boolean(mask & 2),
-  })))('requests only enabled contact fields and always includes a username: %o', async ({ email, phone }) => {
+  })))('always verifies email and only requests enabled optional phone: %o', async ({ email, phone }) => {
     const onJoined = vi.fn()
     render(<JoinForm gameId="ABC123" gameMeta={{
       ...meta, participantFields: {
         email: { required: email }, phone: { required: phone },
       },
     }} onJoined={onJoined} />)
-    for (const [label, enabled, value] of [
-      ['Email', email, 'player@example.com'], ['Teléfono', phone, '+34 600123456'],
-    ] as const) {
-      const input = screen.queryByLabelText(`${label} *`)
-      if (enabled) {
-        expect(input).toBeRequired()
-        fireEvent.change(input!, { target: { value } })
-      } else {
-        expect(input).not.toBeInTheDocument()
-      }
-    }
-    if (phone) expect(screen.getByLabelText('Teléfono *')).toHaveAttribute('type', 'tel')
+    const emailInput = screen.getByLabelText('Email *')
+    expect(emailInput).toBeRequired()
+    fireEvent.change(emailInput, { target: { value: 'player@example.com' } })
+    const phoneInput = screen.queryByLabelText('Teléfono (opcional)')
+    if (phone) {
+      expect(phoneInput).not.toBeRequired()
+      expect(phoneInput).toHaveAttribute('type', 'tel')
+      fireEvent.change(phoneInput!, { target: { value: '+34 600123456' } })
+    } else expect(phoneInput).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Instagram *')).not.toBeInTheDocument()
-    const usernameInput = screen.getByLabelText('Nombre de usuario *')
+    const usernameInput = screen.getByLabelText('Nombre completo *')
     expect(usernameInput).toBeRequired()
     fireEvent.change(usernameInput, { target: { value: 'Player' } })
     fireEvent.click(screen.getByRole('checkbox'))
-    fireEvent.click(screen.getByRole('button', { name: email ? 'Enviar código' : 'Empezar' }))
+    expect(usernameInput).toHaveAttribute('autocomplete', 'name')
+    expect(usernameInput.compareDocumentPosition(emailInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
     const registration = {
       gameId: 'ABC123', consent: true,
       username: 'Player',
-      ...(email ? { email: 'player@example.com' } : {}),
+      email: 'player@example.com',
       ...(phone ? { phone: '+34 600123456' } : {}),
     }
-    if (email) {
-      await screen.findByLabelText('Código de verificación')
-      expect(publicApi.requestEmailCode).toHaveBeenCalledWith({ ...registration, language: 'es' })
-      expect(publicApi.join).not.toHaveBeenCalled()
-      expect(savePlayerSession).not.toHaveBeenCalled()
-      expect(onJoined).not.toHaveBeenCalled()
-      fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
-    } else {
-      expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
-    }
+    await screen.findByLabelText('Código de verificación')
+    expect(publicApi.requestEmailCode).toHaveBeenCalledWith({ ...registration, language: 'es' })
+    expect(publicApi.join).not.toHaveBeenCalled()
+    expect(savePlayerSession).not.toHaveBeenCalled()
+    expect(onJoined).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
     await waitFor(() => expect(onJoined).toHaveBeenCalledWith('token'))
-    expect(publicApi.join).toHaveBeenCalledWith(email
-      ? { gameId: 'ABC123', challengeId: 'challenge-1', code: '012345' }
-      : registration)
+    expect(publicApi.join).toHaveBeenCalledWith({ gameId: 'ABC123', challengeId: 'challenge-1', code: '012345' })
   })
 
   async function startVerification() {
-    fillUsername()
+    fillFullName()
     fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
     fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: /Enviar código|Send code/ }))
@@ -152,8 +145,8 @@ describe('participant registration fields', () => {
     return screen.getByLabelText(/Código de verificación|Verification code/)
   }
 
-  function fillUsername() {
-    const input = screen.queryByLabelText(/^(Nombre de usuario|Username) \*$/) as HTMLInputElement | null
+  function fillFullName() {
+    const input = screen.queryByLabelText(/^(Nombre completo|Full name) \*$/) as HTMLInputElement | null
     if (input && !input.value) fireEvent.change(input, { target: { value: 'Player' } })
   }
 
@@ -167,14 +160,14 @@ describe('participant registration fields', () => {
           email: { required: email }, phone: { required: phone },
         },
       }} onJoined={vi.fn()} />)
-      if (email) fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
-      if (phone) fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '+34123456789' } })
-      const input = screen.getByLabelText('Nombre de usuario *')
+      fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+      if (phone) fireEvent.change(screen.getByLabelText('Teléfono (opcional)'), { target: { value: '+34123456789' } })
+      const input = screen.getByLabelText('Nombre completo *')
       expect(input).toHaveValue('')
       fireEvent.change(input, { target: { value: '  ' } })
       fireEvent.click(screen.getByRole('checkbox'))
       fireEvent.submit(input.closest('form')!)
-      expect(screen.getByRole('alert')).toHaveTextContent('El nombre de usuario es obligatorio.')
+      expect(screen.getByRole('alert')).toHaveTextContent('El nombre completo es obligatorio.')
       expect(publicApi.join).not.toHaveBeenCalled()
       expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
     })
@@ -183,13 +176,13 @@ describe('participant registration fields', () => {
       vi.useFakeTimers()
       const onJoined = vi.fn()
       render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={onJoined} />)
-      fireEvent.change(screen.getByLabelText('Nombre de usuario *'), { target: { value: '  Ana 🌟  ' } })
+      fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: '  Ana 🌟  ' } })
       await startVerification()
       const registration = {
         gameId: 'ABC123', email: 'player@example.com', username: 'Ana 🌟', consent: true, language: 'es',
       }
       expect(publicApi.requestEmailCode).toHaveBeenCalledWith(registration)
-      expect(screen.queryByLabelText('Nombre de usuario *')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
       await act(async () => { vi.advanceTimersByTime(60_000) })
       fireEvent.click(screen.getByRole('button', { name: 'Reenviar código' }))
       await act(async () => {})
@@ -206,16 +199,16 @@ describe('participant registration fields', () => {
     it.each(['', '   '])('rejects an empty username explicitly: %j', (username) => {
       render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
       fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
-      const input = screen.getByLabelText('Nombre de usuario *')
+      const input = screen.getByLabelText('Nombre completo *')
       fireEvent.change(input, { target: { value: username } })
       fireEvent.submit(input.closest('form')!)
-      expect(screen.getByRole('alert')).toHaveTextContent('El nombre de usuario es obligatorio.')
+      expect(screen.getByRole('alert')).toHaveTextContent('El nombre completo es obligatorio.')
       expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
     })
 
     it('counts Unicode characters rather than UTF-16 units at the name length boundary', async () => {
       render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
-      fireEvent.change(screen.getByLabelText('Nombre de usuario *'), { target: { value: '🌟'.repeat(100) } })
+      fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: '🌟'.repeat(100) } })
       await startVerification()
       expect(publicApi.requestEmailCode).toHaveBeenCalledWith(expect.objectContaining({ username: '🌟'.repeat(100) }))
     })
@@ -223,10 +216,10 @@ describe('participant registration fields', () => {
     it.each(['a'.repeat(101), 'Ana\u0007', 'Ana\u007f', 'Ana\u0085B'])('rejects invalid names before requesting a challenge', async (username) => {
       render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
       fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
-      fireEvent.change(screen.getByLabelText('Nombre de usuario *'), { target: { value: username } })
+      fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: username } })
       fireEvent.click(screen.getByRole('checkbox'))
       fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
-      expect(screen.getByRole('alert')).toHaveTextContent('Usa un nombre de usuario de hasta 100 caracteres sin caracteres de control.')
+      expect(screen.getByRole('alert')).toHaveTextContent('Usa un nombre completo de hasta 100 caracteres sin caracteres de control.')
       expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
     })
 
@@ -237,12 +230,12 @@ describe('participant registration fields', () => {
         <JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />
       </ParticipantLanguageProvider>)
       fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
-      expect(screen.getByLabelText('Username *')).toBeRequired()
-      fillUsername()
+      expect(screen.getByLabelText('Full name *')).toBeRequired()
+      fillFullName()
       fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
       fireEvent.click(screen.getByRole('checkbox'))
       fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
-      expect(await screen.findByRole('alert')).toHaveTextContent('Use a username of up to 100 characters without control characters.')
+      expect(await screen.findByRole('alert')).toHaveTextContent('Use a full name of up to 100 characters without control characters.')
     })
   })
 
@@ -261,10 +254,11 @@ describe('participant registration fields', () => {
       vi.mocked(publicApi.uploadParticipantPhoto).mockResolvedValueOnce('https://photo.example/profile.png')
       render(<JoinForm gameId="ABC123" gameMeta={noRequiredFields} onJoined={onJoined} />)
 
-      fillUsername()
+      fillFullName()
       fireEvent.change(screen.getByLabelText('Foto de perfil (opcional)'), { target: { files: [photo] } })
-      fireEvent.click(screen.getByRole('checkbox'))
-      fireEvent.click(screen.getByRole('button', { name: 'Empezar' }))
+      await startVerification()
+      fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
 
       await waitFor(() => expect(onJoined).toHaveBeenCalledWith('token'))
       expect(publicApi.uploadParticipantPhoto).toHaveBeenCalledWith(photo, 'token')
@@ -282,10 +276,11 @@ describe('participant registration fields', () => {
       vi.mocked(publicApi.uploadParticipantPhoto).mockRejectedValueOnce(new Error('network failure'))
       render(<JoinForm gameId="ABC123" gameMeta={noRequiredFields} onJoined={onJoined} />)
 
-      fillUsername()
+      fillFullName()
       fireEvent.change(screen.getByLabelText('Foto de perfil (opcional)'), { target: { files: [photo] } })
-      fireEvent.click(screen.getByRole('checkbox'))
-      fireEvent.click(screen.getByRole('button', { name: 'Empezar' }))
+      await startVerification()
+      fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
 
       await waitFor(() => expect(onJoined).toHaveBeenCalledWith('token', true))
       expect(savePlayerSession).toHaveBeenCalledWith('ABC123', 'token', {
@@ -308,7 +303,7 @@ describe('participant registration fields', () => {
       ['web_join_disabled', 'Web registration is unavailable for this game. Ask the event team.'],
       ['unsupported_game_type', 'Web registration is unavailable for this game. Ask the event team.'],
       ['missing_email', 'Email is required.'],
-      ['missing_username', 'Username is required.'],
+      ['missing_username', 'Full name is required.'],
       ['invalid_email', 'Enter a valid email address.'],
       ['missing_phone', 'Phone number is required.'],
       ['invalid_phone', 'Enter a valid phone number.'],
@@ -320,7 +315,7 @@ describe('participant registration fields', () => {
         <JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />
       </ParticipantLanguageProvider>)
       fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
-      fillUsername()
+      fillFullName()
       fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
       fireEvent.click(screen.getByRole('checkbox'))
       fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
@@ -337,7 +332,7 @@ describe('participant registration fields', () => {
     ])('uses a friendly Spanish fallback for unclassified failures', async (error) => {
       vi.mocked(publicApi.requestEmailCode).mockRejectedValueOnce(error)
       render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
-      fillUsername()
+      fillFullName()
       fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
       fireEvent.click(screen.getByRole('checkbox'))
       fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
@@ -360,7 +355,7 @@ describe('participant registration fields', () => {
 
     it('requires consent before requesting a code for legacy defaults', () => {
       render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
-      fillUsername()
+      fillFullName()
       fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
       fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
       expect(screen.getByRole('alert')).toHaveTextContent('Debes aceptar')
@@ -413,12 +408,12 @@ describe('participant registration fields', () => {
       render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, participantFields: {
         email: { required: true }, phone: { required: true },
       } }} onJoined={vi.fn()} />)
-      fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '+34123456789' } })
+      fireEvent.change(screen.getByLabelText('Teléfono (opcional)'), { target: { value: '+34123456789' } })
       const input = await startVerification()
       expect(screen.queryByLabelText('Email *')).not.toBeInTheDocument()
       expect(screen.queryByLabelText('Instagram *')).not.toBeInTheDocument()
-      expect(screen.queryByLabelText('Nombre de usuario *')).not.toBeInTheDocument()
-      expect(screen.queryByLabelText('Teléfono *')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Teléfono (opcional)')).not.toBeInTheDocument()
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
       expect(screen.queryByText('Regístrate para jugar desde tu móvil')).not.toBeInTheDocument()
       expect(screen.queryByRole('link', { name: 'Política de privacidad' })).not.toBeInTheDocument()
@@ -508,7 +503,7 @@ describe('participant registration fields', () => {
         <JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />
       </ParticipantLanguageProvider>)
       fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
-      fillUsername()
+      fillFullName()
       fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
       fireEvent.click(screen.getByRole('checkbox'))
       fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
@@ -540,7 +535,7 @@ describe('participant registration fields', () => {
       vi.useFakeTimers()
       vi.mocked(publicApi.requestEmailCode).mockRejectedValueOnce(new PublicApiError('raw', 429, 'EmailRateLimited', 90))
       render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
-      fillUsername()
+      fillFullName()
       fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
       fireEvent.click(screen.getByRole('checkbox'))
       fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
@@ -558,7 +553,7 @@ describe('participant registration fields', () => {
       vi.mocked(publicApi.requestEmailCode).mockImplementationOnce(() => new Promise((done) => { resolve = done }))
       const onJoined = vi.fn()
       render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={onJoined} />)
-      fillUsername()
+      fillFullName()
       fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
       fireEvent.click(screen.getByRole('checkbox'))
       const form = screen.getByLabelText('Email *').closest('form')!
@@ -580,31 +575,44 @@ describe('participant registration fields', () => {
   it('keeps email enabled by default, requires a username, and never requests Instagram', () => {
     render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
     expect(screen.getByLabelText('Email *')).toBeRequired()
-    expect(screen.getByLabelText('Nombre de usuario *')).toBeRequired()
+    expect(screen.getByLabelText('Nombre completo *')).toBeRequired()
     expect(screen.queryByLabelText('Instagram *')).not.toBeInTheDocument()
     expect(screen.getAllByRole('textbox')).toHaveLength(2)
   })
 
-  it('does not send disabled email values', async () => {
+  it('does not allow legacy settings to disable email verification', async () => {
     render(<JoinForm gameId="ABC123" gameMeta={{
       ...meta, participantFields: { email: { required: false } },
     }} onJoined={vi.fn()} />)
-    fireEvent.change(screen.getByLabelText('Nombre de usuario *'), { target: { value: 'Player' } })
+    fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: 'Player' } })
     fireEvent.click(screen.getByRole('checkbox'))
-    fireEvent.click(screen.getByRole('button', { name: 'Empezar' }))
-    await waitFor(() => expect(publicApi.join).toHaveBeenCalledWith({
-      gameId: 'ABC123', username: 'Player', consent: true,
-    }))
+    fireEvent.submit(screen.getByLabelText('Email *').closest('form')!)
+    expect(screen.getByRole('alert')).toHaveTextContent('El email es obligatorio.')
+    expect(publicApi.join).not.toHaveBeenCalled()
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
   })
 
-  it('rejects a whitespace-only required phone', () => {
+  it('omits a whitespace-only optional phone', async () => {
     render(<JoinForm gameId="ABC123" gameMeta={{
-      ...meta, participantFields: { email: { required: false }, phone: { required: true } },
+      ...meta, participantFields: { email: { required: false }, phone: { required: false, enabled: true } },
     }} onJoined={vi.fn()} />)
-    const input = screen.getByLabelText('Teléfono *')
+    const input = screen.getByLabelText('Teléfono (opcional)')
     fireEvent.change(input, { target: { value: '   ' } })
-    fireEvent.submit(input.closest('form')!)
-    expect(screen.getByText('El teléfono es obligatorio.')).toBeInTheDocument()
+    await startVerification()
+    expect(publicApi.requestEmailCode).toHaveBeenCalledWith({
+      gameId: 'ABC123', email: 'player@example.com', username: 'Player', consent: true, language: 'es',
+    })
     expect(publicApi.join).not.toHaveBeenCalled()
+  })
+
+  it('honors an explicit hidden phone over the old required-phone setting', async () => {
+    render(<JoinForm gameId="ABC123" gameMeta={{
+      ...meta, participantFields: { phone: { required: true, enabled: false } },
+    }} onJoined={vi.fn()} />)
+    expect(screen.queryByLabelText('Teléfono (opcional)')).not.toBeInTheDocument()
+    await startVerification()
+    expect(publicApi.requestEmailCode).toHaveBeenCalledWith({
+      gameId: 'ABC123', email: 'player@example.com', username: 'Player', consent: true, language: 'es',
+    })
   })
 })

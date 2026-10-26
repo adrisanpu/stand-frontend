@@ -1,6 +1,7 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../api/api'
+import { kivlyApi } from '../../api/kivlyApi'
 import type { GameConfigProps, GameDefinition } from '../types'
 import GameConfigPanel, { GAME_CONFIG_SAVE_LABEL } from './GameConfigPanel'
 import T1merConfig from '../../games/t1mer/GameConfig'
@@ -14,6 +15,9 @@ import { DEFAULT_STACK_CONFIG } from '../../games/stack/stackLogic'
 import { GAME_ACCESS_CAPABILITIES } from './gameAccess'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }))
+vi.mock('../../api/kivlyApi', () => ({
+  kivlyApi: { getAccountConnection: vi.fn(), get: vi.fn(), listRewards: vi.fn(), saveReward: vi.fn() },
+}))
 
 const colors = { primary: '#000', accent: '#000', background: '#000', surface: '#000', textMain: '#fff', textSub: '#fff' }
 function definition(id: string, GameConfigComponent?: React.ComponentType<GameConfigProps>): GameDefinition {
@@ -26,6 +30,7 @@ function gameResponse(game: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({ connected: false, locationId: null, locations: [] })
   vi.mocked(api.get).mockImplementation(async (url: string) => {
     if (url.startsWith('/v1/game/infocards')) return { ok: true, cards: [{ id: 'c1', title: 'Hola', body: 'Texto', order: 0 }] }
     return gameResponse()
@@ -80,7 +85,7 @@ describe('mobile event links', () => {
     const section = screen.getByRole('region', { name: 'Enlaces del evento' })
     expect(section).toHaveClass('grid', 'grid-cols-3')
     expect(section.children).toHaveLength(3)
-    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
+    expect(within(section).getAllByRole('checkbox')).toHaveLength(1)
     expect(screen.queryByText('Enlaces del evento')).not.toBeInTheDocument()
     expect(screen.getByText('∞ móviles')).toBeInTheDocument()
     expect(screen.getByText('Web')).toBeInTheDocument()
@@ -102,6 +107,49 @@ describe('mobile event links', () => {
 })
 
 describe('unified game configuration save', () => {
+  it('loads RULET4 rules from the server and persists them through the shared save action', async () => {
+    const rules = { panels: [{ id: 'red', label: 'Rojo', color: '#DC2626', count: 4 }] }
+    vi.mocked(api.get).mockResolvedValue(gameResponse({
+      playMode: 'mobile', joinChannel: 'web', type: { RULET4: rules },
+    }))
+    const { onSaved } = mount(definition('RULET4', Rulet4Config))
+    await waitFor(() => expect(footer()).toBeEnabled())
+    expect(await screen.findByDisplayValue('Rojo')).toBeInTheDocument()
+    fireEvent.click(footer())
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(api.put).toHaveBeenCalledWith('/v1/game', {
+      gameId: 'ABC123', settings: { rulet4: rules },
+    })
+  })
+
+  it('keeps Kivly setup out of non-STACK game configuration', async () => {
+    mount(definition('T1MER'))
+    await waitFor(() => expect(footer()).toBeEnabled())
+    expect(screen.queryByRole('region', { name: 'Kivly' })).not.toBeInTheDocument()
+    expect(kivlyApi.getAccountConnection).not.toHaveBeenCalled()
+    expect(kivlyApi.get).not.toHaveBeenCalled()
+  })
+
+  it('saves the STACK completion reward with the existing game footer', async () => {
+    const clubSettings = { clubName: 'Club', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms' }
+    vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
+      connected: true, locationId: 'location1', locations: [{ id: 'location1', name: 'Club' }], clubSettings,
+    })
+    vi.mocked(kivlyApi.get).mockResolvedValue({ ok: true, connection: { connected: true }, settings: { enabled: true, ...clubSettings } })
+    vi.mocked(kivlyApi.listRewards).mockResolvedValue([{ id: 'reward1', name: 'Coffee' }])
+    vi.mocked(kivlyApi.saveReward).mockResolvedValue()
+    const { onSaved } = mount(definition('STACK'))
+    const select = await screen.findByLabelText('Premio Kivly al terminar')
+    fireEvent.change(select, { target: { value: 'reward1' } })
+    expect(kivlyApi.saveReward).not.toHaveBeenCalled()
+    fireEvent.click(footer())
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+    expect(kivlyApi.saveReward).toHaveBeenCalledWith('ABC123', 'reward1')
+    expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
+      participantFields: { email: { required: true }, phone: { required: false, enabled: false } },
+    }))
+  })
+
   it.each(['EMPAREJA2', 'T1MER', 'STACK'])('loads and saves all participant fields centrally for %s', async (id) => {
     const participantFields = { email: { required: false }, phone: { required: true } }
     vi.mocked(api.get).mockResolvedValue(gameResponse({
@@ -109,15 +157,16 @@ describe('unified game configuration save', () => {
     }))
     const { onSaved } = mount(definition(id, id === 'EMPAREJA2' ? Empareja2Config : id === 'T1MER' ? T1merConfig : undefined))
     await waitFor(() => expect(footer()).toBeEnabled())
-    expect(screen.getByLabelText('Email')).not.toBeChecked()
+    expect(screen.getByText('Nombre completo y email obligatorios')).toBeInTheDocument()
     expect(screen.queryByLabelText('Instagram')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Teléfono')).toBeChecked()
-    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
+    expect(screen.getByLabelText('Mostrar teléfono (opcional)')).toBeChecked()
+    expect(within(screen.getByRole('region', { name: 'Enlaces del evento' })).getAllByRole('checkbox')).toHaveLength(1)
+    const expectedFields = { email: { required: true }, phone: { required: false, enabled: true } }
     fireEvent.click(footer())
-    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ participantFields })))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ participantFields: expectedFields })))
     expect(api.put).toHaveBeenCalledWith('/v1/game', {
       gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web',
-      participantFields,
+      participantFields: expectedFields,
     })
     const writes = vi.mocked(api.put).mock.calls.filter(([, body]) => 'participantFields' in (body as Record<string, unknown>))
     expect(writes).toHaveLength(1)
@@ -128,16 +177,16 @@ describe('unified game configuration save', () => {
     let resolvePut: (value: unknown) => void = () => {}
     vi.mocked(api.put).mockImplementationOnce(() => new Promise((resolve) => { resolvePut = resolve }))
     const { onSaved } = mount(definition('STACK'))
-    expect(screen.getByLabelText('Teléfono')).toBeDisabled()
+    expect(screen.getByLabelText('Mostrar teléfono (opcional)')).toBeDisabled()
     await waitFor(() => expect(footer()).toBeEnabled())
-    fireEvent.click(screen.getByLabelText('Teléfono'))
+    fireEvent.click(screen.getByLabelText('Mostrar teléfono (opcional)'))
     fireEvent.click(footer())
-    expect(screen.getByLabelText('Teléfono')).toBeDisabled()
+    expect(screen.getByLabelText('Mostrar teléfono (opcional)')).toBeDisabled()
     await act(async () => { resolvePut({ ok: false }) })
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo guardar')
     expect(onSaved).not.toHaveBeenCalled()
-    expect(screen.getByLabelText('Teléfono')).toBeChecked()
-    expect(screen.getByLabelText('Teléfono')).toBeEnabled()
+    expect(screen.getByLabelText('Mostrar teléfono (opcional)')).toBeChecked()
+    expect(screen.getByLabelText('Mostrar teléfono (opcional)')).toBeEnabled()
   })
 
   it('pairs L3TRAS short fields without changing their draft or validation', async () => {
@@ -214,8 +263,7 @@ describe('unified game configuration save', () => {
     const { onSaved, onSettingsChange } = mount(definition('T1MER', T1merConfig))
     await waitFor(() => expect(footer()).toBeEnabled())
     await waitFor(() => expect(screen.queryByText('Cargando configuración...')).not.toBeInTheDocument())
-    fireEvent.click(screen.getByLabelText('Teléfono'))
-    fireEvent.click(screen.getByLabelText('Email'))
+    fireEvent.click(screen.getByLabelText('Mostrar teléfono (opcional)'))
     expect(screen.getByText('Participante')).toBeInTheDocument()
     expect(api.put).not.toHaveBeenCalled()
     expect(onSettingsChange).not.toHaveBeenCalled()
@@ -225,11 +273,11 @@ describe('unified game configuration save', () => {
     expect(api.put).toHaveBeenCalledTimes(1)
     expect(api.put).toHaveBeenCalledWith('/v1/game', {
       gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web',
-      participantFields: { email: { required: false }, phone: { required: true } },
+      participantFields: { email: { required: true }, phone: { required: false, enabled: true } },
     })
     expect(onSaved).toHaveBeenCalledWith({
       playMode: 'mobile', joinChannel: 'web',
-      participantFields: { email: { required: false }, phone: { required: true } },
+      participantFields: { email: { required: true }, phone: { required: false, enabled: true } },
     })
     expect(onSettingsChange).not.toHaveBeenCalled()
   })

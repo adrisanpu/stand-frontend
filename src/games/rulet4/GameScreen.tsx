@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import type { GameScreenProps } from '../../core/types'
 import { LandscapeInfoInstruction } from '../../core/widgets/GameLandscapeInfoColumn'
 import GameLandscapeLeftColumn from '../../core/widgets/GameLandscapeLeftColumn'
@@ -13,6 +13,42 @@ import {
   GAME_LANDSCAPE_CENTER_CARD,
   GAME_LANDSCAPE_THREE_COL_GRID,
 } from '../../core/ui/gameScreenLayout'
+
+type Rulet4SpinResult = {
+  index: number
+  panel: Rulet4PanelConfig
+  configSnapshot: Rulet4Settings
+}
+
+function isRulet4Settings(value: unknown): value is Rulet4Settings {
+  if (!value || typeof value !== 'object' || !Array.isArray((value as Rulet4Settings).panels)) return false
+  const panels = (value as Rulet4Settings).panels
+  if (panels.length < 1 || panels.length > 32) return false
+  const ids = new Set<string>()
+  let total = 0
+  for (const panel of panels) {
+    if (!panel || typeof panel.id !== 'string' || typeof panel.label !== 'string'
+      || !Number.isInteger(panel.count) || panel.count < 1 || panel.count > 360
+      || (panel.color !== undefined && typeof panel.color !== 'string')) return false
+    if (ids.has(panel.id)) return false
+    ids.add(panel.id)
+    total += panel.count
+  }
+  return total <= 360
+}
+
+function isSpinResult(value: unknown): value is Rulet4SpinResult {
+  if (!value || typeof value !== 'object') return false
+  const result = value as Rulet4SpinResult
+  return Number.isInteger(result.index) && result.index >= 0
+    && !!result.panel && typeof result.panel.id === 'string'
+    && typeof result.panel.label === 'string'
+    && isRulet4Settings(result.configSnapshot)
+}
+
+function buildSegments(settings: Rulet4Settings) {
+  return settings.panels.flatMap((panel) => Array.from({ length: panel.count }, () => panel))
+}
 
 type GameState =
   | 'idle'       // player code input
@@ -48,31 +84,23 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     }
   }, [gameId])
 
-  // Load settings from localStorage
+  // The saved server configuration defines both the wheel and its weighted result indexes.
   useEffect(() => {
-    if (gameId) {
-      const storageKey = `RULET4_settings_${gameId}`
-      const saved = localStorage.getItem(storageKey)
-      if (saved) {
-        try {
-          setSettings(JSON.parse(saved))
-        } catch {
-          // Use default settings
-          setSettings({ panels: [
-            { id: '1', label: 'Rojo', color: '#DC2626', count: 4 },
-            { id: '2', label: 'Negro', color: '#000000', count: 4 },
-            { id: '3', label: 'Verde', color: '#22C55E', count: 1 },
-          ]})
-        }
-      } else {
-        // Use default settings
-        setSettings({ panels: [
-          { id: '1', label: 'Rojo', color: '#DC2626', count: 4 },
-          { id: '2', label: 'Negro', color: '#000000', count: 4 },
-          { id: '3', label: 'Verde', color: '#22C55E', count: 1 },
-        ]})
-      }
-    }
+    let cancelled = false
+    setSettings(null)
+    if (!gameId) return
+    void api.get<{ game?: { type?: { RULET4?: unknown } } }>(
+      `/v1/game?gameId=${encodeURIComponent(gameId)}`
+    ).then((data) => {
+      if (cancelled) return
+      const config = data.game?.type?.RULET4
+      if (!isRulet4Settings(config)) throw new Error('No se pudo cargar la configuración de RULET4.')
+      setSettings(config)
+      setError(null)
+    }).catch((cause: unknown) => {
+      if (!cancelled) setError(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración de RULET4.')
+    })
+    return () => { cancelled = true }
   }, [gameId])
 
   const handleValidate = async () => {
@@ -121,21 +149,37 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     }
   }
 
-  const handleSpin = () => {
-    if (gameState !== 'ready' || !sceneReady || hasSpunRef.current || pendingSpinRef.current) return
+  const handleSpin = async () => {
+    if (gameState !== 'ready' || !sceneReady || hasSpunRef.current || pendingSpinRef.current || !playerId) return
     if (segments.length === 0) {
       setError(t('La ruleta no tiene paneles configurados', 'The roulette has no panels configured'))
       return
     }
 
-    // Randomly select winning segment from the already randomized segments array
-    const randomIndex = Math.floor(Math.random() * segments.length)
-    const selectedPanel = segments[randomIndex]
-    const id = ++spinIdRef.current
-    pendingSpinRef.current = { id, panel: selectedPanel, index: randomIndex }
     hasSpunRef.current = true
     setGameState('spinning')
-    setSpin({ id, index: randomIndex })
+    setError(null)
+    const request = {}
+    validationRef.current = request
+    try {
+      const data = await api.post<{ ok: boolean; result?: unknown }>('/v1/game/score', { gameId, playerId })
+      if (request !== validationRef.current) return
+      const result = data.result
+      if (!data.ok || !isSpinResult(result)) throw new Error(t('El servidor no devolvió un resultado válido.', 'The server did not return a valid result.'))
+      const nextSegments = buildSegments(result.configSnapshot)
+      if (result.index >= nextSegments.length || nextSegments[result.index].id !== result.panel.id) {
+        throw new Error(t('El resultado no coincide con la configuración de la ruleta.', 'The result does not match the wheel configuration.'))
+      }
+      setSettings(result.configSnapshot)
+      const id = ++spinIdRef.current
+      pendingSpinRef.current = { id, panel: result.panel, index: result.index }
+      setSpin({ id, index: result.index })
+    } catch (cause: unknown) {
+      if (request !== validationRef.current) return
+      hasSpunRef.current = false
+      setGameState('ready')
+      setError(cause instanceof Error ? cause.message : t('No se pudo obtener el resultado de la ruleta.', 'Could not get the wheel result.'))
+    }
   }
 
   const handleSpinComplete = (id: number) => {
@@ -144,26 +188,6 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     pendingSpinRef.current = null
     setWinningPanel(pending.panel)
     setGameState('result')
-    void submitScore(pending.panel, pending.index)
-  }
-
-  const submitScore = async (panel: Rulet4PanelConfig, index: number) => {
-    if (!playerId || !gameId) {
-      console.error('Missing playerId or gameId')
-      return
-    }
-
-    try {
-      await api.post('/v1/game/score', {
-        gameId: gameId,
-        playerId: playerId,
-        prize: panel.label,
-        index: index,
-      })
-    } catch (err: any) {
-      console.error('Error submitting score:', err)
-      // Don't show error to user, just log it
-    }
   }
 
   const handleReset = () => {
@@ -181,41 +205,7 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
     hasSpunRef.current = false
   }
 
-  // Build segments array from settings with random order (memoized)
-  const [segments, setSegments] = useState<Rulet4PanelConfig[]>([])
-  
-  useEffect(() => {
-    if (settings) {
-      const panels = settings.panels
-      const allSegments: Rulet4PanelConfig[] = []
-      // If we have exactly two panel types with the same count, interleave them then append the rest
-      const maxCount = Math.max(...panels.map(p => p.count), 0)
-      const withMaxCount = panels.filter(p => p.count === maxCount)
-      if (withMaxCount.length === 2 && maxCount >= 2) {
-        const [a, b] = withMaxCount
-        const rest = panels.filter(p => p !== a && p !== b)
-        for (let i = 0; i < maxCount; i++) {
-          allSegments.push(a)
-          allSegments.push(b)
-        }
-        rest.forEach(panel => {
-          for (let i = 0; i < panel.count; i++) allSegments.push(panel)
-        })
-      } else {
-        panels.forEach(panel => {
-          for (let i = 0; i < panel.count; i++) allSegments.push(panel)
-        })
-        // Shuffle the segments randomly (Fisher-Yates shuffle)
-        for (let i = allSegments.length - 1; i > 0; i--) {
-          const j: number = Math.floor(Math.random() * (i + 1))
-          const tmp = allSegments[j]
-          allSegments[j] = allSegments[i]
-          allSegments[i] = tmp
-        }
-      }
-      setSegments(allSegments)
-    }
-  }, [settings])
+  const segments = useMemo(() => settings ? buildSegments(settings) : [], [settings])
 
   const showJoinBlock = !(['ready', 'spinning', 'result'] as GameState[]).includes(gameState)
 
@@ -410,6 +400,11 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
                 </div>
               )}
             {gameState === 'ready' && renderWelcomeBanner('landscape', false)}
+            {gameState === 'ready' && error && (
+              <div role="alert" className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+                {localizeOperatorMessage(error, t)}
+              </div>
+            )}
             {gameState === 'spinning' && renderWelcomeBanner('landscape', true)}
             {gameState === 'result' && renderResultBanner('landscape')}
           </div>
@@ -514,6 +509,11 @@ export default function Rulet4GameScreen({ gameId, orientation, logoElement, pla
 
         {/* Welcome Message - After validation */}
         {gameState === 'ready' && renderWelcomeBanner('portrait', false)}
+        {gameState === 'ready' && error && (
+          <div role="alert" className="p-4 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-base">
+            {localizeOperatorMessage(error, t)}
+          </div>
+        )}
 
         {/* Spinning State - Show in welcome message box */}
         {gameState === 'spinning' && renderWelcomeBanner('portrait', true)}

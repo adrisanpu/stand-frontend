@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import Raffle from '../widgets/Raffle'
 import Quiz from '../widgets/Quiz'
 import AppearanceSettings from '../settings/AppearanceSettings'
+import IntegrationsSettings from '../settings/IntegrationsSettings'
+import GamePlayersSettings from '../settings/GamePlayersSettings'
+import { useKivlyDraft } from '../settings/KivlySettings'
 import OperatorPrizeSettings from '../settings/OperatorPrizeSettings'
 import type { GameDefinition } from '../types'
 import { api } from '../../api/api'
@@ -73,6 +76,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [showExportShareOptions, setShowExportShareOptions] = useState(false)
   const [exportQuizError, setExportQuizError] = useState<string | null>(null)
   const [showGameConfig, setShowGameConfig] = useState(false)
+  const [showGamePlayers, setShowGamePlayers] = useState(false)
   const [showOperatorPrizes, setShowOperatorPrizes] = useState(false)
   const [prizeSaving, setPrizeSaving] = useState(false)
   const prizeSavingRef = useRef(false)
@@ -83,12 +87,14 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const gameConfigSavingRef = useRef(false)
   gameConfigSavingRef.current = gameConfigSaving
   const [showAppearanceSettings, setShowAppearanceSettings] = useState(false)
+  const [showIntegrations, setShowIntegrations] = useState(false)
   const [showUserInfo, setShowUserInfo] = useState(false)
   const [isStartingCheckout, setIsStartingCheckout] = useState(false)
   const { logout } = useAuth()
   const { language, t } = useOperatorLanguage()
   const { user, loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
+  const kivly = useKivlyDraft(gameId ?? '', !!gameId)
 
   const translateKnownError = (message: string) => {
     const translations: Record<string, string> = {
@@ -114,8 +120,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     showExportQuiz: false,
     showExportShareOptions: false,
     showGameConfig: false,
+    showGamePlayers: false,
     showOperatorPrizes: false,
     showAppearanceSettings: false,
+    showIntegrations: false,
     showUserInfo: false,
   })
   modalSnapRef.current = {
@@ -125,8 +133,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     showExportQuiz,
     showExportShareOptions,
     showGameConfig,
+    showGamePlayers,
     showOperatorPrizes,
     showAppearanceSettings,
+    showIntegrations,
     showUserInfo,
   }
 
@@ -153,12 +163,20 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         if (!prizeSavingRef.current) setShowOperatorPrizes(false)
         return true
       }
+      if (s.showGamePlayers) {
+        setShowGamePlayers(false)
+        return true
+      }
       if (s.showGameConfig) {
         if (!gameConfigSavingRef.current) setShowGameConfig(false)
         return true
       }
       if (s.showUserInfo) {
         setShowUserInfo(false)
+        return true
+      }
+      if (s.showIntegrations) {
+        setShowIntegrations(false)
         return true
       }
       if (s.showAppearanceSettings) {
@@ -377,6 +395,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     return <Quiz onBack={() => setShowQuiz(false)} onClose={onClose} gameId={gameId} />
   }
 
+  if (showGamePlayers && gameId) {
+    return <GamePlayersSettings gameId={gameId} onBack={() => setShowGamePlayers(false)} onClose={onClose} />
+  }
+
   if (showAppearanceSettings) {
     return (
       <AppearanceSettings
@@ -385,6 +407,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         gameDefinition={gameDefinition}
       />
     )
+  }
+
+  if (showIntegrations) {
+    return <IntegrationsSettings onBack={() => setShowIntegrations(false)} onClose={onClose} />
   }
 
   if (showUserInfo) {
@@ -983,6 +1009,22 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
           {!gameType && (
             <>
               <button
+                onClick={() => setShowIntegrations(true)}
+                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              >
+                <div className="p-2 rounded-lg bg-indigo-500/20">
+                  <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71m2.25 5.82a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+                  </svg>
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                  <div className="font-medium">{t('Integraciones', 'Integrations')}</div>
+                </div>
+                <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button
                 onClick={() => setShowAppearanceSettings(true)}
                 className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
               >
@@ -1041,8 +1083,33 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </div>
                   <div className="text-left">
                     <div className="font-medium">{t('Configurar juego', 'Configure game')}</div>
+                    {kivly.connection?.connected && <img
+                      src="/images/kivly-logo.svg"
+                      alt={t('Kivly conectado', 'Kivly connected')}
+                      className="mt-1 h-4 w-auto"
+                    />}
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
+
+              {gameId && gameDefinition && (
+                <button
+                  type="button"
+                  onClick={() => setShowGamePlayers(true)}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+                >
+                  <div className="p-2 rounded-lg bg-cyan-500/20">
+                    <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">{t('Gestionar jugadores', 'Manage players')}</div>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>

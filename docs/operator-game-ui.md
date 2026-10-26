@@ -26,6 +26,43 @@ Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas d
 
 ## Configurar juego
 
+### Kivly: registro en STACK
+
+Inicio > Configuracion > Integraciones centraliza la conexion y los datos del
+club del organizador, compartidos por sus juegos. Conectar/cambiar credenciales
+y desconectar son acciones inmediatas. Las credenciales se borran del formulario
+al enviarlas o cancelar; no se guardan en el navegador. Desconectar pide
+confirmacion y desactiva el requisito compartido.
+
+Una conexion con nombre y URLs legales validos habilita el registro del club y
+fuerza email obligatorio, sin una lista de ubicaciones aprobadas. Los enlaces
+de ejemplo conservan el modo demo sin altas reales. El menu del juego muestra
+el logo y estado Kivly; un error de carga bloquea el guardado y muestra una
+accion para comprobar el estado, nunca valores por defecto aparentemente validos.
+
+En `/play`, el consentimiento del club es explicito y separado del de Stand.
+La version aceptada viaja con la solicitud del codigo de email; solo el backend
+registra/vincula al cliente tras verificarlo. Las sesiones antiguas sin membresia
+vuelven al formulario. Los resultados inciertos se notifican sin repetir un alta.
+Todos los formularios `/play` piden nombre completo primero y email obligatorio.
+El nombre se usa tambien en rankings. Configurar juego permite mostrar telefono,
+siempre opcional: solo se envia a Kivly al crear una ficha nueva; no se actualizan
+clientes existentes.
+
+STACK conectado ofrece un selector de premio existente, guardado con los cambios
+del juego. Todos los participantes que terminan reciben el mismo, sin umbral de
+puntos. Tras confirmar el resultado, una tarjeta compacta con la paleta activa
+muestra el premio y solo los botones Apple/Google Wallet que devuelva Kivly.
+No se pide plataforma al registrarse ni se crean enlaces artificiales. Si no hay
+tarjeta, se indica; un fallo de premio no oculta ni invalida el resultado.
+La accion de comprobar consulta el estado sin repetir asignaciones inciertas.
+No hay creacion de premios ni envio de tarjetas por email.
+
+La guia de contrato, recuperacion y escenarios condensados esta en
+`stand-backend\docs\KIVLY_INTEGRATION.md` (repositorio hermano).
+Las pruebas simuladas de API y ajustes cubren el contrato sin aprobacion manual;
+no sustituyen la prueba real del formulario y la membresia en el panel de Kivly.
+
 Action buttons inside settings panels (save/apply, generate Quiz/cards, export,
 share, download and image selection) use the active palette's primary color,
 including hover and border states. Keep destructive actions red. Preserve the

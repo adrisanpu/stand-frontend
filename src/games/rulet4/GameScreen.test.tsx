@@ -11,7 +11,7 @@ const { createScene, controllers } = vi.hoisted(() => ({
   controllers: [] as { spin: ReturnType<typeof vi.fn>; showResult: ReturnType<typeof vi.fn>; reset: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }[],
 }))
 vi.mock('./rulet4Scene', () => ({ createRulet4Scene: createScene }))
-vi.mock('../../api/api', () => ({ api: { post: vi.fn() } }))
+vi.mock('../../api/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }))
 
 type Options = Parameters<typeof import('./rulet4Scene').createRulet4Scene>[1]
 function options(index = createScene.mock.calls.length - 1): Options {
@@ -29,6 +29,15 @@ async function validate() {
   await screen.findByText('¡Bienvenido, Ana!')
 }
 const spinButton = () => screen.getByRole('button', { name: 'GIRAR RULETA' })
+const ruleConfig = { panels: [
+  { id: '1', label: 'Rojo', color: '#DC2626', count: 4 },
+  { id: '2', label: 'Negro', color: '#000000', count: 4 },
+  { id: '3', label: 'Verde', color: '#22C55E', count: 1 },
+] }
+const serverSpin = {
+  ok: true,
+  result: { index: 8, panel: ruleConfig.panels[2], configSnapshot: ruleConfig },
+}
 
 describe('RULET4 3D integration', () => {
   beforeEach(() => {
@@ -41,7 +50,12 @@ describe('RULET4 3D integration', () => {
       opts.onStatus('ready')
       return controller
     })
-    vi.mocked(api.post).mockResolvedValue({ valid: true, playerId: 'player1', username: 'Ana' })
+    vi.mocked(api.get).mockResolvedValue({ game: { type: { RULET4: ruleConfig } } })
+    vi.mocked(api.post).mockImplementation((endpoint) => Promise.resolve(
+      endpoint === '/v1/game/score'
+        ? serverSpin
+        : { valid: true, playerId: 'player1', username: 'Ana' },
+    ) as never)
   })
   afterEach(() => {
     cleanup()
@@ -49,27 +63,46 @@ describe('RULET4 3D integration', () => {
     vi.unstubAllGlobals()
   })
 
-  it.each(['portrait', 'landscape'] as const)('completes and submits the displayed prize once in %s', async (orientation) => {
+  it.each(['portrait', 'landscape'] as const)('animates and displays the server result once in %s', async (orientation) => {
     render(view(orientation))
     await ready()
+    expect(api.get).toHaveBeenCalledWith('/v1/game?gameId=roulette')
     expect(screen.getAllByRole('img', { name: 'Ruleta de premios 3D' })).toHaveLength(1)
     expect(spinButton()).toBeDisabled()
     await validate()
     expect(spinButton()).toBeEnabled()
-    vi.spyOn(Math, 'random').mockReturnValue(0.99)
     fireEvent.click(spinButton())
     fireEvent.click(spinButton())
+    await waitFor(() => expect(controllers[0].spin).toHaveBeenCalledTimes(1))
     expect(controllers[0].spin).toHaveBeenCalledTimes(1)
     expect(controllers[0].spin).toHaveBeenCalledWith(8)
     expect(spinButton()).toBeDisabled()
-    expect(api.post).toHaveBeenCalledTimes(1)
+    expect(api.post).toHaveBeenCalledTimes(2)
     act(() => { options().onComplete(); options().onComplete() })
     expect(screen.getByText('Verde')).toBeInTheDocument()
     expect(controllers[0].showResult).toHaveBeenCalledWith(8)
     expect(api.post).toHaveBeenCalledTimes(2)
-    expect(api.post).toHaveBeenLastCalledWith('/v1/game/score', {
-      gameId: 'roulette', playerId: 'player1', prize: 'Verde', index: 8,
-    })
+    expect(api.post).toHaveBeenLastCalledWith('/v1/game/score', { gameId: 'roulette', playerId: 'player1' })
+  })
+
+  it('can retry an uncertain spin request and animate the persisted server result', async () => {
+    vi.mocked(api.post)
+      .mockResolvedValueOnce({ valid: true, playerId: 'player1', username: 'Ana' })
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce(serverSpin)
+    render(view())
+    await ready()
+    await validate()
+    fireEvent.click(spinButton())
+    expect(await screen.findByRole('alert')).toHaveTextContent('Network error')
+    expect(spinButton()).toBeEnabled()
+    fireEvent.click(spinButton())
+    await waitFor(() => expect(controllers[0].spin).toHaveBeenCalledWith(8))
+    act(() => options().onComplete())
+    expect(screen.getByText('Verde')).toBeInTheDocument()
+    expect(api.post).toHaveBeenCalledTimes(3)
+    expect(api.post).toHaveBeenNthCalledWith(2, '/v1/game/score', { gameId: 'roulette', playerId: 'player1' })
+    expect(api.post).toHaveBeenNthCalledWith(3, '/v1/game/score', { gameId: 'roulette', playerId: 'player1' })
   })
 
   it('blocks a validated player while loading, losing context or failing', async () => {
@@ -99,8 +132,8 @@ describe('RULET4 3D integration', () => {
     render(view())
     await ready()
     await validate()
-    const random = vi.spyOn(Math, 'random').mockReturnValue(0.99)
     fireEvent.click(spinButton())
+    await waitFor(() => expect(controllers[0].spin).toHaveBeenCalledTimes(1))
     const failedOptions = options()
     vi.spyOn(console, 'error').mockImplementation(() => {})
     act(() => failedOptions.onError(new Error('render failed')))
@@ -109,9 +142,8 @@ describe('RULET4 3D integration', () => {
     expect(controllers[0].dispose).toHaveBeenCalledOnce()
     expect(controllers[1].spin).toHaveBeenCalledTimes(1)
     expect(controllers[1].spin).toHaveBeenCalledWith(8)
-    expect(random).toHaveBeenCalledOnce()
     act(() => failedOptions.onComplete())
-    expect(api.post).toHaveBeenCalledTimes(1)
+    expect(api.post).toHaveBeenCalledTimes(2)
     act(() => options().onComplete())
     expect(screen.getByText('Verde')).toBeInTheDocument()
     expect(api.post).toHaveBeenCalledTimes(2)
@@ -121,15 +153,15 @@ describe('RULET4 3D integration', () => {
     const rendered = render(view())
     await ready()
     await validate()
-    vi.spyOn(Math, 'random').mockReturnValue(0.99)
     fireEvent.click(spinButton())
+    await waitFor(() => expect(controllers[0].spin).toHaveBeenCalledTimes(1))
     const old = options()
     rendered.rerender(view('landscape'))
     await waitFor(() => expect(createScene).toHaveBeenCalledTimes(2))
     expect(controllers[1].spin).toHaveBeenCalledTimes(1)
     expect(controllers[1].spin).toHaveBeenCalledWith(8)
     act(() => old.onComplete())
-    expect(api.post).toHaveBeenCalledTimes(1)
+    expect(api.post).toHaveBeenCalledTimes(2)
     act(() => options().onComplete())
     rendered.rerender(view('portrait'))
     await waitFor(() => expect(createScene).toHaveBeenCalledTimes(3))
@@ -143,16 +175,18 @@ describe('RULET4 3D integration', () => {
     await ready()
     await validate()
     fireEvent.click(spinButton())
+    await waitFor(() => expect(controllers[0].spin).toHaveBeenCalledTimes(1))
     fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
     act(() => options().onComplete())
     expect(screen.queryByText('¡Has ganado!')).not.toBeInTheDocument()
-    expect(api.post).toHaveBeenCalledTimes(1)
+    expect(api.post).toHaveBeenCalledTimes(2)
     await validate()
     fireEvent.click(spinButton())
+    await waitFor(() => expect(controllers[0].spin).toHaveBeenCalledTimes(2))
     const old = options()
     rendered.rerender(view('portrait', 'another-game'))
     act(() => old.onComplete())
-    expect(api.post).toHaveBeenCalledTimes(2)
+    expect(api.post).toHaveBeenCalledTimes(4)
     expect(screen.getByRole('spinbutton')).toHaveValue(null)
   })
 
@@ -189,11 +223,12 @@ describe('RULET4 3D integration', () => {
     expect(options().reducedMotion).toBe(true)
     await validate()
     fireEvent.click(spinButton())
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(2))
     const old = options()
     rendered.unmount()
     act(() => old.onComplete())
     expect(controllers[0].dispose).toHaveBeenCalledOnce()
-    expect(api.post).toHaveBeenCalledTimes(1)
+    expect(api.post).toHaveBeenCalledTimes(2)
   })
 
   it('initializes only the live scene under StrictMode', async () => {

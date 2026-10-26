@@ -10,6 +10,7 @@ import './stack.css'
 import type { PrizeCatalog } from '../../core/prizes'
 import ParticipantPrizePromo from '../../core/participant/ParticipantPrizePromo'
 import RankingPrizeClaim from './RankingPrizeClaim'
+import KivlyRewardCard from './KivlyRewardCard'
 
 type Props = {
   gameId: string
@@ -20,13 +21,14 @@ type Props = {
   finishSupported?: boolean
   prizeCatalog?: PrizeCatalog
   showPrizePromo?: boolean
+  kivlyRewardEnabled?: boolean
 }
 
 type SceneStatus = 'loading' | 'ready' | 'lost' | 'error'
 type StartStatus = 'idle' | 'pending' | 'retry' | 'started' | 'blocked'
 const INITIAL_SNAPSHOT: StackSnapshot = { state: 'IDLE', score: 0, perfect: false, placements: [] }
 
-export default function StackParticipantPlay({ gameId, playerToken, config, assignment, startSupported = false, finishSupported = false, prizeCatalog, showPrizePromo = true }: Props) {
+export default function StackParticipantPlay({ gameId, playerToken, config, assignment, startSupported = false, finishSupported = false, prizeCatalog, showPrizePromo = true, kivlyRewardEnabled = false }: Props) {
   const { t } = useParticipantLanguage()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<StackSceneController | null>(null)
@@ -323,6 +325,7 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
       )}
       {hasResult && (
         <>
+          {savedScore != null && kivlyRewardEnabled && <KivlyRewardCard gameId={gameId} playerToken={playerToken} />}
           {showPrizePromo && <ParticipantPrizePromo catalog={prizeCatalog} slots={['ranking']} />}
           {finishStatus === 'pending' && <p role="status">{t('Validando y guardando resultado...')}</p>}
           {finishError && <p role="alert" className="text-sm text-red-300">{t(finishError)}</p>}

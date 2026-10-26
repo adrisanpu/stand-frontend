@@ -17,7 +17,7 @@ const { createScene, controller } = vi.hoisted(() => ({
 vi.mock('./stackScene', () => ({ createStackScene: createScene }))
 vi.mock('../../api/publicApi', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/publicApi')>(),
-  publicApi: { startStackAttempt: vi.fn(), finishStackAttempt: vi.fn(), score: vi.fn(), getPlayer: vi.fn() },
+  publicApi: { startStackAttempt: vi.fn(), finishStackAttempt: vi.fn(), score: vi.fn(), getPlayer: vi.fn(), completionReward: vi.fn() },
 }))
 
 const assignment: StackAssignment = {
@@ -92,6 +92,20 @@ describe('STACK participant gameplay', () => {
     expect(screen.getByRole('button', { name: 'EMPEZAR' })).toBeEnabled()
     unmount()
     expect(controller.dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('requests the club reward only after the server confirms the STACK finish', async () => {
+    vi.mocked(publicApi.completionReward).mockResolvedValue({ status: 'confirmed', name: 'Coffee' })
+    render(<StackParticipantPlay gameId="GAME1234" playerToken="token" assignment={assignment}
+      config={DEFAULT_STACK_CONFIG} startSupported finishSupported kivlyRewardEnabled />)
+    const options = await ready()
+    expect(publicApi.completionReward).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'EMPEZAR' }))
+    await waitFor(() => expect(controller.start).toHaveBeenCalledTimes(1))
+    update(options, { state: 'GAME_OVER', score: 7, placements })
+    expect(await screen.findByText('Coffee')).toBeInTheDocument()
+    expect(publicApi.finishStackAttempt).toHaveBeenCalledTimes(1)
+    expect(publicApi.completionReward).toHaveBeenCalledWith('GAME1234', 'token')
   })
 
   it('does not offer an available attempt when the server reports it consumed', async () => {
