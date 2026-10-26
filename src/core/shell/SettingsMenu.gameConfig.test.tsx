@@ -6,7 +6,7 @@ import L3trasConfig from '../../games/l3tras/GameConfig'
 import SettingsMenu from './SettingsMenu'
 import { OperatorLanguageProvider } from './operatorLanguage'
 
-vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }))
+vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
 vi.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ logout: vi.fn() }) }))
 vi.mock('../../auth/useCurrentUser', () => ({ useCurrentUser: () => ({ user: null, loading: false, plan: 'event' }) }))
 vi.mock('../widgets/Raffle', () => ({ default: () => null }))
@@ -23,6 +23,7 @@ beforeEach(() => {
   localStorage.setItem('L3TRAS_settings_ABC123', JSON.stringify({ objectiveWord: 'STAND' }))
   vi.mocked(api.get).mockResolvedValue({ ok: true, game: { playMode: 'master', joinChannel: 'instagram' } })
   vi.mocked(api.put).mockResolvedValue({ ok: true })
+  vi.mocked(api.delete).mockResolvedValue({ ok: true })
 })
 afterEach(cleanup)
 
@@ -113,5 +114,53 @@ describe('SettingsMenu Configurar juego', () => {
     expect(screen.getByRole('button', { name: 'Cerrar y volver al juego' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar y volver al juego' }))
     expect(screen.getByRole('dialog', { name: 'Configurar juego' })).toBeInTheDocument()
+  })
+
+  it('lists players and removes one only after confirmation', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({
+      ok: true,
+      players: [
+        { playerId: 1, username: 'Ana' },
+        { playerId: 2, username: 'Luis' },
+      ],
+    })
+    render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Gestionar jugadores' }))
+    expect(await screen.findByText('Ana')).toBeInTheDocument()
+    expect(screen.getByText('Luis')).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/v1/game/players?gameId=ABC123')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar a Ana' }))
+    expect(api.delete).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar eliminación' }))
+
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/v1/game/players', {
+      gameId: 'ABC123', playerId: 1,
+    }))
+    await waitFor(() => expect(screen.queryByText('Ana')).not.toBeInTheDocument())
+    expect(screen.getByText('Luis')).toBeInTheDocument()
+  })
+
+  it('keeps the player visible and reports a failed removal', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ ok: true, players: [{ playerId: 1, username: 'Ana' }] })
+    vi.mocked(api.delete).mockRejectedValueOnce(new Error('Servidor caído'))
+    render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Gestionar jugadores' }))
+    expect(await screen.findByText('Ana')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar a Ana' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar eliminación' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Servidor caído')
+    expect(screen.getByText('Ana')).toBeInTheDocument()
+  })
+
+  it('offers a retry after a roster load error and shows the empty state', async () => {
+    vi.mocked(api.get)
+      .mockRejectedValueOnce(new Error('Servidor caído'))
+      .mockResolvedValueOnce({ ok: true, players: [] })
+    render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Gestionar jugadores' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Servidor caído')
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    expect(await screen.findByText('Todavía no hay jugadores en esta partida.')).toBeInTheDocument()
   })
 })
