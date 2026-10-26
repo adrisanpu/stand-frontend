@@ -119,15 +119,15 @@ describe('unified game configuration save', () => {
     expect(screen.queryByRole('region', { name: 'Kivly' })).not.toBeInTheDocument()
   })
 
-  it('shows the connection and preserves an unchanged reward selection', async () => {
+  it('shows the connection without the replaced completion-reward selector', async () => {
     const clubSettings = { clubName: 'Club', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms' }
     vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
       connected: true, locationId: 'location1', locations: [{ id: 'location1', name: 'Club' }], clubSettings,
     })
     const { onSaved } = mount(definition('STACK'))
     expect(await screen.findByText('Conectado')).toBeInTheDocument()
-    expect(await screen.findByLabelText('Premio Kivly al terminar')).toBeInTheDocument()
-    expect(kivlyApi.listRewards).toHaveBeenCalledWith('ABC123')
+    expect(screen.queryByLabelText('Premio Kivly al terminar')).not.toBeInTheDocument()
+    expect(kivlyApi.listRewards).not.toHaveBeenCalled()
     fireEvent.click(footer())
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
@@ -136,7 +136,7 @@ describe('unified game configuration save', () => {
     expect(vi.mocked(api.put).mock.calls.every(([path]) => !path.includes('kivly'))).toBe(true)
   })
 
-  it('saves the selected STACK reward with the unified game configuration action', async () => {
+  it('does not save legacy STACK rewards when saving game rules', async () => {
     const clubSettings = { clubName: 'Club', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms' }
     vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
       connected: true, locationId: 'location1', locations: [{ id: 'location1', name: 'Club' }], clubSettings,
@@ -147,10 +147,9 @@ describe('unified game configuration save', () => {
     ])
     const { onSaved } = mount(definition('STACK'))
     await waitFor(() => expect(footer()).toBeEnabled())
-    fireEvent.change(screen.getByLabelText('Premio Kivly al terminar'), { target: { value: 'reward-2' } })
     fireEvent.click(footer())
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(kivlyApi.saveReward).toHaveBeenCalledWith('ABC123', 'reward-2')
+    expect(kivlyApi.saveReward).not.toHaveBeenCalled()
   })
 
   it('allows saving game rules when the read-only Kivly indicator cannot load', async () => {

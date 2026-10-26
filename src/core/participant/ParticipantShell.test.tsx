@@ -34,6 +34,22 @@ function renderParticipant(strict = false) {
 }
 
 describe('ParticipantShell STACK integration', () => {
+  it('restores an existing STACK session after definitive closure even when paused', async () => {
+    vi.mocked(publicApi.getGame).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'STACK', isActive: false,
+      playMode: 'mobile', joinChannel: 'web', playerCount: 1, validatedCount: 0,
+      recentPairs: [], joinUrl: '', stackConfig: DEFAULT_STACK_CONFIG,
+      stackPrizeState: 'closed', stackPrizeRules: [],
+    })
+    savePlayerSession('GAME1234', 'token', assignment)
+    vi.mocked(publicApi.getPlayer).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'STACK', playerToken: 'token',
+      assignment, prizes: [],
+    })
+    renderParticipant()
+    expect(await screen.findByText('Escena STACK: disponible')).toBeInTheDocument()
+    expect(publicApi.getPlayer).toHaveBeenCalledWith('token', 'GAME1234')
+  })
   it('restores a RULET4 session and shows the server result instead of the generic registered screen', async () => {
     vi.mocked(publicApi.getGame).mockResolvedValue({
       ok: true, gameId: 'GAME1234', gameType: 'RULET4', isActive: true,

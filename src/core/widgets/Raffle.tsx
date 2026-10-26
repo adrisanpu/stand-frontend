@@ -6,6 +6,7 @@ type RaffleProps = {
   onBack: () => void
   onClose: () => void
   gameId?: string
+  gameType?: string
 }
 
 type RaffleResponse = {
@@ -55,7 +56,7 @@ function translateRaffleError(message: string, t: (spanish: string, english?: st
   return Object.prototype.hasOwnProperty.call(knownErrors, message) ? knownErrors[message] : message
 }
 
-export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
+export default function Raffle({ onBack, onClose, gameId, gameType }: RaffleProps) {
   const { t } = useOperatorLanguage()
   const [numberOfWinners, setNumberOfWinners] = useState<number>(1)
   const [eligibilityMode, setEligibilityMode] = useState<EligibilityMode>('all')
@@ -349,7 +350,7 @@ export default function Raffle({ onBack, onClose, gameId }: RaffleProps) {
                   >
                     <option value="all">{t('Todos', 'Everyone')}</option>
                     <option value="quiz">{t('Quiz completado', 'Quiz completed')}</option>
-                    <option value="validated">{t('Validados', 'Validated')}</option>
+                    <option value="validated">{gameType === 'STACK' ? t('Partida completada', 'Game completed') : t('Validados', 'Validated')}</option>
                   </select>
                 </div>
               </div>

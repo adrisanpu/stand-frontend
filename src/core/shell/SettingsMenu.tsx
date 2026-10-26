@@ -388,7 +388,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   }
 
   if (showRaffle) {
-    return <Raffle onBack={() => setShowRaffle(false)} onClose={onClose} gameId={gameId} />
+    return <Raffle onBack={() => setShowRaffle(false)} onClose={onClose} gameId={gameId} gameType={gameDefinition?.id} />
   }
 
   if (showQuiz) {

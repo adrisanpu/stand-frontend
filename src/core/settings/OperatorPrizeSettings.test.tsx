@@ -171,7 +171,7 @@ describe('prize editor', () => {
       gameId: 'GAME 1', slot, fileName: 'prize.png', contentType: 'image/png', sizeBytes: file.size,
     })
     expect(binaryFetch).toHaveBeenCalledWith('https://upload.test/signed', {
-      method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: file,
+      method: 'PUT', headers: { 'Content-Type': 'image/png', 'x-amz-tagging': 'staged=true' }, body: file,
     })
     expect(vi.mocked(api.post).mock.invocationCallOrder[0]).toBeLessThan(binaryFetch.mock.invocationCallOrder[0])
     expect(binaryFetch.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(api.put).mock.invocationCallOrder[0])

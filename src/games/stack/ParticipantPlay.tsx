@@ -22,13 +22,14 @@ type Props = {
   prizeCatalog?: PrizeCatalog
   showPrizePromo?: boolean
   kivlyRewardEnabled?: boolean
+  prizeState?: 'open' | 'closing' | 'closed'
 }
 
 type SceneStatus = 'loading' | 'ready' | 'lost' | 'error'
 type StartStatus = 'idle' | 'pending' | 'retry' | 'started' | 'blocked'
 const INITIAL_SNAPSHOT: StackSnapshot = { state: 'IDLE', score: 0, perfect: false, placements: [] }
 
-export default function StackParticipantPlay({ gameId, playerToken, config, assignment, startSupported = false, finishSupported = false, prizeCatalog, showPrizePromo = true, kivlyRewardEnabled = false }: Props) {
+export default function StackParticipantPlay({ gameId, playerToken, config, assignment, startSupported = false, finishSupported = false, prizeCatalog, showPrizePromo = true, kivlyRewardEnabled = false, prizeState = 'open' }: Props) {
   const { t } = useParticipantLanguage()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<StackSceneController | null>(null)
@@ -52,7 +53,7 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
   const [storageWarning, setStorageWarning] = useState('')
 
   useEffect(() => {
-    if (!assignment.attempt || assignment.score != null) return
+    if (assignment.attempt?.status !== 'started' || assignment.score != null) return
     try {
       setFinishEvidence(loadPendingStackResult(gameId, assignment.playerId, assignment.attempt.attemptId))
     } catch (cause) {
@@ -99,7 +100,7 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
   }, [config])
 
   const start = async () => {
-    if (!startSupported || !finishSupported || startLockRef.current || assignment.attempt || assignment.score != null || status !== 'ready' || !sceneRef.current) return
+    if (prizeState !== 'open' || !startSupported || !finishSupported || startLockRef.current || assignment.attempt || assignment.score != null || status !== 'ready' || !sceneRef.current) return
     if (startStatus !== 'idle' && startStatus !== 'retry') return
     startLockRef.current = true
     setStartStatus('pending')
@@ -301,7 +302,7 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
           <button
             type="button"
             onClick={() => void start()}
-            disabled={!startSupported || !finishSupported || status !== 'ready' || startStatus === 'pending'}
+            disabled={prizeState !== 'open' || !startSupported || !finishSupported || status !== 'ready' || startStatus === 'pending'}
             className="w-full rounded-xl py-4 font-bold text-primary bg-[rgba(var(--color-primary-rgb),0.2)] border border-[rgba(var(--color-primary-rgb),0.3)] disabled:opacity-50"
           >
             {startStatus === 'pending' ? t('Confirmando intento...') : startStatus === 'retry' ? t('Reintentar confirmación') : t('EMPEZAR')}
@@ -323,6 +324,8 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
           {t('Tu intento no está disponible. Si ya empezó, recargar esta página no permite otra partida.')}
         </p>
       )}
+      {prizeState !== 'open' && !hasResult && <p role="status" className="text-sm text-textSub">{t('El juego se está cerrando o ya ha cerrado. No se admiten nuevos intentos.')}</p>}
+      {assignment.attempt?.status === 'excluded' && <p role="alert" className="text-sm text-amber-300">{t('El equipo ha excluido tu intento pendiente del cierre. No tiene puntuación ni premios.')}</p>}
       {hasResult && (
         <>
           {savedScore != null && kivlyRewardEnabled && <KivlyRewardCard gameId={gameId} playerToken={playerToken} />}

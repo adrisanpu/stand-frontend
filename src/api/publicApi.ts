@@ -92,6 +92,8 @@ export type PublicGameResponse = {
   kivlyReward?: { name: string }
   stackStartSnapshot?: boolean
   stackFinishSupported?: boolean
+  stackPrizeState?: 'open' | 'closing' | 'closed'
+  stackPrizeRules?: { condition: import('./stackPrizes').StackPrizeCondition; topX?: number; names: string[] }[]
   joinUrl: string
 }
 
@@ -121,7 +123,7 @@ export type T1merAssignment = {
 
 export type StackAttempt = {
   attemptId: string
-  status: 'started' | 'finished'
+  status: 'started' | 'finished' | 'excluded'
   startedAt: string
   configVersion: '1'
   finishedAt?: string
@@ -289,13 +291,14 @@ export type PlayerResponse = {
   assignment: PlayerAssignment | null
   prizes: PlayerPrize[]
   prizeCatalog?: PrizeCatalog
+  stackPrizes?: import('./stackPrizes').StackPlayerPrizes
 }
 
 export type RedeemResponse = {
   ok: boolean
   gameId: string
   playerId: number
-  kind: PrizeKind
+  kind: PrizeKind | 'award'
   delivered: boolean
   label?: string
   prize?: GamePrize | null
@@ -371,12 +374,12 @@ export const publicApi = {
       body: JSON.stringify({ gameId, playerToken }),
     }),
 
-  redeem: async (prizeToken: string): Promise<RedeemResponse> => {
+  redeem: async (prizeToken: string, gameId?: string): Promise<RedeemResponse> => {
     const url = `${API_BASE_URL}/v1/public/redeem`
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prizeToken }),
+      body: JSON.stringify({ prizeToken, ...(gameId ? { gameId } : {}) }),
     })
     const data = (await response.json().catch(() => ({}))) as RedeemResponse & { error?: string; message?: string }
     if (!response.ok) {

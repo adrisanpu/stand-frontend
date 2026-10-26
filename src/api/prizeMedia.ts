@@ -58,7 +58,7 @@ export async function uploadPrizeImage(gameId: string, slot: PrizeSlot, file: Fi
   if (!result.ok || !result.key || !result.uploadUrl) throw new Error('No upload URL received')
   const response = await fetch(result.uploadUrl, {
     method: 'PUT',
-    headers: { 'Content-Type': 'image/png' },
+    headers: { 'Content-Type': 'image/png', 'x-amz-tagging': 'staged=true' },
     body: file,
   })
   if (!response.ok) throw new Error(`Upload failed (${response.status})`)

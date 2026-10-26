@@ -13,6 +13,7 @@ const PRIZE_LABEL: Record<string, string> = {
   validation: 'Premio por pareja',
   raffle: 'Premio del sorteo',
   ranking: 'Premio del ranking',
+  award: 'Premio STAND',
 }
 
 export default function ValidatorShell() {
@@ -40,7 +41,7 @@ export default function ValidatorShell() {
     setMessage(null)
     setPrize(null)
     try {
-      const res = await publicApi.redeem(token)
+      const res = await publicApi.redeem(token, gameId)
       setPrize(res.prize ?? null)
       setStatus('ok')
       const kindLabel = PRIZE_LABEL[res.kind] || res.kind
@@ -57,7 +58,7 @@ export default function ValidatorShell() {
     } finally {
       busyRef.current = false
     }
-  }, [])
+  }, [gameId])
 
   const startScan = useCallback(async () => {
     stopCamera()

@@ -4,6 +4,8 @@ import { publicApi, type PlayerPrize } from '../../api/publicApi'
 import { useParticipantLanguage } from '../../core/participant/participantLanguage'
 import type { PrizeCatalog } from '../../core/prizes'
 import { PrizeImage } from '../../core/widgets/PrizePresentation'
+import type { StackPlayerPrizes } from '../../api/stackPrizes'
+import StackAwardList, { StackWallet } from './StackAwardList'
 
 type Props = {
   gameId: string
@@ -29,6 +31,7 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
   const { t } = useParticipantLanguage()
   const [prize, setPrize] = useState<PlayerPrize | null>(null)
   const [catalog, setCatalog] = useState<PrizeCatalog | undefined>()
+  const [stackPrizes, setStackPrizes] = useState<StackPlayerPrizes | undefined>()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [revision, setRevision] = useState(0)
@@ -40,6 +43,7 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
     let busy = false
     setPrize(null)
     setCatalog(undefined)
+    setStackPrizes(undefined)
     setLoading(true)
     setLoadError(false)
     const load = async () => {
@@ -53,6 +57,7 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
         if (cancelled) return
         setPrize(result.prizes.find((entry) => entry.kind === 'ranking') ?? null)
         setCatalog(result.prizeCatalog)
+        setStackPrizes(result.stackPrizes)
         setLoadError(false)
       } catch {
         if (!cancelled) {
@@ -75,6 +80,7 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
   const rankingPrize = (catalog ?? prizeCatalog)?.ranking
   return (
     <>
+      {enabled && stackPrizes && <StackWallet url={stackPrizes.walletUrl} expected={stackPrizes.walletExpected} />}
       <div className="stack-viewport relative w-full h-[45vh] min-h-[220px] max-h-[440px] rounded-xl overflow-hidden border border-primary/20">
         {children}
         {enabled && (rank != null || prize) && (
@@ -115,6 +121,7 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
               : <p className="text-sm text-textSub">{t('Muestra este QR en el punto de recogida para canjear tu premio.')}</p>
           )
       )}
+      {enabled && stackPrizes && <StackAwardList data={stackPrizes} />}
     </>
   )
 }

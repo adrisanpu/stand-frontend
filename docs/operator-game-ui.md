@@ -39,12 +39,43 @@ An unavailable indicator must not block saving unrelated game rules.
 When public metadata includes `loyalty`, `/play` asks for separate club consent
 and sends its version with the email-code request. Access opens only after the
 backend confirms verified registration. Changed terms require fresh consent;
-uncertain registration displays an error without granting access. STACK game
-settings can select one existing Kivly reward. Once the server confirms a saved
-finish, participants can check assignment status and use only Wallet links
-returned by Kivly. The feature does not generate rewards or passes, redeem
-rewards, or mark them used; uncertain assignments are not automatically replayed.
-This reward extension is pending review and has not been live-verified.
+uncertain registration displays an error without granting access. STACK prize
+settings now own mixed STAND/Kivly rules; there is no separate completion-reward
+selector. After a confirmed result, show the official club wallet action before
+the game result and individual prize cards below it. Kivly assignments happen
+server-side without returning to the result page. The feature does not generate
+passes, redeem Kivly rewards or mark them used; uncertain assignments are not
+automatically replayed. Installed-wallet propagation has not been live-verified.
+
+### STACK: textual prize rules
+
+`Settings > Premios` uses "Cuando [condition], entregar [one or more prizes]".
+Offer completed game, top X at own finish, final top X at closure, and raffle
+winner (subject to the existing raffle plan). The combined searchable selector
+groups game-local STAND prizes and the connected business's existing Kivly
+catalog. A STAND prize needs a name and may have a PNG; creating one never
+creates a Kivly reward. New Kivly selections use local IDs independent of the
+external reward ID. Edits stay drafts until the save succeeds.
+
+Rule changes create new identities; already earned prizes stay earned. Two
+matching rules can award two units of the same item. "Partida completada"
+replaces validation terminology for STACK. Public promotions summarize every
+configured rule without repeating the old Pizza/ranking sticker.
+
+Results display a separate card and local QR per uncollected STAND unit.
+Collected cards retain a clear collected state. Kivly cards have no STAND QR:
+show queued, confirming, confirmed or team-verification-required status.
+Poll results every 30 seconds and expose read errors with retry. The official
+Kivly wallet page offers Apple/Google; configure only the business origin,
+without `/add-to-wallet` or customer identifiers. Explain unavailable access
+when a club card is expected instead of silently hiding it.
+
+Definitive closure is separate from pause: confirm that starts are blocked and
+active attempts may finish; the server automatically finalizes afterward.
+Excluding displayed pending attempts requires a second confirmation explaining
+that no score/prizes will be saved and late results will be rejected. Disable
+rule editing after closure begins. The delivery panel shows each unit's status
+and safe pre-earn failure code; refresh must not discard unsaved edits.
 
 Action buttons inside settings panels (save/apply, generate Quiz/cards, export,
 share, download and image selection) use the active palette's primary color,
@@ -56,7 +87,7 @@ The Tailwind primary token must support opacity via `--color-primary-rgb`.
 
 ### Prize images
 
-`Settings > Premios` stores independent `validation`, `ranking` and `raffle`
+For non-STACK games and legacy STACK flows, `Settings > Premios` stores independent `validation`, `ranking` and `raffle`
 entries in the game's `prizeCatalog`. Each entry has a name, nullable limit,
 optional ranking `topX` and optional image. In the editor, order controls as
 name -> image -> numeric parameters (including Top X where applicable).
@@ -89,7 +120,7 @@ username on the right of the same row. After the server confirms the result,
 show the actual rank as a large `Posición: #N` overlay inside the scene, without
 a separate game-over summary below it. Preserve pending-save status, errors and
 save retries; never display an unconfirmed rank.
-Once STACK has a saved score, fetch ranking-prize eligibility from the player
+For legacy STACK attempts without the new program, fetch ranking-prize eligibility from the player
 endpoint. For a server-issued claim, overlay the prize image and its name below
 the position, with the locally generated redemption QR alongside the prize.
 Keep the redemption instruction below the scene, without a separate prize card

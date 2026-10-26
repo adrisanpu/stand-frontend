@@ -10,6 +10,7 @@ import { useOperatorLanguage } from '../shell/operatorLanguage'
 import {
   getOperatorPrizeSlotVisibility, readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle,
 } from './operatorPrizeSlots'
+import StackPrizeSettings from './StackPrizeSettings'
 
 type Props = {
   gameId: string
@@ -67,7 +68,14 @@ function validInteger(value: string, min: number, max = Number.MAX_SAFE_INTEGER)
   return /^\d+$/.test(value.trim()) && Number.isSafeInteger(Number(value)) && Number(value) >= min && Number(value) <= max
 }
 
-export default function OperatorPrizeSettings({
+export default function OperatorPrizeSettings(props: Props) {
+  return props.gameDefinition.id === 'STACK'
+    ? <StackPrizeSettings gameId={props.gameId} raffles={getFeaturesByPlan(props.plan).raffles}
+        onPersist={props.onPersist} onSavingChange={props.onSavingChange} />
+    : <LegacyPrizeSettings {...props} />
+}
+
+function LegacyPrizeSettings({
   gameId, gameDefinition, settings, plan, onPersist, onSavingChange,
 }: Props) {
   const { t } = useOperatorLanguage()

@@ -52,7 +52,7 @@ it('shows the redeemed prize image and name above the delivery confirmation and 
   const image = screen.getByRole('img', { name: 'Consola' })
   expect(image).toHaveAttribute('src', '/console.png')
   expect(screen.getByText('Consola').parentElement?.nextElementSibling).toBe(message)
-  expect(publicApi.redeem).toHaveBeenCalledWith('prize-token')
+  expect(publicApi.redeem).toHaveBeenCalledWith('prize-token', 'ABC123')
   expect(stop).toHaveBeenCalled()
 
   vi.mocked(jsQR).mockReturnValue(null)

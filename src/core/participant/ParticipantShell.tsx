@@ -14,6 +14,7 @@ import ResultView from './ResultView'
 import T1merParticipantPlay from '../../games/t1mer/ParticipantPlay'
 import T1merParticipantResult from '../../games/t1mer/ParticipantResult'
 import StackParticipantPlay from '../../games/stack/ParticipantPlay'
+import StackPrizeSummary from '../../games/stack/StackPrizeSummary'
 import ImpostorParticipantPlay from '../../games/impostor/ParticipantPlay'
 import Rulet4ParticipantPlay from '../../games/rulet4/ParticipantPlay'
 import { isRulet4Assignment, type Rulet4Assignment } from '../../games/rulet4/rulet4Logic'
@@ -163,7 +164,9 @@ function ParticipantContent() {
       try {
         const meta = await publicApi.getGame(gameId)
         if (cancelled) return
-        if (!meta.ok || meta.gameId !== gameId || !meta.isActive) {
+        const closedStack = normalizeGameType(meta.gameType) === 'STACK'
+          && (meta.stackPrizeState === 'closing' || meta.stackPrizeState === 'closed')
+        if (!meta.ok || meta.gameId !== gameId || (!meta.isActive && !closedStack)) {
           setStep('unsupported')
           return
         }
@@ -248,6 +251,7 @@ function ParticipantContent() {
               {t('No se pudo guardar la foto; se muestra el avatar genérico.')}
             </p>
           )}
+          {gameMeta?.stackPrizeRules && <StackPrizeSummary rules={gameMeta.stackPrizeRules} />}
           {step === 'loading' && <p className="text-center text-textSub">{t('Cargando...')}</p>}
           {step === 'unsupported' && (
             <div className="text-center space-y-2">
@@ -294,7 +298,7 @@ function ParticipantContent() {
           )}
 
           {gameType === 'STACK' && step === 'play' && stackAssignment && playerToken && (
-            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} showPrizePromo={false} kivlyRewardEnabled={Boolean(gameMeta?.kivlyReward)} />
+            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} showPrizePromo={false} kivlyRewardEnabled={Boolean(gameMeta?.kivlyReward)} prizeState={gameMeta?.stackPrizeState} />
           )}
 
           {gameType === 'IMPOSTOR' && step === 'play' && impostorAssignment && playerToken && (
