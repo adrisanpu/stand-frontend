@@ -146,6 +146,14 @@ Final email registration sends only `{ gameId, challengeId, code }` to `/v1/publ
 
 ### Kivly: connection and player registration
 
+The STACK prize configurator groups catalog stock and award rules into two
+numbered steps, with compact responsive prize cards and separate QR/club
+delivery labels. Each rule explains whether it awards every selected prize or
+one random option; units per winner and shared event stock remain independent.
+Available stock previews draft total-stock changes without saving them. Explicit
+remove controls, an unsaved-changes indicator and a sticky save action keep edits
+visible; saving, closure confirmations and allocation behavior are unchanged.
+
 Home settings > **Integraciones** connects one Kivly location per organizer and stores shared club details through `/v1/kivly`. This first release enables club registration only for **STACK**; other games do not require Kivly membership. Credentials are sent only to the authenticated backend, cleared from the form and never stored in the browser. Disconnecting requires confirmation and affects all the organizer's STACK games.
 
 When the backend publishes `loyalty` metadata, `/play` requires separate, explicit club consent. Its `consentVersion` is bound to the email challenge. The backend registers or reuses the customer only after email verification; unresolved registration blocks access without claiming success. Changed terms discard the challenge and require consent again. Legacy sessions rejected for missing club membership/consent return to registration.

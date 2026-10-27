@@ -4,8 +4,8 @@ import { kivlyApi, type KivlyReward } from '../../api/kivlyApi'
 import { PrizeImageError, uploadPrizeImage, validatePrizeImage } from '../../api/prizeMedia'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 
-const field = 'rounded-xl border border-white/15 bg-surface px-3 py-2 text-sm min-w-0'
-const action = 'rounded-xl border border-primary/30 bg-primary/10 px-4 py-2 text-sm disabled:opacity-40'
+const field = 'rounded-lg border border-white/15 bg-surface px-2.5 py-1.5 text-sm min-w-0'
+const action = 'rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm disabled:opacity-40'
 const conditions: StackPrizeCondition[] = ['completed', 'top_finish', 'top_final', 'raffle']
 const newId = () => crypto.randomUUID()
 
@@ -127,19 +127,27 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       id: `kivly_${r.id}`, source: 'kivly', rewardId: r.id, name: r.name, locationId: locationId ?? '',
       stockTotal: 100,
     }))]
-    const invalidProgram = program.catalog.some((prize) => {
-      const stock = data.inventory.find((item) => item.prizeId === prize.id)
-      const alreadyAllocated = stock ? stock.total - stock.remaining : 0
-      return !Number.isInteger(prize.stockTotal) || prize.stockTotal < Math.max(1, alreadyAllocated) || prize.stockTotal > 1000
-    }) || program.rules.some((rule) =>
-      rule.allocations.length === 0 || rule.allocations.some((allocation) =>
-        !Number.isInteger(allocation.quantity) || allocation.quantity < 1 || allocation.quantity > 10)
-        || (rule.condition.startsWith('top_') && (!Number.isInteger(rule.topX) || (rule.topX ?? 0) < 1 || (rule.topX ?? 101) > 100)))
-  return <div className="space-y-5">
-    <header>
-      <h2 className="font-semibold text-lg">{t('Reglas de premios', 'Prize rules')}</h2>
-      <p className="text-sm text-textSub">{t('Define cuándo se gana y qué se entrega. STAND: recogida con QR. Kivly: asignación automática a la cuenta del club.',
-        'Choose when prizes are earned and what to deliver. STAND: collect with QR. Kivly: automatic assignment to the club account.')}</p>
+  const invalidProgram = program.catalog.some((prize) => {
+    const stock = data.inventory.find((item) => item.prizeId === prize.id)
+    const alreadyAllocated = stock ? stock.total - stock.remaining : 0
+    return !Number.isInteger(prize.stockTotal) || prize.stockTotal < Math.max(1, alreadyAllocated) || prize.stockTotal > 1000
+  }) || program.rules.some((rule) =>
+    rule.allocations.length === 0 || rule.allocations.some((allocation) =>
+      !Number.isInteger(allocation.quantity) || allocation.quantity < 1 || allocation.quantity > 10)
+      || (rule.condition.startsWith('top_') && (!Number.isInteger(rule.topX) || (rule.topX ?? 0) < 1 || (rule.topX ?? 101) > 100)))
+  return <div className="space-y-4">
+    <header className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold text-lg">{t('Reglas de premios', 'Prize rules')}</h2>
+        <span role="status" className={`rounded-full px-2 py-1 text-xs ${dirty ? 'bg-amber-400/10 text-amber-300' : 'bg-white/5 text-textSub'}`}>
+          {dirty ? t('Cambios sin guardar', 'Unsaved changes') : t('Sin cambios pendientes', 'No pending changes')}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2 text-xs">
+        <span className="rounded-full border border-white/10 px-2 py-1">{program.catalog.length} {t('premios', 'prizes')} · {program.rules.length} {t('reglas', 'rules')}</span>
+        <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">STAND · {t('Recogida con QR', 'QR collection')}</span>
+        <span className="rounded-full bg-accent/10 px-2 py-1 text-accent">Kivly · {t('Asignación al club', 'Club assignment')}</span>
+      </div>
     </header>
     {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
     {message && <p role="status" className="text-sm text-accent">{message}</p>}
@@ -147,39 +155,62 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       <button type="button" className="ml-2 underline" disabled={busy || dirty} onClick={() => setRevision((r) => r + 1)}>{t('Reintentar', 'Retry')}</button>
     </div>}
     <fieldset disabled={busy || !editable} className="space-y-4">
-      <div className="rounded-2xl border border-white/10 p-4 space-y-3">
-        <h3 className="text-sm font-semibold">{t('Tus premios STAND', 'Your STAND prizes')}</h3>
+      <div className="rounded-xl border border-white/10 p-3 space-y-3">
+        <h3 className="text-sm font-semibold">{t('1. Catálogo e inventario', '1. Catalog and stock')}</h3>
         <div className="flex gap-2">
           <input aria-label={t('Nombre del premio STAND', 'STAND prize name')} value={name} maxLength={200} onChange={(e) => setName(e.target.value)}
             className={`${field} flex-1 w-full`} placeholder={t('Por ejemplo: porción de pizza', 'For example: pizza slice')} />
           <button type="button" className={action} disabled={!name.trim() || program.catalog.length >= 32} onClick={addStand}>{t('Añadir', 'Add')}</button>
         </div>
-        {program.catalog.map((p) => <div key={p.id} className="flex flex-wrap items-center gap-2 border-t border-white/5 pt-2 text-sm">
-          {p.source === 'stand' && p.imageUrl && <img src={p.imageUrl} alt={`${t('Vista previa del premio', 'Prize preview')} ${p.name}`} className="w-10 h-10 object-contain" />}
-          <span className="flex-1">{p.name} <span className="text-xs text-textSub">{p.source === 'kivly' ? 'Kivly' : 'STAND'}</span></span>
-          {p.source === 'stand' && <label className={`${action} cursor-pointer`}>{p.imageKey ? t('Cambiar imagen', 'Change image') : t('Imagen opcional', 'Optional image')}
-            <input type="file" accept="image/png" className="sr-only" aria-label={`${t('Imagen de', 'Image for')} ${p.name}`} onChange={(e) => {
-              const file = e.target.files?.[0]; if (file) void chooseImage(p, file)
-            }} />
-          </label>}
-          <label className="flex items-center gap-2 text-xs">
-            Y
-            <input type="number" min={1} max={1000} value={p.stockTotal} className={`${field} w-20`}
-              aria-label={`${t('Inventario total Y de', 'Total stock Y for')} ${p.name}`}
-              onChange={(e) => change({ ...program, catalog: program.catalog.map((item) =>
-                item.id === p.id ? { ...item, stockTotal: e.target.valueAsNumber } : item) })} />
-          </label>
-          <span className="text-xs text-textSub">{t('restan', 'left')} {data.inventory.find((item) => item.prizeId === p.id)?.remaining ?? p.stockTotal}</span>
-          {p.source === 'stand' && p.imageKey && <button type="button" className="text-textSub underline" aria-label={`${t('Quitar imagen de', 'Remove image for')} ${p.name}`}
-            onClick={() => change({ ...program, catalog: program.catalog.map((item) => item.id === p.id ? { ...item, imageKey: null, imageUrl: null } : item) })}>
-            {t('Quitar imagen', 'Remove image')}
-          </button>}
-        </div>)}
-        <p className="text-xs text-textSub">{t('Y es el stock del evento, compartido entre todas las reglas. Máximo 1.000. PNG, máx. 5 MB.', 'Y is the event stock shared by all rules. Maximum 1,000. PNG, max. 5 MB.')}</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {program.catalog.map((p) => {
+            const stock = data.inventory.find((item) => item.prizeId === p.id)
+            const remaining = Math.max(0, p.stockTotal - (stock ? stock.total - stock.remaining : 0))
+            return <div key={p.id} className="min-w-0 rounded-lg border border-white/10 bg-white/[0.02] p-2.5 space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                {p.source === 'stand' && p.imageUrl && <img src={p.imageUrl} alt={`${t('Vista previa del premio', 'Prize preview')} ${p.name}`} className="w-9 h-9 shrink-0 object-contain" />}
+                <span className="min-w-0 flex-1 break-words font-medium">{p.name}</span>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${p.source === 'kivly' ? 'bg-accent/10 text-accent' : 'bg-primary/10 text-primary'}`}>
+                  {p.source === 'kivly' ? 'Kivly' : 'STAND'}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-xs text-textSub">
+                  {t('Stock total', 'Total stock')}
+                  <input type="number" min={1} max={1000} value={p.stockTotal} className={`${field} w-20 text-textMain`}
+                    aria-label={`${t('Inventario total Y de', 'Total stock Y for')} ${p.name}`}
+                    onChange={(e) => change({ ...program, catalog: program.catalog.map((item) =>
+                      item.id === p.id ? { ...item, stockTotal: e.target.valueAsNumber } : item) })} />
+                </label>
+                <span className="text-xs text-textSub">{t('Disponibles', 'Available')}: {Number.isFinite(remaining) ? remaining : '—'}</span>
+              </div>
+              {p.source === 'stand' && <div className="flex flex-wrap items-center gap-2">
+                <label className="cursor-pointer rounded text-xs text-textSub underline focus-within:ring-2 focus-within:ring-primary">{p.imageKey ? t('Cambiar imagen', 'Change image') : t('+ Imagen opcional', '+ Optional image')}
+                  <input type="file" accept="image/png" className="sr-only" aria-label={`${t('Imagen de', 'Image for')} ${p.name}`} onChange={(e) => {
+                    const file = e.target.files?.[0]; if (file) void chooseImage(p, file)
+                  }} />
+                </label>
+                {p.imageKey && <button type="button" className="text-xs text-textSub underline" aria-label={`${t('Quitar imagen de', 'Remove image for')} ${p.name}`}
+                  onClick={() => change({ ...program, catalog: program.catalog.map((item) => item.id === p.id ? { ...item, imageKey: null, imageUrl: null } : item) })}>
+                  {t('Quitar imagen', 'Remove image')}
+                </button>}
+              </div>}
+            </div>
+          })}
+        </div>
+        <p className="text-xs text-textSub">{t('Stock compartido entre todas las reglas (máx. 1.000 por premio). Imágenes PNG, máx. 5 MB.',
+          'Stock is shared across all rules (max. 1,000 per prize). PNG images, max. 5 MB.')}</p>
       </div>
+      <h3 className="text-sm font-semibold">{t('2. Cuándo y qué entregar', '2. When and what to award')}</h3>
       <input className={`${field} w-full`} value={search} onChange={(e) => setSearch(e.target.value)}
         aria-label={t('Buscar premios', 'Search prizes')} placeholder={t('Buscar entre premios STAND y Kivly…', 'Search STAND and Kivly prizes…')} />
-      {program.rules.map((rule, index) => <section key={index} className="rounded-2xl border border-primary/25 bg-primary/5 p-4 space-y-3">
+      {program.rules.map((rule, index) => <section key={index} aria-label={`${t('Regla', 'Rule')} ${index + 1}`}
+        className="rounded-xl border border-primary/25 bg-primary/5 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-primary">{t('Regla', 'Rule')} {index + 1}</span>
+          <button type="button" className="text-xs text-textSub underline" aria-label={`${t('Quitar regla', 'Remove rule')} ${index + 1}`}
+            onClick={() => change({ ...program, rules: program.rules.filter((_, i) => i !== index) })}>{t('Quitar regla', 'Remove rule')}</button>
+        </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span>{t('Cuando', 'When')}</span>
           <select aria-label={`${t('Condición', 'Condition')} ${index + 1}`} className={`${field} flex-1`} value={rule.condition}
@@ -194,36 +225,40 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
             <input type="number" min={1} max={100} value={rule.topX ?? 10} className={`${field} w-20`} aria-label={`Top ${index + 1}`}
               onChange={(e) => change({ ...program, rules: program.rules.map((r, i) => i === index ? { ...r, id: newId(), topX: e.target.valueAsNumber } : r) })} />
           </label>}
-          <button type="button" className="text-textSub underline" onClick={() => change({ ...program, rules: program.rules.filter((_, i) => i !== index) })}>{t('Quitar regla', 'Remove rule')}</button>
         </div>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex flex-wrap items-center gap-2 text-sm">
           {t('Agrupar premios', 'Prize grouping')}
           <select className={field} aria-label={`${t('Agrupación', 'Grouping')} ${index + 1}`} value={rule.mode}
             onChange={(e) => change({ ...program, rules: program.rules.map((r, i) => i === index
               ? { ...r, id: newId(), mode: e.target.value as StackPrizeProgram['rules'][number]['mode'] } : r) })}>
-            <option value="all">{t('Y · entregar todos', 'AND · award all')}</option>
-            <option value="random_one">{t('O · elegir uno al azar', 'OR · choose one at random')}</option>
+            <option value="all">{t('Todos los seleccionados', 'All selected prizes')}</option>
+            <option value="random_one">{t('Uno al azar', 'One at random')}</option>
           </select>
         </label>
-        <p className="text-sm">{t('Premios por ganador', 'Prizes per winner')} {rule.allocations.length === 0 && <span className="text-textSub">{t('— selecciona uno o varios premios', '— select one or more prizes')}</span>}</p>
-        <div className="flex flex-wrap gap-2">
+        <p className="text-xs text-textSub">{rule.mode === 'all'
+          ? t('Cada ganador recibe todos los premios seleccionados, según el stock.', 'Each winner receives all selected prizes, subject to stock.')
+          : t('Cada ganador recibe una opción al azar entre las que tienen stock.', 'Each winner receives one random option with stock.')}
+          {rule.allocations.length === 0 && <span className="block text-amber-300">{t('Selecciona al menos un premio.', 'Select at least one prize.')}</span>}</p>
+        <div className="grid gap-2 sm:grid-cols-2">
           {rule.allocations.map((allocation) => {
             const p = program.catalog.find((item) => item.id === allocation.prizeId)
-            return <div key={allocation.prizeId} className="flex items-center gap-2 rounded-full border border-primary/30 px-3 py-1 text-sm">
-              <button type="button" aria-label={`${t('Quitar premio', 'Remove prize')} ${p?.name}`}
-                onClick={() => change({ ...program, rules: program.rules.map((r, i) => i === index ? {
-                  ...r, id: newId(), allocations: r.allocations.filter((item) => item.prizeId !== allocation.prizeId),
-                } : r) })}>
-                {p?.name} · {p?.source === 'kivly' ? 'Kivly' : 'STAND'}
-              </button>
-              <label className="flex items-center gap-1 text-xs">X
-                <input type="number" min={1} max={10} value={allocation.quantity} className={`${field} w-16`}
+            return <div key={allocation.prizeId} className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-surface/50 px-2.5 py-2 text-sm">
+              <span className="min-w-0 flex-1 break-words">{p?.name} · {p?.source === 'kivly' ? 'Kivly' : 'STAND'}</span>
+              <label className="flex items-center gap-1 text-xs text-textSub">{t('Unid.', 'Qty.')}
+                <input type="number" min={1} max={10} value={allocation.quantity} className={`${field} w-16 text-textMain`}
                   aria-label={`${t('Cantidad X por ganador de', 'Quantity X per winner for')} ${p?.name}`}
                   onChange={(e) => change({ ...program, rules: program.rules.map((r, i) => i === index ? {
                     ...r, id: newId(), allocations: r.allocations.map((item) => item.prizeId === allocation.prizeId
                       ? { ...item, quantity: e.target.valueAsNumber } : item),
                   } : r) })} />
               </label>
+              <button type="button" aria-label={`${t('Quitar premio', 'Remove prize')} ${p?.name}`}
+                className="rounded px-2 py-1 text-textSub hover:bg-white/10"
+                onClick={() => change({ ...program, rules: program.rules.map((r, i) => i === index ? {
+                  ...r, id: newId(), allocations: r.allocations.filter((item) => item.prizeId !== allocation.prizeId),
+                } : r) })}>
+                <span aria-hidden="true">×</span>
+              </button>
             </div>
           })}
         </div>
@@ -258,8 +293,12 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         <span className="block text-xs text-textSub">{t('Solo el origen del negocio, sin /add-to-wallet ni identificadores de clientes.',
           'Only the business origin, without /add-to-wallet or customer identifiers.')}</span>
       </label>
-      <button type="button" className={`${action} w-full font-semibold`} disabled={invalidProgram || (!dirty && data.enabled)}
-        onClick={() => void save()}>{busy ? t('Guardando…', 'Saving…') : t('Guardar reglas de premios', 'Save prize rules')}</button>
+      <div className="sticky bottom-0 z-10 rounded-xl border border-white/10 bg-surface p-2 space-y-1">
+        {invalidProgram && <p className="text-xs text-amber-300">{t('Revisa el stock, las cantidades y que cada regla tenga premios.',
+          'Check stock, quantities, and that every rule has prizes.')}</p>}
+        <button type="button" className={`${action} w-full font-semibold`} disabled={invalidProgram || (!dirty && data.enabled)}
+          onClick={() => void save()}>{busy ? t('Guardando…', 'Saving…') : t('Guardar reglas de premios', 'Save prize rules')}</button>
+      </div>
     </fieldset>
     {data.enabled && <section className="border-t border-white/10 pt-4 space-y-3">
       <h3 className="font-semibold">{t('Cierre del juego', 'Game closure')}</h3>

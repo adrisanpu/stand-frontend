@@ -81,6 +81,36 @@ it('configures AND/OR, winner quantity X and shared event stock Y', async () => 
   expect(saved.catalog[0].stockTotal).toBe(8)
 })
 
+it('explains delivery and grouping, previews remaining stock, and marks unsaved edits', async () => {
+  vi.mocked(stackPrizeApi.get).mockResolvedValue({
+    ...structuredClone(response), inventory: [{ prizeId: 'pizza', total: 100, remaining: 97 }],
+  })
+  mount()
+  await screen.findByText('1. Catálogo e inventario')
+  expect(screen.getByText('STAND · Recogida con QR')).toBeInTheDocument()
+  expect(screen.getByText('Kivly · Asignación al club')).toBeInTheDocument()
+  expect(screen.getByText('Sin cambios pendientes')).toBeInTheDocument()
+  expect(screen.getByText('Disponibles: 97')).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Inventario total Y de Pizza'), { target: { value: '8' } })
+  expect(screen.getByText('Disponibles: 5')).toBeInTheDocument()
+  expect(screen.getByText('Cambios sin guardar')).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Agrupación 1'), { target: { value: 'random_one' } })
+  expect(screen.getByText('Cada ganador recibe una opción al azar entre las que tienen stock.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
+  await screen.findByText('Sin cambios pendientes')
+})
+
+it('removes a selected prize only through its explicit remove control', async () => {
+  mount()
+  await screen.findByText('Pizza · STAND')
+  fireEvent.click(screen.getByText('Pizza · STAND'))
+  expect(screen.getByLabelText('Cantidad X por ganador de Pizza')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Quitar premio Pizza' }))
+  expect(screen.queryByLabelText('Cantidad X por ganador de Pizza')).not.toBeInTheDocument()
+  expect(screen.getByText('Selecciona al menos un premio.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Guardar reglas de premios' })).toBeDisabled()
+})
+
 it('offers both distinct ranking conditions and requires a prize on every rule', async () => {
   mount()
   await screen.findByText('Reglas de premios')
