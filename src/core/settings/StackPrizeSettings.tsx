@@ -52,7 +52,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     setCatalogError('')
     void stackPrizeApi.get(gameId).then((response) => {
       if (cancelled) return
-      if (response.ok !== true || response.program?.version !== 1) throw new Error('Invalid prize configuration')
+      if (response.ok !== true || response.program?.version !== 2) throw new Error('Invalid prize configuration')
       setData(response)
       setProgram(response.program)
     }).catch((cause: unknown) => {
@@ -82,7 +82,14 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     const saved = await stackPrizeApi.save(gameId, program)
     setProgram(saved)
     setDirty(false)
-    setData((previous) => previous ? { ...previous, program: saved, enabled: true } : previous)
+    setData((previous) => previous ? {
+      ...previous, program: saved, enabled: true,
+      inventory: saved.catalog.map((prize) => {
+        const old = previous.inventory.find((item) => item.prizeId === prize.id)
+        const consumed = old ? Math.max(0, old.total - old.remaining) : 0
+        return { prizeId: prize.id, total: prize.stockTotal, remaining: Math.max(0, prize.stockTotal - consumed) }
+      }),
+    } : previous)
     onPersist({ stackPrizeProgram: saved, prizeCatalog: {} })
     setMessage(t('Reglas guardadas. Se aplican a los nuevos intentos y próximos sorteos; los premios ganados se conservan.',
       'Rules saved. They apply to new attempts and future raffles; earned prizes are preserved.'))
@@ -96,7 +103,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   })
   const addStand = () => {
     if (!program || !name.trim()) return
-    change({ ...program, catalog: [...program.catalog, { id: newId(), source: 'stand', name: name.trim(), limit: null }] })
+    change({ ...program, catalog: [...program.catalog, { id: newId(), source: 'stand', name: name.trim(), limit: null, stockTotal: 100 }] })
     setName('')
   }
   const chooseImage = (prize: StackPrizeItem, file: File) => run(async () => {
@@ -118,7 +125,16 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   const available = [...program.catalog, ...rewards.filter((r) => !program.catalog.some((p) =>
     p.source === 'kivly' && p.rewardId === r.id && p.locationId === locationId)).map((r): StackPrizeItem => ({
       id: `kivly_${r.id}`, source: 'kivly', rewardId: r.id, name: r.name, locationId: locationId ?? '',
+      stockTotal: 100,
     }))]
+    const invalidProgram = program.catalog.some((prize) => {
+      const stock = data.inventory.find((item) => item.prizeId === prize.id)
+      const alreadyAllocated = stock ? stock.total - stock.remaining : 0
+      return !Number.isInteger(prize.stockTotal) || prize.stockTotal < Math.max(1, alreadyAllocated) || prize.stockTotal > 1000
+    }) || program.rules.some((rule) =>
+      rule.allocations.length === 0 || rule.allocations.some((allocation) =>
+        !Number.isInteger(allocation.quantity) || allocation.quantity < 1 || allocation.quantity > 10)
+        || (rule.condition.startsWith('top_') && (!Number.isInteger(rule.topX) || (rule.topX ?? 0) < 1 || (rule.topX ?? 101) > 100)))
   return <div className="space-y-5">
     <header>
       <h2 className="font-semibold text-lg">{t('Reglas de premios', 'Prize rules')}</h2>
@@ -138,20 +154,28 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
             className={`${field} flex-1 w-full`} placeholder={t('Por ejemplo: porción de pizza', 'For example: pizza slice')} />
           <button type="button" className={action} disabled={!name.trim() || program.catalog.length >= 32} onClick={addStand}>{t('Añadir', 'Add')}</button>
         </div>
-        {program.catalog.filter((p) => p.source === 'stand').map((p) => <div key={p.id} className="flex flex-wrap items-center gap-2 border-t border-white/5 pt-2 text-sm">
-          {p.imageUrl && <img src={p.imageUrl} alt={`${t('Vista previa del premio', 'Prize preview')} ${p.name}`} className="w-10 h-10 object-contain" />}
-          <span className="flex-1">{p.name} <span className="text-xs text-textSub">STAND</span></span>
-          <label className={`${action} cursor-pointer`}>{p.imageKey ? t('Cambiar imagen', 'Change image') : t('Imagen opcional', 'Optional image')}
+        {program.catalog.map((p) => <div key={p.id} className="flex flex-wrap items-center gap-2 border-t border-white/5 pt-2 text-sm">
+          {p.source === 'stand' && p.imageUrl && <img src={p.imageUrl} alt={`${t('Vista previa del premio', 'Prize preview')} ${p.name}`} className="w-10 h-10 object-contain" />}
+          <span className="flex-1">{p.name} <span className="text-xs text-textSub">{p.source === 'kivly' ? 'Kivly' : 'STAND'}</span></span>
+          {p.source === 'stand' && <label className={`${action} cursor-pointer`}>{p.imageKey ? t('Cambiar imagen', 'Change image') : t('Imagen opcional', 'Optional image')}
             <input type="file" accept="image/png" className="sr-only" aria-label={`${t('Imagen de', 'Image for')} ${p.name}`} onChange={(e) => {
               const file = e.target.files?.[0]; if (file) void chooseImage(p, file)
             }} />
+          </label>}
+          <label className="flex items-center gap-2 text-xs">
+            Y
+            <input type="number" min={1} max={1000} value={p.stockTotal} className={`${field} w-20`}
+              aria-label={`${t('Inventario total Y de', 'Total stock Y for')} ${p.name}`}
+              onChange={(e) => change({ ...program, catalog: program.catalog.map((item) =>
+                item.id === p.id ? { ...item, stockTotal: e.target.valueAsNumber } : item) })} />
           </label>
-          {p.imageKey && <button type="button" className="text-textSub underline" aria-label={`${t('Quitar imagen de', 'Remove image for')} ${p.name}`}
+          <span className="text-xs text-textSub">{t('restan', 'left')} {data.inventory.find((item) => item.prizeId === p.id)?.remaining ?? p.stockTotal}</span>
+          {p.source === 'stand' && p.imageKey && <button type="button" className="text-textSub underline" aria-label={`${t('Quitar imagen de', 'Remove image for')} ${p.name}`}
             onClick={() => change({ ...program, catalog: program.catalog.map((item) => item.id === p.id ? { ...item, imageKey: null, imageUrl: null } : item) })}>
             {t('Quitar imagen', 'Remove image')}
           </button>}
         </div>)}
-        <p className="text-xs text-textSub">{t('PNG, máx. 5 MB.', 'PNG, max. 5 MB.')}</p>
+        <p className="text-xs text-textSub">{t('Y es el stock del evento, compartido entre todas las reglas. Máximo 1.000. PNG, máx. 5 MB.', 'Y is the event stock shared by all rules. Maximum 1,000. PNG, max. 5 MB.')}</p>
       </div>
       <input className={`${field} w-full`} value={search} onChange={(e) => setSearch(e.target.value)}
         aria-label={t('Buscar premios', 'Search prizes')} placeholder={t('Buscar entre premios STAND y Kivly…', 'Search STAND and Kivly prizes…')} />
@@ -162,7 +186,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
             onChange={(e) => {
               const condition = e.target.value as StackPrizeCondition
               change({ ...program, rules: program.rules.map((r, i) => i === index
-                ? { id: newId(), condition, prizeIds: r.prizeIds, ...(condition.startsWith('top_') ? { topX: 10 } : {}) } : r) })
+                ? { ...r, id: newId(), condition, ...(condition.startsWith('top_') ? { topX: 10 } : {}) } : r) })
             }}>
             {conditions.filter((c) => c !== 'raffle' || raffles || rule.condition === 'raffle').map((c) => <option key={c} value={c}>{label(c)}</option>)}
           </select>
@@ -172,18 +196,38 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
           </label>}
           <button type="button" className="text-textSub underline" onClick={() => change({ ...program, rules: program.rules.filter((_, i) => i !== index) })}>{t('Quitar regla', 'Remove rule')}</button>
         </div>
-        <p className="text-sm">{t('entregar', 'deliver')} {rule.prizeIds.length === 0 && <span className="text-textSub">{t('— selecciona uno o varios premios', '— select one or more prizes')}</span>}</p>
+        <label className="flex items-center gap-2 text-sm">
+          {t('Agrupar premios', 'Prize grouping')}
+          <select className={field} aria-label={`${t('Agrupación', 'Grouping')} ${index + 1}`} value={rule.mode}
+            onChange={(e) => change({ ...program, rules: program.rules.map((r, i) => i === index
+              ? { ...r, id: newId(), mode: e.target.value as StackPrizeProgram['rules'][number]['mode'] } : r) })}>
+            <option value="all">{t('Y · entregar todos', 'AND · award all')}</option>
+            <option value="random_one">{t('O · elegir uno al azar', 'OR · choose one at random')}</option>
+          </select>
+        </label>
+        <p className="text-sm">{t('Premios por ganador', 'Prizes per winner')} {rule.allocations.length === 0 && <span className="text-textSub">{t('— selecciona uno o varios premios', '— select one or more prizes')}</span>}</p>
         <div className="flex flex-wrap gap-2">
-          {rule.prizeIds.map((id) => {
-            const p = program.catalog.find((item) => item.id === id)
-            return <button type="button" key={id} className="rounded-full border border-primary/30 px-3 py-1 text-sm"
-              aria-label={`${t('Quitar premio', 'Remove prize')} ${p?.name}`}
-              onClick={() => change({ ...program, rules: program.rules.map((r, i) => i === index ? { ...r, id: newId(), prizeIds: r.prizeIds.filter((pid) => pid !== id) } : r) })}>
-              {p?.name} · {p?.source === 'kivly' ? 'Kivly' : 'STAND'}
-            </button>
+          {rule.allocations.map((allocation) => {
+            const p = program.catalog.find((item) => item.id === allocation.prizeId)
+            return <div key={allocation.prizeId} className="flex items-center gap-2 rounded-full border border-primary/30 px-3 py-1 text-sm">
+              <button type="button" aria-label={`${t('Quitar premio', 'Remove prize')} ${p?.name}`}
+                onClick={() => change({ ...program, rules: program.rules.map((r, i) => i === index ? {
+                  ...r, id: newId(), allocations: r.allocations.filter((item) => item.prizeId !== allocation.prizeId),
+                } : r) })}>
+                {p?.name} · {p?.source === 'kivly' ? 'Kivly' : 'STAND'}
+              </button>
+              <label className="flex items-center gap-1 text-xs">X
+                <input type="number" min={1} max={10} value={allocation.quantity} className={`${field} w-16`}
+                  aria-label={`${t('Cantidad X por ganador de', 'Quantity X per winner for')} ${p?.name}`}
+                  onChange={(e) => change({ ...program, rules: program.rules.map((r, i) => i === index ? {
+                    ...r, id: newId(), allocations: r.allocations.map((item) => item.prizeId === allocation.prizeId
+                      ? { ...item, quantity: e.target.valueAsNumber } : item),
+                  } : r) })} />
+              </label>
+            </div>
           })}
         </div>
-        <select className={`${field} w-full`} aria-label={`${t('Añadir premio a regla', 'Add prize to rule')} ${index + 1}`} value="" disabled={rule.prizeIds.length >= 8}
+        <select className={`${field} w-full`} aria-label={`${t('Añadir premio a regla', 'Add prize to rule')} ${index + 1}`} value="" disabled={rule.allocations.length >= 8}
           onChange={(e) => {
             const selected = available.find((item) => item.id === e.target.value)
             if (!selected) return
@@ -191,21 +235,22 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
             if (!existing && program.catalog.length >= 32) return
             const p = existing ? selected : { ...selected, id: newId() }
             change({ ...program, catalog: existing ? program.catalog : [...program.catalog, p],
-              rules: program.rules.map((r, i) => i === index ? { ...r, id: newId(), prizeIds: [...r.prizeIds, p.id] } : r) })
+              rules: program.rules.map((r, i) => i === index ? { ...r, id: newId(),
+                allocations: [...r.allocations, { prizeId: p.id, quantity: 1 }] } : r) })
           }}>
           <option value="">{t('Seleccionar premio…', 'Select prize…')}</option>
           {(['stand', 'kivly'] as const).map((source) => <optgroup key={source} label={source === 'stand' ? 'STAND · QR' : 'Kivly · Wallet'}>
-            {available.filter((p) => p.source === source && !rule.prizeIds.includes(p.id) && p.name.toLowerCase().includes(search.toLowerCase())).map((p) =>
+            {available.filter((p) => p.source === source && !rule.allocations.some((item) => item.prizeId === p.id) && p.name.toLowerCase().includes(search.toLowerCase())).map((p) =>
               <option key={p.id} value={p.id} disabled={program.catalog.length >= 32 && !program.catalog.some((item) => item.id === p.id)}>{p.name}</option>)}
           </optgroup>)}
         </select>
-        {rule.prizeIds.length > 0 && <button type="button" className="text-xs text-textSub underline"
-          onClick={() => change({ ...program, rules: program.rules.map((r, i) => i === index ? { ...r, id: newId(), prizeIds: [] } : r) })}>
+        {rule.allocations.length > 0 && <button type="button" className="text-xs text-textSub underline"
+          onClick={() => change({ ...program, rules: program.rules.map((r, i) => i === index ? { ...r, id: newId(), allocations: [] } : r) })}>
           {t('Vaciar selección', 'Clear selection')}
         </button>}
       </section>)}
       <button type="button" className={action} disabled={program.rules.length >= 8} onClick={() => change({ ...program,
-        rules: [...program.rules, { id: newId(), condition: 'completed', prizeIds: [] }] })}>{t('Añadir regla', 'Add rule')}</button>
+        rules: [...program.rules, { id: newId(), condition: 'completed', mode: 'all', allocations: [] }] })}>{t('Añadir regla', 'Add rule')}</button>
       <label className="block space-y-2 text-sm">
         <span>{t('Web oficial del club Kivly', 'Official Kivly club website')}</span>
         <input type="url" aria-label={t('Web oficial del club Kivly', 'Official Kivly club website')} className={`${field} w-full`} value={program.storefrontUrl} placeholder="https://tu-negocio.kivly.store"
@@ -213,7 +258,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         <span className="block text-xs text-textSub">{t('Solo el origen del negocio, sin /add-to-wallet ni identificadores de clientes.',
           'Only the business origin, without /add-to-wallet or customer identifiers.')}</span>
       </label>
-      <button type="button" className={`${action} w-full font-semibold`} disabled={program.rules.some((r) => r.prizeIds.length === 0) || (!dirty && data.enabled)}
+      <button type="button" className={`${action} w-full font-semibold`} disabled={invalidProgram || (!dirty && data.enabled)}
         onClick={() => void save()}>{busy ? t('Guardando…', 'Saving…') : t('Guardar reglas de premios', 'Save prize rules')}</button>
     </fieldset>
     {data.enabled && <section className="border-t border-white/10 pt-4 space-y-3">
@@ -251,8 +296,26 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
           confirmed: t('Asignado en Kivly', 'Assigned in Kivly'),
           reconciliation_required: t('Requiere comprobación', 'Verification required'),
           connection_required: t('Revisar conexión Kivly', 'Check Kivly connection'),
-        })[a.state]}{a.lastError && <span className="block text-amber-300">{a.lastError}</span>}</span>
+        })[a.state]}{a.lastError && <span className="block text-amber-300">
+          {a.lastError} · {({
+            connection: t('conexión', 'connection'),
+            pre_earn_lookup: t('consulta previa', 'pre-assignment lookup'),
+            earn: t('asignación', 'assignment'),
+            post_earn_lookup: t('verificación', 'verification'),
+          } as Record<string, string>)[a.lastErrorStage ?? ''] ?? a.lastErrorStage}
+          {a.lastErrorHttpStatus ? ` · HTTP ${a.lastErrorHttpStatus}` : ''}
+        </span>}</span>
       </div>)}
+    </section>}
+    {data.allocations.length > 0 && <section className="space-y-2 border-t border-white/10 pt-4">
+      <h3 className="font-semibold">{t('Reparto de premios', 'Prize allocation')}</h3>
+      {data.allocations.map((allocation, index) => <p key={`${allocation.ruleId}-${allocation.playerId}-${index}`} className="text-sm text-textSub">
+        #{allocation.playerId} · {allocation.state === 'out_of_stock'
+        ? t('sin stock disponible', 'no stock available')
+        : allocation.state === 'not_eligible'
+          ? t('no cumple el límite de posición del premio', 'does not meet the prize rank limit')
+          : allocation.awarded.map((item) => `${item.quantity} × ${item.name}`).join(', ')}
+      </p>)}
     </section>}
   </div>
 }

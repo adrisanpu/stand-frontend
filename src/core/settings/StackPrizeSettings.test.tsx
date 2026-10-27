@@ -12,10 +12,11 @@ vi.mock('../../api/prizeMedia', async (importOriginal) => ({
   uploadPrizeImage: vi.fn(), validatePrizeImage: vi.fn(),
 }))
 const response: StackPrizeSettingsResponse = {
-  ok: true, enabled: true, state: 'open', pendingPlayers: [], awards: [],
-  program: { version: 1, storefrontUrl: 'https://club.kivly.store', catalog: [
-    { id: 'pizza', source: 'stand', name: 'Pizza', limit: null },
-  ], rules: [{ id: 'done', condition: 'completed', prizeIds: ['pizza'] }] },
+  ok: true, enabled: true, state: 'open', pendingPlayers: [], awards: [], allocations: [],
+  inventory: [{ prizeId: 'pizza', total: 100, remaining: 100 }],
+  program: { version: 2, storefrontUrl: 'https://club.kivly.store', catalog: [
+    { id: 'pizza', source: 'stand', name: 'Pizza', limit: null, stockTotal: 100 },
+  ], rules: [{ id: 'done', condition: 'completed', mode: 'all', allocations: [{ prizeId: 'pizza', quantity: 1 }] }] },
 }
 beforeEach(() => {
   vi.clearAllMocks()
@@ -44,10 +45,13 @@ it('adds a Kivly reward to the same textual rule as a STAND prize', async () => 
   await waitFor(() => expect(onPersist).toHaveBeenCalledTimes(1))
   const saved = vi.mocked(stackPrizeApi.save).mock.calls[0][1]
   const reward = saved.catalog.find((p) => p.source === 'kivly')!
-  expect(saved.rules[0].prizeIds).toEqual(['pizza', reward.id])
+  expect(saved.rules[0].allocations).toEqual([
+    { prizeId: 'pizza', quantity: 1 }, { prizeId: reward.id, quantity: 1 },
+  ])
   expect(saved.rules[0].id).not.toBe('done')
   expect(reward.id.length).toBeLessThanOrEqual(80)
   expect(reward).toMatchObject({ rewardId: 'coffee', locationId: 'loc', source: 'kivly' })
+  expect(reward.stockTotal).toBe(100)
 })
 
 it('adds a local STAND prize without creating anything in Kivly', async () => {
@@ -58,8 +62,23 @@ it('adds a local STAND prize without creating anything in Kivly', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
   await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalled())
   expect(vi.mocked(stackPrizeApi.save).mock.calls[0][1].catalog).toEqual(expect.arrayContaining([
-    expect.objectContaining({ source: 'stand', name: 'Bebida' }),
+    expect.objectContaining({ source: 'stand', name: 'Bebida', stockTotal: 100 }),
   ]))
+})
+
+it('configures AND/OR, winner quantity X and shared event stock Y', async () => {
+  mount()
+  await screen.findByText('Reglas de premios')
+  fireEvent.change(screen.getByLabelText('Cantidad X por ganador de Pizza'), { target: { value: '3' } })
+  fireEvent.change(screen.getByLabelText('Inventario total Y de Pizza'), { target: { value: '8' } })
+  fireEvent.change(screen.getByLabelText('Agrupación 1'), { target: { value: 'random_one' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
+  await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalled())
+  const saved = vi.mocked(stackPrizeApi.save).mock.calls[0][1]
+  expect(saved.rules[0]).toMatchObject({
+    mode: 'random_one', allocations: [{ prizeId: 'pizza', quantity: 3 }],
+  })
+  expect(saved.catalog[0].stockTotal).toBe(8)
 })
 
 it('offers both distinct ranking conditions and requires a prize on every rule', async () => {
