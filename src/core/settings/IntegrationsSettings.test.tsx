@@ -1,118 +1,110 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { kivlyApi } from '../../api/kivlyApi'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { kivlyApi, type KivlyAccountConnection } from '../../api/kivlyApi'
 import IntegrationsSettings from './IntegrationsSettings'
 
 vi.mock('../../api/kivlyApi', () => ({
-  kivlyApi: {
-    getAccountConnection: vi.fn(),
-    connectAccount: vi.fn(),
-    disconnectAccount: vi.fn(),
-    saveClubSettings: vi.fn(),
-  },
+  kivlyApi: { getAccountConnection: vi.fn(), connectAccount: vi.fn(), disconnectAccount: vi.fn(), saveClubSettings: vi.fn() },
 }))
-
-afterEach(() => {
-  cleanup()
+const connected: KivlyAccountConnection = {
+  connected: true, locationId: 'loc', locations: [{ id: 'loc', name: 'Test club' }],
+}
+beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(kivlyApi.saveClubSettings).mockResolvedValue()
+  vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue(connected)
 })
-
-describe('IntegrationsSettings', () => {
-  it('explains when the account endpoint is missing from the backend', async () => {
-    vi.mocked(kivlyApi.getAccountConnection).mockRejectedValue(Object.assign(new Error('Not found'), { status: 404 }))
-    render(<IntegrationsSettings onBack={vi.fn()} onClose={vi.fn()} />)
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Despliega la versión del backend')
-    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
+afterEach(cleanup)
+async function mount(state = 'Conectado') {
+  render(<IntegrationsSettings onBack={vi.fn()} onClose={vi.fn()} />)
+  await screen.findByText(state)
+  fireEvent.click(screen.getByAltText('Kivly').closest('summary')!)
+}
+it('explains a missing backend endpoint and offers a status check', async () => {
+  vi.mocked(kivlyApi.getAccountConnection).mockRejectedValue(Object.assign(new Error('Missing'), { status: 404 }))
+  render(<IntegrationsSettings onBack={vi.fn()} onClose={vi.fn()} />)
+  expect(await screen.findByRole('alert')).toHaveTextContent('Despliega la versión del backend')
+  expect(screen.getByRole('button', { name: 'Comprobar conexión' })).toBeInTheDocument()
+})
+it('connects and saves default club settings without retaining credentials', async () => {
+  vi.mocked(kivlyApi.getAccountConnection)
+    .mockResolvedValueOnce({ connected: false, locationId: null, locations: [] }).mockResolvedValue(connected)
+  vi.mocked(kivlyApi.connectAccount).mockResolvedValue(false)
+  await mount('Desconectado')
+  fireEvent.change(screen.getByLabelText('client_id'), { target: { value: 'id' } })
+  fireEvent.change(screen.getByLabelText('client_secret'), { target: { value: 'secret' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Conectar Kivly' }))
+  await waitFor(() => expect(kivlyApi.connectAccount).toHaveBeenCalledWith('id', 'secret'))
+  await screen.findByText('Conexión actualizada.')
+  expect(kivlyApi.saveClubSettings).toHaveBeenCalledWith({
+    clubName: 'Test club', privacyUrl: `${window.location.origin}/pages/privacy-es.html`,
+    termsUrl: `${window.location.origin}/pages/legal.html`,
   })
-
-  it('connects Kivly with credentials without retaining them in the form', async () => {
-    vi.mocked(kivlyApi.getAccountConnection)
-      .mockResolvedValueOnce({ connected: false, locationId: null, locations: [] })
-      .mockResolvedValueOnce({
-        connected: true,
-        locationId: 'location-1', locations: [{ id: 'location-1', name: 'Test club' }],
-      })
-    vi.mocked(kivlyApi.connectAccount).mockResolvedValue(false)
-    render(<IntegrationsSettings onBack={vi.fn()} onClose={vi.fn()} />)
-
-    await screen.findByText('Desconectado')
-    const toggle = screen.getByRole('switch', { name: 'Activar integración Kivly' })
-    expect(toggle).not.toBeChecked()
-    fireEvent.click(toggle)
-    expect(toggle).toBeChecked()
-    fireEvent.change(screen.getByLabelText('client_id'), { target: { value: 'client-id' } })
-    fireEvent.change(screen.getByLabelText('client_secret'), { target: { value: 'client-secret' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Conectar Kivly' }))
-
-    await waitFor(() => expect(kivlyApi.connectAccount).toHaveBeenCalledWith('client-id', 'client-secret'))
-    expect(await screen.findByText('Conectado')).toBeInTheDocument()
-    expect(screen.queryByLabelText('client_id')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('client_secret')).not.toBeInTheDocument()
-    expect(screen.getByText('Test club')).toBeInTheDocument()
-    expect(screen.getByLabelText('location_id')).toHaveValue('location-1')
-    expect(screen.getByLabelText('Nombre del club')).toHaveValue('Test club')
-    expect(screen.getByLabelText('URL de privacidad')).toHaveValue(`${window.location.origin}/pages/privacy-es.html`)
-    expect(screen.getByLabelText('URL de condiciones')).toHaveValue(`${window.location.origin}/pages/legal.html`)
+  expect(screen.queryByLabelText('client_secret')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('location_id')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Nombre del club')).not.toBeInTheDocument()
+})
+it('shows a compact connected entry without credential editing', async () => {
+  await mount()
+  expect(screen.getByText('Test club')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Cambiar credenciales' })).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Acceder a Kivly' })).toHaveAttribute('href', 'https://getkivly.com/auth/login')
+  expect(kivlyApi.connectAccount).not.toHaveBeenCalled()
+})
+it('saves the shared storefront without overwriting existing legal settings', async () => {
+  vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
+    ...connected, clubSettings: { clubName: 'Saved', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms' },
   })
-
-  it('restores the saved location when opening an already connected account', async () => {
-    vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
-      connected: true,
-      locationId: 'saved-location', locations: [{ id: 'saved-location', name: 'Saved club' }],
-    })
-    render(<IntegrationsSettings onBack={vi.fn()} onClose={vi.fn()} />)
-    expect(await screen.findByText('Saved club')).toBeInTheDocument()
-    expect(screen.getByLabelText('location_id')).toHaveAttribute('readonly')
-    expect(kivlyApi.connectAccount).not.toHaveBeenCalled()
+  await mount()
+  fireEvent.change(screen.getByLabelText('Web oficial del club Kivly'), { target: { value: 'https://club.kivly.store' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar web del club' }))
+  await screen.findByText('Web del club guardada para todos tus STACK.')
+  expect(kivlyApi.saveClubSettings).toHaveBeenCalledWith({
+    clubName: 'Saved', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms', storefrontUrl: 'https://club.kivly.store',
   })
-
-  it('saves shared club details from home without reconnecting', async () => {
-    vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
-      connected: true, locationId: 'location-1',
-      locations: [{ id: 'location-1', name: 'Club' }],
-      clubSettings: { clubName: 'Saved club', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms' },
-    })
-    vi.mocked(kivlyApi.saveClubSettings).mockResolvedValue()
-    render(<IntegrationsSettings onBack={vi.fn()} onClose={vi.fn()} />)
-    await screen.findByText('Datos del club')
-    expect(screen.getByLabelText('Nombre del club')).toHaveValue('Saved club')
-    fireEvent.change(screen.getByLabelText('Nombre del club'), { target: { value: 'Updated club' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar club', hidden: true }))
-    expect(await screen.findByText('Club guardado para tus juegos.')).toBeInTheDocument()
-    expect(kivlyApi.saveClubSettings).toHaveBeenCalledWith({
-      clubName: 'Updated club', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms',
-    })
-    expect(kivlyApi.connectAccount).not.toHaveBeenCalled()
-  })
-
-  it('clears edited credentials when cancelling', async () => {
-    vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
-      connected: true, locationId: 'location-1', locations: [{ id: 'location-1', name: 'Club' }],
-    })
-    render(<IntegrationsSettings onBack={vi.fn()} onClose={vi.fn()} />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Cambiar credenciales' }))
-    fireEvent.change(screen.getByLabelText('client_id'), { target: { value: 'new-id' } })
-    fireEvent.change(screen.getByLabelText('client_secret'), { target: { value: 'new-secret' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Cambiar credenciales' }))
-    expect(screen.getByLabelText('client_id')).toHaveValue('')
-    expect(screen.getByLabelText('client_secret')).toHaveValue('')
-    expect(kivlyApi.connectAccount).not.toHaveBeenCalled()
-  })
-
-  it('requires confirmation before disconnecting the shared account', async () => {
-    vi.mocked(kivlyApi.getAccountConnection)
-      .mockResolvedValueOnce({
-        connected: true, locationId: 'location-1', locations: [{ id: 'location-1', name: 'Club' }],
-      })
-      .mockResolvedValueOnce({ connected: false, locationId: null, locations: [] })
-    vi.mocked(kivlyApi.disconnectAccount).mockResolvedValue(false)
-    render(<IntegrationsSettings onBack={vi.fn()} onClose={vi.fn()} />)
-    fireEvent.click(await screen.findByRole('switch', { name: 'Activar integración Kivly' }))
-    expect(kivlyApi.disconnectAccount).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar desconexión' }))
-    expect(await screen.findByText('Desconectado')).toBeInTheDocument()
-    expect(kivlyApi.disconnectAccount).toHaveBeenCalledOnce()
-  })
+})
+it('clears unsent credentials when the entry is collapsed', async () => {
+  vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({ connected: false, locationId: null, locations: [] })
+  await mount('Desconectado')
+  fireEvent.change(screen.getByLabelText('client_secret'), { target: { value: 'secret' } })
+  const details = screen.getByAltText('Kivly').closest('details')!
+  details.open = false
+  fireEvent(details, new Event('toggle'))
+  details.open = true
+  expect(screen.getByLabelText('client_secret')).toHaveValue('')
+})
+it('saves an explicit empty storefront when clearing the shared wallet link', async () => {
+  const clubSettings = {
+    clubName: 'Saved', privacyUrl: 'https://club.test/privacy', termsUrl: 'https://club.test/terms',
+    storefrontUrl: 'https://club.kivly.store',
+  }
+  vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({ ...connected, clubSettings })
+  await mount()
+  fireEvent.change(screen.getByLabelText('Web oficial del club Kivly'), { target: { value: '   ' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar web del club' }))
+  await screen.findByText('Web del club guardada para todos tus STACK.')
+  expect(kivlyApi.saveClubSettings).toHaveBeenCalledWith({ ...clubSettings, storefrontUrl: '' })
+  expect(screen.getByLabelText('Web oficial del club Kivly')).toHaveValue('')
+})
+it('requires confirmation before disconnecting all STACK games', async () => {
+  await mount()
+  vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({ connected: false, locationId: null, locations: [] })
+  fireEvent.click(screen.getByRole('button', { name: 'Desconectar' }))
+  expect(kivlyApi.disconnectAccount).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar desconexión' }))
+  await screen.findByText('Desconectado')
+  expect(kivlyApi.disconnectAccount).toHaveBeenCalledOnce()
+})
+it('reports failed automatic club setup without reporting successful completion', async () => {
+  vi.mocked(kivlyApi.getAccountConnection)
+    .mockResolvedValueOnce({ connected: false, locationId: null, locations: [] }).mockResolvedValue(connected)
+  vi.mocked(kivlyApi.saveClubSettings).mockRejectedValueOnce(new Error('Unavailable'))
+  await mount('Desconectado')
+  fireEvent.change(screen.getByLabelText('client_id'), { target: { value: 'id' } })
+  fireEvent.change(screen.getByLabelText('client_secret'), { target: { value: 'secret' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Conectar Kivly' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Kivly está conectado, pero no se pudo guardar')
+  expect(screen.queryByText('Conexión actualizada.')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar web del club' }))
+  await screen.findByText('Web del club guardada para todos tus STACK.')
 })

@@ -14,11 +14,12 @@ import ResultView from './ResultView'
 import T1merParticipantPlay from '../../games/t1mer/ParticipantPlay'
 import T1merParticipantResult from '../../games/t1mer/ParticipantResult'
 import StackParticipantPlay from '../../games/stack/ParticipantPlay'
-import StackPrizeSummary from '../../games/stack/StackPrizeSummary'
+import StackPrizePromo from '../../games/stack/StackPrizePromo'
 import ImpostorParticipantPlay from '../../games/impostor/ParticipantPlay'
 import Rulet4ParticipantPlay from '../../games/rulet4/ParticipantPlay'
 import { isRulet4Assignment, type Rulet4Assignment } from '../../games/rulet4/rulet4Logic'
 import { ParticipantLanguageProvider, ParticipantLanguageSelector, useParticipantLanguage } from './participantLanguage'
+import './participant.css'
 
 type Empareja2Step = 'loading' | 'unsupported' | 'join' | 'assignment' | 'validate' | 'result'
 type T1merStep = 'loading' | 'unsupported' | 'join' | 'play' | 'result'
@@ -48,6 +49,37 @@ export default function ParticipantShell() {
 }
 
 function ParticipantContent() {
+  const viewportRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const element = viewportRef.current
+    if (!element) return
+    const viewport = window.visualViewport
+    let frame = 0
+    const update = () => {
+      if (viewport && viewport.scale !== 1) return
+      const height = viewport?.height ?? window.innerHeight
+      element.style.setProperty('--play-viewport-height', `${height}px`)
+      element.dataset.keyboard = String(height < window.innerHeight * 0.8)
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const active = document.activeElement
+        if (active instanceof HTMLElement && element.contains(active)
+          && active.matches('input:not([type="checkbox"]):not([type="file"]), textarea')) {
+          active.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+        }
+      })
+    }
+    update()
+    window.addEventListener('resize', update)
+    viewport?.addEventListener('resize', update)
+    element.addEventListener('focusin', update)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('resize', update)
+      viewport?.removeEventListener('resize', update)
+      element.removeEventListener('focusin', update)
+    }
+  }, [])
   const { language, t } = useParticipantLanguage()
   const { gameId = '' } = useParams()
   const [step, setStep] = useState<Step>('loading')
@@ -74,7 +106,7 @@ function ParticipantContent() {
   const logo = currentGameMeta ? currentGameMeta.clientLogoUrl || game?.assets?.logo : undefined
   const isMobile = gameMeta && WEB_PLAY_TYPES.has(gameType)
     ? resolveGameAccess(gameType, gameMeta).playMode === 'mobile' : false
-  const hasPrizeCatalog = currentGameMeta?.prizeCatalog !== undefined
+  const hasPrizeCatalog = currentGameMeta?.prizeCatalog !== undefined || currentGameMeta?.stackPrizeRules !== undefined
 
   const refreshPrizes = useCallback(async () => {
     try {
@@ -82,7 +114,7 @@ function ParticipantContent() {
       if (activeGameId.current !== gameId) return
       if (!meta.ok || meta.gameId !== gameId) throw new Error('Invalid game metadata')
       setGameMeta((previous) => previous?.gameId === gameId
-        ? { ...previous, prizeCatalog: meta.prizeCatalog }
+        ? { ...previous, prizeCatalog: meta.prizeCatalog, stackPrizeRules: meta.stackPrizeRules, stackPrizeState: meta.stackPrizeState }
         : previous)
       setPrizeRefreshFailed(false)
     } catch {
@@ -219,23 +251,22 @@ function ParticipantContent() {
   return (
     <ThemeProvider game={game ?? null} appearance={gameMeta?.appearance}>
       <div
+        ref={viewportRef}
         lang={language}
-        className="min-h-dvh bg-club text-textMain font-sans px-4 py-6"
-        style={gameType === 'STACK' ? {
-          paddingTop: 'max(1.5rem, env(safe-area-inset-top, 0px))',
-          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
-        } : undefined}
+        className="play-shell bg-club text-textMain font-sans"
       >
         <div className="relative mx-auto max-w-md w-full flex flex-col">
-          <ParticipantPrizePromo catalog={currentGameMeta?.prizeCatalog} stickers />
+          {gameType === 'STACK' && gameMeta?.stackPrizeRules
+            ? <StackPrizePromo rules={gameMeta.stackPrizeRules} />
+            : <ParticipantPrizePromo catalog={currentGameMeta?.prizeCatalog} stickers />}
           <div className="relative w-full">
           <ParticipantLanguageSelector />
-        <div className="card relative w-full p-6 pt-14 space-y-5">
+        <div className="play-card card relative w-full">
           {logo && (
             <img
               src={logo}
               alt={currentGameMeta?.clientLogoUrl ? t('Logo del cliente') : game?.name}
-              className="mx-auto h-32 w-auto max-w-full object-contain"
+              className="play-logo mx-auto w-auto max-w-full object-contain"
             />
           )}
           {prizeRefreshFailed && (
@@ -251,7 +282,6 @@ function ParticipantContent() {
               {t('No se pudo guardar la foto; se muestra el avatar genérico.')}
             </p>
           )}
-          {gameMeta?.stackPrizeRules && <StackPrizeSummary rules={gameMeta.stackPrizeRules} />}
           {step === 'loading' && <p className="text-center text-textSub">{t('Cargando...')}</p>}
           {step === 'unsupported' && (
             <div className="text-center space-y-2">

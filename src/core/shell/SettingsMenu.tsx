@@ -3,6 +3,7 @@ import Raffle from '../widgets/Raffle'
 import Quiz from '../widgets/Quiz'
 import AppearanceSettings from '../settings/AppearanceSettings'
 import IntegrationsSettings from '../settings/IntegrationsSettings'
+import StackCloseSettings from '../settings/StackCloseSettings'
 import GamePlayersSettings from '../settings/GamePlayersSettings'
 import { useKivlyDraft } from '../settings/KivlySettings'
 import OperatorPrizeSettings from '../settings/OperatorPrizeSettings'
@@ -69,6 +70,8 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   /** tras 1er clic en «Terminar el juego» mostramos el aviso irreversible; 2º clic continúa */
   const [terminateIrreversibleAck, setTerminateIrreversibleAck] = useState(false)
   const [isTerminating, setIsTerminating] = useState(false)
+  const closingBusyRef = useRef(false)
+  closingBusyRef.current = isTerminating
   const [terminateError, setTerminateError] = useState<string | null>(null)
   const [showExportQuiz, setShowExportQuiz] = useState(false)
   const [isExportingQuiz, setIsExportingQuiz] = useState(false)
@@ -155,6 +158,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         return true
       }
       if (s.showExitConfirm) {
+        if (closingBusyRef.current) return true
         setShowExitConfirm(false)
         setTerminateIrreversibleAck(false)
         return true
@@ -611,7 +615,9 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             </button>
             </div>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6">
+          <div className={gameDefinition.id === 'STACK'
+            ? 'flex-1 min-h-0 flex flex-col overflow-hidden px-6 pb-6'
+            : 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6'}>
             <OperatorPrizeSettings
               gameId={gameId}
               gameDefinition={gameDefinition}
@@ -831,6 +837,10 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     )
   }
 
+  if (showExitConfirm && gameId && (gameDefinition?.id ?? gameType)?.toUpperCase() === 'STACK') {
+    return <StackCloseSettings gameId={gameId} onBack={() => setShowExitConfirm(false)} onClose={onClose}
+      onLeave={onLeaveGame} onSavingChange={setIsTerminating} />
+  }
   if (showExitConfirm) {
     return (
       <div
@@ -1194,7 +1204,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </button>
               )}
 
-              {/* Salir: mismo texto en todos los juegos */}
               <button
                 onClick={() => {
                   setTerminateIrreversibleAck(false)
@@ -1208,7 +1217,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </svg>
                 </div>
                 <div className="text-left">
-                  <div className="font-medium">{t('Salir', 'Exit')}</div>
+                  <div className="font-medium">{(gameDefinition?.id ?? gameType)?.toUpperCase() === 'STACK' ? t('Cerrar juego', 'Close game') : t('Salir', 'Exit')}</div>
                 </div>
                 <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

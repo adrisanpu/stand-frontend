@@ -30,7 +30,10 @@ it('does not show a QR for an already collected prize', () => {
 })
 it('opens the official wallet page without requiring a reward', () => {
   render(<StackWallet url={data.walletUrl} />)
-  expect(screen.getByRole('link', { name: 'Añadir a mi wallet' })).toHaveAttribute('href', data.walletUrl)
+  const wallet = screen.getByRole('link', { name: 'Añadir a mi wallet y desbloquear mi premio' })
+  expect(wallet).toHaveAttribute('href', data.walletUrl)
+  expect(wallet).toHaveClass('wallet-highlight')
+  expect(wallet.querySelector('svg')).not.toBeNull()
 })
 it('rejects a wallet link outside the official Kivly storefront', () => {
   render(<StackWallet url="https://kivly.store.attacker.test/add-to-wallet" />)
@@ -45,6 +48,6 @@ it('explains an unavailable wallet instead of silently hiding an expected club c
 it('translates the wallet and award states to English', () => {
   render(<ParticipantLanguageProvider><ParticipantLanguageSelector /><StackWallet url={data.walletUrl} /><StackAwardList data={data} /></ParticipantLanguageProvider>)
   fireEvent.change(screen.getByLabelText('Idioma'), { target: { value: 'en' } })
-  expect(screen.getByRole('link', { name: 'Add to my wallet' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Add to my wallet and unlock my prize' })).toBeInTheDocument()
   expect(screen.getByText('Your prizes')).toBeInTheDocument()
 })

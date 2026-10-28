@@ -15,9 +15,10 @@ import { DEFAULT_STACK_CONFIG } from '../../games/stack/stackLogic'
 import { GAME_ACCESS_CAPABILITIES } from './gameAccess'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn(), post: vi.fn() } }))
+vi.mock('../../games/stack/BlockPreview', () => ({ default: () => <div data-testid="block-preview" /> }))
 vi.mock('../../api/kivlyApi', () => ({
   kivlyApi: {
-    getAccountConnection: vi.fn(), getReward: vi.fn(), listRewards: vi.fn(), saveReward: vi.fn(),
+    getAccountConnection: vi.fn(), listRewards: vi.fn(),
   },
 }))
 
@@ -33,9 +34,7 @@ function gameResponse(game: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({ connected: false, locationId: null, locations: [] })
-  vi.mocked(kivlyApi.getReward).mockResolvedValue(null)
   vi.mocked(kivlyApi.listRewards).mockResolvedValue([])
-  vi.mocked(kivlyApi.saveReward).mockResolvedValue(undefined)
   vi.mocked(api.get).mockImplementation(async (url: string) => {
     if (url.startsWith('/v1/game/infocards')) return { ok: true, cards: [{ id: 'c1', title: 'Hola', body: 'Texto', order: 0 }] }
     return gameResponse()
@@ -141,7 +140,6 @@ describe('unified game configuration save', () => {
     vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
       connected: true, locationId: 'location1', locations: [{ id: 'location1', name: 'Club' }], clubSettings,
     })
-    vi.mocked(kivlyApi.getReward).mockResolvedValue({ id: 'reward-1', name: 'Coffee' })
     vi.mocked(kivlyApi.listRewards).mockResolvedValue([
       { id: 'reward-1', name: 'Coffee' }, { id: 'reward-2', name: 'Tea' },
     ])
@@ -149,7 +147,7 @@ describe('unified game configuration save', () => {
     await waitFor(() => expect(footer()).toBeEnabled())
     fireEvent.click(footer())
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
-    expect(kivlyApi.saveReward).not.toHaveBeenCalled()
+    expect(vi.mocked(api.put).mock.calls.every(([path]) => !path.includes('kivly'))).toBe(true)
   })
 
   it('allows saving game rules when the read-only Kivly indicator cannot load', async () => {

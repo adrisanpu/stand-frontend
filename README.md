@@ -146,19 +146,45 @@ Final email registration sends only `{ gameId, challengeId, code }` to `/v1/publ
 
 ### Kivly: connection and player registration
 
-The STACK prize configurator groups catalog stock and award rules into two
-numbered steps, with compact responsive prize cards and separate QR/club
-delivery labels. Each rule explains whether it awards every selected prize or
-one random option; units per winner and shared event stock remain independent.
-Available stock previews draft total-stock changes without saving them. Explicit
-remove controls, an unsaved-changes indicator and a sticky save action keep edits
-visible; saving, closure confirmations and allocation behavior are unchanged.
+The STACK prize configurator starts with **Catálogo e inventario**, followed by
+consecutive rules without search filters or diagnostic delivery panels. Create
+STAND prizes locally; Kivly rewards are created on Kivly's website and selected
+from its existing catalog. Each rule contains alternative **OR groups**, with
+**AND prizes** inside each group. Choose uniformly among groups with some
+available stock, then deliver the available units of the chosen group.
+Fully exhausted groups are excluded; quantities and shared stock remain
+independent. Changes stay drafts until the sticky save action succeeds.
 
-Home settings > **Integraciones** connects one Kivly location per organizer and stores shared club details through `/v1/kivly`. This first release enables club registration only for **STACK**; other games do not require Kivly membership. Credentials are sent only to the authenticated backend, cleared from the form and never stored in the browser. Disconnecting requires confirmation and affects all the organizer's STACK games.
+Home settings > **Integraciones** is a compact list with a collapsible Kivly entry.
+Disconnected accounts show credentials and Connect; connected accounts show the
+local business, Disconnect, [Kivly login](https://getkivly.com/auth/login), and a
+shared club website field. New connections initialize club name and STAND legal
+links automatically; existing club details are preserved. The club website is
+shared across all the organizer's STACK games, separate from the login URL.
+Credentials are cleared and never stored in the browser. Disconnect requires
+confirmation. STACK shows only Connected/Not connected, not a demo mode;
+loading, errors and retries remain explicit. Other games do not require Kivly.
 
 When the backend publishes `loyalty` metadata, `/play` requires separate, explicit club consent. Its `consentVersion` is bound to the email challenge. The backend registers or reuses the customer only after email verification; unresolved registration blocks access without claiming success. Changed terms discard the challenge and require consent again. Legacy sessions rejected for missing club membership/consent return to registration.
 
-STACK settings show the Kivly connection indicator and, when the club setup is valid, can select one existing reward for everyone who finishes STACK, including zero scores. The choice saves with the shared game settings. After the server confirms the result, participants can check whether the reward is pending or confirmed and use only Apple/Google Wallet URLs returned by Kivly. The integration does not create rewards, redeem them, mark them used, or generate passes; uncertain assignments are not replayed automatically. Phone is shared with Kivly only when supplied for a new customer, never to overwrite an existing one. The reward/Wallet extension is local and pending review; real registration, reward, and Wallet effects still require separately authorized live tests.
+All games register in three steps: email, other data and consent, then email
+verification. The first step is local; code delivery starts only after the
+second step. Controls retain STAND branding and theme. Existing verification,
+expiry, resend and recovery protections remain in place.
+
+STACK keeps its piece selector and static 3D block preview visible, with speed
+and tolerance controls inside collapsed **Ajustes avanzados**. **Cerrar juego**
+unifies definitive closure and final prizes, allowing active attempts to finish;
+excluding pending attempts requires another confirmation. Promotional stickers
+slide through prize images/names: all prizes in `/play`, completion prizes in
+Players, ranking prizes in Ranking, raffle prizes in Raffle. They have pause/
+next controls and respect reduced motion. After a confirmed result, a compact
+official club-wallet action appears below the scene and before earned prizes.
+Earned cards show image/name and their individual STAND QR or delivery status,
+not the promotional carousel. Kivly assignment remains server-side; uncertain
+writes are not replayed. No passes or Kivly rewards are created or redeemed.
+Phone is shared only when supplied for a new customer. Live registration,
+reward and wallet effects still require separately authorized tests.
 
 After valid, active game metadata is loaded, an explicitly rejected saved participant session (`InvalidPlayerToken` or `PlayerNotFound`, HTTP 401/403/404) is cleared only for that game and returns to Web registration, requiring a new email code when configured. Network failures, throttling, server errors, unknown rejections and invalid game metadata retain the saved session and existing error/retry behavior.
 

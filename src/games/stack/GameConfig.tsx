@@ -5,6 +5,7 @@ import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/sett
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import { localizeOperatorMessage } from '../operatorText'
 import { DEFAULT_STACK_CONFIG, isStackConfig, STACK_SKINS, type StackConfig, type StackSkin } from './stackLogic'
+import BlockPreview from './BlockPreview'
 
 const FIELDS = [
   { key: 'initialSpeed', label: 'Velocidad inicial', min: 0.1, step: 0.1 },
@@ -104,7 +105,10 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
           {STACK_SKINS.map((skin) => <option key={skin} value={skin}>{t(SKIN_LABELS[skin], skin === 'blocks' ? 'Color blocks' : skin === 'pizza' ? 'Pizza' : 'Pistachio baklava')}</option>)}
         </select>
       </label>
-      <div className="grid grid-cols-2 gap-4">
+      <BlockPreview skin={config.skin ?? 'blocks'} />
+      <details className="rounded-xl border border-white/10 p-3">
+      <summary className="cursor-pointer text-sm font-medium">{t('Ajustes avanzados', 'Advanced settings')}</summary>
+      <div className="grid grid-cols-2 gap-4 pt-3">
         {FIELDS.map(({ key, label, min, step }) => (
           <label key={key} className="min-w-0 flex flex-col gap-1">
             <span className="text-sm">{t(label, key === 'initialSpeed' ? 'Initial speed' : key === 'speedIncrement' ? 'Increment per block' : key === 'maxSpeed' ? 'Maximum speed' : 'Perfect tolerance')}</span>
@@ -123,6 +127,7 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
           </label>
         ))}
       </div>
+      </details>
       {message && <p role={status === 'saved' ? 'status' : 'alert'} className="text-sm">{localizeOperatorMessage(message, t)}</p>}
       {!embedded && (
         <button

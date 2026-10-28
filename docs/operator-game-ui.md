@@ -28,12 +28,18 @@ Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas d
 
 ### Kivly: connection and registration
 
-Home settings > **Integraciones** owns the organizer-wide connection and club
-details. Connecting/changing credentials and disconnecting are immediate actions;
+Home settings > **Integraciones** is a compact list with one collapsible Kivly
+entry. Disconnected accounts show credentials and Connect; connected accounts
+show the business name, Disconnect, the fixed `https://getkivly.com/auth/login`
+link and the shared official club website field. There is no technical location
+field, credential editor or legal-settings editor. Initialize new club settings
+from the business name and STAND legal links; preserve existing legal data.
+Connecting and disconnecting are immediate actions;
 credentials are cleared on submission/cancellation and never stored in browser
 storage. The first release enables club registration only for STACK. Disconnect
 requires confirmation and affects all the organizer's STACK games.
-STACK settings show only a read-only logo/status and an explicit retry on errors.
+STACK settings show only a read-only logo with Connected/Not connected, never
+a demo mode, and an explicit retry on errors.
 An unavailable indicator must not block saving unrelated game rules.
 
 When public metadata includes `loyalty`, `/play` asks for separate club consent
@@ -41,41 +47,57 @@ and sends its version with the email-code request. Access opens only after the
 backend confirms verified registration. Changed terms require fresh consent;
 uncertain registration displays an error without granting access. STACK prize
 settings now own mixed STAND/Kivly rules; there is no separate completion-reward
-selector. After a confirmed result, show the official club wallet action before
-the game result and individual prize cards below it. Kivly assignments happen
+selector. After a confirmed result, show a compact official club wallet action
+below the game result and before individual prize cards. Kivly assignments happen
 server-side without returning to the result page. The feature does not generate
 passes, redeem Kivly rewards or mark them used; uncertain assignments are not
 automatically replayed. Installed-wallet propagation has not been live-verified.
 
 ### STACK: textual prize rules
 
-`Settings > Premios` uses "Cuando [condition], entregar [one or more prizes]".
+`Settings > Premios` starts with **Catálogo e inventario**, without a redundant
+header, summary counters or search filters, followed by consecutive rules.
+Each rule uses "Cuando [condition], entregar [OR groups of AND prizes]".
 Offer completed game, top X at own finish, final top X at closure, and raffle
-winner (subject to the existing raffle plan). The combined searchable selector
+winner (subject to the existing raffle plan). The combined selector
 groups game-local STAND prizes and the connected business's existing Kivly
-catalog. A STAND prize needs a name and may have a PNG; creating one never
+catalog without filtering. A STAND prize needs a name and may have a PNG; creating one never
 creates a Kivly reward. New Kivly selections use local IDs independent of the
 external reward ID. Edits stay drafts until the save succeeds.
 
+Each alternative group contains one or more prizes and quantities. A single
+group awards its available prizes. Multiple groups are selected with equal
+probability among groups with some eligible stock. An exhausted group cannot
+win; partial stock delivers only available units from the selected group.
+There is no weighting control or flat All/Random grouping selector.
 Rule changes create new identities; already earned prizes stay earned. Two
 matching rules can award two units of the same item. "Partida completada"
 replaces validation terminology for STACK. Public promotions summarize every
-configured rule without repeating the old Pizza/ranking sticker.
+configured prize through the restored promotional sticker, independent of
+OR/AND grouping, without a separate textual rule-summary panel.
 
-Results display a separate card and local QR per uncollected STAND unit.
+Results display a compact card with image, name and local QR per uncollected
+STAND unit. Omit the reason and STAND/Kivly badge from earned cards.
 Collected cards retain a clear collected state. Kivly cards have no STAND QR:
 show queued, confirming, confirmed or team-verification-required status.
 Poll results every 30 seconds and expose read errors with retry. The official
 Kivly wallet page offers Apple/Google; configure only the business origin,
-without `/add-to-wallet` or customer identifiers. Explain unavailable access
+without `/add-to-wallet` or customer identifiers, in Integraciones and shared
+across the organizer's STACK games. Read older per-game values only until a
+shared value is configured. Explain unavailable access
 when a club card is expected instead of silently hiding it.
 
-Definitive closure is separate from pause: confirm that starts are blocked and
+The single **Cerrar juego** menu entry owns definitive closure, not Premios.
+Closure is separate from pause: confirm that starts are blocked and
 active attempts may finish; the server automatically finalizes afterward.
 Excluding displayed pending attempts requires a second confirmation explaining
 that no score/prizes will be saved and late results will be rejected. Disable
-rule editing after closure begins. The delivery panel shows each unit's status
-and safe pre-earn failure code; refresh must not discard unsaved edits.
+rule editing after closure begins. Do not show delivery/allocation diagnostic
+panels in Premios; retain the durable delivery data and participant statuses.
+
+Keep the piece appearance selector and a static preview of the selected block
+visible. Reuse gameplay geometry/materials without starting a game or continuous
+animation. Speed and Perfect tolerance live in collapsed **Ajustes avanzados**.
 
 Action buttons inside settings panels (save/apply, generate Quiz/cards, export,
 share, download and image selection) use the active palette's primary color,
@@ -84,6 +106,9 @@ original category icon colors and neutral navigation styling in the main setting
 menu; do not recolor those icons to match the palette. Use `bg-primary/20`,
 `border-primary/30` and `hover:bg-primary/30`, not hard-coded action colors.
 The Tailwind primary token must support opacity via `--color-primary-rgb`.
+Settings dialogs layer the themed surface over a solid background, without
+transparency into the game. Persistent save footers sit outside the scrolling
+content region with an opaque background; fields must not pass behind buttons.
 
 ### Prize images
 
@@ -128,17 +153,40 @@ or repeated prize name. Eligibility requires a configured prize, a rank within
 Top X and within its quantity limit (if set). Refresh claims every 30 seconds;
 replace the QR with a collected notice after delivery. The validator rechecks
 the current ranking and records delivery once, even for concurrent scans.
-The shared participant `/play` panel shows validation and ranking prizes as
+For STACK, one promotional sticker slides between configured prize images and
+names. `/play` includes all configured prizes; on `/home`, Players has no STACK
+prize sticker. Ranking combines completion and top-at-finish/final prizes in the
+same carousel above its card, and Raffle includes raffle prizes. Keep
+ranking condition/top labels clear, deduplicate prizes within each scope, and
+do not imply the carousel chooses the earned prize. Provide pause/next and
+disable automatic rotation with reduced motion. A single prize stays static.
+Carousel names omit the generic prize prefix; ranking keeps its Top labels.
+Pause/next controls are visually hidden until keyboard focus, without arrow glyphs.
+After a confirmed STACK result, highlight the wallet action with a leading wallet
+icon and a short pulse (disabled with reduced motion). Where a valid wallet link
+exists, show all earned cards semitransparent with a lock, withholding STAND QRs
+until that action is clicked. This is a local presentation reveal, not confirmation
+of wallet installation or a change to server-side prize allocation. Without a
+valid wallet link, keep prizes accessible normally.
+For other games, the shared participant `/play` panel shows validation and ranking prizes as
 compact stickers overlapping its top-left border, instead of a promotion block
 inside each view. Keep them visible during registration, play, validation and results.
 The language selector is a sibling outside the card's backdrop-filter stacking
 context, at `z-50`, anchored inside the panel's top-right corner via a shared
-relative wrapper. Use `pt-14` for logo clearance and a `h-32` logo.
+relative wrapper. `/play` uses a safe-area-aware viewport with vertical overflow
+only when needed. Size the logo, STACK scene and roulette against available
+height; shrink spacing on short screens. Follow VisualViewport keyboard resizes
+and keep focused fields in view. Inputs, textareas and selects have a minimum
+computed 16px font to prevent automatic iOS focus zoom; never disable pinch zoom.
 Keep registration consent concise, with a separate privacy-policy link.
-After a verification code is successfully sent, hide the registration prompt,
-participant fields and consent notice while showing code entry. Keep the
-accepted consent and field values in state; "Cambiar datos" restores them.
-If sending fails, keep the registration fields and consent visible.
+Registration in every game has three steps: email, other fields and consent,
+then verification, without a visible step counter or introductory registration
+headline. The first step only validates locally. Request the code
+after step two, never before consent. Keep accepted consent and field values
+in state; back/edit restores the draft. After sending, show code entry instead
+of fields; failed sends keep step two and its errors visible. Use labels above
+rounded bordered fields, short hints and a wide rounded primary action, while
+retaining STAND branding and theme.
 Reserve space to the right of
 the stickers so they do not cover the selector on narrow screens.
 Stack multiple configured prizes above the same corner, hide

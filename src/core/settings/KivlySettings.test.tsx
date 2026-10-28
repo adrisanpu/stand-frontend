@@ -18,7 +18,7 @@ function Panel() {
 }
 
 describe('Kivly game connection indicator', () => {
-  it('shows only the connected logo and demo status for example links', async () => {
+  it('shows binary connection status without offering a demo mode', async () => {
     vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
       ...connection, locationId: 'location', locations: [{ id: 'location', name: 'Club' }],
       clubSettings: { clubName: 'Club', privacyUrl: 'https://example.com/privacy', termsUrl: 'https://example.com/terms' },
@@ -26,9 +26,15 @@ describe('Kivly game connection indicator', () => {
     render(<Panel />)
     expect(await screen.findByRole('img', { name: 'Kivly' })).toHaveAttribute('src', '/images/kivly-logo.svg')
     expect(screen.getByText('Conectado')).toBeInTheDocument()
-    expect(screen.getByText(/Demo, sin altas reales/)).toBeInTheDocument()
+    expect(screen.queryByText(/Demo/)).not.toBeInTheDocument()
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('shows the disconnected state explicitly', async () => {
+    vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({ connected: false, locationId: null, locations: [] })
+    render(<Panel />)
+    expect(await screen.findByText('Desconectado')).toBeInTheDocument()
   })
 
   it('uses the global club without displaying game settings', async () => {

@@ -93,7 +93,7 @@ export type PublicGameResponse = {
   stackStartSnapshot?: boolean
   stackFinishSupported?: boolean
   stackPrizeState?: 'open' | 'closing' | 'closed'
-  stackPrizeRules?: { condition: import('./stackPrizes').StackPrizeCondition; topX?: number; names: string[] }[]
+  stackPrizeRules?: import('./stackPrizes').StackPrizePromotion[]
   joinUrl: string
 }
 

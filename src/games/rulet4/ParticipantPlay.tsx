@@ -47,7 +47,7 @@ export default function Rulet4ParticipantPlay({ gameId, playerToken, config, ass
     <section className="space-y-4 text-center">
       <h1 className="text-xl font-bold">RULET4</h1>
       <p>{assignment.displayName}</p>
-      <div className="aspect-square w-full">
+      <div className="play-wheel aspect-square w-full">
         <Rulet4Wheel segments={segments} spin={spin} completed={completed} dimmed={false} language={language}
           onReadyChange={setReady} onComplete={() => setCompleted(true)} />
       </div>

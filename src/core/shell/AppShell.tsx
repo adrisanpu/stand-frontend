@@ -22,6 +22,8 @@ import MobileGameHome from '../widgets/MobileGameHome'
 import { OperatorLanguageProvider, useOperatorLanguage } from './operatorLanguage'
 import { usePolling } from '../../hooks/usePolling'
 import type { PrizeCatalog } from '../prizes'
+import type { StackPrizePromotion } from '../../api/stackPrizes'
+import { stackPrizePromotions } from '../widgets/stackPrizePromotions'
 // Logo size on game screens (portrait and landscape) — larger across breakpoints
 // Landscape: slightly smaller so left column fits
 const GAME_SCREEN_LOGO_CLASS_LANDSCAPE = 'h-28 sm:h-32 lg:h-36 xl:h-40 2xl:h-44 w-auto object-contain max-w-full'
@@ -49,8 +51,12 @@ function AppContent() {
   const [gameConfigVersion, setGameConfigVersion] = useState(0)
   const [loadedAccess, setLoadedAccess] = useState<{ gameId: string; access: GameAccess } | null>(null)
   const [accessError, setAccessError] = useState<string | null>(null)
-  const [loadedPrizes, setLoadedPrizes] = useState<{ gameId: string; catalog?: PrizeCatalog } | null>(null)
+  const [loadedPrizes, setLoadedPrizes] = useState<{ gameId: string; catalog?: PrizeCatalog; stackRules?: StackPrizePromotion[] } | null>(null)
   const prizeCatalog = loadedPrizes?.gameId === gameId ? loadedPrizes.catalog : undefined
+  const stackRules = normalizeGameType(gameType ?? undefined) === 'STACK' && loadedPrizes?.gameId === gameId ? loadedPrizes.stackRules : undefined
+  const stackPlayersPrizes = stackRules ? [] : undefined
+  const stackRankingPrizes = stackRules ? stackPrizePromotions(stackRules, t, ['completed', 'top_finish', 'top_final']) : undefined
+  const stackRafflePrizes = stackRules ? stackPrizePromotions(stackRules, t, ['raffle']) : undefined
   const metadataKey = JSON.stringify([gameId, gameType, gameConfigVersion])
   const metadataSource = useRef({ key: metadataKey })
   if (metadataSource.current.key !== metadataKey) metadataSource.current = { key: metadataKey }
@@ -181,7 +187,7 @@ function AppContent() {
     if (!gameId) return
     const source = metadataSource.current
     try {
-      const data = await api.get<{ ok: boolean; prizeCatalog?: PrizeCatalog; game?: { joinChannel?: string; playMode?: string; gameType?: string } }>(
+      const data = await api.get<{ ok: boolean; prizeCatalog?: PrizeCatalog; stackPrizeRules?: StackPrizePromotion[]; game?: { joinChannel?: string; playMode?: string; gameType?: string } }>(
         `/v1/game?gameId=${encodeURIComponent(gameId)}`
       )
       if (metadataSource.current !== source) return
@@ -191,7 +197,7 @@ function AppContent() {
         && previous.access.joinChannel === nextAccess.joinChannel
         && previous.access.playMode === nextAccess.playMode
         ? previous : { gameId, access: nextAccess })
-      setLoadedPrizes({ gameId, catalog: data.prizeCatalog })
+      setLoadedPrizes({ gameId, catalog: data.prizeCatalog, stackRules: data.stackPrizeRules })
       setAccessError(null)
     } catch (cause) {
       if (metadataSource.current === source) {
@@ -263,6 +269,7 @@ function AppContent() {
       ? gs.prizeTopX.trim()
       : undefined
   const rankingTopX =
+    stackRules ? Math.max(0, ...stackRules.filter((rule) => rule.condition === 'top_finish' || rule.condition === 'top_final').map((rule) => rule.topX ?? 0)) || undefined :
     prizeCatalog !== undefined ? prizeCatalog.ranking?.topX :
     currentGame?.showRanking && gs && typeof gs.topX === 'number' && gs.topX >= 1
       ? gs.topX
@@ -388,13 +395,13 @@ function AppContent() {
                   logoSrc={customLogo ?? currentGame.assets?.logo}
                   logoAlt={customLogo ? t('Logo del cliente', 'Client logo') : currentGame.name}
                   players={
-                    <Players gameName={gameName} gameId={gameId} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={10000} />
+                    <Players stackPrizes={stackPlayersPrizes} gameName={gameName} gameId={gameId} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={10000} />
                   }
                   raffle={features.raffles ? (
-                    <RaffleData gameId={gameId} gameName={gameName} compact={!isPortrait} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={10000} />
+                    <RaffleData stackPrizes={stackRafflePrizes} gameId={gameId} gameName={gameName} compact={!isPortrait} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={10000} />
                   ) : undefined}
                   ranking={currentGame.showRanking ? (
-                    <Ranking gameId={gameId} gameType={gameType ?? undefined} prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={10000} />
+                    <Ranking stackPrizes={stackRankingPrizes} gameId={gameId} gameType={gameType ?? undefined} prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={10000} />
                   ) : undefined}
                 />
               </div>
@@ -441,14 +448,14 @@ function AppContent() {
                       </div>
                       <div className="grow-[2] basis-0 shrink min-h-0 flex flex-col gap-3 min-w-0 overflow-hidden">
                         <div className="flex-shrink-0 w-full">
-                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Players stackPrizes={stackPlayersPrizes} gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         </div>
                         <div className="min-h-0 flex-1 flex flex-col min-w-0">
-                          <Ranking gameId={gameId} gameType={gameType ?? undefined} prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Ranking stackPrizes={stackRankingPrizes} gameId={gameId} gameType={gameType ?? undefined} prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         </div>
                         {features.raffles && (
                           <div className="flex-shrink-0 w-full">
-                            <RaffleData gameId={gameId} gameName={gameName} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                            <RaffleData stackPrizes={stackRafflePrizes} gameId={gameId} gameName={gameName} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                           </div>
                         )}
                       </div>
@@ -470,11 +477,11 @@ function AppContent() {
                       </div>
                       <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
                         <div className="flex-1 min-w-[200px]">
-                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Players stackPrizes={stackPlayersPrizes} gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         </div>
                         {features.raffles && (
                           <div className="flex-1 min-w-[200px]">
-                            <RaffleData gameId={gameId} gameName={gameName} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                            <RaffleData stackPrizes={stackRafflePrizes} gameId={gameId} gameName={gameName} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                           </div>
                         )}
                       </div>
@@ -522,18 +529,18 @@ function AppContent() {
                           ) : null
                         }
                         playersElement={
-                          <Players gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                          <Players stackPrizes={stackPlayersPrizes} gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                         }
                         sidebarElement={
                           <div className="flex flex-col gap-2 w-full min-w-0 min-h-0 flex-1 h-full overflow-y-auto self-stretch">
                             {currentGame.showRanking && (
                               <div className="min-h-0 flex-1 flex flex-col w-full overflow-hidden">
-                                <Ranking gameId={gameId} gameType={gameType ?? undefined} compact prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                                <Ranking stackPrizes={stackRankingPrizes} gameId={gameId} gameType={gameType ?? undefined} compact prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                               </div>
                             )}
                             {features.raffles && (
                               <div className="flex-shrink-0 w-full min-h-[min(32vh,220px)] flex flex-col">
-                                <RaffleData gameId={gameId} gameName={gameName} compact prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
+                                <RaffleData stackPrizes={stackRafflePrizes} gameId={gameId} gameName={gameName} compact prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
                               </div>
                             )}
                           </div>

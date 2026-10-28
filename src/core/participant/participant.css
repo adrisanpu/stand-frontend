@@ -1,0 +1,79 @@
+.play-shell.bg-club {
+  --play-viewport-height: 100dvh;
+  box-sizing: border-box;
+  height: var(--play-viewport-height);
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  padding: max(12px, env(safe-area-inset-top, 0px))
+    max(12px, env(safe-area-inset-right, 0px))
+    max(12px, env(safe-area-inset-bottom, 0px))
+    max(12px, env(safe-area-inset-left, 0px));
+  scroll-padding-block: 16px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.play-card {
+  padding: 3rem clamp(12px, 4vw, 24px) 16px;
+  overflow-wrap: anywhere;
+}
+
+.play-card > * + * {
+  margin-top: clamp(8px, calc(var(--play-viewport-height) * 0.018), 20px);
+}
+
+.play-shell .play-logo {
+  height: clamp(40px, calc(var(--play-viewport-height) * 0.12), 96px);
+}
+
+/* A minimum 16px computed font prevents iOS focus zoom without disabling pinch zoom. */
+.play-shell input,
+.play-shell textarea,
+.play-shell select {
+  font-size: max(16px, 1em);
+  max-width: 100%;
+}
+
+.play-shell input,
+.play-shell textarea {
+  min-width: 0;
+  scroll-margin-block: 16px;
+}
+
+.play-shell input[type="file"] {
+  white-space: normal;
+}
+
+.play-shell .stack-viewport {
+  height: clamp(160px, calc(var(--play-viewport-height) * 0.42), 400px);
+  min-height: 0;
+}
+
+.play-shell .play-wheel {
+  width: min(100%, max(140px, calc(var(--play-viewport-height) - 280px)));
+  margin-inline: auto;
+}
+
+.play-shell .play-character {
+  min-height: 0;
+  height: clamp(140px, calc(var(--play-viewport-height) * 0.3), 256px);
+}
+
+.play-shell .play-character > img {
+  height: 100%;
+  width: 100%;
+}
+
+.play-shell[data-keyboard="true"] .play-logo {
+  height: 32px;
+}
+
+@media (max-height: 650px) {
+  .play-card .space-y-6 > * + *,
+  .play-card .space-y-5 > * + *,
+  .play-card .space-y-4 > * + * {
+    margin-top: 10px;
+  }
+}

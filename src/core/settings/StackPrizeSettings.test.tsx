@@ -14,15 +14,14 @@ vi.mock('../../api/prizeMedia', async (importOriginal) => ({
 const response: StackPrizeSettingsResponse = {
   ok: true, enabled: true, state: 'open', pendingPlayers: [], awards: [], allocations: [],
   inventory: [{ prizeId: 'pizza', total: 100, remaining: 100 }],
-  program: { version: 2, storefrontUrl: 'https://club.kivly.store', catalog: [
+  program: { version: 3, storefrontUrl: 'https://club.kivly.store', catalog: [
     { id: 'pizza', source: 'stand', name: 'Pizza', limit: null, stockTotal: 100 },
-  ], rules: [{ id: 'done', condition: 'completed', mode: 'all', allocations: [{ prizeId: 'pizza', quantity: 1 }] }] },
+  ], rules: [{ id: 'done', condition: 'completed', groups: [{ allocations: [{ prizeId: 'pizza', quantity: 1 }] }] }] },
 }
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(stackPrizeApi.get).mockResolvedValue(structuredClone(response))
   vi.mocked(stackPrizeApi.save).mockImplementation(async (_, program) => program)
-  vi.mocked(stackPrizeApi.close).mockResolvedValue({ ...response, state: 'closing' })
   vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
     connected: true, locationId: 'loc', locations: [{ id: 'loc', name: 'Club' }],
   })
@@ -34,135 +33,122 @@ function mount() {
   render(<StackPrizeSettings gameId="ABC123" raffles onPersist={onPersist} />)
   return { onPersist }
 }
+const save = () => fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
 
-it('adds a Kivly reward to the same textual rule as a STAND prize', async () => {
+it('adds a Kivly reward to an AND group without creating it externally', async () => {
   const { onPersist } = mount()
   await screen.findByRole('option', { name: 'Coffee' })
-  fireEvent.change(screen.getByLabelText('Añadir premio a regla 1'), { target: { value: 'kivly_coffee' } })
-  expect(screen.getByText('Pizza · STAND')).toBeInTheDocument()
-  expect(screen.getByText('Coffee · Kivly')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
+  fireEvent.change(screen.getByLabelText('Añadir premio al grupo 1.1'), { target: { value: 'kivly_coffee' } })
+  save()
   await waitFor(() => expect(onPersist).toHaveBeenCalledTimes(1))
   const saved = vi.mocked(stackPrizeApi.save).mock.calls[0][1]
-  const reward = saved.catalog.find((p) => p.source === 'kivly')!
-  expect(saved.rules[0].allocations).toEqual([
+  const reward = saved.catalog.find((prize) => prize.source === 'kivly')!
+  expect(saved.rules[0].groups[0].allocations).toEqual([
     { prizeId: 'pizza', quantity: 1 }, { prizeId: reward.id, quantity: 1 },
   ])
   expect(saved.rules[0].id).not.toBe('done')
   expect(reward.id.length).toBeLessThanOrEqual(80)
-  expect(reward).toMatchObject({ rewardId: 'coffee', locationId: 'loc', source: 'kivly' })
-  expect(reward.stockTotal).toBe(100)
+  expect(reward).toMatchObject({ rewardId: 'coffee', locationId: 'loc', source: 'kivly', stockTotal: 100 })
+})
+
+it('shows the full external catalog without publishing it until selected', async () => {
+  mount()
+  await screen.findByRole('option', { name: 'Coffee' })
+  expect(screen.getByRole('button', { name: 'Añadir al inventario' })).toBeInTheDocument()
+  expect(stackPrizeApi.save).not.toHaveBeenCalled()
+  expect(screen.queryByRole('textbox', { name: 'Buscar premios' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Reglas de premios')).not.toBeInTheDocument()
+  expect(screen.queryByText('Entregas')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Web oficial del club Kivly')).not.toBeInTheDocument()
 })
 
 it('adds a local STAND prize without creating anything in Kivly', async () => {
   mount()
-  await screen.findByText('Reglas de premios')
+  await screen.findByText('Catálogo e inventario')
   fireEvent.change(screen.getByLabelText('Nombre del premio STAND'), { target: { value: 'Bebida' } })
   fireEvent.click(screen.getByRole('button', { name: 'Añadir' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
+  save()
   await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalled())
   expect(vi.mocked(stackPrizeApi.save).mock.calls[0][1].catalog).toEqual(expect.arrayContaining([
     expect.objectContaining({ source: 'stand', name: 'Bebida', stockTotal: 100 }),
   ]))
 })
 
-it('configures AND/OR, winner quantity X and shared event stock Y', async () => {
+it('configures OR groups of AND prizes, quantities and shared stock', async () => {
   mount()
-  await screen.findByText('Reglas de premios')
-  fireEvent.change(screen.getByLabelText('Cantidad X por ganador de Pizza'), { target: { value: '3' } })
+  await screen.findByRole('option', { name: 'Coffee' })
+  fireEvent.change(screen.getByLabelText('Cantidad de Pizza · 1.1'), { target: { value: '3' } })
   fireEvent.change(screen.getByLabelText('Inventario total Y de Pizza'), { target: { value: '8' } })
-  fireEvent.change(screen.getByLabelText('Agrupación 1'), { target: { value: 'random_one' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
+  fireEvent.click(screen.getByRole('button', { name: 'O añadir grupo' }))
+  expect(screen.getByRole('button', { name: 'Guardar reglas de premios' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Añadir premio al grupo 1.2'), { target: { value: 'kivly_coffee' } })
+  fireEvent.change(screen.getByLabelText('Añadir premio al grupo 1.2'), { target: { value: 'pizza' } })
+  save()
   await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalled())
   const saved = vi.mocked(stackPrizeApi.save).mock.calls[0][1]
-  expect(saved.rules[0]).toMatchObject({
-    mode: 'random_one', allocations: [{ prizeId: 'pizza', quantity: 3 }],
-  })
+  expect(saved.rules[0].groups).toHaveLength(2)
+  expect(saved.rules[0].groups[0].allocations).toEqual([{ prizeId: 'pizza', quantity: 3 }])
+  expect(saved.rules[0].groups[1].allocations).toHaveLength(2)
   expect(saved.catalog[0].stockTotal).toBe(8)
+  expect(screen.queryByLabelText('Agrupación 1')).not.toBeInTheDocument()
 })
 
-it('explains delivery and grouping, previews remaining stock, and marks unsaved edits', async () => {
+it('previews remaining stock while editing without a header of counters', async () => {
   vi.mocked(stackPrizeApi.get).mockResolvedValue({
     ...structuredClone(response), inventory: [{ prizeId: 'pizza', total: 100, remaining: 97 }],
   })
   mount()
-  await screen.findByText('1. Catálogo e inventario')
-  expect(screen.getByText('STAND · Recogida con QR')).toBeInTheDocument()
-  expect(screen.getByText('Kivly · Asignación al club')).toBeInTheDocument()
-  expect(screen.getByText('Sin cambios pendientes')).toBeInTheDocument()
+  await screen.findByText('Catálogo e inventario')
   expect(screen.getByText('Disponibles: 97')).toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Inventario total Y de Pizza'), { target: { value: '8' } })
   expect(screen.getByText('Disponibles: 5')).toBeInTheDocument()
-  expect(screen.getByText('Cambios sin guardar')).toBeInTheDocument()
-  fireEvent.change(screen.getByLabelText('Agrupación 1'), { target: { value: 'random_one' } })
-  expect(screen.getByText('Cada ganador recibe una opción al azar entre las que tienen stock.')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
-  await screen.findByText('Sin cambios pendientes')
+  expect(screen.queryByText('STAND · Recogida con QR')).not.toBeInTheDocument()
+  expect(screen.queryByText('Sin cambios pendientes')).not.toBeInTheDocument()
+  save()
+  expect(await screen.findByText('Premios guardados. Los premios ya ganados se conservan.')).toBeInTheDocument()
 })
 
 it('removes a selected prize only through its explicit remove control', async () => {
   mount()
-  await screen.findByText('Pizza · STAND')
-  fireEvent.click(screen.getByText('Pizza · STAND'))
-  expect(screen.getByLabelText('Cantidad X por ganador de Pizza')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Quitar premio Pizza' }))
-  expect(screen.queryByLabelText('Cantidad X por ganador de Pizza')).not.toBeInTheDocument()
+  const quantity = await screen.findByLabelText('Cantidad de Pizza · 1.1')
+  fireEvent.click(quantity)
+  expect(quantity).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Quitar premio Pizza · 1.1' }))
+  expect(screen.queryByLabelText('Cantidad de Pizza · 1.1')).not.toBeInTheDocument()
   expect(screen.getByText('Selecciona al menos un premio.')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Guardar reglas de premios' })).toBeDisabled()
 })
 
-it('offers both distinct ranking conditions and requires a prize on every rule', async () => {
+it('offers both ranking conditions and requires a prize in each added rule', async () => {
   mount()
-  await screen.findByText('Reglas de premios')
+  await screen.findByText('Catálogo e inventario')
   fireEvent.click(screen.getByRole('button', { name: 'Añadir regla' }))
   expect(screen.getByRole('button', { name: 'Guardar reglas de premios' })).toBeDisabled()
   fireEvent.change(screen.getByLabelText('Condición 2'), { target: { value: 'top_final' } })
   expect(screen.getByLabelText('Top 2')).toHaveValue(10)
   expect(screen.getAllByRole('option', { name: 'entre en el top al terminar su partida' })).toHaveLength(2)
-  expect(screen.getAllByRole('option', { name: 'esté en el top al cerrar el juego' })).toHaveLength(2)
 })
 
-it('reports catalog failure without treating it as successful empty Kivly catalog', async () => {
-  vi.mocked(kivlyApi.listRewards).mockRejectedValue(new Error('Unavailable'))
+it('retries the external catalog without replacing unsaved edits', async () => {
+  vi.mocked(kivlyApi.listRewards).mockRejectedValueOnce(new Error('Unavailable'))
   mount()
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar Kivly.')
-  expect(screen.getByText('Pizza · STAND')).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Inventario total Y de Pizza'), { target: { value: '8' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+  await screen.findByRole('option', { name: 'Coffee' })
+  expect(screen.getByLabelText('Inventario total Y de Pizza')).toHaveValue(8)
+  expect(stackPrizeApi.get).toHaveBeenCalledTimes(1)
 })
 
-it('requires confirmation before requesting definitive closure', async () => {
-  mount()
-  fireEvent.click(await screen.findByRole('button', { name: 'Cerrar juego y entregar premios finales' }))
-  expect(stackPrizeApi.close).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: 'Confirmar cierre' }))
-  await waitFor(() => expect(stackPrizeApi.close).toHaveBeenCalledWith('ABC123', []))
-})
-
-it('requires a second confirmation before excluding abandoned attempts', async () => {
-  vi.mocked(stackPrizeApi.get).mockResolvedValue({ ...response, state: 'closing', pendingPlayers: [{ playerId: 3, name: 'Pending' }] })
-  mount()
-  fireEvent.click(await screen.findByRole('button', { name: 'Excluir los intentos pendientes' }))
-  expect(stackPrizeApi.close).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: 'Confirmar exclusión y cierre' }))
-  await waitFor(() => expect(stackPrizeApi.close).toHaveBeenCalledWith('ABC123', [3]))
-})
-
-it('does not replace unsaved edits when retrying the catalog', async () => {
-  vi.mocked(kivlyApi.listRewards).mockRejectedValue(new Error('Unavailable'))
-  mount()
-  await screen.findByRole('alert')
-  fireEvent.change(screen.getByLabelText('Web oficial del club Kivly'), { target: { value: 'https://new.kivly.store' } })
-  expect(screen.getByRole('button', { name: 'Reintentar' })).toBeDisabled()
-})
-
-it('uses a local stable ID even when the external reward ID is long', async () => {
+it('uses a stable local ID for a long external reward ID', async () => {
   const externalId = 'reward'.repeat(80)
   vi.mocked(kivlyApi.listRewards).mockResolvedValue([{ id: externalId, name: 'Long reward' }])
   mount()
   await screen.findByRole('option', { name: 'Long reward' })
-  fireEvent.change(screen.getByLabelText('Añadir premio a regla 1'), { target: { value: `kivly_${externalId}` } })
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
+  fireEvent.change(screen.getByLabelText('Añadir premio al grupo 1.1'), { target: { value: `kivly_${externalId}` } })
+  save()
   await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalled())
-  const selected = vi.mocked(stackPrizeApi.save).mock.calls[0][1].catalog.find((p) => p.source === 'kivly')!
+  const selected = vi.mocked(stackPrizeApi.save).mock.calls[0][1].catalog.find((prize) => prize.source === 'kivly')!
   expect(selected.id.length).toBeLessThanOrEqual(80)
   expect(selected.rewardId).toBe(externalId)
 })
@@ -170,10 +156,10 @@ it('uses a local stable ID even when the external reward ID is long', async () =
 it('keeps edits and retry available after a failed save', async () => {
   vi.mocked(stackPrizeApi.save).mockRejectedValue(new Error('Unavailable'))
   const { onPersist } = mount()
-  fireEvent.change(await screen.findByLabelText('Web oficial del club Kivly'), { target: { value: 'https://new.kivly.store' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
+  fireEvent.change(await screen.findByLabelText('Inventario total Y de Pizza'), { target: { value: '8' } })
+  save()
   expect(await screen.findByRole('alert')).toHaveTextContent('Unavailable')
-  expect(screen.getByLabelText('Web oficial del club Kivly')).toHaveValue('https://new.kivly.store')
+  expect(screen.getByLabelText('Inventario total Y de Pizza')).toHaveValue(8)
   expect(screen.getByRole('button', { name: 'Guardar reglas de premios' })).toBeEnabled()
   expect(onPersist).not.toHaveBeenCalled()
 })
@@ -191,4 +177,11 @@ it('previews a staged PNG and lets the owner remove it before saving', async () 
   expect(stackPrizeApi.save).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Quitar imagen de Pizza' }))
   expect(screen.queryByRole('img', { name: 'Vista previa del premio Pizza' })).not.toBeInTheDocument()
+})
+
+it('locks prize editing after closure starts', async () => {
+  vi.mocked(stackPrizeApi.get).mockResolvedValue({ ...response, state: 'closing' })
+  mount()
+  expect(await screen.findByLabelText('Inventario total Y de Pizza')).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Confirmar cierre' })).not.toBeInTheDocument()
 })

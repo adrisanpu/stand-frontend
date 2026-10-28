@@ -130,7 +130,6 @@ export default function ValidatorShell() {
       >
         <div className="mx-auto max-w-md w-full space-y-4">
           <h1 className="text-xl font-bold text-center">Validador de premios</h1>
-          {gameId && <p className="text-center text-xs text-textSub font-mono">{gameId}</p>}
 
           <div className="relative overflow-hidden rounded-xl border border-white/15 bg-black/40 aspect-[3/4]">
             <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted />

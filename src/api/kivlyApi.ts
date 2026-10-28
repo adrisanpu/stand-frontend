@@ -7,7 +7,7 @@ export type KivlySettings = {
   termsUrl: string
 }
 
-export type KivlyClubSettings = Omit<KivlySettings, 'enabled'>
+export type KivlyClubSettings = Omit<KivlySettings, 'enabled'> & { storefrontUrl?: string }
 
 export type KivlyConnection = {
   connected: boolean
@@ -22,17 +22,6 @@ export type KivlyAccountConnection = KivlyConnection & {
 export type KivlyReward = { id: string; name: string }
 
 export const kivlyApi = {
-  async getReward(gameId: string): Promise<KivlyReward | null> {
-    const data = await api.get<{ ok: boolean; reward?: KivlyReward | null }>(
-      `/v1/game/kivly?gameId=${encodeURIComponent(gameId)}`,
-    )
-    if (data?.ok !== true || (data.reward != null
-      && (typeof data.reward.id !== 'string' || !data.reward.id
-        || typeof data.reward.name !== 'string' || !data.reward.name))) {
-      throw new Error('Invalid Kivly reward response')
-    }
-    return data.reward ?? null
-  },
   async listRewards(gameId: string): Promise<KivlyReward[]> {
     const data = await api.get<{ ok: boolean; rewards: KivlyReward[] }>(
       `/v1/game/kivly/rewards?gameId=${encodeURIComponent(gameId)}`,
@@ -43,10 +32,6 @@ export const kivlyApi = {
       throw new Error('Invalid Kivly rewards response')
     }
     return data.rewards
-  },
-  async saveReward(gameId: string, rewardId: string | null) {
-    const data = await api.put<{ ok: boolean }>('/v1/game/kivly', { gameId, rewardId })
-    if (data?.ok !== true) throw new Error('Kivly reward not confirmed')
   },
   async getAccountConnection(): Promise<KivlyAccountConnection> {
     const data = await api.get<{ ok: boolean; connection: KivlyAccountConnection }>('/v1/kivly')
@@ -61,7 +46,9 @@ export const kivlyApi = {
         : data.connection.locationId !== null || data.connection.locations.length !== 0)
       || (data.connection.clubSettings != null
         && !(['clubName', 'privacyUrl', 'termsUrl'] as const).every((key) =>
-          typeof data.connection.clubSettings?.[key] === 'string'))) {
+          typeof data.connection.clubSettings?.[key] === 'string'))
+      || (data.connection.clubSettings?.storefrontUrl != null
+        && typeof data.connection.clubSettings.storefrontUrl !== 'string')) {
       throw new Error('Invalid Kivly connection response')
     }
     return data.connection

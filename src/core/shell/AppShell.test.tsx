@@ -68,6 +68,28 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('game home identity and configuration', () => {
+  it.each([true, false])('places STACK completion prizes in the ranking carousel, not over players (portrait=%s)', async (portrait) => {
+    state.portrait = portrait
+    localStorage.setItem('gameType', 'STACK')
+    vi.mocked(api.get).mockResolvedValue({
+      ok: true, game: { gameType: 'STACK', playMode: 'mobile', joinChannel: 'web' },
+      stackPrizeRules: [
+        { condition: 'completed', names: ['Pizza'] },
+        { condition: 'top_finish', topX: 3, names: ['Copa'] },
+        { condition: 'raffle', names: ['Bolsa'] },
+      ],
+    })
+    render(<AppShell />)
+    await waitFor(() => {
+      const ranking = JSON.parse(screen.getByTestId('ranking').getAttribute('data-props')!)
+      expect(ranking.stackPrizes?.map((prize: { name: string }) => prize.name)).toEqual(['Pizza', 'Copa'])
+    })
+    const players = JSON.parse(screen.getByTestId('players').getAttribute('data-props')!)
+    expect(players.stackPrizes).toEqual([])
+    const raffle = JSON.parse(screen.getByTestId('raffle').getAttribute('data-props')!)
+    expect(raffle.stackPrizes.map((prize: { name: string }) => prize.name)).toEqual(['Bolsa'])
+  })
+
   it.each([
     [true, 'mobile', true], [false, 'mobile', true],
     [true, 'master', true], [false, 'master', true],

@@ -33,6 +33,11 @@ function renderParticipant(strict = false) {
   return render(strict ? <StrictMode>{participant}</StrictMode> : participant)
 }
 
+async function advanceToParticipantDetails(email = 'player@example.test') {
+  fireEvent.change(await screen.findByLabelText(/Email/), { target: { value: email } })
+  fireEvent.click(await screen.findByRole('button', { name: 'Continuar' }))
+}
+
 describe('ParticipantShell STACK integration', () => {
   it('restores an existing STACK session after definitive closure even when paused', async () => {
     vi.mocked(publicApi.getGame).mockResolvedValue({
@@ -129,10 +134,10 @@ describe('ParticipantShell STACK integration', () => {
     })
     vi.mocked(publicApi.uploadParticipantPhoto).mockRejectedValueOnce(new Error('offline'))
     const { container } = renderParticipant()
+    await advanceToParticipantDetails('ana@club.test')
     const photo = new File([new Uint8Array([1, 2, 3])], 'profile.png', { type: 'image/png' })
     fireEvent.change(await screen.findByLabelText('Foto de perfil (opcional)'), { target: { files: [photo] } })
     fireEvent.change(screen.getByLabelText(/Nombre completo/), { target: { value: 'Ana' } })
-    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'ana@club.test' } })
     vi.mocked(publicApi.requestEmailCode).mockResolvedValueOnce({
       ok: true, challengeId: 'photo-challenge', emailMasked: 'a***@club.test',
       expiresAt: new Date(Date.now() + 600000).toISOString(),
@@ -219,13 +224,45 @@ describe('ParticipantShell STACK integration', () => {
   })
   afterEach(() => {
     cleanup()
+    vi.unstubAllGlobals()
     window.history.replaceState(null, '', '/')
+  })
+
+  it('adapts to keyboard viewport changes without overriding manual pinch zoom and cleans up listeners', async () => {
+    const viewport = Object.assign(new EventTarget(), { height: 720, scale: 1 })
+    const remove = vi.spyOn(viewport, 'removeEventListener')
+    vi.stubGlobal('visualViewport', viewport)
+    const { container, unmount } = renderParticipant()
+    const input = await screen.findByLabelText(/Email/)
+    const shell = container.querySelector<HTMLElement>('.play-shell')!
+    expect(shell.style.getPropertyValue('--play-viewport-height')).toBe('720px')
+    const scroll = vi.fn()
+    input.scrollIntoView = scroll
+    fireEvent.focusIn(input)
+    input.focus()
+    viewport.height = 320
+    act(() => { viewport.dispatchEvent(new Event('resize')) })
+    expect(shell.style.getPropertyValue('--play-viewport-height')).toBe('320px')
+    expect(shell.dataset.keyboard).toBe('true')
+    await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' }))
+    viewport.scale = 2
+    viewport.height = 160
+    act(() => { viewport.dispatchEvent(new Event('resize')) })
+    expect(shell.style.getPropertyValue('--play-viewport-height')).toBe('320px')
+    viewport.scale = 1
+    viewport.height = 720
+    act(() => { viewport.dispatchEvent(new Event('resize')) })
+    expect(shell.dataset.keyboard).toBe('false')
+    unmount()
+    expect(remove).toHaveBeenCalledWith('resize', expect.any(Function))
   })
 
   it('uses the existing registration form for a new player', async () => {
     renderParticipant()
-    expect(await screen.findByText('Regístrate para jugar desde tu móvil')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Enviar código' })).toHaveClass('text-primary', 'bg-[rgba(var(--color-primary-rgb),0.25)]')
+    expect(await screen.findByRole('button', { name: 'Continuar' })).toBeInTheDocument()
+    expect(screen.queryByText('Regístrate para jugar desde tu móvil')).not.toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Paso de registro' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continuar' })).toHaveClass('text-primary', 'bg-[rgba(var(--color-primary-rgb),0.25)]')
     expect(screen.getByLabelText(/Email/)).toBeInTheDocument()
     expect(publicApi.getPlayer).not.toHaveBeenCalled()
   })
@@ -279,12 +316,12 @@ describe('ParticipantShell STACK integration', () => {
       ok: true, gameId: 'GAME1234', gameType: 'STACK', playerToken: 'new-token', assignment,
     })
     renderParticipant()
-    expect(await screen.findByRole('button', { name: 'Enviar código' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Continuar' })).toBeInTheDocument()
     expect(loadPlayerToken('GAME1234')).toBeNull()
     expect(loadAssignment('GAME1234')).toBeNull()
     expect(loadPlayerToken('OTHERGAME')).toBe('other-token')
     expect(screen.queryByText(/Escena STACK/)).not.toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+    await advanceToParticipantDetails('player@example.com')
     fireEvent.change(screen.getByLabelText(/Nombre completo/), { target: { value: 'Player' } })
     fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
@@ -375,7 +412,7 @@ describe('ParticipantShell STACK integration', () => {
     expect(logo.parentElement).toHaveClass('card', 'relative')
     expect(logo.nextElementSibling?.tagName).toBe('FORM')
     expect(screen.queryByText('TEST')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Enviar código' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeInTheDocument()
   })
 
   it.each([
@@ -415,8 +452,8 @@ describe('ParticipantShell STACK integration', () => {
     expect(selector.parentElement).toBe(logo.parentElement?.parentElement)
     expect(selector.closest('.card')).toBeNull()
     expect(selector).toHaveClass('z-50', 'pointer-events-auto')
-    expect(logo.parentElement).toHaveClass('card', 'relative', 'p-6', 'pt-14')
-    expect(logo).toHaveClass('h-32')
+    expect(logo.parentElement).toHaveClass('card', 'relative', 'play-card')
+    expect(logo).toHaveClass('play-logo')
     const promo = screen.getByLabelText('Premios en juego')
     expect(promo.parentElement).toBe(selector.parentElement?.parentElement)
     expect(promo.nextElementSibling).toBe(selector.parentElement)
@@ -461,13 +498,13 @@ describe('ParticipantShell STACK integration', () => {
     })
 
     renderParticipant()
-    await waitFor(() => expect(screen.getByText('Regístrate para jugar desde tu móvil')).toBeInTheDocument())
+    expect(await screen.findByRole('button', { name: 'Continuar' })).toBeInTheDocument()
   })
 
   it('switches registration language without losing entered values or fetching again', async () => {
       renderParticipant()
-      expect(await screen.findByText('Regístrate para jugar desde tu móvil')).toBeInTheDocument()
-      fireEvent.change(screen.getByLabelText(/Email/), { target: { value: 'ana@example.test' } })
+      expect(await screen.findByRole('button', { name: 'Continuar' })).toBeInTheDocument()
+      await advanceToParticipantDetails('ana@example.test')
       fireEvent.click(screen.getByRole('checkbox'))
       const selector = screen.getByRole('combobox', { name: 'Idioma' })
       expect(selector).toHaveClass('absolute', 'right-3', 'top-3')
@@ -476,10 +513,13 @@ describe('ParticipantShell STACK integration', () => {
       expect(screen.getByRole('option', { name: 'EN' })).toBeInTheDocument()
       expect(screen.queryByText('Idioma')).not.toBeInTheDocument()
       fireEvent.change(selector, { target: { value: 'en' } })
-      expect(screen.getByText('Register to play on your phone')).toBeInTheDocument()
+      expect(screen.getByLabelText(/Full name/)).toBeInTheDocument()
+      expect(screen.queryByText('Your details')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Send code' })).toBeInTheDocument()
       expect(screen.getByRole('link', { name: 'Privacy policy' })).toHaveAttribute('href', '/pages/privacy.html')
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
       expect(screen.getByLabelText(/Email/)).toHaveValue('ana@example.test')
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
       expect(screen.getByRole('checkbox')).toBeChecked()
       fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), { target: { value: 'es' } })
       expect(screen.getByRole('button', { name: 'Enviar código' })).toBeInTheDocument()
@@ -610,8 +650,8 @@ describe('ParticipantShell STACK integration', () => {
       assignment: gameType === 'T1MER' ? timerAssignment : pairAssignment,
     })
     renderParticipant()
-    expect(await screen.findByText('Regístrate para jugar desde tu móvil')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText(/Email/), { target: { value: 'ana@example.test' } })
+    expect(await screen.findByRole('button', { name: 'Continuar' })).toBeInTheDocument()
+    await advanceToParticipantDetails('ana@example.test')
     fireEvent.change(screen.getByLabelText(/Nombre completo/), { target: { value: 'Ana' } })
     fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
@@ -856,6 +896,7 @@ describe('ParticipantShell STACK integration', () => {
       })
       renderParticipant()
       expect(await screen.findByLabelText('Email *')).toBeInTheDocument()
+      await advanceToParticipantDetails()
       expect(screen.getByLabelText('Nombre completo *')).toBeInTheDocument()
       expect(screen.queryByText('Participa desde Instagram')).not.toBeInTheDocument()
       expect(screen.queryByText('Juego no disponible')).not.toBeInTheDocument()

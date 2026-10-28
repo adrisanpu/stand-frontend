@@ -5,6 +5,7 @@ import { usePolling } from '../../hooks/usePolling'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import type { GamePrize } from '../prizes'
 import PrizeSticker from './PrizeSticker'
+import type { StickerPrize } from './stackPrizePromotions'
 import { HOME_TITLE_TEXT, HOME_BODY_TEXT } from '../ui/homeTypography'
 
 interface RaffleWinner {
@@ -38,6 +39,7 @@ interface AutoRaffleConfig {
 }
 
 interface RaffleDataProps {
+  stackPrizes?: StickerPrize[]
   gameId: string
   gameName: string
   refreshInterval?: number // in milliseconds, 0 to disable
@@ -61,7 +63,7 @@ const loadAutoRaffleConfig = (gameId: string): AutoRaffleConfig | null => {
   return null
 }
 
-export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false, prizeLabel: legacyPrizeLabel, prize, maxPrizeRaffle: legacyMax }: RaffleDataProps) {
+export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false, prizeLabel: legacyPrizeLabel, prize, maxPrizeRaffle: legacyMax, stackPrizes }: RaffleDataProps) {
   const { t } = useOperatorLanguage()
   const prizeLabel = prize ? prize.name : legacyPrizeLabel
   const maxPrizeRaffle = prize ? prize.limit ?? undefined : legacyMax
@@ -324,7 +326,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
 
   return (
     <div className="flex flex-col h-full min-h-0 min-w-0 flex-1">
-      <PrizeSticker prize={prize} label={prizeLabel} current={winners.length} max={maxPrizeRaffle} compact={compact} />
+      <PrizeSticker items={stackPrizes} prize={prize} label={prizeLabel} current={winners.length} max={maxPrizeRaffle} compact={compact} />
       <div
         className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col relative flex-1 min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0' : 'p-3 sm:p-4 lg:p-6'} ${winnersDropdownOpen ? 'overflow-visible' : 'overflow-hidden'}`}
         ref={winnersDropdownRef}

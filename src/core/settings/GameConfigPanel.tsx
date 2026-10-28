@@ -214,7 +214,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
           </fieldset>
         )}
       </div>
-      <div className="flex-shrink-0 border-t border-white/10 px-6 py-4 space-y-2">
+      <div className="settings-footer border-t border-white/10 px-6 py-4 space-y-2">
         {saveState.status === 'error' && (
           <p role="alert" className="text-sm text-red-300">{translateSaveError(saveState.message)}</p>
         )}

@@ -21,7 +21,7 @@ export default function AssignmentView({ gameId, gameMeta, onValidate, showPrize
 
   return (
     <div className="space-y-5 text-center">
-      <div className="relative min-h-[16rem] overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      <div className="play-character relative min-h-[16rem] overflow-hidden rounded-2xl border border-white/10 bg-white/5">
         <div className="absolute left-3 right-3 top-3 z-10 flex items-center justify-between gap-2">
           <p className="shrink-0 rounded-lg bg-black/60 px-2 py-1 text-left text-sm text-white uppercase tracking-wide">{t('Te toca')}</p>
           <div className="flex min-w-0 items-center gap-2 rounded-lg bg-black/60 px-2 py-1 text-white">

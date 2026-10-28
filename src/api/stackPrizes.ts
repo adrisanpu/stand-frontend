@@ -15,12 +15,17 @@ export type StackPrizeItem = {
 export type StackPrizeRule = {
   id: string
   condition: StackPrizeCondition
-  mode: 'all' | 'random_one'
-  allocations: { prizeId: string; quantity: number }[]
+  groups: { allocations: { prizeId: string; quantity: number }[] }[]
   topX?: number
 }
+export type StackPrizePromotion = {
+  condition: StackPrizeCondition
+  topX?: number
+  names: string[]
+  prizes?: { id: string; name: string; imageUrl?: string | null }[]
+}
 export type StackPrizeProgram = {
-  version: 2
+  version: 3
   catalog: StackPrizeItem[]
   rules: StackPrizeRule[]
   storefrontUrl: string
@@ -58,7 +63,7 @@ export const stackPrizeApi = {
   get: (gameId: string) => api.get<StackPrizeSettingsResponse>(`/v1/game/stack/prizes?gameId=${encodeURIComponent(gameId)}`),
   async save(gameId: string, program: StackPrizeProgram) {
     const data = await api.put<{ ok: boolean; program: StackPrizeProgram }>('/v1/game/stack/prizes', { gameId, program })
-    if (data.ok !== true || data.program?.version !== 2) throw new Error('Invalid Stack prize response')
+    if (data.ok !== true || data.program?.version !== 3) throw new Error('Invalid Stack prize response')
     return data.program
   },
   close: (gameId: string, excludePlayerIds: number[] = []) =>

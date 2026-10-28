@@ -44,6 +44,23 @@ function openConfig() {
 const footer = () => screen.getByRole('button', { name: 'Guardar y aplicar cambios' })
 
 describe('SettingsMenu Configurar juego', () => {
+  it('routes STACK closure through prize finalization rather than generic deactivation', async () => {
+    const state = {
+      ok: true, enabled: true, state: 'open', pendingPlayers: [], awards: [], inventory: [], allocations: [],
+      program: { version: 3, catalog: [], rules: [], storefrontUrl: '' },
+    }
+    vi.mocked(api.get).mockResolvedValue(state)
+    vi.mocked(api.post).mockResolvedValue({ ...state, state: 'closed' })
+    render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="STACK" gameDefinition={{ ...l3tras, id: 'STACK' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar juego' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cerrar juego' }))
+    expect(api.post).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cierre' }))
+    await screen.findByText(/Juego cerrado. El ranking es definitivo/)
+    expect(api.post).toHaveBeenCalledWith('/v1/game/stack/prizes', { gameId: 'ABC123', excludePlayerIds: [] })
+    expect(api.put).not.toHaveBeenCalled()
+  })
+
   it('shows the connected Kivly logo on the game configuration menu entry', async () => {
     const account = vi.spyOn(kivlyApi, 'getAccountConnection').mockResolvedValueOnce({
       connected: true,

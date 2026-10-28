@@ -71,3 +71,60 @@ it('does not show a claim from a mismatched game response', async () => {
   expect(await screen.findByRole('alert')).toBeInTheDocument()
   expect(screen.queryByRole('img', { name: 'QR Premio del ranking' })).not.toBeInTheDocument()
 })
+
+it('places the compact wallet after the result and before earned prizes', async () => {
+  vi.mocked(publicApi.getPlayer).mockResolvedValue({
+    ...response, prizes: [], stackPrizes: {
+      walletUrl: 'https://club.kivly.store/add-to-wallet', state: 'open', finalPrizesPending: false,
+      awards: [{ id: 'unit', name: 'Pizza', source: 'stand', condition: 'completed', state: 'available', token: 'qr' }],
+    },
+  })
+  const { rerender } = render(<RankingPrizeClaim gameId="GAME1" playerToken="session" enabled={false} rank={null} />)
+  expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  rerender(<RankingPrizeClaim gameId="GAME1" playerToken="session" enabled rank={1} />)
+  const wallet = await screen.findByRole('link', { name: 'Añadir a mi wallet y desbloquear mi premio' })
+  const position = screen.getByRole('heading', { name: 'Posición: #1' })
+  const prize = screen.getByRole('heading', { name: 'Pizza' })
+  expect(position.compareDocumentPosition(wallet) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(wallet.compareDocumentPosition(prize) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.queryByText('STAND · QR')).not.toBeInTheDocument()
+  expect(screen.queryByText('Por completar la partida')).not.toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Abre la wallet para ver tu premio' })).toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: 'QR Pizza' })).not.toBeInTheDocument()
+  fireEvent.click(wallet)
+  expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
+  expect(wallet).not.toHaveClass('wallet-highlight')
+})
+
+it.each([null, 'https://other.example/add-to-wallet'])('keeps prizes accessible without a usable wallet link (%s)', async (walletUrl) => {
+  vi.mocked(publicApi.getPlayer).mockResolvedValue({
+    ...response, prizes: [], stackPrizes: {
+      walletUrl, state: 'open', finalPrizesPending: false,
+      awards: [{ id: 'unit', name: 'Pizza', source: 'stand', condition: 'completed', state: 'available', token: 'qr' }],
+    },
+  })
+  render(<RankingPrizeClaim gameId="GAME1" playerToken="session" enabled rank={1} />)
+  expect(await screen.findByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
+})
+
+it('preserves the visual reveal across prize refreshes', async () => {
+  vi.useFakeTimers()
+  vi.mocked(publicApi.getPlayer).mockResolvedValue({
+    ...response, prizes: [], stackPrizes: {
+      walletUrl: 'https://club.kivly.store/add-to-wallet', state: 'open', finalPrizesPending: false,
+      awards: [
+        { id: 'unit', name: 'Pizza', source: 'stand', condition: 'completed', state: 'available', token: 'qr' },
+        { id: 'club', name: 'Coffee', source: 'kivly', condition: 'completed', state: 'confirmed' },
+      ],
+    },
+  })
+  render(<RankingPrizeClaim gameId="GAME1" playerToken="session" enabled rank={1} />)
+  await act(async () => {})
+  expect(screen.getAllByRole('img', { name: 'Abre la wallet para ver tu premio' })).toHaveLength(2)
+  fireEvent.click(screen.getByRole('link', { name: 'Añadir a mi wallet y desbloquear mi premio' }))
+  await act(async () => { vi.advanceTimersByTime(30000) })
+  expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
+})

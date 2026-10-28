@@ -7,6 +7,7 @@ import { usePolling } from '../../hooks/usePolling'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import type { GamePrize } from '../prizes'
 import PrizeSticker from './PrizeSticker'
+import type { StickerPrize } from './stackPrizePromotions'
 import { HOME_TITLE_TEXT, HOME_BODY_TEXT } from '../ui/homeTypography'
 
 interface GameDataResponse {
@@ -20,6 +21,7 @@ interface GameDataResponse {
 }
 
 interface PlayersProps {
+  stackPrizes?: StickerPrize[]
   gameName: string
   gameId?: string
   gameType?: string
@@ -48,7 +50,7 @@ function getEmpareja2MaxValidations(gameId: string | undefined): number | undefi
   }
 }
 
-export default function Players({ gameName, gameId, gameType, refreshInterval = 10000, compact = false, countersOnly = false, prizeLabel: legacyPrizeLabel, prize, maxPrizeValidationLimit }: PlayersProps) {
+export default function Players({ gameName, gameId, gameType, refreshInterval = 10000, compact = false, countersOnly = false, prizeLabel: legacyPrizeLabel, prize, maxPrizeValidationLimit, stackPrizes }: PlayersProps) {
   const { t } = useOperatorLanguage()
   const { plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
@@ -94,7 +96,7 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
   if (countersOnly && isEmpareja2) {
     return (
       <div className="flex flex-col shrink-0 min-w-0">
-        <PrizeSticker label={prizeLabel} prize={prize} current={validatedCount} max={effectiveMax} compact={compact} />
+        <PrizeSticker items={stackPrizes} label={prizeLabel} prize={prize} current={validatedCount} max={effectiveMax} compact={compact} />
         <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
           {isStale && <span className={`${HOME_BODY_TEXT} font-normal text-yellow-500 mb-1 block`}>● {t('sin señal', 'offline')}</span>}
           <div className="space-y-2">
@@ -125,7 +127,7 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
 
   return (
     <div className="flex flex-col shrink-0 min-w-0">
-      <PrizeSticker label={prizeLabel} prize={prize} current={validatedCount} max={effectiveMax} compact={compact} />
+      <PrizeSticker items={stackPrizes} label={prizeLabel} prize={prize} current={validatedCount} max={effectiveMax} compact={compact} />
       <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
         {isStale && <span className={`${HOME_BODY_TEXT} font-normal text-yellow-500 mb-1 block`}>● {t('sin señal', 'offline')}</span>}
         <div className="flex flex-wrap items-center gap-3">

@@ -5,7 +5,7 @@ import { useParticipantLanguage } from '../../core/participant/participantLangua
 import type { PrizeCatalog } from '../../core/prizes'
 import { PrizeImage } from '../../core/widgets/PrizePresentation'
 import type { StackPlayerPrizes } from '../../api/stackPrizes'
-import StackAwardList, { StackWallet } from './StackAwardList'
+import StackAwardList, { isStackWalletUrl, StackWallet } from './StackAwardList'
 
 type Props = {
   gameId: string
@@ -35,6 +35,9 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [revision, setRevision] = useState(0)
+  const [openedWallet, setOpenedWallet] = useState('')
+  const walletKey = JSON.stringify([gameId, playerToken, stackPrizes?.walletUrl])
+  const walletLocked = isStackWalletUrl(stackPrizes?.walletUrl ?? null) && openedWallet !== walletKey
   const retry = useCallback(() => setRevision((previous) => previous + 1), [])
 
   useEffect(() => {
@@ -80,7 +83,6 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
   const rankingPrize = (catalog ?? prizeCatalog)?.ranking
   return (
     <>
-      {enabled && stackPrizes && <StackWallet url={stackPrizes.walletUrl} expected={stackPrizes.walletExpected} />}
       <div className="stack-viewport relative w-full h-[45vh] min-h-[220px] max-h-[440px] rounded-xl overflow-hidden border border-primary/20">
         {children}
         {enabled && (rank != null || prize) && (
@@ -121,7 +123,11 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
               : <p className="text-sm text-textSub">{t('Muestra este QR en el punto de recogida para canjear tu premio.')}</p>
           )
       )}
-      {enabled && stackPrizes && <StackAwardList data={stackPrizes} />}
+      {enabled && stackPrizes && <>
+        <StackWallet url={stackPrizes.walletUrl} expected={stackPrizes.walletExpected}
+          highlight={walletLocked} onOpen={() => setOpenedWallet(walletKey)} />
+        <StackAwardList data={stackPrizes} locked={walletLocked} />
+      </>}
     </>
   )
 }

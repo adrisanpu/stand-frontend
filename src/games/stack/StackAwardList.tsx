@@ -14,35 +14,37 @@ function AwardQR({ award }: { award: StackAward }) {
   return source ? <img src={source} alt={`QR ${award.name}`} className="w-36 h-36 rounded-xl bg-white shrink-0" /> : null
 }
 
-export function StackWallet({ url, expected = false }: { url: string | null; expected?: boolean }) {
+export function isStackWalletUrl(url: string | null): boolean {
+  if (!url) return false
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' && parsed.hostname.endsWith('.kivly.store')
+      && !parsed.username && !parsed.password && parsed.pathname === '/add-to-wallet'
+  } catch { return false }
+}
+
+export function StackWallet({ url, expected = false, onOpen, highlight = true }: {
+  url: string | null; expected?: boolean; onOpen?: () => void; highlight?: boolean
+}) {
   const { t } = useParticipantLanguage()
   if (!url) return expected ? <p role="status" className="text-sm text-amber-300">
     {t('Tu tarjeta del club no está disponible aquí. Consulta al equipo del evento.')}
   </p> : null
-  let safe = false
-  try {
-    const parsed = new URL(url)
-    safe = parsed.protocol === 'https:' && parsed.hostname.endsWith('.kivly.store')
-      && !parsed.username && !parsed.password && parsed.pathname === '/add-to-wallet'
-  } catch { safe = false }
-  if (!safe) return <p role="alert">{t('No se pudo comprobar el enlace de tu wallet.')}</p>
-  return <section className="rounded-2xl border border-primary/30 bg-primary/10 p-5 space-y-2 text-center">
-    <h2 className="text-lg font-bold">{t('Tu tarjeta del club')}</h2>
-    <p className="text-sm text-textSub">{t('Guárdala en Apple Wallet o Google Wallet. Los premios Kivly se asignan automáticamente a tu cuenta.')}</p>
-    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex rounded-xl bg-white text-black px-6 py-3 font-semibold">
-      {t('Añadir a mi wallet')}
+  if (!isStackWalletUrl(url)) return <p role="alert">{t('No se pudo comprobar el enlace de tu wallet.')}</p>
+  return <div className="text-center">
+    <a href={url} target="_blank" rel="noopener noreferrer" onClick={onOpen}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl border border-primary bg-primary/30 hover:bg-primary/40 px-4 py-3 text-sm font-semibold ${highlight ? 'wallet-highlight' : ''}`}>
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M20 8V5a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v12H5a3 3 0 0 1-3-3V6" />
+        <path d="M22 12h-6v5h6zM18 14.5h1" />
+      </svg>
+      {t('Añadir a mi wallet y desbloquear mi premio')}
     </a>
-  </section>
+  </div>
 }
 
-export default function StackAwardList({ data }: { data: StackPlayerPrizes }) {
+export default function StackAwardList({ data, locked = false }: { data: StackPlayerPrizes; locked?: boolean }) {
   const { t } = useParticipantLanguage()
-  const labels: Record<StackAward['condition'], string> = {
-    completed: t('Por completar la partida'),
-    top_finish: t('Por tu posición al terminar'),
-    top_final: t('Por tu posición final'),
-    raffle: t('Por ganar el sorteo'),
-  }
   const states: Record<StackAward['state'], string> = {
     available: t('Recógelo mostrando este QR.'),
     delivered: t('Premio recogido. ¡Disfrútalo!'),
@@ -55,17 +57,24 @@ export default function StackAwardList({ data }: { data: StackPlayerPrizes }) {
   return <section aria-label={t('Tus premios')} className="space-y-3 text-left">
     <h2 className="text-lg font-bold">{t('Tus premios')}</h2>
     {data.awards.length === 0 && <p className="text-sm text-textSub">{t('Todavía no tienes premios asignados.')}</p>}
-    {data.awards.map((award) => <article key={award.id} className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
+    {data.awards.map((award) => <article key={award.id} className="relative rounded-xl border border-white/10 bg-black/20 p-3">
+      <div className={`space-y-2 ${locked ? 'opacity-30' : ''}`}>
       <div className="flex items-center gap-3">
         {award.imageUrl && <img src={award.imageUrl} alt="" className="w-14 h-14 object-contain" />}
-        <div className="flex-1 min-w-0"><p className="text-xs text-textSub">{labels[award.condition]}</p>
-          <h3 className="font-semibold break-words">{award.name}</h3></div>
-        <span className="shrink-0 rounded-full bg-white/5 px-2 py-1 text-xs">{award.source === 'stand' ? 'STAND · QR' : 'Kivly · Wallet'}</span>
+        <h3 className="flex-1 min-w-0 font-semibold break-words">{award.name}</h3>
       </div>
       <div className="flex flex-col sm:flex-row items-center gap-4">
-        {award.source === 'stand' && award.state === 'available' && <AwardQR award={award} />}
+        {!locked && award.source === 'stand' && award.state === 'available' && <AwardQR award={award} />}
         <p role="status" className={`text-sm ${award.state.includes('required') ? 'text-amber-300' : 'text-textSub'}`}>{states[award.state]}</p>
       </div>
+      </div>
+      {locked && <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/10">
+        <span role="img" aria-label={t('Abre la wallet para ver tu premio')} className="rounded-full bg-surface p-3 text-primary shadow-lg">
+          <svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="4" y="10" width="16" height="12" rx="3" /><path d="M8 10V6a4 4 0 0 1 8 0v4M12 15v3" />
+          </svg>
+        </span>
+      </div>}
     </article>)}
     {data.finalPrizesPending && <p className="text-sm text-textSub">{t('El ranking definitivo y sus premios se decidirán al cerrar el juego.')}</p>}
     {data.state === 'closed' && <p className="text-sm text-textSub">{t('Juego cerrado. Tus premios siguen disponibles aquí.')}</p>}
