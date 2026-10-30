@@ -23,10 +23,12 @@ describe('API error responses', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      new Response('External response must remain private', { status: 502 })
+      new Response(JSON.stringify({
+        error: 'KivlyRewardCreationUncertain', detail: 'External response must remain private',
+      }), { status: 502 })
     ))
     await expect(api.get('/v1/kivly')).rejects.toMatchObject({
-      status: 502, message: 'Kivly API error: 502',
+      status: 502, code: 'KivlyRewardCreationUncertain', message: 'Kivly API error: 502',
     })
     expect(log).not.toHaveBeenCalled()
   })

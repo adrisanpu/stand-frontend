@@ -19,7 +19,21 @@ export type KivlyAccountConnection = KivlyConnection & {
   clubSettings?: KivlyClubSettings | null
 }
 
-export type KivlyReward = { id: string; name: string }
+export type KivlyReward = { id: string; name: string; imageUrl?: string }
+
+export type KivlyRewardDraft = {
+  title: string
+  description: string
+  rewardType: 'discount_percentage' | 'discount_fixed' | 'free_item'
+  value: number
+  pointsRequired: number
+  image?: string
+  termsAndConditions?: string
+  validFrom?: string
+  validUntil?: string
+  maxRedemptions?: number
+  maxRedemptionsPerUser?: number
+}
 
 export const kivlyApi = {
   async listRewards(gameId: string): Promise<KivlyReward[]> {
@@ -28,10 +42,21 @@ export const kivlyApi = {
     )
     if (data?.ok !== true || !Array.isArray(data.rewards)
       || !data.rewards.every((reward) => typeof reward?.id === 'string' && !!reward.id
-        && typeof reward.name === 'string' && !!reward.name)) {
+        && typeof reward.name === 'string' && !!reward.name
+        && (reward.imageUrl === undefined || typeof reward.imageUrl === 'string'))) {
       throw new Error('Invalid Kivly rewards response')
     }
     return data.rewards
+  },
+  async createReward(gameId: string, reward: KivlyRewardDraft): Promise<KivlyReward> {
+    const data = await api.post<{ ok: boolean; reward: KivlyReward }>(
+      '/v1/game/kivly/rewards', { gameId, ...reward },
+    )
+    if (data?.ok !== true || typeof data.reward?.id !== 'string' || !data.reward.id
+      || typeof data.reward.name !== 'string' || !data.reward.name) {
+      throw new Error('Invalid Kivly reward creation response')
+    }
+    return data.reward
   },
   async getAccountConnection(): Promise<KivlyAccountConnection> {
     const data = await api.get<{ ok: boolean; connection: KivlyAccountConnection }>('/v1/kivly')

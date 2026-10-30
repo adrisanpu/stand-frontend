@@ -55,9 +55,23 @@ automatically replayed. Installed-wallet propagation has not been live-verified.
 
 ### STACK: textual prize rules
 
-`Settings > Premios` starts with an exclusive **Wallet / Email** selector for
-Kivly delivery, followed by **Catálogo e inventario**, without a redundant
-header, summary counters or search filters, then consecutive rules.
+`Settings > Premios` starts with **Catálogo de premios**: name search,
+**+ CREAR** opening an inline creation form above the gallery, and a horizontal
+scroll-snap gallery with four cards on desktop, two on smaller screens and
+one on mobile. Arrow controls and native touch scrolling reveal more prizes.
+Cards put the image first, followed by name, source logo, consumed inventory
+as **Entregados**, editable total **Stock**, and **Disponibles = Stock - Entregados**.
+Hover, image click and keyboard focus reveal upload/remove actions, without
+exposing native file-input text. Uploaded PNGs (up to 5 MB) are game-local for
+both STAND and Kivly; they do not edit the external Kivly catalog.
+Both creation forms share a compact four-column desktop row for source, name,
+initial stock (1-1,000, default 100), and PNG upload with inline preview.
+Kivly-only fields and advanced options use the same compact controls and grid.
+Prize artwork has a transparent background; source badges use the footer logos.
+Rules follow the gallery; the exclusive **Wallet / Email** Kivly delivery
+selector comes after the rules. Dropdown controls have transparent backgrounds,
+with white text in dark mode and black text in light mode; native option lists
+use a matching theme background to keep choices readable.
 Wallet is the default for older programs. Email selection is unavailable until
 the backend environment enables it. A channel change affects only new attempts.
 Email mode automatically sends confirmed Kivly rewards to the verified address
@@ -75,9 +89,15 @@ Each rule uses "Cuando [condition], entregar [OR groups of AND prizes]".
 Offer completed game, top X at own finish, final top X at closure, and raffle
 winner (subject to the existing raffle plan). The combined selector
 groups game-local STAND prizes and the connected business's existing Kivly
-catalog without filtering. A STAND prize needs a name and may have a PNG; creating one never
-creates a Kivly reward. New Kivly selections use local IDs independent of the
-external reward ID. Edits stay drafts until the save succeeds.
+catalog without filtering. When connected, owners can create Kivly rewards here
+with the required name, description, type, value and points threshold; optional
+image upload is part of the creation form; terms, validity dates and redemption
+limits are under advanced options. Creation adds the reward to the local game
+inventory and refreshes the external catalog; the owner selects it in a rule
+separately. Image and inventory drafts require saving. An uncertain create requires a catalog refresh before another
+attempt. A STAND prize needs a name and may have a PNG. New Kivly selections use
+local IDs independent of the external reward ID. Edits stay drafts until the
+save succeeds.
 
 Each alternative group contains one or more prizes and quantities. A single
 group awards its available prizes. Multiple groups are selected with equal

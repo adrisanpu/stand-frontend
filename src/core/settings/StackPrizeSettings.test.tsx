@@ -1,12 +1,14 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { stackPrizeApi, type StackPrizeSettingsResponse } from '../../api/stackPrizes'
 import { kivlyApi } from '../../api/kivlyApi'
-import { uploadPrizeImage } from '../../api/prizeMedia'
+import { uploadPrizeImage, validatePrizeImage } from '../../api/prizeMedia'
 import StackPrizeSettings from './StackPrizeSettings'
 
 vi.mock('../../api/stackPrizes', () => ({ stackPrizeApi: { get: vi.fn(), save: vi.fn(), close: vi.fn(), retryEmail: vi.fn() } }))
-vi.mock('../../api/kivlyApi', () => ({ kivlyApi: { getAccountConnection: vi.fn(), listRewards: vi.fn() } }))
+vi.mock('../../api/kivlyApi', () => ({
+  kivlyApi: { getAccountConnection: vi.fn(), listRewards: vi.fn(), createReward: vi.fn() },
+}))
 vi.mock('../../api/prizeMedia', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/prizeMedia')>(),
   uploadPrizeImage: vi.fn(), validatePrizeImage: vi.fn(),
@@ -26,6 +28,7 @@ beforeEach(() => {
     connected: true, locationId: 'loc', locations: [{ id: 'loc', name: 'Club' }],
   })
   vi.mocked(kivlyApi.listRewards).mockResolvedValue([{ id: 'coffee', name: 'Coffee' }])
+  vi.mocked(kivlyApi.createReward).mockResolvedValue({ id: 'new-reward', name: 'New reward' })
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 function mount() {
@@ -34,6 +37,13 @@ function mount() {
   return { onPersist }
 }
 const save = () => fireEvent.click(screen.getByRole('button', { name: 'Guardar reglas de premios' }))
+async function openCreate(source: 'stand' | 'kivly' = 'stand') {
+  fireEvent.click(await screen.findByRole('button', { name: '+ CREAR' }))
+  if (source === 'kivly') {
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Kivly' })).toBeEnabled())
+    fireEvent.change(screen.getByLabelText('Origen del premio'), { target: { value: 'kivly' } })
+  }
+}
 
 it('adds a Kivly reward to an AND group without creating it externally', async () => {
   const { onPersist } = mount()
@@ -96,21 +106,71 @@ it('shows the full external catalog without publishing it until selected', async
   await screen.findByRole('option', { name: 'Coffee' })
   expect(screen.getByRole('button', { name: 'Añadir al inventario' })).toBeInTheDocument()
   expect(stackPrizeApi.save).not.toHaveBeenCalled()
-  expect(screen.queryByRole('textbox', { name: 'Buscar premios' })).not.toBeInTheDocument()
+  expect(screen.getByRole('searchbox', { name: 'Buscar premios' })).toBeInTheDocument()
   expect(screen.queryByText('Reglas de premios')).not.toBeInTheDocument()
   expect(screen.queryByText('Entregas')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Web oficial del club Kivly')).not.toBeInTheDocument()
 })
 
+it('creates a Kivly reward with minimal required details and refreshes the catalog', async () => {
+  mount()
+  await openCreate('kivly')
+  fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Tea' } })
+  fireEvent.change(screen.getByLabelText('Tipo de premio'), { target: { value: 'discount_fixed' } })
+  fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'A cup of tea' } })
+  fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '5' } })
+  fireEvent.change(screen.getByLabelText('Puntos necesarios'), { target: { value: '20' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Crear en Kivly' }))
+
+  await waitFor(() => expect(kivlyApi.createReward).toHaveBeenCalledWith('ABC123', {
+    title: 'Tea', description: 'A cup of tea', rewardType: 'discount_fixed',
+    value: 5, pointsRequired: 20,
+  }))
+  expect(await screen.findByText('Premio creado en Kivly. Guarda para aplicar el inventario y la imagen al juego.')).toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: 'Crear premio' })).not.toBeInTheDocument()
+  await waitFor(() => expect(kivlyApi.listRewards).toHaveBeenCalledTimes(2))
+  expect(stackPrizeApi.save).not.toHaveBeenCalled()
+})
+
+it('hides Kivly reward creation when the account is disconnected', async () => {
+  vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
+    connected: false, locationId: null, locations: [],
+  })
+  mount()
+  await screen.findByText('Catálogo de premios')
+  expect(screen.queryByRole('button', { name: 'Crear en Kivly' })).not.toBeInTheDocument()
+})
+
+it('requires a catalog refresh before retrying an uncertain creation', async () => {
+  vi.mocked(kivlyApi.createReward).mockRejectedValueOnce(Object.assign(
+    new Error('Kivly API error: 503'), { code: 'KivlyRewardCreationUncertain' },
+  ))
+  mount()
+  await openCreate('kivly')
+  fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Tea' } })
+  fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'A cup of tea' } })
+  fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '5' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Crear en Kivly' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo confirmar la creación')
+  expect(screen.getByRole('button', { name: 'Crear en Kivly' })).toBeDisabled()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Actualizar catálogo y revisar' }))
+  await screen.findByText('No se encontró un premio con ese nombre. Ya puedes volver a intentar.')
+  expect(screen.getByRole('button', { name: 'Crear en Kivly' })).toBeEnabled()
+  expect(kivlyApi.createReward).toHaveBeenCalledTimes(1)
+})
+
 it('adds a local STAND prize without creating anything in Kivly', async () => {
   mount()
-  await screen.findByText('Catálogo e inventario')
+  await openCreate()
   fireEvent.change(screen.getByLabelText('Nombre del premio STAND'), { target: { value: 'Bebida' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Añadir' }))
+  fireEvent.change(screen.getByLabelText('Stock inicial'), { target: { value: '25' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Crear premio STAND' }))
+  await screen.findByRole('article', { name: 'Bebida' })
   save()
   await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalled())
   expect(vi.mocked(stackPrizeApi.save).mock.calls[0][1].catalog).toEqual(expect.arrayContaining([
-    expect.objectContaining({ source: 'stand', name: 'Bebida', stockTotal: 100 }),
+    expect.objectContaining({ source: 'stand', name: 'Bebida', stockTotal: 25 }),
   ]))
 })
 
@@ -138,10 +198,11 @@ it('previews remaining stock while editing without a header of counters', async 
     ...structuredClone(response), inventory: [{ prizeId: 'pizza', total: 100, remaining: 97 }],
   })
   mount()
-  await screen.findByText('Catálogo e inventario')
-  expect(screen.getByText('Disponibles: 97')).toBeInTheDocument()
+  const card = await screen.findByRole('article', { name: 'Pizza' })
+  expect(card).toHaveTextContent('Disponibles: 97')
+  expect(card).toHaveTextContent('Entregados: 3')
   fireEvent.change(screen.getByLabelText('Inventario total Y de Pizza'), { target: { value: '8' } })
-  expect(screen.getByText('Disponibles: 5')).toBeInTheDocument()
+  expect(card).toHaveTextContent('Disponibles: 5')
   expect(screen.queryByText('STAND · Recogida con QR')).not.toBeInTheDocument()
   expect(screen.queryByText('Sin cambios pendientes')).not.toBeInTheDocument()
   save()
@@ -161,7 +222,7 @@ it('removes a selected prize only through its explicit remove control', async ()
 
 it('offers both ranking conditions and requires a prize in each added rule', async () => {
   mount()
-  await screen.findByText('Catálogo e inventario')
+  await screen.findByText('Catálogo de premios')
   fireEvent.click(screen.getByRole('button', { name: 'Añadir regla' }))
   expect(screen.getByRole('button', { name: 'Guardar reglas de premios' })).toBeDisabled()
   fireEvent.change(screen.getByLabelText('Condición 2'), { target: { value: 'top_final' } })
@@ -224,4 +285,117 @@ it('locks prize editing after closure starts', async () => {
   mount()
   expect(await screen.findByLabelText('Inventario total Y de Pizza')).toBeDisabled()
   expect(screen.queryByRole('button', { name: 'Confirmar cierre' })).not.toBeInTheDocument()
+})
+
+it('filters only the cards by name without changing rule choices or unsaved stock', async () => {
+  mount()
+  await screen.findByRole('article', { name: 'Coffee' })
+  fireEvent.change(screen.getByLabelText('Inventario total Y de Pizza'), { target: { value: '8' } })
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar premios' }), { target: { value: ' COFF ' } })
+  expect(screen.queryByRole('article', { name: 'Pizza' })).not.toBeInTheDocument()
+  expect(screen.getByRole('article', { name: 'Coffee' })).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar premios' }), { target: { value: 'missing' } })
+  expect(screen.getByText('No hay premios que coincidan con la búsqueda.')).toBeInTheDocument()
+  expect(within(screen.getByLabelText('Añadir premio al grupo 1.1')).getByRole('option', { name: 'Coffee' })).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar premios' }), { target: { value: '' } })
+  expect(screen.getByLabelText('Inventario total Y de Pizza')).toHaveValue(8)
+  expect(stackPrizeApi.save).not.toHaveBeenCalled()
+})
+
+it('provides a four-card desktop row and navigates horizontally in both directions', async () => {
+  vi.mocked(kivlyApi.listRewards).mockResolvedValue(Array.from({ length: 5 }, (_, index) => ({
+    id: `reward-${index}`, name: `Reward ${index}`,
+  })))
+  mount()
+  await screen.findByRole('article', { name: 'Reward 4' })
+  const cards = screen.getAllByRole('article')
+  expect(cards).toHaveLength(6)
+  cards.forEach((card) => expect(card).toHaveClass('shrink-0', 'lg:basis-[calc((100%_-_1.5rem)/4)]'))
+  const scroller = cards[0].parentElement!
+  const scrollBy = vi.fn()
+  Object.defineProperty(scroller, 'clientWidth', { value: 800 })
+  scroller.scrollBy = scrollBy
+  fireEvent.click(screen.getByRole('button', { name: 'Premios siguientes' }))
+  expect(scrollBy).toHaveBeenLastCalledWith({ left: 800, behavior: 'smooth' })
+  fireEvent.click(screen.getByRole('button', { name: 'Premios anteriores' }))
+  expect(scrollBy).toHaveBeenLastCalledWith({ left: -800, behavior: 'smooth' })
+})
+
+it('places delivery after the rules and gives every dropdown readable colors', async () => {
+  mount()
+  const delivery = await screen.findByLabelText('Entrega de premios Kivly')
+  const rule = screen.getByRole('region', { name: 'Regla 1' })
+  expect(rule.compareDocumentPosition(delivery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  await openCreate('kivly')
+  screen.getAllByRole('combobox').forEach((select) => {
+    expect(select).toHaveClass('bg-transparent', 'stack-prize-select')
+  })
+})
+
+it('uploads a Kivly image locally and keeps its durable key when saving', async () => {
+  vi.stubGlobal('URL', class extends URL {
+    static createObjectURL = vi.fn(() => 'blob:kivly-preview')
+    static revokeObjectURL = vi.fn()
+  })
+  vi.mocked(uploadPrizeImage).mockResolvedValue('staged/kivly.png')
+  mount()
+  await openCreate('kivly')
+  fireEvent.change(screen.getByLabelText('Stock inicial'), { target: { value: '42' } })
+  fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Tea' } })
+  fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'A cup of tea' } })
+  fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '5' } })
+  const file = new File(['png'], 'tea.png', { type: 'image/png' })
+  fireEvent.change(screen.getByLabelText('Imagen del nuevo premio Kivly'), { target: { files: [file] } })
+  await screen.findByRole('img', { name: 'Vista previa del nuevo premio' })
+  fireEvent.click(screen.getByRole('button', { name: 'Crear en Kivly' }))
+  const card = await screen.findByRole('article', { name: 'New reward' })
+  expect(within(card).getByRole('img', { name: 'Vista previa del premio New reward' })).toHaveAttribute('src', 'blob:kivly-preview')
+  expect(validatePrizeImage).toHaveBeenCalledWith(file)
+  expect(uploadPrizeImage).toHaveBeenCalledWith('ABC123', 'ranking', file)
+  expect(kivlyApi.createReward).toHaveBeenCalledWith('ABC123', expect.not.objectContaining({ image: expect.anything() }))
+  save()
+  await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalledWith('ABC123', expect.objectContaining({
+    catalog: expect.arrayContaining([expect.objectContaining({ source: 'kivly', rewardId: 'new-reward', imageKey: 'staged/kivly.png', stockTotal: 42 })]),
+  })))
+})
+
+it('validates initial stock for both creation sources and uses footer logos', async () => {
+  mount()
+  await openCreate()
+  fireEvent.change(screen.getByLabelText('Nombre del premio STAND'), { target: { value: 'Gift' } })
+  for (const stock of ['', '0', '1001', '1.5']) {
+    fireEvent.change(screen.getByLabelText('Stock inicial'), { target: { value: stock } })
+    expect(screen.getByRole('button', { name: 'Crear premio STAND' })).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('El stock debe ser un entero entre 1 y 1000.')
+  }
+  await waitFor(() => expect(screen.getByRole('option', { name: 'Kivly' })).toBeEnabled())
+  fireEvent.change(screen.getByLabelText('Origen del premio'), { target: { value: 'kivly' } })
+  expect(screen.getByLabelText('Stock inicial')).toHaveValue(100)
+  fireEvent.change(screen.getByLabelText('Stock inicial'), { target: { value: '0' } })
+  expect(screen.getByRole('button', { name: 'Crear en Kivly' })).toBeDisabled()
+  const stand = within(screen.getByRole('article', { name: 'Pizza' })).getByRole('img', { name: 'STAND' })
+  const kivly = within(screen.getByRole('article', { name: 'Coffee' })).getByRole('img', { name: 'Kivly' })
+  expect(stand).toHaveAttribute('src', '/images/logo-stand-footer.png')
+  expect(kivly).toHaveAttribute('src', '/images/logo-kivly-footer.png')
+  expect(screen.getByRole('button', { name: 'Opciones de imagen para Pizza' }).parentElement).toHaveClass('bg-transparent')
+})
+
+it('uploads an image from an unconfigured Kivly card and adds it to the game inventory', async () => {
+  vi.stubGlobal('URL', class extends URL {
+    static createObjectURL = vi.fn(() => 'blob:coffee')
+    static revokeObjectURL = vi.fn()
+  })
+  vi.mocked(uploadPrizeImage).mockResolvedValue('staged/coffee.png')
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: 'Opciones de imagen para Coffee' }))
+  expect(screen.getByRole('button', { name: 'Opciones de imagen para Coffee' })).toHaveAttribute('aria-expanded', 'true')
+  fireEvent.change(screen.getByLabelText('Imagen de Coffee'), {
+    target: { files: [new File(['png'], 'coffee.png', { type: 'image/png' })] },
+  })
+  await screen.findByLabelText('Inventario total Y de Coffee')
+  save()
+  await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalledWith('ABC123', expect.objectContaining({
+    catalog: expect.arrayContaining([expect.objectContaining({ source: 'kivly', rewardId: 'coffee', imageKey: 'staged/coffee.png' })]),
+  })))
+  expect(kivlyApi.createReward).not.toHaveBeenCalled()
 })

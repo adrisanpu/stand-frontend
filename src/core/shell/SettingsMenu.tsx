@@ -582,7 +582,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
         <div className="absolute inset-0 bg-black/70" onClick={() => { if (!prizeSavingRef.current) onClose() }} aria-hidden="true" />
-        <div className="relative card w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className={`relative card w-full max-h-[90vh] flex flex-col overflow-hidden ${gameDefinition.id === 'STACK' ? 'max-w-5xl' : 'max-w-2xl'}`}>
           <div className="flex items-center justify-between gap-3 p-6 pb-4 flex-shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <button
