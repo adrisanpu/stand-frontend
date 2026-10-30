@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { stackPrizeApi, type StackPrizeCondition, type StackPrizeItem, type StackPrizeProgram, type StackPrizeRule, type StackPrizeSettingsResponse } from '../../api/stackPrizes'
-import { kivlyApi, type KivlyReward } from '../../api/kivlyApi'
+import { kivlyApi, type KivlyReward, type KivlyRewardDraft } from '../../api/kivlyApi'
 import { PrizeImageError, uploadPrizeImage, validatePrizeImage } from '../../api/prizeMedia'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 
@@ -8,6 +8,32 @@ const field = 'rounded-xl border border-white/15 bg-surface px-3 py-2 text-sm mi
 const action = 'rounded-xl border border-primary/30 bg-primary/20 px-3 py-2 text-sm hover:bg-primary/30 disabled:opacity-40'
 const conditions: StackPrizeCondition[] = ['completed', 'top_finish', 'top_final', 'raffle']
 const newId = () => crypto.randomUUID()
+
+type KivlyRewardForm = {
+  title: string
+  description: string
+  rewardType: KivlyRewardDraft['rewardType']
+  value: string
+  pointsRequired: string
+  image: string
+  termsAndConditions: string
+  validFrom: string
+  validUntil: string
+  maxRedemptions: string
+  maxRedemptionsPerUser: string
+}
+
+const emptyKivlyRewardForm: KivlyRewardForm = {
+  title: '', description: '', rewardType: 'discount_percentage', value: '',
+  pointsRequired: '0', image: '', termsAndConditions: '', validFrom: '',
+  validUntil: '', maxRedemptions: '', maxRedemptionsPerUser: '',
+}
+
+function isUncertainRewardCreation(error: unknown) {
+  if (typeof error !== 'object' || error === null) return false
+  if ('code' in error && error.code === 'KivlyRewardCreationUncertain') return true
+  return 'isNetworkError' in error && error.isNetworkError === true
+}
 
 export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavingChange }: {
   gameId: string
@@ -22,15 +48,21 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   const [program, setProgram] = useState<StackPrizeProgram | null>(null)
   const [rewards, setRewards] = useState<KivlyReward[]>([])
   const [locationId, setLocationId] = useState<string | null>(null)
+  const [kivlyConnected, setKivlyConnected] = useState(false)
   const [catalogError, setCatalogError] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [rewardForm, setRewardForm] = useState<KivlyRewardForm>(emptyKivlyRewardForm)
+  const [rewardError, setRewardError] = useState('')
+  const [rewardMessage, setRewardMessage] = useState('')
+  const [rewardCreationUncertain, setRewardCreationUncertain] = useState(false)
   const [busy, setBusy] = useState(false)
   const [revision, setRevision] = useState(0)
   const [catalogRevision, setCatalogRevision] = useState(0)
   const [name, setName] = useState('')
   const [dirty, setDirty] = useState(false)
   const previews = useRef(new Map<string, string>())
+  const uncertainRewardTitle = useRef<string | null>(null)
   useEffect(() => () => {
     previews.current.forEach((url) => URL.revokeObjectURL(url))
     previews.current.clear()
@@ -61,11 +93,36 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     let cancelled = false
     setRewards([])
     setLocationId(null)
+    setKivlyConnected(false)
     setCatalogError('')
     void kivlyApi.getAccountConnection().then(async (connection) => {
+      if (cancelled) return
+      setKivlyConnected(connection.connected)
       if (!connection.connected) return
+      setLocationId(connection.locationId)
       const catalog = await kivlyApi.listRewards(gameId)
-      if (!cancelled) { setLocationId(connection.locationId); setRewards(catalog) }
+      if (!cancelled) {
+        setRewards(catalog)
+        const pendingTitle = uncertainRewardTitle.current
+        if (pendingTitle !== null) {
+          const found = catalog.some((reward) => reward.name.trim().toLocaleLowerCase()
+            === pendingTitle.trim().toLocaleLowerCase())
+          if (!found) {
+            uncertainRewardTitle.current = null
+            setRewardCreationUncertain(false)
+            setRewardError('')
+            setRewardMessage(text.current(
+              'No se encontró un premio con ese nombre. Ya puedes volver a intentar.',
+              'No reward with that name was found. You can try again now.',
+            ))
+          } else {
+            setRewardMessage(text.current(
+              'Ya hay un premio con ese nombre en Kivly. No se enviará otro para evitar duplicados.',
+              'A reward with that name is already in Kivly. Another will not be sent to avoid duplicates.',
+            ))
+          }
+        }
+      }
     }).catch(() => {
       if (!cancelled) setCatalogError(text.current('No se pudo cargar Kivly. Comprueba la conexión antes de guardar sus premios.',
         'Could not load Kivly. Check the connection before saving its rewards.'))
@@ -73,7 +130,24 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     return () => { cancelled = true }
   }, [gameId, catalogRevision])
 
+  useEffect(() => {
+    setRewards([])
+    setLocationId(null)
+    setKivlyConnected(false)
+    setCatalogError('')
+    setRewardForm(emptyKivlyRewardForm)
+    setRewardError('')
+    setRewardMessage('')
+    setRewardCreationUncertain(false)
+    uncertainRewardTitle.current = null
+  }, [gameId])
+
   const change = (next: StackPrizeProgram) => { setProgram(next); setDirty(true); setMessage('') }
+  const updateRewardForm = (patch: Partial<KivlyRewardForm>) => {
+    setRewardForm((previous) => ({ ...previous, ...patch }))
+    setRewardError('')
+    setRewardMessage('')
+  }
   const run = async (work: () => Promise<void>) => {
     if (busy) return
     setBusy(true); onSavingChange?.(true); setError(''); setMessage('')
@@ -110,6 +184,110 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     change({ ...program, catalog: program.catalog.map((item) => item.id === prize.id ? { ...item, imageKey, imageUrl } : item) })
     setMessage(t('Imagen preparada; guarda para aplicarla.', 'Image ready; save to apply it.'))
   })
+  const createKivlyReward = async () => {
+    if (!kivlyConnected || !locationId || data?.state !== 'open' || rewardCreationUncertain) return
+    const value = Number(rewardForm.value)
+    const pointsRequired = Number(rewardForm.pointsRequired)
+    if (!rewardForm.title.trim() || !rewardForm.description.trim()
+      || !rewardForm.value.trim() || !Number.isFinite(value)
+      || !Number.isInteger(pointsRequired) || pointsRequired < 0) {
+      setRewardError(t('Completa nombre, descripción, valor y puntos válidos.',
+        'Enter a name, description, value, and valid points threshold.'))
+      return
+    }
+
+    let image: string | undefined
+    if (rewardForm.image.trim()) {
+      try {
+        const url = new URL(rewardForm.image.trim())
+        if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) throw new Error()
+        image = url.toString()
+      } catch {
+        setRewardError(t('La imagen debe usar una URL HTTPS válida.', 'Image must use a valid HTTPS URL.'))
+        return
+      }
+    }
+
+    const dateToIso = (value: string) => {
+      if (!value) return undefined
+      const date = new Date(value)
+      return Number.isNaN(date.getTime()) ? null : date.toISOString()
+    }
+    const validFrom = dateToIso(rewardForm.validFrom)
+    const validUntil = dateToIso(rewardForm.validUntil)
+    if (validFrom === null || validUntil === null
+      || (validFrom && validUntil && new Date(validFrom) > new Date(validUntil))) {
+      setRewardError(t('Revisa las fechas de vigencia.', 'Check the reward validity dates.'))
+      return
+    }
+    const maxRedemptions = rewardForm.maxRedemptions.trim()
+      ? Number(rewardForm.maxRedemptions) : undefined
+    const maxRedemptionsPerUser = rewardForm.maxRedemptionsPerUser.trim()
+      ? Number(rewardForm.maxRedemptionsPerUser) : undefined
+    if ((maxRedemptions !== undefined && (!Number.isInteger(maxRedemptions) || maxRedemptions < 1))
+      || (maxRedemptionsPerUser !== undefined
+        && (!Number.isInteger(maxRedemptionsPerUser) || maxRedemptionsPerUser < 1))) {
+      setRewardError(t('Los límites deben ser números enteros mayores que cero.',
+        'Redemption limits must be whole numbers greater than zero.'))
+      return
+    }
+
+    const draft: KivlyRewardDraft = {
+      title: rewardForm.title.trim(),
+      description: rewardForm.description.trim(),
+      rewardType: rewardForm.rewardType,
+      value,
+      pointsRequired,
+      ...(image ? { image } : {}),
+      ...(rewardForm.termsAndConditions.trim()
+        ? { termsAndConditions: rewardForm.termsAndConditions.trim() } : {}),
+      ...(validFrom ? { validFrom } : {}),
+      ...(validUntil ? { validUntil } : {}),
+      ...(maxRedemptions !== undefined ? { maxRedemptions } : {}),
+      ...(maxRedemptionsPerUser !== undefined ? { maxRedemptionsPerUser } : {}),
+    }
+    setBusy(true)
+    onSavingChange?.(true)
+    setRewardError('')
+    setRewardMessage('')
+    try {
+      await kivlyApi.createReward(gameId, draft)
+      setRewardForm(emptyKivlyRewardForm)
+      uncertainRewardTitle.current = null
+      setRewardCreationUncertain(false)
+      setRewardMessage(t('Premio creado en Kivly. Actualizando el catálogo…',
+        'Reward created in Kivly. Refreshing the catalog…'))
+      setCatalogRevision((revision) => revision + 1)
+    } catch (cause) {
+      if (isUncertainRewardCreation(cause)) {
+        uncertainRewardTitle.current = draft.title
+        setRewardCreationUncertain(true)
+        setRewardError(t('No se pudo confirmar la creación. Actualiza el catálogo antes de volver a enviarla.',
+          'Creation could not be confirmed. Refresh the catalog before submitting again.'))
+      } else {
+        const code = typeof cause === 'object' && cause !== null && 'code' in cause
+          && typeof cause.code === 'string' ? cause.code : ''
+        const codeMessages: Record<string, string> = {
+          KivlyWritesDisabled: t('La creación de premios Kivly está deshabilitada en este entorno.',
+            'Kivly reward creation is disabled in this environment.'),
+          KivlyAccessDenied: t('La conexión de Kivly no tiene permiso para crear premios.',
+            'The Kivly connection is not authorized to create rewards.'),
+          KivlyConnectionRequired: t('Conecta Kivly antes de crear un premio.',
+            'Connect Kivly before creating a reward.'),
+          KivlyRateLimited: t('Kivly ha limitado las solicitudes. Espera antes de volver a intentarlo.',
+            'Kivly is rate limiting requests. Wait before trying again.'),
+          KivlyValidationFailed: t('Kivly no aceptó estos datos. Revisa los campos del premio.',
+            'Kivly rejected these details. Review the reward fields.'),
+        }
+        const codeMessage = codeMessages[code]
+        setRewardError(codeMessage ?? (cause instanceof Error ? cause.message
+          : t('No se pudo crear el premio.', 'Could not create the reward.')))
+      }
+    } finally {
+      setBusy(false)
+      onSavingChange?.(false)
+    }
+  }
   if (!program || !data) return <div className="space-y-3">
     {error ? <p role="alert" className="text-red-300">{error}</p> : <p role="status">{t('Cargando premios...', 'Loading prizes...')}</p>}
     {error && <button className={action} onClick={() => setRevision((value) => value + 1)}>{t('Reintentar', 'Retry')}</button>}
@@ -119,6 +297,12 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     prize.source === 'kivly' && prize.rewardId === reward.id && prize.locationId === locationId)).map((reward): StackPrizeItem => ({
       id: `kivly_${reward.id}`, source: 'kivly', rewardId: reward.id, name: reward.name, locationId: locationId ?? '', stockTotal: 100,
     }))]
+  const parsedRewardValue = Number(rewardForm.value)
+  const parsedPointsRequired = Number(rewardForm.pointsRequired)
+  const canCreateReward = rewardForm.title.trim().length > 0
+    && rewardForm.description.trim().length > 0 && rewardForm.value.trim().length > 0
+    && Number.isFinite(parsedRewardValue)
+    && Number.isInteger(parsedPointsRequired) && parsedPointsRequired >= 0
   const invalidProgram = program.catalog.some((prize) => {
     const stock = data.inventory.find((item) => item.prizeId === prize.id)
     const allocated = stock ? stock.total - stock.remaining : 0
@@ -182,6 +366,93 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       </section>
       <section className="rounded-xl border border-white/10 p-3 space-y-3">
         <h3 className="text-sm font-semibold">{t('Catálogo e inventario', 'Catalog and stock')}</h3>
+        {kivlyConnected && locationId && <section aria-label={t('Crear premio Kivly', 'Create Kivly reward')}
+          className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-3">
+          <h4 className="text-sm font-semibold">{t('Crear premio Kivly', 'Create Kivly reward')}</h4>
+          {rewardError && <p role="alert" className="text-xs text-red-300">{rewardError}</p>}
+          {rewardMessage && <p role="status" className="text-xs text-textSub">{rewardMessage}</p>}
+          {rewardCreationUncertain && <button type="button" className={action} disabled={busy}
+            onClick={() => setCatalogRevision((revision) => revision + 1)}>
+            {t('Actualizar catálogo y revisar', 'Refresh catalog and review')}
+          </button>}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="space-y-1 text-xs text-textSub">
+              <span>{t('Nombre', 'Name')}</span>
+              <input className={`${field} w-full`} maxLength={200} value={rewardForm.title}
+                onChange={(event) => updateRewardForm({ title: event.target.value })} />
+            </label>
+            <label className="space-y-1 text-xs text-textSub">
+              <span>{t('Tipo de premio', 'Reward type')}</span>
+              <select className={`${field} w-full`} value={rewardForm.rewardType}
+                onChange={(event) => updateRewardForm({
+                  rewardType: event.target.value as KivlyRewardDraft['rewardType'],
+                })}>
+                <option value="discount_percentage">{t('Descuento porcentual', 'Percentage discount')}</option>
+                <option value="discount_fixed">{t('Descuento fijo', 'Fixed discount')}</option>
+                <option value="free_item">{t('Producto gratis', 'Free item')}</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-xs text-textSub sm:col-span-2">
+              <span>{t('Descripción', 'Description')}</span>
+              <textarea className={`${field} w-full`} maxLength={2048} rows={2} value={rewardForm.description}
+                onChange={(event) => updateRewardForm({ description: event.target.value })} />
+            </label>
+            <label className="space-y-1 text-xs text-textSub">
+              <span>{t('Valor', 'Value')}</span>
+              <input className={`${field} w-full`} type="number" step="any" value={rewardForm.value}
+                onChange={(event) => updateRewardForm({ value: event.target.value })} />
+            </label>
+            <label className="space-y-1 text-xs text-textSub">
+              <span>{t('Puntos necesarios', 'Points required')}</span>
+              <input className={`${field} w-full`} type="number" min={0} step={1} value={rewardForm.pointsRequired}
+                onChange={(event) => updateRewardForm({ pointsRequired: event.target.value })} />
+            </label>
+          </div>
+          <details className="space-y-2">
+            <summary className="cursor-pointer text-xs text-textSub">
+              {t('Opciones avanzadas', 'Advanced options')}
+            </summary>
+            <div className="grid gap-2 pt-2 sm:grid-cols-2">
+              <label className="space-y-1 text-xs text-textSub sm:col-span-2">
+                <span>{t('URL de imagen (HTTPS)', 'Image URL (HTTPS)')}</span>
+                <input className={`${field} w-full`} type="url" maxLength={2048} value={rewardForm.image}
+                  onChange={(event) => updateRewardForm({ image: event.target.value })} />
+              </label>
+              <label className="space-y-1 text-xs text-textSub sm:col-span-2">
+                <span>{t('Condiciones', 'Terms and conditions')}</span>
+                <textarea className={`${field} w-full`} maxLength={4096} rows={2}
+                  value={rewardForm.termsAndConditions}
+                  onChange={(event) => updateRewardForm({ termsAndConditions: event.target.value })} />
+              </label>
+              <label className="space-y-1 text-xs text-textSub">
+                <span>{t('Válido desde', 'Valid from')}</span>
+                <input className={`${field} w-full`} type="datetime-local" value={rewardForm.validFrom}
+                  onChange={(event) => updateRewardForm({ validFrom: event.target.value })} />
+              </label>
+              <label className="space-y-1 text-xs text-textSub">
+                <span>{t('Válido hasta', 'Valid until')}</span>
+                <input className={`${field} w-full`} type="datetime-local" value={rewardForm.validUntil}
+                  onChange={(event) => updateRewardForm({ validUntil: event.target.value })} />
+              </label>
+              <label className="space-y-1 text-xs text-textSub">
+                <span>{t('Canjes máximos en total', 'Maximum total redemptions')}</span>
+                <input className={`${field} w-full`} type="number" min={1} step={1}
+                  value={rewardForm.maxRedemptions}
+                  onChange={(event) => updateRewardForm({ maxRedemptions: event.target.value })} />
+              </label>
+              <label className="space-y-1 text-xs text-textSub">
+                <span>{t('Canjes máximos por usuario', 'Maximum redemptions per user')}</span>
+                <input className={`${field} w-full`} type="number" min={1} step={1}
+                  value={rewardForm.maxRedemptionsPerUser}
+                  onChange={(event) => updateRewardForm({ maxRedemptionsPerUser: event.target.value })} />
+              </label>
+            </div>
+          </details>
+          <button type="button" className={action} disabled={busy || !editable || !canCreateReward || rewardCreationUncertain}
+            onClick={() => void createKivlyReward()}>
+            {busy ? t('Creando…', 'Creating…') : t('Crear en Kivly', 'Create in Kivly')}
+          </button>
+        </section>}
         <div className="flex gap-2">
           <input aria-label={t('Nombre del premio STAND', 'STAND prize name')} value={name} maxLength={200} onChange={(event) => setName(event.target.value)}
             className={`${field} flex-1 w-full`} placeholder={t('Nombre del nuevo premio STAND', 'New STAND prize name')} />
@@ -228,8 +499,8 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
             </div>
           })}
         </div>
-        <p className="text-xs text-textSub">{t('Stock compartido entre reglas. Crea y edita los premios Kivly en su web. Imágenes STAND: PNG, máx. 5 MB.',
-          'Stock is shared between rules. Create and edit Kivly rewards on its website. STAND images: PNG, max. 5 MB.')}</p>
+        <p className="text-xs text-textSub">{t('Stock compartido entre reglas. Crea premios Kivly aquí cuando la cuenta esté conectada; para editarlos, usa Kivly. Imágenes STAND: PNG, máx. 5 MB.',
+          'Stock is shared between rules. Create Kivly rewards here when connected; edit them in Kivly. STAND images: PNG, max. 5 MB.')}</p>
       </section>
       <h3 className="text-sm font-semibold">{t('Cuándo y qué entregar', 'When and what to award')}</h3>
       {program.rules.map((rule, index) => <section key={index} aria-label={`${t('Regla', 'Rule')} ${index + 1}`}

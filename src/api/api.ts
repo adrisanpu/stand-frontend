@@ -50,7 +50,20 @@ async function request<T>(
 
   if (!response.ok) {
     if (/^\/v1\/(?:game\/)?kivly(?:[/?]|$)/.test(endpoint)) {
-      throw Object.assign(new Error(`Kivly API error: ${response.status}`), { status: response.status })
+      const responseText = await response.text()
+      let code: string | undefined
+      try {
+        const payload: unknown = JSON.parse(responseText)
+        if (typeof payload === 'object' && payload !== null
+          && 'error' in payload && typeof payload.error === 'string') {
+          code = payload.error
+        }
+      } catch {
+        // Kivly responses may be non-JSON; retain only the HTTP status in that case.
+      }
+      throw Object.assign(new Error(`Kivly API error: ${response.status}`), {
+        status: response.status, code,
+      })
     }
     let errorText = await response.text()
     try {

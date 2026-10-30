@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from './api'
 import { kivlyApi } from './kivlyApi'
 
-vi.mock('./api', () => ({ api: { get: vi.fn(), put: vi.fn(), delete: vi.fn() } }))
+vi.mock('./api', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }))
 beforeEach(() => { vi.clearAllMocks() })
 
 describe('Kivly account location', () => {
@@ -26,6 +26,24 @@ describe('Kivly account location', () => {
     it('rejects malformed rewards', async () => {
       vi.mocked(api.get).mockResolvedValueOnce({ ok: true, rewards: [{}] })
       await expect(kivlyApi.listRewards('GAME1')).rejects.toThrow('Invalid Kivly rewards response')
+    })
+
+    it('creates a reward through the authenticated STACK catalog endpoint', async () => {
+      const draft = {
+        title: 'Coffee', description: 'One coffee', rewardType: 'free_item' as const,
+        value: 1, pointsRequired: 25,
+      }
+      vi.mocked(api.post).mockResolvedValueOnce({ ok: true, reward: { id: 'reward-1', name: 'Coffee' } })
+      await expect(kivlyApi.createReward('GAME1', draft)).resolves.toEqual({ id: 'reward-1', name: 'Coffee' })
+      expect(api.post).toHaveBeenCalledWith('/v1/game/kivly/rewards', { gameId: 'GAME1', ...draft })
+    })
+
+    it('rejects unconfirmed or malformed reward creation responses', async () => {
+      vi.mocked(api.post).mockResolvedValueOnce({ ok: false, reward: { id: 'reward-1', name: 'Coffee' } })
+      await expect(kivlyApi.createReward('GAME1', {
+        title: 'Coffee', description: 'One coffee', rewardType: 'free_item',
+        value: 1, pointsRequired: 0,
+      })).rejects.toThrow('Invalid Kivly reward creation response')
     })
   })
 

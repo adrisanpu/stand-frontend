@@ -6,7 +6,9 @@ import { uploadPrizeImage } from '../../api/prizeMedia'
 import StackPrizeSettings from './StackPrizeSettings'
 
 vi.mock('../../api/stackPrizes', () => ({ stackPrizeApi: { get: vi.fn(), save: vi.fn(), close: vi.fn(), retryEmail: vi.fn() } }))
-vi.mock('../../api/kivlyApi', () => ({ kivlyApi: { getAccountConnection: vi.fn(), listRewards: vi.fn() } }))
+vi.mock('../../api/kivlyApi', () => ({
+  kivlyApi: { getAccountConnection: vi.fn(), listRewards: vi.fn(), createReward: vi.fn() },
+}))
 vi.mock('../../api/prizeMedia', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/prizeMedia')>(),
   uploadPrizeImage: vi.fn(), validatePrizeImage: vi.fn(),
@@ -26,6 +28,7 @@ beforeEach(() => {
     connected: true, locationId: 'loc', locations: [{ id: 'loc', name: 'Club' }],
   })
   vi.mocked(kivlyApi.listRewards).mockResolvedValue([{ id: 'coffee', name: 'Coffee' }])
+  vi.mocked(kivlyApi.createReward).mockResolvedValue({ id: 'new-reward', name: 'New reward' })
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 function mount() {
@@ -100,6 +103,53 @@ it('shows the full external catalog without publishing it until selected', async
   expect(screen.queryByText('Reglas de premios')).not.toBeInTheDocument()
   expect(screen.queryByText('Entregas')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Web oficial del club Kivly')).not.toBeInTheDocument()
+})
+
+it('creates a Kivly reward with minimal required details and refreshes the catalog', async () => {
+  mount()
+  await screen.findByRole('button', { name: 'Crear en Kivly' })
+  fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Tea' } })
+  fireEvent.change(screen.getByLabelText('Tipo de premio'), { target: { value: 'discount_fixed' } })
+  fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'A cup of tea' } })
+  fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '5' } })
+  fireEvent.change(screen.getByLabelText('Puntos necesarios'), { target: { value: '20' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Crear en Kivly' }))
+
+  await waitFor(() => expect(kivlyApi.createReward).toHaveBeenCalledWith('ABC123', {
+    title: 'Tea', description: 'A cup of tea', rewardType: 'discount_fixed',
+    value: 5, pointsRequired: 20,
+  }))
+  expect(await screen.findByText('Premio creado en Kivly. Actualizando el catálogo…')).toBeInTheDocument()
+  await waitFor(() => expect(kivlyApi.listRewards).toHaveBeenCalledTimes(2))
+  expect(stackPrizeApi.save).not.toHaveBeenCalled()
+})
+
+it('hides Kivly reward creation when the account is disconnected', async () => {
+  vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({
+    connected: false, locationId: null, locations: [],
+  })
+  mount()
+  await screen.findByText('Catálogo e inventario')
+  expect(screen.queryByRole('button', { name: 'Crear en Kivly' })).not.toBeInTheDocument()
+})
+
+it('requires a catalog refresh before retrying an uncertain creation', async () => {
+  vi.mocked(kivlyApi.createReward).mockRejectedValueOnce(Object.assign(
+    new Error('Kivly API error: 503'), { code: 'KivlyRewardCreationUncertain' },
+  ))
+  mount()
+  await screen.findByRole('button', { name: 'Crear en Kivly' })
+  fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Tea' } })
+  fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'A cup of tea' } })
+  fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '5' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Crear en Kivly' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo confirmar la creación')
+  expect(screen.getByRole('button', { name: 'Crear en Kivly' })).toBeDisabled()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Actualizar catálogo y revisar' }))
+  await screen.findByText('No se encontró un premio con ese nombre. Ya puedes volver a intentar.')
+  expect(screen.getByRole('button', { name: 'Crear en Kivly' })).toBeEnabled()
+  expect(kivlyApi.createReward).toHaveBeenCalledTimes(1)
 })
 
 it('adds a local STAND prize without creating anything in Kivly', async () => {

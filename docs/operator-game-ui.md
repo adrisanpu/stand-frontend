@@ -75,9 +75,14 @@ Each rule uses "Cuando [condition], entregar [OR groups of AND prizes]".
 Offer completed game, top X at own finish, final top X at closure, and raffle
 winner (subject to the existing raffle plan). The combined selector
 groups game-local STAND prizes and the connected business's existing Kivly
-catalog without filtering. A STAND prize needs a name and may have a PNG; creating one never
-creates a Kivly reward. New Kivly selections use local IDs independent of the
-external reward ID. Edits stay drafts until the save succeeds.
+catalog without filtering. When connected, owners can create Kivly rewards here
+with the required name, description, type, value and points threshold; optional
+image, terms, validity dates and redemption limits are under advanced options.
+After creation the catalog refreshes, and the owner selects the reward in a rule
+separately. An uncertain create requires a catalog refresh before another
+attempt. A STAND prize needs a name and may have a PNG. New Kivly selections use
+local IDs independent of the external reward ID. Edits stay drafts until the
+save succeeds.
 
 Each alternative group contains one or more prizes and quantities. A single
 group awards its available prizes. Multiple groups are selected with equal
