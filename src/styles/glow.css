@@ -18,6 +18,24 @@
 
 :root { color-scheme: dark; }
 
+.stack-prize-select {
+  color: #fff;
+}
+.stack-prize-select option,
+.stack-prize-select optgroup {
+  background: var(--color-background, #0B0A12);
+  color: #fff;
+}
+html.light-mode .stack-prize-select {
+  color: #000;
+  border-color: #9CA3AF;
+}
+html.light-mode .stack-prize-select option,
+html.light-mode .stack-prize-select optgroup {
+  background: #fff;
+  color: #000;
+}
+
 /* Segment7: solo fuente local en public/fonts/segment7/Segment7Standard.otf */
 @font-face {
   font-family: 'Segment7Standard';

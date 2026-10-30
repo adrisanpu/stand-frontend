@@ -5,6 +5,7 @@ import { PrizeImageError, uploadPrizeImage, validatePrizeImage } from '../../api
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 
 const field = 'rounded-xl border border-white/15 bg-surface px-3 py-2 text-sm min-w-0'
+const selectField = 'stack-prize-select rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm min-w-0'
 const action = 'rounded-xl border border-primary/30 bg-primary/20 px-3 py-2 text-sm hover:bg-primary/30 disabled:opacity-40'
 const conditions: StackPrizeCondition[] = ['completed', 'top_finish', 'top_final', 'raffle']
 const newId = () => crypto.randomUUID()
@@ -15,7 +16,6 @@ type KivlyRewardForm = {
   rewardType: KivlyRewardDraft['rewardType']
   value: string
   pointsRequired: string
-  image: string
   termsAndConditions: string
   validFrom: string
   validUntil: string
@@ -25,7 +25,7 @@ type KivlyRewardForm = {
 
 const emptyKivlyRewardForm: KivlyRewardForm = {
   title: '', description: '', rewardType: 'discount_percentage', value: '',
-  pointsRequired: '0', image: '', termsAndConditions: '', validFrom: '',
+  pointsRequired: '0', termsAndConditions: '', validFrom: '',
   validUntil: '', maxRedemptions: '', maxRedemptionsPerUser: '',
 }
 
@@ -56,17 +56,34 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   const [rewardError, setRewardError] = useState('')
   const [rewardMessage, setRewardMessage] = useState('')
   const [rewardCreationUncertain, setRewardCreationUncertain] = useState(false)
+  const [rewardImage, setRewardImage] = useState<File | null>(null)
+  const [rewardImagePreview, setRewardImagePreview] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createSource, setCreateSource] = useState<'stand' | 'kivly'>('stand')
+  const [initialStock, setInitialStock] = useState({ stand: 100, kivly: 100 })
+  const [standImage, setStandImage] = useState<File | null>(null)
+  const [standImagePreview, setStandImagePreview] = useState('')
+  const [validatingImage, setValidatingImage] = useState(false)
+  const [search, setSearch] = useState('')
+  const [activeImageActions, setActiveImageActions] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [revision, setRevision] = useState(0)
   const [catalogRevision, setCatalogRevision] = useState(0)
   const [name, setName] = useState('')
   const [dirty, setDirty] = useState(false)
   const previews = useRef(new Map<string, string>())
+  const catalogScroller = useRef<HTMLDivElement | null>(null)
   const uncertainRewardTitle = useRef<string | null>(null)
   useEffect(() => () => {
     previews.current.forEach((url) => URL.revokeObjectURL(url))
     previews.current.clear()
   }, [gameId])
+  useEffect(() => () => {
+    if (rewardImagePreview) URL.revokeObjectURL(rewardImagePreview)
+  }, [rewardImagePreview])
+  useEffect(() => () => {
+    if (standImagePreview) URL.revokeObjectURL(standImagePreview)
+  }, [standImagePreview])
   const label = (condition: StackPrizeCondition) => ({
     completed: t('complete una partida', 'a player completes a game'),
     top_finish: t('entre en el top al terminar su partida', 'a player finishes in the top'),
@@ -136,6 +153,13 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     setKivlyConnected(false)
     setCatalogError('')
     setRewardForm(emptyKivlyRewardForm)
+    setRewardImage(null)
+    setRewardImagePreview('')
+    setStandImage(null)
+    setStandImagePreview('')
+    setCreateOpen(false)
+    setInitialStock({ stand: 100, kivly: 100 })
+    setSearch('')
     setRewardError('')
     setRewardMessage('')
     setRewardCreationUncertain(false)
@@ -147,6 +171,27 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     setRewardForm((previous) => ({ ...previous, ...patch }))
     setRewardError('')
     setRewardMessage('')
+  }
+  const updateDraftImage = async (file: File, source: 'stand' | 'kivly') => {
+    setValidatingImage(true)
+    try {
+      await validatePrizeImage(file)
+      const preview = URL.createObjectURL(file)
+      if (source === 'stand') {
+        setStandImage(file)
+        setStandImagePreview(preview)
+      } else {
+        setRewardImage(file)
+        setRewardImagePreview(preview)
+      }
+      setRewardError('')
+    } catch (cause) {
+      setRewardError(cause instanceof PrizeImageError
+        ? t('Selecciona una imagen PNG válida de como máximo 5 MB.', 'Choose a valid PNG image no larger than 5 MB.')
+        : cause instanceof Error ? cause.message : t('No se pudo leer la imagen.', 'Could not read the image.'))
+    } finally {
+      setValidatingImage(false)
+    }
   }
   const run = async (work: () => Promise<void>) => {
     if (busy) return
@@ -175,17 +220,24 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   })
   const chooseImage = (prize: StackPrizeItem, file: File) => run(async () => {
     if (!program) return
+    const configured = program.catalog.some((item) => item.id === prize.id)
+    if (!configured && program.catalog.length >= 32) throw new Error(t('El catálogo admite hasta 32 premios.', 'The catalog supports up to 32 prizes.'))
     await validatePrizeImage(file)
     const imageKey = await uploadPrizeImage(gameId, 'ranking', file)
     const oldPreview = previews.current.get(prize.id)
     if (oldPreview) URL.revokeObjectURL(oldPreview)
     const imageUrl = URL.createObjectURL(file)
-    previews.current.set(prize.id, imageUrl)
-    change({ ...program, catalog: program.catalog.map((item) => item.id === prize.id ? { ...item, imageKey, imageUrl } : item) })
+    const id = configured ? prize.id : newId()
+    previews.current.set(id, imageUrl)
+    change({ ...program, catalog: configured
+      ? program.catalog.map((item) => item.id === prize.id ? { ...item, imageKey, imageUrl } : item)
+      : [...program.catalog, { ...prize, id, imageKey, imageUrl }] })
     setMessage(t('Imagen preparada; guarda para aplicarla.', 'Image ready; save to apply it.'))
   })
   const createKivlyReward = async () => {
-    if (!kivlyConnected || !locationId || data?.state !== 'open' || rewardCreationUncertain) return
+    if (busy || !Number.isInteger(initialStock.kivly) || initialStock.kivly < 1 || initialStock.kivly > 1000
+      || !program || program.catalog.length >= 32 || !kivlyConnected || !locationId
+      || data?.state !== 'open' || rewardCreationUncertain) return
     const value = Number(rewardForm.value)
     const pointsRequired = Number(rewardForm.pointsRequired)
     if (!rewardForm.title.trim() || !rewardForm.description.trim()
@@ -194,18 +246,6 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       setRewardError(t('Completa nombre, descripción, valor y puntos válidos.',
         'Enter a name, description, value, and valid points threshold.'))
       return
-    }
-
-    let image: string | undefined
-    if (rewardForm.image.trim()) {
-      try {
-        const url = new URL(rewardForm.image.trim())
-        if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) throw new Error()
-        image = url.toString()
-      } catch {
-        setRewardError(t('La imagen debe usar una URL HTTPS válida.', 'Image must use a valid HTTPS URL.'))
-        return
-      }
     }
 
     const dateToIso = (value: string) => {
@@ -238,7 +278,6 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       rewardType: rewardForm.rewardType,
       value,
       pointsRequired,
-      ...(image ? { image } : {}),
       ...(rewardForm.termsAndConditions.trim()
         ? { termsAndConditions: rewardForm.termsAndConditions.trim() } : {}),
       ...(validFrom ? { validFrom } : {}),
@@ -250,16 +289,30 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     onSavingChange?.(true)
     setRewardError('')
     setRewardMessage('')
+    let creationRequested = false
     try {
-      await kivlyApi.createReward(gameId, draft)
+      const imageKey = rewardImage ? await uploadPrizeImage(gameId, 'ranking', rewardImage) : undefined
+      creationRequested = true
+      const reward = await kivlyApi.createReward(gameId, draft)
+      const id = newId()
+      const imageUrl = rewardImage ? URL.createObjectURL(rewardImage) : reward.imageUrl
+      if (rewardImage && imageUrl) previews.current.set(id, imageUrl)
+      change({ ...program, catalog: [...program.catalog, {
+        id, source: 'kivly', rewardId: reward.id, locationId, name: reward.name,
+        stockTotal: initialStock.kivly, ...(imageKey ? { imageKey } : {}), imageUrl,
+      }] })
       setRewardForm(emptyKivlyRewardForm)
+      setRewardImage(null)
+      setRewardImagePreview('')
+      setInitialStock((previous) => ({ ...previous, kivly: 100 }))
+      setCreateOpen(false)
       uncertainRewardTitle.current = null
       setRewardCreationUncertain(false)
-      setRewardMessage(t('Premio creado en Kivly. Actualizando el catálogo…',
-        'Reward created in Kivly. Refreshing the catalog…'))
+      setMessage(t('Premio creado en Kivly. Guarda para aplicar el inventario y la imagen al juego.',
+        'Reward created in Kivly. Save to apply stock and the image to the game.'))
       setCatalogRevision((revision) => revision + 1)
     } catch (cause) {
-      if (isUncertainRewardCreation(cause)) {
+      if (creationRequested && isUncertainRewardCreation(cause)) {
         uncertainRewardTitle.current = draft.title
         setRewardCreationUncertain(true)
         setRewardError(t('No se pudo confirmar la creación. Actualiza el catálogo antes de volver a enviarla.',
@@ -295,7 +348,8 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   const editable = data.state === 'open'
   const available = [...program.catalog, ...rewards.filter((reward) => !program.catalog.some((prize) =>
     prize.source === 'kivly' && prize.rewardId === reward.id && prize.locationId === locationId)).map((reward): StackPrizeItem => ({
-      id: `kivly_${reward.id}`, source: 'kivly', rewardId: reward.id, name: reward.name, locationId: locationId ?? '', stockTotal: 100,
+      id: `kivly_${reward.id}`, source: 'kivly', rewardId: reward.id, name: reward.name,
+      locationId: locationId ?? '', stockTotal: 100, imageUrl: reward.imageUrl,
     }))]
   const parsedRewardValue = Number(rewardForm.value)
   const parsedPointsRequired = Number(rewardForm.pointsRequired)
@@ -327,6 +381,32 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       } : rule),
     })
   }
+  const createStandPrize = () => run(async () => {
+    if (!program || !name.trim() || program.catalog.length >= 32
+      || !Number.isInteger(initialStock.stand) || initialStock.stand < 1 || initialStock.stand > 1000) return
+    const id = newId()
+    let imageKey: string | null = null
+    if (standImage) imageKey = await uploadPrizeImage(gameId, 'ranking', standImage)
+    const imageUrl = standImage ? URL.createObjectURL(standImage) : null
+    if (imageUrl) previews.current.set(id, imageUrl)
+    change({
+      ...program,
+      catalog: [...program.catalog, {
+        id, source: 'stand', name: name.trim(), limit: null, stockTotal: initialStock.stand,
+        imageKey, imageUrl,
+      }],
+    })
+    setName('')
+    setStandImage(null)
+    setStandImagePreview('')
+    setInitialStock((previous) => ({ ...previous, stand: 100 }))
+    setCreateOpen(false)
+  })
+  const normalizedSearch = search.trim().toLocaleLowerCase()
+  const filteredPrizes = available.filter((prize) =>
+    prize.name.toLocaleLowerCase().includes(normalizedSearch))
+  const validInitialStock = Number.isInteger(initialStock[createSource])
+    && initialStock[createSource] >= 1 && initialStock[createSource] <= 1000
   const emailStates = {
     pending: t('Pendiente de envío', 'Waiting to send'),
     sending: t('Enviando', 'Sending'),
@@ -343,47 +423,74 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     </div>}
     {!editable && <p role="status" className="text-sm text-textSub">{t('El juego se está cerrando o está cerrado. Los premios no se pueden editar.',
       'The game is closing or closed. Prizes cannot be edited.')}</p>}
-    <fieldset disabled={busy || !editable} className="space-y-4">
-      <section className="rounded-xl border border-white/10 p-3 space-y-3">
-        <label className="block text-sm font-semibold" htmlFor="stack-delivery-channel">
-          {t('Entrega de premios Kivly', 'Kivly reward delivery')}
-        </label>
-        <select id="stack-delivery-channel" className={`${field} w-full`} value={program.deliveryChannel ?? 'wallet'}
-          onChange={(event) => {
-            if (event.target.value === 'wallet' || event.target.value === 'email')
-              change({ ...program, deliveryChannel: event.target.value })
-          }}>
-          <option value="wallet">Wallet</option>
-          <option value="email" disabled={!data.emailAvailable}>Email</option>
-        </select>
-        <p className="text-xs text-textSub">{t('Solo un canal. Los cambios se aplican a nuevas partidas; los premios STAND mantienen su QR.',
-          'One channel only. Changes apply to new games; STAND prizes keep their QR.')}</p>
-        {program.deliveryChannel === 'email' && <p className="text-xs text-textSub">{t(
-          'Enviaremos el premio al email verificado con un QR del teléfono registrado en Kivly. No se necesita wallet.',
-          'We will email the reward to the verified address with a QR of the phone registered in Kivly. No wallet needed.')}</p>}
-        {!data.emailAvailable && <p className="text-xs text-amber-300">{t('El envío de premios por email aún no está habilitado en este entorno.',
-          'Reward email delivery is not enabled in this environment yet.')}</p>}
-      </section>
-      <section className="rounded-xl border border-white/10 p-3 space-y-3">
-        <h3 className="text-sm font-semibold">{t('Catálogo e inventario', 'Catalog and stock')}</h3>
-        {kivlyConnected && locationId && <section aria-label={t('Crear premio Kivly', 'Create Kivly reward')}
-          className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-3">
-          <h4 className="text-sm font-semibold">{t('Crear premio Kivly', 'Create Kivly reward')}</h4>
+    <fieldset disabled={busy || validatingImage || !editable} className="space-y-4">
+      <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold">{t('Catálogo de premios', 'Prize catalog')}</h3>
+            <p className="text-xs text-textSub">{t('Busca, crea y gestiona el inventario disponible.', 'Search, create, and manage available stock.')}</p>
+          </div>
+          <button type="button" className={`${action} font-semibold`} aria-expanded={createOpen}
+            onClick={() => setCreateOpen((open) => !open)}>
+            {createOpen ? t('Cerrar', 'Close') : t('+ CREAR', '+ CREATE')}
+          </button>
+        </div>
+        {createOpen && <section aria-label={t('Crear premio', 'Create prize')}
+          className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2 [&_input:not([type=file])]:h-8 [&_input]:px-2 [&_input]:py-1 [&_input]:text-xs [&_select]:h-8 [&_select]:px-2 [&_select]:py-1 [&_select]:text-xs [&_textarea]:px-2 [&_textarea]:py-1 [&_textarea]:text-xs">
           {rewardError && <p role="alert" className="text-xs text-red-300">{rewardError}</p>}
+          <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-4">
+            <label className="space-y-1 text-xs text-textSub">
+              <span>{t('Origen del premio', 'Prize source')}</span>
+              <select className={`${selectField} w-full`} value={createSource}
+                onChange={(event) => setCreateSource(event.target.value as 'stand' | 'kivly')}>
+                <option value="stand">STAND</option>
+                <option value="kivly" disabled={!kivlyConnected || !locationId}>Kivly</option>
+              </select>
+            </label>
+              <label className="space-y-1 text-xs text-textSub">
+                <span>{t('Nombre', 'Name')}</span>
+                <input aria-label={createSource === 'stand' ? t('Nombre del premio STAND', 'STAND prize name') : t('Nombre', 'Name')}
+                  value={createSource === 'stand' ? name : rewardForm.title} maxLength={200}
+                  onChange={(event) => createSource === 'stand' ? setName(event.target.value) : updateRewardForm({ title: event.target.value })} className={`${field} w-full`}
+                  placeholder={t('Nombre del nuevo premio', 'New prize name')} />
+              </label>
+              <label className="space-y-1 text-xs text-textSub">
+                <span>{t('Stock inicial', 'Initial stock')}</span>
+                <input type="number" min={1} max={1000} step={1} className={`${field} w-full`}
+                  value={Number.isFinite(initialStock[createSource]) ? initialStock[createSource] : ''}
+                  onChange={(event) => setInitialStock({ ...initialStock, [createSource]: event.target.valueAsNumber })} />
+              </label>
+              <label className="space-y-1 text-xs text-textSub">
+                <span>{t('Imagen PNG', 'PNG image')}</span>
+                <span className="flex h-8 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-white/25 px-2 text-xs hover:border-primary/60">
+                  {(createSource === 'stand' ? standImagePreview : rewardImagePreview) && <img
+                    src={createSource === 'stand' ? standImagePreview : rewardImagePreview}
+                    alt={t('Vista previa del nuevo premio', 'New prize preview')} className="h-6 w-6 shrink-0 object-contain" />}
+                  <span className="truncate">{(createSource === 'stand' ? standImage : rewardImage)?.name ?? t('Subir imagen', 'Upload image')}</span>
+                  <input type="file" accept="image/png" className="sr-only"
+                    aria-label={createSource === 'stand' ? t('Imagen del nuevo premio STAND', 'New STAND prize image') : t('Imagen del nuevo premio Kivly', 'New Kivly reward image')}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      event.target.value = ''
+                      if (file) void updateDraftImage(file, createSource)
+                    }} />
+                </span>
+              </label>
+            </div>
+          {!validInitialStock && <p role="alert" className="text-xs text-red-300">{t('El stock debe ser un entero entre 1 y 1000.', 'Stock must be a whole number between 1 and 1000.')}</p>}
+          {createSource === 'stand' ? <>
+            <button type="button" className={`${action} py-1 text-xs`} disabled={!name.trim() || !validInitialStock || program.catalog.length >= 32}
+              onClick={() => void createStandPrize()}>{t('Crear premio STAND', 'Create STAND prize')}</button>
+          </> : <>
           {rewardMessage && <p role="status" className="text-xs text-textSub">{rewardMessage}</p>}
           {rewardCreationUncertain && <button type="button" className={action} disabled={busy}
             onClick={() => setCatalogRevision((revision) => revision + 1)}>
             {t('Actualizar catálogo y revisar', 'Refresh catalog and review')}
           </button>}
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="space-y-1 text-xs text-textSub">
-              <span>{t('Nombre', 'Name')}</span>
-              <input className={`${field} w-full`} maxLength={200} value={rewardForm.title}
-                onChange={(event) => updateRewardForm({ title: event.target.value })} />
-            </label>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <label className="space-y-1 text-xs text-textSub">
               <span>{t('Tipo de premio', 'Reward type')}</span>
-              <select className={`${field} w-full`} value={rewardForm.rewardType}
+              <select className={`${selectField} w-full`} value={rewardForm.rewardType}
                 onChange={(event) => updateRewardForm({
                   rewardType: event.target.value as KivlyRewardDraft['rewardType'],
                 })}>
@@ -391,11 +498,6 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
                 <option value="discount_fixed">{t('Descuento fijo', 'Fixed discount')}</option>
                 <option value="free_item">{t('Producto gratis', 'Free item')}</option>
               </select>
-            </label>
-            <label className="space-y-1 text-xs text-textSub sm:col-span-2">
-              <span>{t('Descripción', 'Description')}</span>
-              <textarea className={`${field} w-full`} maxLength={2048} rows={2} value={rewardForm.description}
-                onChange={(event) => updateRewardForm({ description: event.target.value })} />
             </label>
             <label className="space-y-1 text-xs text-textSub">
               <span>{t('Valor', 'Value')}</span>
@@ -407,20 +509,20 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
               <input className={`${field} w-full`} type="number" min={0} step={1} value={rewardForm.pointsRequired}
                 onChange={(event) => updateRewardForm({ pointsRequired: event.target.value })} />
             </label>
+            <label className="space-y-1 text-xs text-textSub">
+              <span>{t('Descripción', 'Description')}</span>
+              <textarea className={`${field} w-full`} maxLength={2048} rows={1} value={rewardForm.description}
+                onChange={(event) => updateRewardForm({ description: event.target.value })} />
+            </label>
           </div>
           <details className="space-y-2">
             <summary className="cursor-pointer text-xs text-textSub">
               {t('Opciones avanzadas', 'Advanced options')}
             </summary>
-            <div className="grid gap-2 pt-2 sm:grid-cols-2">
-              <label className="space-y-1 text-xs text-textSub sm:col-span-2">
-                <span>{t('URL de imagen (HTTPS)', 'Image URL (HTTPS)')}</span>
-                <input className={`${field} w-full`} type="url" maxLength={2048} value={rewardForm.image}
-                  onChange={(event) => updateRewardForm({ image: event.target.value })} />
-              </label>
-              <label className="space-y-1 text-xs text-textSub sm:col-span-2">
+            <div className="grid grid-cols-2 gap-2 pt-2 sm:grid-cols-4">
+              <label className="space-y-1 text-xs text-textSub col-span-2 sm:col-span-4">
                 <span>{t('Condiciones', 'Terms and conditions')}</span>
-                <textarea className={`${field} w-full`} maxLength={4096} rows={2}
+                <textarea className={`${field} w-full`} maxLength={4096} rows={1}
                   value={rewardForm.termsAndConditions}
                   onChange={(event) => updateRewardForm({ termsAndConditions: event.target.value })} />
               </label>
@@ -448,59 +550,101 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
               </label>
             </div>
           </details>
-          <button type="button" className={action} disabled={busy || !editable || !canCreateReward || rewardCreationUncertain}
+          <button type="button" className={`${action} py-1 text-xs`} disabled={busy || !editable || !validInitialStock || !canCreateReward || rewardCreationUncertain || program.catalog.length >= 32}
             onClick={() => void createKivlyReward()}>
             {busy ? t('Creando…', 'Creating…') : t('Crear en Kivly', 'Create in Kivly')}
           </button>
+          </>}
         </section>}
-        <div className="flex gap-2">
-          <input aria-label={t('Nombre del premio STAND', 'STAND prize name')} value={name} maxLength={200} onChange={(event) => setName(event.target.value)}
-            className={`${field} flex-1 w-full`} placeholder={t('Nombre del nuevo premio STAND', 'New STAND prize name')} />
-          <button type="button" className={action} disabled={!name.trim() || program.catalog.length >= 32} onClick={() => {
-            change({ ...program, catalog: [...program.catalog, { id: newId(), source: 'stand', name: name.trim(), limit: null, stockTotal: 100 }] })
-            setName('')
-          }}>{t('Añadir', 'Add')}</button>
+        <div className="flex items-center gap-2">
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">{t('Buscar premios', 'Search prizes')}</span>
+            <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textSub">⌕</span>
+            <input type="search" aria-label={t('Buscar premios', 'Search prizes')} value={search}
+              onChange={(event) => setSearch(event.target.value)} className={`${field} w-full pl-9`}
+              placeholder={t('Buscar premio por nombre…', 'Search prize by name…')} />
+          </label>
+          <button type="button" className={`${action} h-10 w-10 p-0 text-lg`} aria-label={t('Premios anteriores', 'Previous prizes')}
+            onClick={() => catalogScroller.current?.scrollBy({ left: -catalogScroller.current.clientWidth, behavior: 'smooth' })}>‹</button>
+          <button type="button" className={`${action} h-10 w-10 p-0 text-lg`} aria-label={t('Premios siguientes', 'Next prizes')}
+            onClick={() => catalogScroller.current?.scrollBy({ left: catalogScroller.current.clientWidth, behavior: 'smooth' })}>›</button>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {available.map((prize) => {
+        <div ref={catalogScroller} className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-2">
+          {filteredPrizes.map((prize) => {
             const configured = program.catalog.some((item) => item.id === prize.id)
             const stock = data.inventory.find((item) => item.prizeId === prize.id)
-            const remaining = Math.max(0, prize.stockTotal - (stock ? stock.total - stock.remaining : 0))
-            return <div key={prize.id} className="min-w-0 rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                {prize.imageUrl && <img src={prize.imageUrl} alt={`${t('Vista previa del premio', 'Prize preview')} ${prize.name}`} className="w-9 h-9 shrink-0 object-contain" />}
-                <span className="min-w-0 flex-1 break-words font-medium">{prize.name}</span>
-                <span className="text-xs text-textSub">{prize.source === 'kivly' ? 'Kivly' : 'STAND'}</span>
+            const delivered = stock ? Math.max(0, stock.total - stock.remaining) : 0
+            const remaining = Math.max(0, prize.stockTotal - delivered)
+            const actionsVisible = activeImageActions === prize.id
+            return <article key={prize.id} aria-label={prize.name}
+              className="min-w-0 shrink-0 basis-[78%] snap-start overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-sm sm:basis-[calc((100%_-_0.5rem)/2)] lg:basis-[calc((100%_-_1.5rem)/4)]">
+              <div className="group relative aspect-[4/3] w-full overflow-hidden bg-transparent"
+                onKeyDown={(event) => { if (event.key === 'Escape') setActiveImageActions(null) }}>
+              <button type="button" className="block h-full w-full"
+                aria-label={`${t('Opciones de imagen para', 'Image options for')} ${prize.name}`}
+                aria-expanded={actionsVisible} onClick={() => setActiveImageActions(actionsVisible ? null : prize.id)}
+                disabled={!configured && program.catalog.length >= 32}>
+                {prize.imageUrl
+                  ? <img src={prize.imageUrl} alt={`${t('Vista previa del premio', 'Prize preview')} ${prize.name}`} className="h-full w-full object-contain" />
+                  : <span className="flex h-full items-center justify-center text-4xl font-black text-gray-300">{prize.name.slice(0, 1).toUpperCase()}</span>}
+              </button>
+                <div className={`absolute inset-0 flex flex-wrap content-center items-center justify-center gap-2 bg-black/65 p-2 transition-opacity group-focus-within:opacity-100 group-focus-within:pointer-events-auto ${actionsVisible ? 'opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
+                  <label className="cursor-pointer rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-950 focus-within:ring-2 focus-within:ring-primary">
+                    {t('Subir', 'Upload')}
+                    <input type="file" accept="image/png" className="sr-only" disabled={!configured && program.catalog.length >= 32}
+                      aria-label={`${t('Imagen de', 'Image for')} ${prize.name}`} onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      event.target.value = ''
+                      if (file) void chooseImage(prize, file)
+                    }} />
+                  </label>
+                  {prize.imageUrl && configured && <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-red-700"
+                    aria-label={`${t('Quitar imagen de', 'Remove image for')} ${prize.name}`}
+                    onClick={() => {
+                      const preview = previews.current.get(prize.id)
+                      if (preview) URL.revokeObjectURL(preview)
+                      previews.current.delete(prize.id)
+                      change({ ...program, catalog: program.catalog.map((item) =>
+                        item.id === prize.id ? { ...item, imageKey: null, imageUrl: null } : item) })
+                    }}>{t('Quitar', 'Remove')}</button>}
+                </div>
               </div>
-              {configured ? <>
-                <label className="flex flex-wrap items-center gap-2 text-xs text-textSub">{t('Stock total', 'Total stock')}
-                  <input type="number" min={1} max={1000} value={Number.isFinite(prize.stockTotal) ? prize.stockTotal : ''} className={`${field} w-20 text-textMain`}
-                    aria-label={`${t('Inventario total Y de', 'Total stock Y for')} ${prize.name}`}
-                    onChange={(event) => change({ ...program, catalog: program.catalog.map((item) =>
-                      item.id === prize.id ? { ...item, stockTotal: event.target.valueAsNumber } : item) })} />
-                </label>
-                <p className="text-xs text-textSub">{t('Disponibles', 'Available')}: {Number.isFinite(remaining) ? remaining : '—'}</p>
-              </> : <button type="button" className={action} disabled={program.catalog.length >= 32}
-                onClick={() => change({ ...program, catalog: [...program.catalog, { ...prize, id: newId() }] })}>
-                {t('Añadir al inventario', 'Add to stock')}
-              </button>}
-              {prize.source === 'stand' && <div className="flex flex-wrap items-center gap-2">
-                <label className="cursor-pointer rounded text-xs text-textSub underline focus-within:ring-2 focus-within:ring-primary">
-                  {prize.imageKey ? t('Cambiar imagen', 'Change image') : t('+ Imagen opcional', '+ Optional image')}
-                  <input type="file" accept="image/png" className="sr-only" aria-label={`${t('Imagen de', 'Image for')} ${prize.name}`} onChange={(event) => {
-                    const file = event.target.files?.[0]; if (file) void chooseImage(prize, file)
-                  }} />
-                </label>
-                {prize.imageKey && <button type="button" className="text-xs text-textSub underline" aria-label={`${t('Quitar imagen de', 'Remove image for')} ${prize.name}`}
-                  onClick={() => change({ ...program, catalog: program.catalog.map((item) => item.id === prize.id ? { ...item, imageKey: null, imageUrl: null } : item) })}>
-                  {t('Quitar imagen', 'Remove image')}
+              <div className="space-y-3 p-3">
+                <div className="flex items-start gap-2">
+                  <h4 className="min-w-0 flex-1 break-words font-semibold">{prize.name}</h4>
+                  <span className="flex h-7 max-w-[5rem] shrink-0 items-center">
+                    <img src={prize.source === 'kivly' ? '/images/logo-kivly-footer.png' : '/images/logo-stand-footer.png'}
+                      alt={prize.source === 'kivly' ? 'Kivly' : 'STAND'} className="max-h-5 max-w-full object-contain" />
+                  </span>
+                </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <span className="rounded-lg bg-black/15 p-2 text-textSub">{t('Entregados', 'Delivered')}: <strong className="text-textMain">{delivered}</strong></span>
+                    <span className="rounded-lg bg-black/15 p-2 text-textSub">{t('Disponibles', 'Available')}: <strong className="text-textMain">{Number.isFinite(remaining) ? remaining : '—'}</strong></span>
+                  </div>
+                  <label className="block text-xs text-textSub">{t('Stock', 'Stock')}
+                    <input type="number" min={1} max={1000} value={Number.isFinite(prize.stockTotal) ? prize.stockTotal : ''}
+                      disabled={!configured && program.catalog.length >= 32}
+                      className={`${field} mt-1 w-full text-textMain`}
+                      aria-label={`${t('Inventario total Y de', 'Total stock Y for')} ${prize.name}`}
+                      onChange={(event) => change({ ...program, catalog: configured
+                        ? program.catalog.map((item) => item.id === prize.id ? { ...item, stockTotal: event.target.valueAsNumber } : item)
+                        : [...program.catalog, { ...prize, id: newId(), stockTotal: event.target.valueAsNumber }] })} />
+                  </label>
+                {!configured && <button type="button" className={`${action} w-full`} disabled={program.catalog.length >= 32}
+                  onClick={() => change({ ...program, catalog: [...program.catalog, { ...prize, id: newId() }] })}>
+                  {t('Añadir al inventario', 'Add to stock')}
                 </button>}
-              </div>}
-            </div>
+              </div>
+            </article>
           })}
         </div>
-        <p className="text-xs text-textSub">{t('Stock compartido entre reglas. Crea premios Kivly aquí cuando la cuenta esté conectada; para editarlos, usa Kivly. Imágenes STAND: PNG, máx. 5 MB.',
-          'Stock is shared between rules. Create Kivly rewards here when connected; edit them in Kivly. STAND images: PNG, max. 5 MB.')}</p>
+        {filteredPrizes.length === 0 && <p className="py-6 text-center text-sm text-textSub">
+          {t('No hay premios que coincidan con la búsqueda.', 'No prizes match your search.')}
+        </p>}
+        <p className="text-xs text-textSub">{t('Stock compartido entre reglas. Imágenes PNG, máx. 5 MB.',
+          'Stock is shared between rules. PNG images, max. 5 MB.')}</p>
+        <p className="text-xs text-textSub">{t('Las imágenes subidas se aplican a este juego; no modifican el catálogo externo de Kivly.',
+          'Uploaded images apply to this game; they do not change the external Kivly catalog.')}</p>
       </section>
       <h3 className="text-sm font-semibold">{t('Cuándo y qué entregar', 'When and what to award')}</h3>
       {program.rules.map((rule, index) => <section key={index} aria-label={`${t('Regla', 'Rule')} ${index + 1}`}
@@ -512,7 +656,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span>{t('Cuando', 'When')}</span>
-          <select aria-label={`${t('Condición', 'Condition')} ${index + 1}`} className={`${field} flex-1`} value={rule.condition}
+          <select aria-label={`${t('Condición', 'Condition')} ${index + 1}`} className={`${selectField} flex-1`} value={rule.condition}
             onChange={(event) => {
               const condition = event.target.value as StackPrizeCondition
               updateRule(index, { ...rule, condition, topX: condition.startsWith('top_') ? 10 : undefined })
@@ -553,7 +697,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
               </div>
             })}
             {group.allocations.length === 0 && <p className="text-xs text-amber-300">{t('Selecciona al menos un premio.', 'Select at least one prize.')}</p>}
-            <select className={`${field} w-full`} aria-label={`${t('Añadir premio al grupo', 'Add prize to group')} ${index + 1}.${groupIndex + 1}`}
+            <select className={`${selectField} w-full`} aria-label={`${t('Añadir premio al grupo', 'Add prize to group')} ${index + 1}.${groupIndex + 1}`}
               value="" disabled={group.allocations.length >= 8} onChange={(event) => addPrize(index, groupIndex, event.target.value)}>
               <option value="">{group.allocations.length ? t('Y añadir premio…', 'AND add prize…') : t('Seleccionar premio…', 'Select prize…')}</option>
               {(['stand', 'kivly'] as const).map((source) => <optgroup key={source} label={source === 'stand' ? 'STAND' : 'Kivly'}>
@@ -571,6 +715,26 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       <button type="button" className={action} disabled={program.rules.length >= 8} onClick={() => change({ ...program,
         rules: [...program.rules, { id: newId(), condition: 'completed', groups: [{ allocations: [] }] }],
       })}>{t('Añadir regla', 'Add rule')}</button>
+      <section className="rounded-xl border border-white/10 p-3 space-y-3">
+        <label className="block text-sm font-semibold" htmlFor="stack-delivery-channel">
+          {t('Entrega de premios Kivly', 'Kivly reward delivery')}
+        </label>
+        <select id="stack-delivery-channel" className={`${selectField} w-full`} value={program.deliveryChannel ?? 'wallet'}
+          onChange={(event) => {
+            if (event.target.value === 'wallet' || event.target.value === 'email')
+              change({ ...program, deliveryChannel: event.target.value })
+          }}>
+          <option value="wallet">Wallet</option>
+          <option value="email" disabled={!data.emailAvailable}>Email</option>
+        </select>
+        <p className="text-xs text-textSub">{t('Solo un canal. Los cambios se aplican a nuevas partidas; los premios STAND mantienen su QR.',
+          'One channel only. Changes apply to new games; STAND prizes keep their QR.')}</p>
+        {program.deliveryChannel === 'email' && <p className="text-xs text-textSub">{t(
+          'Enviaremos el premio al email verificado con un QR del teléfono registrado en Kivly. No se necesita wallet.',
+          'We will email the reward to the verified address with a QR of the phone registered in Kivly. No wallet needed.')}</p>}
+        {!data.emailAvailable && <p className="text-xs text-amber-300">{t('El envío de premios por email aún no está habilitado en este entorno.',
+          'Reward email delivery is not enabled in this environment yet.')}</p>}
+      </section>
     </fieldset>
     {data.awards.some((award) => award.deliveryChannel === 'email') && <section className="rounded-xl border border-white/10 p-3 space-y-3">
       <h3 className="text-sm font-semibold">{t('Envíos de premios por email', 'Reward emails')}</h3>
@@ -595,7 +759,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     </section>}
     </div>
     <div className="settings-footer border-t border-white/10 pt-3">
-      <button type="button" className={`${action} w-full font-semibold`} disabled={busy || !editable || invalidProgram || (!dirty && data.enabled)}
+      <button type="button" className={`${action} w-full font-semibold`} disabled={busy || validatingImage || !editable || invalidProgram || (!dirty && data.enabled)}
         onClick={() => void save()}>{busy ? t('Guardando…', 'Saving…') : t('Guardar reglas de premios', 'Save prize rules')}</button>
     </div>
   </div>
