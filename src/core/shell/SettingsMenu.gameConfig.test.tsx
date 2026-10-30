@@ -61,13 +61,14 @@ describe('SettingsMenu Configurar juego', () => {
     expect(api.put).not.toHaveBeenCalled()
   })
 
-  it('shows the connected Kivly logo on the game configuration menu entry', async () => {
-    const account = vi.spyOn(kivlyApi, 'getAccountConnection').mockResolvedValueOnce({
+  it('does not show a Kivly logo on the game configuration menu entry', async () => {
+    const account = vi.spyOn(kivlyApi, 'getAccountConnection').mockResolvedValue({
       connected: true,
       locationId: 'location', locations: [{ id: 'location', name: 'Club' }],
     })
     render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="STACK" gameDefinition={{ ...l3tras, id: 'STACK' }} />)
-    expect(await screen.findByRole('img', { name: 'Kivly conectado' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Configurar juego/ })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Kivly conectado' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Integraciones' })).not.toBeInTheDocument()
     account.mockRestore()
   })

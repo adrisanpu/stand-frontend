@@ -49,7 +49,7 @@ const invalidChallenges = new Set(['VerificationRequired', 'VerificationExpired'
 
 export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   const { language, t } = useParticipantLanguage()
-  const pf = resolveParticipantFields(gameMeta.participantFields)
+  const pf = resolveParticipantFields(gameMeta.participantFields, gameMeta.gameType)
   const phoneEnabled = pf.phone.enabled
 
   const [email, setEmail] = useState('')
@@ -191,6 +191,15 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         setError(verificationErrors.invalid_username)
         return
       }
+      if (pf.phone.required && !phone.trim()) {
+        setError(verificationErrors.missing_phone)
+        return
+      }
+      if (pf.phone.required && (!/^\+?[0-9][0-9 ()-]*$/.test(phone.trim())
+        || (phone.match(/[0-9]/g)?.length ?? 0) < 3 || phone.trim().length > 64)) {
+        setError(verificationErrors.invalid_phone)
+        return
+      }
       if (!consent) {
         setError('Debes aceptar la política de privacidad.')
         return
@@ -293,11 +302,11 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         <p className="mt-1 text-xs text-textSub">{t('Usa el nombre con el que quieres aparecer en el juego.')}</p>
       </div>
       {phoneEnabled && <div>
-        <label className="block text-sm mb-1" htmlFor="join-phone">{t('Teléfono (opcional)')}</label>
+        <label className="block text-sm mb-1" htmlFor="join-phone">{t(pf.phone.required ? 'Teléfono' : 'Teléfono (opcional)')}</label>
         <input id="join-phone" type="tel" autoComplete="tel" value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3"
-          maxLength={64} />
+          maxLength={64} required={pf.phone.required} />
       </div>}
       <div>
         <label className="block text-sm mb-1" htmlFor="join-photo">
@@ -337,7 +346,9 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         <input type="checkbox" checked={clubConsent} onChange={(event) => setClubConsent(event.target.checked)} className="mt-1" required />
         <span>{t('Acepto registrarme en el club')} <strong>{gameMeta.loyalty.clubName}</strong>.{' '}
           {t('Acepto las condiciones y la política de privacidad del club. El registro es necesario para jugar.')}{' '}
-          {phoneEnabled && <>{t('Si añades tu teléfono, también se compartirá con el club al crear tu ficha.')}{' '}</>}
+          {phoneEnabled && <>{t(pf.phone.required
+            ? 'Tu teléfono se compartirá con el club al crear tu ficha.'
+            : 'Si añades tu teléfono, también se compartirá con el club al crear tu ficha.')}{' '}</>}
           <a href={gameMeta.loyalty.termsUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Condiciones del club')}</a>{' · '}
           <a href={gameMeta.loyalty.privacyUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Privacidad del club')}</a>
         </span>

@@ -6,6 +6,7 @@ import Players from './Players'
 import Ranking from './Ranking'
 import RaffleData from './RaffleData'
 import { HOME_TITLE_TEXT, HOME_BODY_TEXT } from '../ui/homeTypography'
+import { prizeText } from '../../test/prizeText'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn() } }))
 vi.mock('../../auth/useCurrentUser', () => ({ useCurrentUser: () => ({ plan: 'event' }) }))
@@ -39,7 +40,7 @@ it.each([true, false])('shares title and body sizes across all home panels (comp
   }
   for (const text of ['PREMIO: Entrada VIP', 'PREMIO TOP 2: Copa', 'PREMIO: Camiseta',
     '2/4', '1/3', '0/8', '10.000s', 'No hay ganadores aún']) {
-    expect(await screen.findByText(text)).toHaveClass(...HOME_BODY_TEXT.split(' '))
+    expect(await screen.findByText(text.includes(': ') ? prizeText(text) : text)).toHaveClass(...HOME_BODY_TEXT.split(' '))
   }
   expect(screen.getByText('Player').parentElement).toHaveClass(...HOME_BODY_TEXT.split(' '))
   expect(count).toHaveClass('text-[var(--color-primary)]')
@@ -62,7 +63,7 @@ it('shows the correct slot image beside each single custom name and server limit
   expect(screen.getByText('2/4')).toBeInTheDocument()
   expect(screen.getByText('1/3')).toBeInTheDocument()
   expect(screen.getByText('0/8')).toBeInTheDocument()
-  expect(screen.getByText('PREMIO TOP 2: Copa')).toBeInTheDocument()
+  expect(screen.getByText(prizeText('PREMIO TOP 2: Copa'))).toBeInTheDocument()
   expect(screen.queryByText(/Old/)).not.toBeInTheDocument()
 })
 
@@ -72,9 +73,9 @@ it('preserves legacy text-only prizes without creating images', async () => {
     <Ranking gameId="GAME" prizeLabel="Trofeo" topX={3} />
     <RaffleData gameId="GAME" gameName="Event" prizeLabel="Bolsa" />
   </>)
-  expect(await screen.findByText('PREMIO: Entrada')).toBeInTheDocument()
-  expect(await screen.findByText('PREMIO TOP 3: Trofeo')).toBeInTheDocument()
-  expect(await screen.findByText('PREMIO: Bolsa')).toBeInTheDocument()
+  expect(await screen.findByText(prizeText('PREMIO: Entrada'))).toBeInTheDocument()
+  expect(await screen.findByText(prizeText('PREMIO TOP 3: Trofeo'))).toBeInTheDocument()
+  expect(await screen.findByText(prizeText('PREMIO: Bolsa'))).toBeInTheDocument()
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
 })
 
@@ -86,9 +87,9 @@ it.each([true, false])('keeps authoritative null limits unlimited despite legacy
     <Ranking gameId="GAME" prize={{ ...ranking, limit: null }} maxPrizeRanking={88} />
     <RaffleData gameId="GAME" gameName="Event" prize={{ ...raffle, limit: null }} maxPrizeRaffle={88} />
   </>)
-  expect(await screen.findByText('PREMIO: Entrada VIP')).toBeInTheDocument()
-  expect(await screen.findByText('PREMIO TOP 2: Copa')).toBeInTheDocument()
-  expect(await screen.findByText('PREMIO: Camiseta')).toBeInTheDocument()
+  expect(await screen.findByText(prizeText('PREMIO: Entrada VIP'))).toBeInTheDocument()
+  expect(await screen.findByText(prizeText('PREMIO TOP 2: Copa'))).toBeInTheDocument()
+  expect(await screen.findByText(prizeText('PREMIO: Camiseta'))).toBeInTheDocument()
   expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument()
 })
 
@@ -98,7 +99,7 @@ it('removes an image immediately without resurrecting cached signed URLs', async
   expect(await screen.findByRole('img', { name: 'Entrada VIP' })).toHaveAttribute('src', '/validation.png')
   rerender(<Players gameName="Event" prize={{ ...validation, imageKey: null, imageUrl: null }} />)
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
-  expect(screen.getByText('PREMIO: Entrada VIP')).toBeInTheDocument()
+  expect(screen.getByText(prizeText('PREMIO: Entrada VIP'))).toBeInTheDocument()
   rerender(<Players gameName="Event" prize={{ name: '', limit: null }} />)
   expect(screen.queryByText(/PREMIO:/)).not.toBeInTheDocument()
 })
@@ -114,7 +115,7 @@ it.each([true, false])('overlaps the raffle card without hiding winner controls 
   })
   vi.mocked(api.put).mockResolvedValue({ ok: true })
   render(<RaffleData gameId="GAME" gameName="Event" compact={compact} prize={raffle} />)
-  const label = await screen.findByText('PREMIO: Camiseta')
+  const label = await screen.findByText(prizeText('PREMIO: Camiseta'))
   expect(screen.getByRole('heading', { name: 'Sorteo' })).toHaveClass(
     'text-xl', 'sm:text-2xl',
   )

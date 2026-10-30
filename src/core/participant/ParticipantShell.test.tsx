@@ -8,6 +8,7 @@ import { StrictMode } from 'react'
 import ParticipantShell from './ParticipantShell'
 import { loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
 import { STORAGE_KEY_COLORS, STORAGE_KEY_THEME_MODE } from '../storageKeys'
+import { prizeText } from '../../test/prizeText'
 
 vi.mock('../../api/publicApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/publicApi')>()
@@ -323,6 +324,7 @@ describe('ParticipantShell STACK integration', () => {
     expect(screen.queryByText(/Escena STACK/)).not.toBeInTheDocument()
     await advanceToParticipantDetails('player@example.com')
     fireEvent.change(screen.getByLabelText(/Nombre completo/), { target: { value: 'Player' } })
+    fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '+34 612345678' } })
     fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
     const input = await screen.findByLabelText('Código de verificación')
@@ -463,7 +465,7 @@ describe('ParticipantShell STACK integration', () => {
     fireEvent.change(selector, { target: { value: 'en' } })
     expect(screen.getByRole('combobox', { name: 'Language' })).toHaveValue('en')
     expect(screen.getByLabelText('Prizes to play for')).toBeInTheDocument()
-    expect(screen.getByText(type === 'EMPAREJA2' ? 'PRIZE: Mochila' : 'TOP PRIZE 3: Auriculares')).toBeInTheDocument()
+    expect(screen.getByText(prizeText(type === 'EMPAREJA2' ? 'PRIZE: Mochila' : 'TOP PRIZE 3: Auriculares'))).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Client logo' })).toHaveAttribute('src', 'https://images.test/client.png')
   })
 

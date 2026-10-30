@@ -37,7 +37,8 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
   const [revision, setRevision] = useState(0)
   const [openedWallet, setOpenedWallet] = useState('')
   const walletKey = JSON.stringify([gameId, playerToken, stackPrizes?.walletUrl])
-  const walletLocked = isStackWalletUrl(stackPrizes?.walletUrl ?? null) && openedWallet !== walletKey
+  const walletLocked = stackPrizes?.deliveryChannel !== 'email'
+    && isStackWalletUrl(stackPrizes?.walletUrl ?? null) && openedWallet !== walletKey
   const retry = useCallback(() => setRevision((previous) => previous + 1), [])
 
   useEffect(() => {
@@ -124,8 +125,8 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
           )
       )}
       {enabled && stackPrizes && <>
-        <StackWallet url={stackPrizes.walletUrl} expected={stackPrizes.walletExpected}
-          highlight={walletLocked} onOpen={() => setOpenedWallet(walletKey)} />
+        {stackPrizes.deliveryChannel !== 'email' && <StackWallet url={stackPrizes.walletUrl} expected={stackPrizes.walletExpected}
+          highlight={walletLocked} onOpen={() => setOpenedWallet(walletKey)} />}
         <StackAwardList data={stackPrizes} locked={walletLocked} />
       </>}
     </>

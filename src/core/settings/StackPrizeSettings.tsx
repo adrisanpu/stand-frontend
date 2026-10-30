@@ -143,6 +143,13 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       } : rule),
     })
   }
+  const emailStates = {
+    pending: t('Pendiente de envío', 'Waiting to send'),
+    sending: t('Enviando', 'Sending'),
+    accepted: t('Aceptado por el proveedor de email; entrega no confirmada', 'Accepted by email provider; delivery not confirmed'),
+    failed: t('Error de envío', 'Sending failed'),
+    reconciliation_required: t('Envío incierto: comprobar antes de reenviar', 'Uncertain send: check before resending'),
+  }
   return <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
     <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-4 pb-4">
     {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
@@ -153,6 +160,26 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     {!editable && <p role="status" className="text-sm text-textSub">{t('El juego se está cerrando o está cerrado. Los premios no se pueden editar.',
       'The game is closing or closed. Prizes cannot be edited.')}</p>}
     <fieldset disabled={busy || !editable} className="space-y-4">
+      <section className="rounded-xl border border-white/10 p-3 space-y-3">
+        <label className="block text-sm font-semibold" htmlFor="stack-delivery-channel">
+          {t('Entrega de premios Kivly', 'Kivly reward delivery')}
+        </label>
+        <select id="stack-delivery-channel" className={`${field} w-full`} value={program.deliveryChannel ?? 'wallet'}
+          onChange={(event) => {
+            if (event.target.value === 'wallet' || event.target.value === 'email')
+              change({ ...program, deliveryChannel: event.target.value })
+          }}>
+          <option value="wallet">Wallet</option>
+          <option value="email" disabled={!data.emailAvailable}>Email</option>
+        </select>
+        <p className="text-xs text-textSub">{t('Solo un canal. Los cambios se aplican a nuevas partidas; los premios STAND mantienen su QR.',
+          'One channel only. Changes apply to new games; STAND prizes keep their QR.')}</p>
+        {program.deliveryChannel === 'email' && <p className="text-xs text-textSub">{t(
+          'Enviaremos el premio al email verificado con un QR del teléfono registrado en Kivly. No se necesita wallet.',
+          'We will email the reward to the verified address with a QR of the phone registered in Kivly. No wallet needed.')}</p>}
+        {!data.emailAvailable && <p className="text-xs text-amber-300">{t('El envío de premios por email aún no está habilitado en este entorno.',
+          'Reward email delivery is not enabled in this environment yet.')}</p>}
+      </section>
       <section className="rounded-xl border border-white/10 p-3 space-y-3">
         <h3 className="text-sm font-semibold">{t('Catálogo e inventario', 'Catalog and stock')}</h3>
         <div className="flex gap-2">
@@ -274,6 +301,27 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         rules: [...program.rules, { id: newId(), condition: 'completed', groups: [{ allocations: [] }] }],
       })}>{t('Añadir regla', 'Add rule')}</button>
     </fieldset>
+    {data.awards.some((award) => award.deliveryChannel === 'email') && <section className="rounded-xl border border-white/10 p-3 space-y-3">
+      <h3 className="text-sm font-semibold">{t('Envíos de premios por email', 'Reward emails')}</h3>
+      {data.awards.filter((award) => award.deliveryChannel === 'email').map((award) => <div key={award.id} className="text-sm space-y-1">
+        <p>#{award.playerId} · {award.name} · {award.emailState ? emailStates[award.emailState] : award.state}</p>
+        {award.emailError && <p role="alert" className="text-amber-300">{award.emailError === 'KivlyPhoneRequired'
+          ? t('Falta un teléfono válido en Kivly. Corrige la ficha allí y reintenta el email.',
+            'A valid phone is missing in Kivly. Correct the record there and retry the email.')
+          : award.emailError}</p>}
+        {award.emailState === 'failed' && <button type="button" className={action} disabled={busy || !data.emailAvailable}
+          onClick={() => void run(async () => {
+            const next = await stackPrizeApi.retryEmail(gameId, award.id)
+            if (next.ok !== true) throw new Error(t('No se pudo reintentar el email.', 'Could not retry the email.'))
+            setData(next)
+          })}>{t('Reintentar email sin reasignar premio', 'Retry email without assigning again')}</button>}
+      </div>)}
+      <button type="button" className={action} disabled={busy} onClick={() => void run(async () => {
+        const next = await stackPrizeApi.get(gameId)
+        if (next.ok !== true) throw new Error(t('No se pudo actualizar el estado.', 'Could not refresh status.'))
+        setData(next)
+      })}>{t('Actualizar envíos', 'Refresh emails')}</button>
+    </section>}
     </div>
     <div className="settings-footer border-t border-white/10 pt-3">
       <button type="button" className={`${action} w-full font-semibold`} disabled={busy || !editable || invalidProgram || (!dirty && data.enabled)}

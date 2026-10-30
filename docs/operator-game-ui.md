@@ -47,7 +47,7 @@ and sends its version with the email-code request. Access opens only after the
 backend confirms verified registration. Changed terms require fresh consent;
 uncertain registration displays an error without granting access. STACK prize
 settings now own mixed STAND/Kivly rules; there is no separate completion-reward
-selector. After a confirmed result, show a compact official club wallet action
+selector. With wallet selected, after a confirmed result show a compact official club wallet action
 below the game result and before individual prize cards. Kivly assignments happen
 server-side without returning to the result page. The feature does not generate
 passes, redeem Kivly rewards or mark them used; uncertain assignments are not
@@ -55,8 +55,22 @@ automatically replayed. Installed-wallet propagation has not been live-verified.
 
 ### STACK: textual prize rules
 
-`Settings > Premios` starts with **Catálogo e inventario**, without a redundant
-header, summary counters or search filters, followed by consecutive rules.
+`Settings > Premios` starts with an exclusive **Wallet / Email** selector for
+Kivly delivery, followed by **Catálogo e inventario**, without a redundant
+header, summary counters or search filters, then consecutive rules.
+Wallet is the default for older programs. Email selection is unavailable until
+the backend environment enables it. A channel change affects only new attempts.
+Email mode automatically sends confirmed Kivly rewards to the verified address
+with the Kivly customer's phone QR; no wallet action or reveal lock is shown.
+STAND prize QRs retain their usual behavior. The prize panel also shows email
+states and lets the organizer retry definitive failures without awarding again,
+including after closure; uncertain sends require investigation instead.
+
+STACK registration always requires name, verified email and phone in both
+channels. Its shared game configuration has no optional-phone toggle. Other
+games keep their existing optional-phone configuration. The QR uses the phone
+in Kivly, not a conflicting value entered in STAND; a missing Kivly phone shows
+an actionable error and never silently falls back.
 Each rule uses "Cuando [condition], entregar [OR groups of AND prizes]".
 Offer completed game, top X at own finish, final top X at closure, and raffle
 winner (subject to the existing raffle plan). The combined selector
@@ -225,7 +239,9 @@ changes. Keep user-entered names, prizes and game content unchanged; participant
 `/play` uses its separate language context.
 
 All games use **∞ móviles** for gameplay and **Web** for participant access;
-master-screen and Instagram game-access options are not available.
+master-screen and Instagram game-access options are not available. The config
+panel no longer shows the fixed "Modo de juego" / "Acceso del participante"
+labels; the values are still normalized and saved silently.
 Use two columns for short rule parameters (STACK speeds/tolerance, L3TRAS word/time,
 INFOCARDS generation counts); a lone short field such as IMPOSTOR's player limit
 occupies one column. Long text, word editors and descriptions retain their full

@@ -29,6 +29,7 @@ export type StackPrizeProgram = {
   catalog: StackPrizeItem[]
   rules: StackPrizeRule[]
   storefrontUrl: string
+  deliveryChannel?: 'wallet' | 'email'
 }
 export type StackAward = {
   id: string
@@ -41,17 +42,22 @@ export type StackAward = {
   lastError?: string | null
   lastErrorStage?: string | null
   lastErrorHttpStatus?: number | null
+  deliveryChannel?: 'wallet' | 'email'
+  emailState?: 'pending' | 'sending' | 'accepted' | 'failed' | 'reconciliation_required' | null
+  emailError?: string | null
 }
 export type StackPlayerPrizes = {
   awards: StackAward[]
   walletUrl: string | null
   walletExpected?: boolean
+  deliveryChannel?: 'wallet' | 'email'
   state: 'open' | 'closing' | 'closed'
   finalPrizesPending: boolean
 }
 export type StackPrizeSettingsResponse = {
   ok: true
   enabled: boolean
+  emailAvailable?: boolean
   program: StackPrizeProgram
   state: StackPlayerPrizes['state']
   pendingPlayers: { playerId: number; name: string }[]
@@ -68,4 +74,6 @@ export const stackPrizeApi = {
   },
   close: (gameId: string, excludePlayerIds: number[] = []) =>
     api.post<StackPrizeSettingsResponse>('/v1/game/stack/prizes', { gameId, excludePlayerIds }),
+  retryEmail: (gameId: string, awardId: string) =>
+    api.post<StackPrizeSettingsResponse>('/v1/game/stack/prizes', { gameId, action: 'retry_email', awardId }),
 }

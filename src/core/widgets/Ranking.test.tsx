@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../api/api'
 import Ranking from './Ranking'
 import { OperatorLanguageProvider, OperatorLanguageSelector } from '../shell/operatorLanguage'
+import { prizeText } from '../../test/prizeText'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn() } }))
 afterEach(cleanup)
@@ -34,13 +35,13 @@ describe('Ranking game score formatting', () => {
     })
     render(<Ranking gameId="GAME1234" gameType="STACK" compact={compact}
       prize={{ name: 'Copa', limit: 20, topX: 2, imageUrl: '/cup.png' }} />)
-    const label = await screen.findByText('PREMIO TOP 2: Copa')
+    const label = await screen.findByText(prizeText('PREMIO TOP 2: Copa'))
     const sticker = label.parentElement?.parentElement
     expect(sticker).toHaveClass('self-end', compact ? 'h-16' : 'h-20', compact ? '-mb-8' : '-mb-10')
     expect(sticker?.nextElementSibling).toHaveClass('card', 'flex-1', 'min-h-0', compact ? 'p-2' : 'p-3')
     expect(sticker?.nextElementSibling).not.toHaveClass('h-full', 'pt-10')
     expect(screen.getByRole('img', { name: 'Copa' })).toHaveClass('object-contain', 'h-full')
-    expect(label.nextElementSibling).toHaveTextContent('12/20')
+    expect(sticker).toHaveTextContent('12/20')
     expect(screen.getAllByLabelText('Premio')).toHaveLength(2)
     expect(screen.getByText('+2 más').parentElement).toHaveClass('overflow-y-auto', 'flex-1', 'min-h-0')
     expect(api.get).toHaveBeenCalledWith('/v1/game/score?gameId=GAME1234&limit=20')
@@ -54,9 +55,9 @@ describe('Ranking game score formatting', () => {
         <Ranking gameId="GAME1234" prize={{ name: 'Copa', limit: null, topX: 3 }} />
       </OperatorLanguageProvider>,
     )
-    await screen.findByText('PREMIO TOP 3: Copa')
+    await screen.findByText(prizeText('PREMIO TOP 3: Copa'))
     fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
-    expect(screen.getByText('TOP PRIZE 3: Copa')).toBeInTheDocument()
+    expect(screen.getByText(prizeText('TOP PRIZE 3: Copa'))).toBeInTheDocument()
     expect(screen.getByText('No scores yet')).toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument()

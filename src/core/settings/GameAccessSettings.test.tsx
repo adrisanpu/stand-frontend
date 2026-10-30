@@ -19,12 +19,12 @@ function mount(type = 'T1MER') {
 }
 
 describe('fixed mobile and Web access presentation', () => {
-  it('shows fixed informative values instead of selectors', async () => {
-    mount()
-    await waitFor(() => expect(screen.getByText('∞ móviles')).toBeInTheDocument())
-    expect(screen.getByText('Web')).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Modo de juego' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Acceso del participante' })).toBeInTheDocument()
+  it('does not show the fixed mode/access labels or selectors', async () => {
+    const { onLoaded } = mount()
+    await waitFor(() => expect(onLoaded).toHaveBeenCalled())
+    expect(screen.queryByText('∞ móviles')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Modo de juego' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Acceso del participante' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '1 pantalla' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Instagram' })).not.toBeInTheDocument()
   })
@@ -41,9 +41,8 @@ describe('fixed mobile and Web access presentation', () => {
   it('normalizes legacy values for every supported game', async () => {
     for (const type of ['L3TRAS', 'RULET4', 'CUPIDO', 'SEMAFORO', 'INFOCARDS', 'IMPOSTOR', 'STACK']) {
       vi.mocked(api.get).mockResolvedValueOnce({ ok: true, game: { playMode: 'old', joinChannel: 'old' } })
-      mount(type)
-      await waitFor(() => expect(screen.getByText('∞ móviles')).toBeInTheDocument())
-      expect(screen.getByText('Web')).toBeInTheDocument()
+      const { onLoaded } = mount(type)
+      await waitFor(() => expect(onLoaded).toHaveBeenCalledWith({ playMode: 'mobile', joinChannel: 'web' }))
       cleanup()
     }
   })

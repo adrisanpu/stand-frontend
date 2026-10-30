@@ -35,9 +35,10 @@ export default function GamePortraitHeaderJoin({
             margin={6}
             containerClassName="w-full max-w-[min(100%,128px)] sm:max-w-[140px] aspect-square"
             alt={t('QR para unirse al juego', 'QR code to join the game')}
-            className="!border-0 !bg-white !p-2 rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+            className="!border-0 !bg-transparent !p-0"
+            themed
           />
-          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-gray-300/90 text-center">
+          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-primary text-center">
             {t('Escanea para jugar', 'Scan to play')}
           </p>
           <GameIdHint gameId={gameId} joinChannel={joinChannel} />

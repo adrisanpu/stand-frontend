@@ -42,7 +42,7 @@ export function useGameAccessDraft(gameId: string, gameType: string, onLoaded?: 
   const [status, setStatus] = useState<GameAccessLoadStatus>('loading')
   const [loadError, setLoadError] = useState('')
   const [loadVersion, setLoadVersion] = useState(0)
-  const [participantFields, setParticipantFields] = useState(resolveParticipantFields)
+  const [participantFields, setParticipantFields] = useState(() => resolveParticipantFields(undefined, gameType))
 
   useEffect(() => {
     let cancelled = false
@@ -56,7 +56,7 @@ export function useGameAccessDraft(gameId: string, gameType: string, onLoaded?: 
       if (!data.ok || !data.game) throw new Error('No se pudo cargar el acceso del juego.')
       const loaded = resolveGameAccess(gameType, data.game)
       setAccess(loaded)
-      setParticipantFields(resolveParticipantFields(data.game.participantFields))
+      setParticipantFields(resolveParticipantFields(data.game.participantFields, gameType))
       onLoaded?.(loaded)
       setStatus('ready')
     }).catch((cause: unknown) => {
@@ -83,35 +83,6 @@ export function useGameAccessDraft(gameId: string, gameType: string, onLoaded?: 
   }
 
   return { access, status, loadError, setAccess, reload, persist, participantFields, setParticipantFields }
-}
-
-type FieldsProps = {
-  gameType: string
-  access: GameAccess | null
-  disabled?: boolean
-  onChange: (access: GameAccess) => void
-}
-
-export function GameAccessFields({ gameType, access, disabled = false, onChange }: FieldsProps) {
-  const { t } = useOperatorLanguage()
-  void onChange
-  const supported = Boolean(gameType && access)
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <fieldset disabled className="min-w-0">
-        <legend className="text-sm font-medium mb-2">{t('Modo de juego', 'Game mode')}</legend>
-        <p className={`min-w-0 rounded-xl px-2 py-3 text-center text-sm border ${supported ? 'bg-primary/20 border-primary' : 'bg-white/5 border-white/10'} ${disabled ? 'opacity-50' : ''}`}>
-          {t('∞ móviles', '∞ mobile devices')}
-        </p>
-      </fieldset>
-      <fieldset disabled className="min-w-0">
-        <legend className="text-sm font-medium mb-2">{t('Acceso del participante', 'Participant access')}</legend>
-        <p className={`min-w-0 rounded-xl px-2 py-3 text-center text-sm border ${supported ? 'bg-primary/20 border-primary' : 'bg-white/5 border-white/10'} ${disabled ? 'opacity-50' : ''}`}>
-          Web
-        </p>
-      </fieldset>
-    </div>
-  )
 }
 
 type Props = {
@@ -146,8 +117,6 @@ export default function GameAccessSettings({ gameId, gameType, onLoaded, onSaved
 
   return (
     <div className="space-y-4 border-b border-white/10 pb-6 mb-6">
-      <GameAccessFields gameType={gameType} access={draft.access} disabled={saveStatus === 'saving'}
-        onChange={(next) => { draft.setAccess(next); setSaveStatus('idle') }} />
       {draft.status === 'loading' && <p role="status">{t('Cargando acceso...', 'Loading access...')}</p>}
       {error && <p role="alert" className="text-sm text-red-300">{translateGameAccessMessage(error, t)}</p>}
       {draft.status === 'error' ? (

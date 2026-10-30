@@ -5,7 +5,7 @@ import { kivlyApi } from '../../api/kivlyApi'
 import { uploadPrizeImage } from '../../api/prizeMedia'
 import StackPrizeSettings from './StackPrizeSettings'
 
-vi.mock('../../api/stackPrizes', () => ({ stackPrizeApi: { get: vi.fn(), save: vi.fn(), close: vi.fn() } }))
+vi.mock('../../api/stackPrizes', () => ({ stackPrizeApi: { get: vi.fn(), save: vi.fn(), close: vi.fn(), retryEmail: vi.fn() } }))
 vi.mock('../../api/kivlyApi', () => ({ kivlyApi: { getAccountConnection: vi.fn(), listRewards: vi.fn() } }))
 vi.mock('../../api/prizeMedia', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/prizeMedia')>(),
@@ -49,6 +49,46 @@ it('adds a Kivly reward to an AND group without creating it externally', async (
   expect(saved.rules[0].id).not.toBe('done')
   expect(reward.id.length).toBeLessThanOrEqual(80)
   expect(reward).toMatchObject({ rewardId: 'coffee', locationId: 'loc', source: 'kivly', stockTotal: 100 })
+})
+
+it('saves one exclusive email channel while retaining wallet as the legacy default', async () => {
+  vi.mocked(stackPrizeApi.get).mockResolvedValue({ ...structuredClone(response), emailAvailable: true })
+  mount()
+  const channel = await screen.findByLabelText('Entrega de premios Kivly')
+  expect(channel).toHaveValue('wallet')
+  expect(screen.queryByRole('option', { name: /ambas/i })).not.toBeInTheDocument()
+  fireEvent.change(channel, { target: { value: 'email' } })
+  save()
+  await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalledWith('ABC123',
+    expect.objectContaining({ deliveryChannel: 'email' })))
+})
+
+it('disables email when it is unavailable in this environment', async () => {
+  mount()
+  await screen.findByLabelText('Entrega de premios Kivly')
+  expect(screen.getByRole('option', { name: 'Email' })).toBeDisabled()
+  expect(screen.getByText('El envío de premios por email aún no está habilitado en este entorno.')).toBeInTheDocument()
+})
+
+it('shows missing Kivly phone and retries only the email, including after closure', async () => {
+  const data: StackPrizeSettingsResponse = {
+    ...structuredClone(response), state: 'closed', emailAvailable: true,
+    awards: [{ id: 'award_one', playerId: 7, name: 'Coffee', source: 'kivly', condition: 'completed',
+      state: 'confirmed', deliveryChannel: 'email', emailState: 'failed', emailError: 'KivlyPhoneRequired' }],
+  }
+  vi.mocked(stackPrizeApi.get).mockResolvedValue(data)
+  vi.mocked(stackPrizeApi.retryEmail).mockResolvedValue({
+    ...data, awards: [{ ...data.awards[0], emailState: 'pending', emailError: null }],
+  })
+  mount()
+  const retry = await screen.findByRole('button', { name: 'Reintentar email sin reasignar premio' })
+  expect(screen.getByRole('alert')).toHaveTextContent('Falta un teléfono válido en Kivly')
+  expect(retry).toBeEnabled()
+  fireEvent.click(retry)
+  await waitFor(() => expect(stackPrizeApi.retryEmail).toHaveBeenCalledWith('ABC123', 'award_one'))
+  expect(await screen.findByText(/Pendiente de envío/)).toBeInTheDocument()
+  expect(stackPrizeApi.save).not.toHaveBeenCalled()
+  expect(stackPrizeApi.close).not.toHaveBeenCalled()
 })
 
 it('shows the full external catalog without publishing it until selected', async () => {

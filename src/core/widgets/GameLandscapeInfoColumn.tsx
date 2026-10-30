@@ -34,9 +34,10 @@ export default function GameLandscapeInfoColumn({ gameId, logoElement, children,
             margin={8}
             containerClassName="w-full max-w-[min(100%,240px)] aspect-square mx-auto"
             alt={t('QR para unirse', 'QR code to join')}
-            className="!border-0 !bg-white !p-2.5 sm:!p-3 rounded-2xl shadow-[0_0_24px_rgba(255,255,255,0.12)]"
+            className="!border-0 !bg-transparent !p-0"
+            themed
           />
-          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-gray-300/90 text-center">
+          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-primary text-center">
             {t('Escanea para jugar', 'Scan to play')}
           </p>
           <GameIdHint gameId={gameId} joinChannel={joinChannel} />

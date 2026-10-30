@@ -7,6 +7,7 @@ import JoinForm from './JoinForm'
 import ParticipantPrizePromo from './ParticipantPrizePromo'
 import { ParticipantLanguageProvider, ParticipantLanguageSelector } from './participantLanguage'
 import type { PrizeCatalog } from '../prizes'
+import { prizeText } from '../../test/prizeText'
 
 vi.mock('../../api/publicApi', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/publicApi')>(),
@@ -42,6 +43,28 @@ const catalog: PrizeCatalog = {
   ranking: { name: 'Auriculares', limit: null, topX: 3, imageKey: 'ranking.png', imageUrl: '/prizes/headphones.png' },
   raffle: { name: 'Sorteo secreto', limit: 1, imageUrl: '/prizes/raffle.png' },
 }
+
+it('requires a phone for STACK even when old metadata disables it', async () => {
+  render(<JoinForm gameId="ABC123" gameMeta={{
+    ...meta, gameType: 'STACK', participantFields: { phone: { enabled: false, required: false } },
+  }} onJoined={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.test' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+  fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: 'Player' } })
+  fireEvent.click(screen.getAllByRole('checkbox')[0])
+  const phone = screen.getByLabelText('Teléfono')
+  expect(phone).toBeRequired()
+  fireEvent.submit(phone.closest('form')!)
+  expect(screen.getByRole('alert')).toHaveTextContent('El teléfono es obligatorio.')
+  expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+  fireEvent.change(phone, { target: { value: 'invalid' } })
+  fireEvent.submit(phone.closest('form')!)
+  expect(screen.getByRole('alert')).toHaveTextContent('Introduce un teléfono válido.')
+  fireEvent.change(phone, { target: { value: '+34 612345678' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+  await screen.findByLabelText('Código de verificación')
+  expect(publicApi.requestEmailCode).toHaveBeenCalledWith(expect.objectContaining({ phone: '+34 612345678' }))
+})
 
 describe('Kivly club registration', () => {
   const loyalty = {
@@ -127,7 +150,7 @@ describe('participant prize promotion', () => {
     const heading = screen.getByLabelText('Premios en juego')
     expect(heading.compareDocumentPosition(screen.getByLabelText('Email *')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(heading).toHaveClass('-mb-8', 'items-start')
-    expect(screen.getByText('PREMIO: Mochila').closest('.rounded-full')).toHaveClass('self-start', 'h-16', 'border-primary')
+    expect(screen.getByText(prizeText('PREMIO: Mochila')).closest('.rounded-full')).toHaveClass('self-start', 'h-16', 'border-primary')
     expect(screen.queryByText('0/20')).not.toBeInTheDocument()
   })
 
@@ -136,7 +159,7 @@ describe('participant prize promotion', () => {
       validation: { name: 'Sin existencias', limit: 0, imageUrl: '/out.png' },
       ranking: { name: 'Entrada', limit: null, topX: 3 },
     }} stickers />)
-    expect(screen.getByText('PREMIO TOP 3: Entrada')).toBeInTheDocument()
+    expect(screen.getByText(prizeText('PREMIO TOP 3: Entrada'))).toBeInTheDocument()
     expect(screen.queryByText('Sin existencias')).not.toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
@@ -157,8 +180,8 @@ describe('participant prize promotion', () => {
     fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
     expect(screen.getByLabelText('Prizes to play for')).toBeInTheDocument()
-    expect(screen.getByText('PRIZE: Mochila')).toBeInTheDocument()
-    expect(screen.getByText('TOP PRIZE 3: Auriculares')).toBeInTheDocument()
+    expect(screen.getByText(prizeText('PRIZE: Mochila'))).toBeInTheDocument()
+    expect(screen.getByText(prizeText('TOP PRIZE 3: Auriculares'))).toBeInTheDocument()
     expect(screen.getByLabelText('Email *')).toHaveValue('player@example.com')
   })
 })

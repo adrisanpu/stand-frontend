@@ -50,28 +50,40 @@ export default function PrizeSticker({ prize, label, current, max, compact = fal
     max = undefined
   }
   if (!label && !prize?.imageUrl) return null
+  const sliding = Boolean(items && items.length > 1)
+  const badge = items
+    ? heading
+    : heading ?? (topX != null ? `${t('PREMIO TOP', 'TOP PRIZE')} ${topX}` : t('PREMIO', 'PRIZE'))
 
   return (
     <div
-      className={`relative z-10 ${inline ? 'self-start' : 'self-end'} flex shrink-0 items-center gap-2 max-w-full min-w-0 rounded-full border-2 border-primary bg-[var(--color-background,#0B0A12)] bg-[linear-gradient(var(--color-surface),var(--color-surface))] shadow-lg pr-4 ${items ? 'w-72 overflow-hidden' : ''} ${compact ? 'h-16' : 'h-20'} ${inline ? '' : compact ? '-mb-8' : '-mb-10'}`}
+      data-testid="prize-sticker"
+      className={`relative z-10 ${inline ? 'self-start' : 'self-end'} flex w-72 shrink-0 items-center gap-3 max-w-full min-w-0 overflow-hidden rounded-full border-2 border-primary bg-[var(--color-background,#0B0A12)] bg-[linear-gradient(var(--color-surface),var(--color-surface))] shadow-lg p-1 pr-4 ${compact ? 'h-16' : 'h-20'} ${inline ? '' : compact ? '-mb-8' : '-mb-10'}`}
     >
-      {prize?.imageUrl && (
-        <div key={`${item?.id ?? 'prize'}-image`} className={`shrink-0 rounded-full bg-primary flex items-center justify-center p-1 h-full aspect-square ${items && items.length > 1 ? 'prize-catalog-slide' : ''}`}>
-          <PrizeImage prize={prize} className="h-full w-full object-contain" />
-        </div>
-      )}
-      <div key={item?.id ?? 'label'} className={`min-w-0 py-1 ${prize?.imageUrl ? '' : 'pl-4'} ${items && items.length > 1 ? 'prize-catalog-slide' : ''}`}>
-        <p title={label} className={`font-bold text-textMain break-words [overflow-wrap:anywhere] line-clamp-2 ${HOME_BODY_TEXT}`}>
-          {items
-            ? <>{heading && `${heading}: `}{label}</>
-            : <>{heading ?? (topX != null ? `${t('PREMIO TOP', 'TOP PRIZE')} ${topX}` : t('PREMIO', 'PRIZE'))}: {label}</>}
-        </p>
-        {max !== undefined && (
-          <p className={`font-semibold text-textMain tabular-nums ${HOME_BODY_TEXT}`}>
-            {current}/{max}
-          </p>
-        )}
+      <div key={`${item?.id ?? 'prize'}-image`} data-testid="prize-sticker-art" className={`shrink-0 overflow-hidden rounded-full bg-primary flex items-center justify-center p-1 h-full aspect-square ${sliding ? 'prize-catalog-slide' : ''}`}>
+        {prize?.imageUrl
+          ? <PrizeImage prize={prize} className="h-full w-full object-contain" />
+          : <svg aria-hidden="true" className="h-1/2 w-1/2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112-2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+            </svg>}
       </div>
+      <div key={item?.id ?? 'label'} className={`min-w-0 flex-1 ${sliding ? 'prize-catalog-slide' : ''}`}>
+        {label
+          ? <p title={label} className={`font-bold leading-tight text-textMain break-words [overflow-wrap:anywhere] line-clamp-2 ${HOME_BODY_TEXT}`}>
+              {badge && <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-primary">{badge}<span className="sr-only">: </span></span>}
+              <span className={badge ? 'line-clamp-1' : 'line-clamp-2'}>{label}</span>
+            </p>
+          : badge && <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-primary">{badge}</p>}
+        {sliding && <div aria-hidden="true" className="mt-1 flex gap-1">
+          {items!.map((entry, position) => <span key={entry.id}
+            className={`h-1 rounded-full transition-all ${position === index % items!.length ? 'w-3 bg-primary' : 'w-1 bg-white/30'}`} />)}
+        </div>}
+      </div>
+      {max !== undefined && (
+        <p className={`shrink-0 rounded-full border border-primary/40 bg-primary/15 px-2 py-0.5 font-semibold text-textMain tabular-nums ${HOME_BODY_TEXT}`}>
+          {current}/{max}
+        </p>
+      )}
       {items && items.length > 1 && <div className="sr-only focus-within:not-sr-only shrink-0 ml-auto flex">
         <button type="button" className="rounded-full p-1 text-xs hover:bg-primary/20" aria-pressed={paused}
           aria-label={paused ? resumeLabel ?? t('Reanudar premios', 'Resume prizes') : pauseLabel ?? t('Pausar premios', 'Pause prizes')}

@@ -304,7 +304,7 @@ export default function Raffle({ onBack, onClose, gameId, gameType }: RaffleProp
                       className="peer sr-only"
                       aria-label={t('Activar sorteo automático', 'Enable automatic raffle')}
                     />
-                    <div className="relative h-6 w-11 shrink-0 rounded-full bg-gray-600 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-purple-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500" />
+                    <div className="relative h-6 w-11 shrink-0 rounded-full bg-gray-600 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary" />
                   </label>
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                     <span className="text-sm text-gray-300 whitespace-nowrap">{t('Cada:', 'Every:')}</span>

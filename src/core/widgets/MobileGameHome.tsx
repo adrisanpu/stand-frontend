@@ -53,10 +53,10 @@ export default function MobileGameHome({
         aria-label={t('QR de acceso al juego', 'Game access QR code')}
         className={`card flex flex-col items-center justify-evenly gap-4 sm:gap-6 min-w-0 p-4 sm:p-6 ${portrait ? 'order-2 min-h-[32dvh]' : 'h-full min-h-0 overflow-hidden'}`}
       >
-        <h2 lang={language} className="shrink-0 text-center text-4xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-wide text-white">
+        <h2 lang={language} className="shrink-0 text-center text-4xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-wide text-textMain">
           {language === 'es'
-            ? <><span className="text-red-500">ESCANEA</span> PARA JUGAR.</>
-            : <><span className="text-red-500">SCAN</span> TO PLAY.</>}
+            ? <><span className="text-primary">ESCANEA</span> PARA JUGAR.</>
+            : <><span className="text-primary">SCAN</span> TO PLAY.</>}
         </h2>
         <QRCode
           data={getJoinUrl(gameId, joinChannel)}
@@ -66,7 +66,8 @@ export default function MobileGameHome({
           containerClassName={portrait
             ? 'w-full max-w-[min(100%,44dvh)] aspect-square'
             : 'w-full max-w-[min(100%,calc(80dvh-12rem))] aspect-square max-h-full'}
-          className="!bg-white !border-0 !p-2 sm:!p-3"
+          className="!bg-transparent !border-0 !p-0"
+          themed
         />
       </div>
       {ranking && (

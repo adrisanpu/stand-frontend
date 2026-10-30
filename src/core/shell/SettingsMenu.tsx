@@ -5,7 +5,6 @@ import AppearanceSettings from '../settings/AppearanceSettings'
 import IntegrationsSettings from '../settings/IntegrationsSettings'
 import StackCloseSettings from '../settings/StackCloseSettings'
 import GamePlayersSettings from '../settings/GamePlayersSettings'
-import { useKivlyDraft } from '../settings/KivlySettings'
 import OperatorPrizeSettings from '../settings/OperatorPrizeSettings'
 import type { GameDefinition } from '../types'
 import { api } from '../../api/api'
@@ -97,7 +96,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const { language, t } = useOperatorLanguage()
   const { user, loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
-  const kivly = useKivlyDraft(gameId ?? '', !!gameId && (gameDefinition?.id ?? gameType)?.toUpperCase() === 'STACK')
 
   const translateKnownError = (message: string) => {
     const translations: Record<string, string> = {
@@ -1093,11 +1091,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </div>
                   <div className="text-left">
                     <div className="font-medium">{t('Configurar juego', 'Configure game')}</div>
-                    {kivly.connection?.connected && <img
-                      src="/images/kivly-logo.svg"
-                      alt={t('Kivly conectado', 'Kivly connected')}
-                      className="mt-1 h-4 w-auto"
-                    />}
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1125,34 +1118,26 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </button>
               )}
 
-              {/* Quiz - For all games, disabled for FREE plan */}
-              <div className="relative">
+              {/* Premios — todos los juegos con partida */}
+              {gameId && gameDefinition && (
                 <button
-                  onClick={() => {
-                    if (plan === 'free') return
-                    setShowQuiz(true)
-                  }}
-                  disabled={plan === 'free'}
-                  className={`w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors relative ${
-                    plan !== 'free'
-                      ? 'hover:bg-[rgba(255,255,255,0.1)]' 
-                      : 'opacity-50 cursor-not-allowed'
-                  }`}
-                  title={plan === 'free' ? t('Disponible en el plan Event 24h', 'Available on the Event 24h plan') : undefined}
+                  type="button"
+                  onClick={() => setShowOperatorPrizes(true)}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
                 >
-                  <div className="p-2 rounded-lg bg-green-500/20">
-                    <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  <div className="p-2 rounded-lg bg-amber-500/20">
+                    <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112-2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                     </svg>
                   </div>
                   <div className="text-left">
-                    <div className="font-medium">{t('Quiz', 'Quiz')}</div>
+                    <div className="font-medium">{t('Premios', 'Prizes')}</div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
-              </div>
+              )}
 
               {/* Raffle - Always shown, disabled for FREE plan */}
               <div className="relative">
@@ -1183,26 +1168,34 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                 </button>
               </div>
 
-              {/* Premios — todos los juegos con partida */}
-              {gameId && gameDefinition && (
+              {/* Quiz - For all games, disabled for FREE plan */}
+              <div className="relative">
                 <button
-                  type="button"
-                  onClick={() => setShowOperatorPrizes(true)}
-                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+                  onClick={() => {
+                    if (plan === 'free') return
+                    setShowQuiz(true)
+                  }}
+                  disabled={plan === 'free'}
+                  className={`w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors relative ${
+                    plan !== 'free'
+                      ? 'hover:bg-[rgba(255,255,255,0.1)]' 
+                      : 'opacity-50 cursor-not-allowed'
+                  }`}
+                  title={plan === 'free' ? t('Disponible en el plan Event 24h', 'Available on the Event 24h plan') : undefined}
                 >
-                  <div className="p-2 rounded-lg bg-amber-500/20">
-                    <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112-2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                  <div className="p-2 rounded-lg bg-green-500/20">
+                    <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                     </svg>
                   </div>
                   <div className="text-left">
-                    <div className="font-medium">{t('Premios', 'Prizes')}</div>
+                    <div className="font-medium">{t('Quiz', 'Quiz')}</div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
-              )}
+              </div>
 
               <button
                 onClick={() => {

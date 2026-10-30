@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api/api'
 import Players from './Players'
 import { OperatorLanguageProvider, OperatorLanguageSelector } from '../shell/operatorLanguage'
+import { prizeText } from '../../test/prizeText'
 
 const state = vi.hoisted(() => ({ plan: 'event' }))
 vi.mock('../../auth/useCurrentUser', () => ({
@@ -30,7 +31,7 @@ it('translates the panel but preserves custom prize names', async () => {
   await screen.findByText('25')
   fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
   expect(screen.getByText('Players')).toBeInTheDocument()
-  expect(screen.getByText('PRIZE: Premio por pareja')).toBeInTheDocument()
+  expect(screen.getByText(prizeText('PRIZE: Premio por pareja'))).toBeInTheDocument()
 })
 
 it.each([
@@ -47,8 +48,8 @@ it.each([
   expect(label).toHaveClass('text-xl', 'sm:text-2xl')
   expect(count).toHaveClass('text-xl', 'sm:text-2xl', 'tabular-nums')
   expect(screen.getAllByText('Jugadores')).toHaveLength(1)
-  expect(screen.getByText('PREMIO: Entrada')).toBeInTheDocument()
-  const sticker = screen.getByText('PREMIO: Entrada').parentElement?.parentElement
+  expect(screen.getByText(prizeText('PREMIO: Entrada'))).toBeInTheDocument()
+  const sticker = screen.getByText(prizeText('PREMIO: Entrada')).parentElement?.parentElement
   expect(sticker?.nextElementSibling).toHaveClass('card', compact ? 'p-2' : 'p-3')
   expect(sticker?.nextElementSibling).not.toHaveClass('pt-10')
   expect(screen.getByText('3/10')).toBeInTheDocument()

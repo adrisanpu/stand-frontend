@@ -89,14 +89,12 @@ describe('mobile event links', () => {
     const section = screen.getByRole('region', { name: 'Enlaces del evento' })
     expect(section).toHaveClass('grid', 'grid-cols-3')
     expect(section.children).toHaveLength(3)
-    expect(within(section).getAllByRole('checkbox')).toHaveLength(1)
+    expect(within(section).queryAllByRole('checkbox')).toHaveLength(id === 'STACK' ? 0 : 1)
     expect(screen.queryByText('Enlaces del evento')).not.toBeInTheDocument()
-    expect(screen.getByText('∞ móviles')).toBeInTheDocument()
-    expect(screen.getByText('Web')).toBeInTheDocument()
+    expect(screen.queryByText('∞ móviles')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Acceso del participante' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Instagram' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '1 pantalla' })).not.toBeInTheDocument()
-    const accessInfo = screen.getByRole('group', { name: 'Acceso del participante' }).parentElement!.parentElement!
-    expect(accessInfo).toContainElement(section)
     if (id !== 'T1MER') {
       const rules = id === 'STACK' ? screen.getByLabelText('Velocidad inicial') : screen.getByText('Dificultad para encontrar a tu pareja')
       expect(section.compareDocumentPosition(rules) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
@@ -130,7 +128,7 @@ describe('unified game configuration save', () => {
     fireEvent.click(footer())
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
-      participantFields: { email: { required: true }, phone: { required: false, enabled: false } },
+      participantFields: { email: { required: true }, phone: { required: true, enabled: true } },
     }))
     expect(vi.mocked(api.put).mock.calls.every(([path]) => !path.includes('kivly'))).toBe(true)
   })
@@ -166,11 +164,13 @@ describe('unified game configuration save', () => {
     }))
     const { onSaved } = mount(definition(id, id === 'EMPAREJA2' ? Empareja2Config : id === 'T1MER' ? T1merConfig : undefined))
     await waitFor(() => expect(footer()).toBeEnabled())
-    expect(screen.getByText('Nombre completo y email obligatorios')).toBeInTheDocument()
+    expect(screen.getByText(id === 'STACK' ? 'Nombre completo, email y teléfono obligatorios'
+      : 'Nombre completo y email obligatorios')).toBeInTheDocument()
     expect(screen.queryByLabelText('Instagram')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Mostrar teléfono (opcional)')).toBeChecked()
-    expect(within(screen.getByRole('region', { name: 'Enlaces del evento' })).getAllByRole('checkbox')).toHaveLength(1)
-    const expectedFields = { email: { required: true }, phone: { required: false, enabled: true } }
+    if (id !== 'STACK') expect(screen.getByLabelText('Mostrar teléfono (opcional)')).toBeChecked()
+    else expect(screen.queryByLabelText('Mostrar teléfono (opcional)')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Enlaces del evento' })).queryAllByRole('checkbox')).toHaveLength(id === 'STACK' ? 0 : 1)
+    const expectedFields = { email: { required: true }, phone: { required: id === 'STACK', enabled: true } }
     fireEvent.click(footer())
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ participantFields: expectedFields })))
     expect(api.put).toHaveBeenCalledWith('/v1/game', {
@@ -185,7 +185,7 @@ describe('unified game configuration save', () => {
     vi.mocked(api.get).mockResolvedValue(gameResponse({ playMode: 'mobile' }))
     let resolvePut: (value: unknown) => void = () => {}
     vi.mocked(api.put).mockImplementationOnce(() => new Promise((resolve) => { resolvePut = resolve }))
-    const { onSaved } = mount(definition('STACK'))
+    const { onSaved } = mount(definition('T1MER'))
     expect(screen.getByLabelText('Mostrar teléfono (opcional)')).toBeDisabled()
     await waitFor(() => expect(footer()).toBeEnabled())
     fireEvent.click(screen.getByLabelText('Mostrar teléfono (opcional)'))

@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { GameConfigSaveRegistration, GameDefinition } from '../types'
 import { getRedeemUrl, getWebPlayUrl } from '../lib/joinUrl'
 import QRCode from '../widgets/QRCode'
-import { GameAccessFields, translateGameAccessMessage, useGameAccessDraft } from './GameAccessSettings'
+import { translateGameAccessMessage, useGameAccessDraft } from './GameAccessSettings'
 import { GAME_ACCESS_CAPABILITIES, resolveGameAccess, type GameAccess } from './gameAccess'
 import { saveErrorMessage } from './gameConfigSave'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
@@ -156,15 +156,6 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
     <>
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6">
         <fieldset disabled={saving} className="min-w-0 space-y-4 border-b border-white/10 pb-6 mb-6">
-          <GameAccessFields
-            gameType={gameDefinition.id}
-            access={accessDraft.access}
-            disabled={saving}
-            onChange={(next) => {
-              accessDraft.setAccess(next)
-              if (saveState.status === 'error') setSaveState({ status: 'idle' })
-            }}
-          />
           {accessDraft.status === 'loading' && <p role="status">{t('Cargando acceso...', 'Loading access...')}</p>}
           {accessDraft.status === 'error' && (
             <>
@@ -173,7 +164,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
             </>
           )}
           {gameId && supportsMobile && (
-            <section aria-label={t('Enlaces del evento', 'Event links')} className="grid grid-cols-3 items-start gap-3 border-t border-white/10 pt-3 text-xs">
+            <section aria-label={t('Enlaces del evento', 'Event links')} className="grid grid-cols-3 items-start gap-3 text-xs">
               <div className="min-w-0 space-y-2 text-center">
                 <QRCode data={playUrl} size={80} margin={4} alt={t('QR participante', 'Participant QR code')} className="!bg-white !p-1" />
                 <a href={playUrl} target="_blank" rel="noopener noreferrer" className="block text-primary underline underline-offset-4">
@@ -188,14 +179,15 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
               </div>
               <fieldset disabled={accessDraft.status !== 'ready'} className="min-w-0 space-y-2">
                 <legend className="mb-2 font-medium">{t('Datos del participante', 'Participant information')}</legend>
-                <p>{t('Nombre completo y email obligatorios', 'Full name and email required')}</p>
-                <label className="flex items-center gap-2">
+                <p>{isStack ? t('Nombre completo, email y teléfono obligatorios', 'Full name, email and phone required')
+                  : t('Nombre completo y email obligatorios', 'Full name and email required')}</p>
+                {!isStack && <label className="flex items-center gap-2">
                   <input type="checkbox" checked={participantFields.phone.enabled}
                     onChange={(event) => accessDraft.setParticipantFields({
                       ...participantFields, phone: { required: false, enabled: event.target.checked },
                     })} />
                   {t('Mostrar teléfono (opcional)', 'Show phone (optional)')}
-                </label>
+                </label>}
               </fieldset>
             </section>
           )}

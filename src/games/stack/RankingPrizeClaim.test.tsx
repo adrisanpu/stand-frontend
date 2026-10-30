@@ -34,6 +34,25 @@ it('shows no prize or QR when the server does not grant a ranking claim', async 
   expect(container.querySelector('.stack-viewport')).toBeEmptyDOMElement()
 })
 
+it('does not require or offer wallet in email mode and preserves STAND QR access', async () => {
+  vi.mocked(publicApi.getPlayer).mockResolvedValue({
+    ...response, prizes: [], stackPrizes: {
+      deliveryChannel: 'email', walletUrl: 'https://club.kivly.store/add-to-wallet',
+      walletExpected: true, state: 'open', finalPrizesPending: false,
+      awards: [
+        { id: 'local', name: 'Pizza', source: 'stand', condition: 'completed', state: 'available', token: 'qr' },
+        { id: 'club', name: 'Coffee', source: 'kivly', condition: 'completed', state: 'confirmed',
+          deliveryChannel: 'email', emailState: 'accepted' },
+      ],
+    },
+  })
+  render(<RankingPrizeClaim gameId="GAME1" playerToken="session" />)
+  expect(await screen.findByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: /wallet/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
+  expect(screen.getByText(/Email de tu premio enviado/)).toBeInTheDocument()
+})
+
 it('replaces the QR with delivery confirmation on the next poll', async () => {
   vi.useFakeTimers()
   render(<RankingPrizeClaim gameId="GAME1" playerToken="session" />)

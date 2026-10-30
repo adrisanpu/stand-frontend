@@ -91,7 +91,8 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
   return (
     <div className="space-y-4">
       {status === 'loading' && <p role="status">{t('Cargando configuración...', 'Loading configuration...')}</p>}
-      <label className="flex flex-col gap-1">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+      <label className="min-w-0 flex flex-col gap-1">
         <span className="text-sm">{t('Aspecto de las piezas', 'Piece appearance')}</span>
         <select
           value={config.skin ?? 'blocks'}
@@ -106,6 +107,7 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
         </select>
       </label>
       <BlockPreview skin={config.skin ?? 'blocks'} />
+      </div>
       <details className="rounded-xl border border-white/10 p-3">
       <summary className="cursor-pointer text-sm font-medium">{t('Ajustes avanzados', 'Advanced settings')}</summary>
       <div className="grid grid-cols-2 gap-4 pt-3">

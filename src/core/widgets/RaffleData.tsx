@@ -368,13 +368,13 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
                 createPortal(
                   <div
                     ref={dropdownPortalRef}
-                    className="fixed z-[9999] rounded-xl border border-white/15 bg-[rgba(30,30,40,0.98)] shadow-lg shadow-purple-500/10 overflow-hidden flex flex-col w-max min-w-0"
+                    className="fixed z-[9999] rounded-xl border border-primary/30 bg-[var(--color-background,#0B0A12)] bg-[linear-gradient(var(--color-surface),var(--color-surface))] text-textMain shadow-lg overflow-hidden flex flex-col w-max min-w-0"
                     style={{
                       top: dropdownPosition.top,
                       right: dropdownPosition.right,
                       minWidth: dropdownPosition.minWidth,
                       maxWidth: 'calc(100vw - 2rem)',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(147,51,234,0.25)',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--color-primary-rgb,147,51,234),0.25)',
                     }}
                     role="listbox"
                     aria-label={t('Lista de ganadores', 'Winners list')}
@@ -394,7 +394,7 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
                             checked={!!w.prizeDelivered}
                             onChange={() => handleToggleDelivered(w.raffleId!, w.prizeDelivered ?? false)}
                             disabled={updatingDelivered || !gameType}
-                            className="w-4 h-4 flex-shrink-0 rounded border-white/20 text-purple-500 focus:ring-purple-500"
+                            className="w-4 h-4 flex-shrink-0 rounded border-white/20 accent-[var(--color-primary)] text-primary focus:ring-primary"
                             onClick={e => e.stopPropagation()}
                             aria-label={`${t('Premio entregado para', 'Prize delivered for')} ${w.username}`}
                           />

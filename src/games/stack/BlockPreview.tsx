@@ -52,11 +52,11 @@ export default function BlockPreview({ skin }: { skin: StackSkin }) {
       renderer?.dispose()
     }
   }, [skin, revision])
-  return <figure className="rounded-xl border border-white/10 bg-white/5 p-2">
+  return <figure className="flex h-20 w-28 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-1">
     <canvas ref={canvas} width={240} height={160} role="img" aria-label={t('Vista previa del bloque', 'Block preview')}
-      className={`mx-auto h-40 w-60 max-w-full ${failed || !ready ? 'hidden' : ''}`} />
-    {!failed && !ready && <p role="status" className="p-3 text-sm text-textSub">{t('Cargando vista previa...', 'Loading preview...')}</p>}
-    {failed && <div role="alert" className="p-3 text-sm text-amber-300">
+      className={`h-[4.5rem] w-[6.75rem] ${failed || !ready ? 'hidden' : ''}`} />
+    {!failed && !ready && <p role="status" className="text-center text-[10px] text-textSub">{t('Cargando vista previa...', 'Loading preview...')}</p>}
+    {failed && <div role="alert" className="text-center text-[10px] text-amber-300">
       <p>{t('No se pudo mostrar la vista previa 3D.', 'Could not display the 3D preview.')}</p>
       <button type="button" className="underline" onClick={() => setRevision((value) => value + 1)}>{t('Reintentar', 'Retry')}</button>
     </div>}

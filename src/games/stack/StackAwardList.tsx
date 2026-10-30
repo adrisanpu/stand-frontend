@@ -54,6 +54,13 @@ export default function StackAwardList({ data, locked = false }: { data: StackPl
     reconciliation_required: t('La asignación requiere comprobación del equipo. No vuelvas a solicitarla.'),
     connection_required: t('No se pudo vincular el premio al club. Consulta al equipo del evento.'),
   }
+  const emailStates: Record<NonNullable<StackAward['emailState']>, string> = {
+    pending: t('Preparando el email de tu premio. No necesitas wallet.'),
+    sending: t('Enviando el email de tu premio.'),
+    accepted: t('Email de tu premio enviado. Revisa tu bandeja y spam; muestra su QR al personal para canjear en Kivly.'),
+    failed: t('No se pudo enviar el email del premio. Consulta al equipo del evento.'),
+    reconciliation_required: t('El envío del email requiere comprobación del equipo. No vuelvas a solicitarlo.'),
+  }
   return <section aria-label={t('Tus premios')} className="space-y-3 text-left">
     <h2 className="text-lg font-bold">{t('Tus premios')}</h2>
     {data.awards.length === 0 && <p className="text-sm text-textSub">{t('Todavía no tienes premios asignados.')}</p>}
@@ -67,6 +74,12 @@ export default function StackAwardList({ data, locked = false }: { data: StackPl
         {!locked && award.source === 'stand' && award.state === 'available' && <AwardQR award={award} />}
         <p role="status" className={`text-sm ${award.state.includes('required') ? 'text-amber-300' : 'text-textSub'}`}>{states[award.state]}</p>
       </div>
+      {award.deliveryChannel === 'email' && award.state === 'confirmed' && award.emailState && <p role="status" className="text-sm text-textSub">
+        {emailStates[award.emailState]}
+      </p>}
+      {award.emailError === 'KivlyPhoneRequired' && <p role="alert" className="text-sm text-amber-300">
+        {t('Falta el teléfono en tu ficha de Kivly. Pide al equipo que lo revise para poder enviarte el QR.')}
+      </p>}
       </div>
       {locked && <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/10">
         <span role="img" aria-label={t('Abre la wallet para ver tu premio')} className="rounded-full bg-surface p-3 text-primary shadow-lg">

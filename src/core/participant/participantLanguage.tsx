@@ -2,6 +2,13 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 
 type Language = 'es' | 'en'
 const translations: Record<string, string> = {
+  'Tu teléfono se compartirá con el club al crear tu ficha.': 'Your phone will be shared with the club when creating your record.',
+  'Preparando el email de tu premio. No necesitas wallet.': 'Preparing your reward email. No wallet needed.',
+  'Enviando el email de tu premio.': 'Sending your reward email.',
+  'Email de tu premio enviado. Revisa tu bandeja y spam; muestra su QR al personal para canjear en Kivly.': 'Your reward email has been sent. Check your inbox and spam; show its QR to staff to redeem in Kivly.',
+  'No se pudo enviar el email del premio. Consulta al equipo del evento.': 'Could not send your reward email. Ask the event team.',
+  'El envío del email requiere comprobación del equipo. No vuelvas a solicitarlo.': 'The team needs to check the email send. Do not request it again.',
+  'Falta el teléfono en tu ficha de Kivly. Pide al equipo que lo revise para poder enviarte el QR.': 'Your Kivly record is missing a phone. Ask the team to check it so we can email your QR.',
   'Top al terminar tu partida': 'Top when you finish your game',
   'Top al cerrar el juego': 'Top when the game closes',
   'El juego se está cerrando o ya ha cerrado. No se admiten nuevos intentos.': 'The game is closing or closed. New attempts are not accepted.',
