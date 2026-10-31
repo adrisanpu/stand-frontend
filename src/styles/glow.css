@@ -58,6 +58,14 @@ html {
 }
 
 /* Portrait: smaller base font so content (logo, instructions, validation) fits on vertical screens (e.g. WebOS, 32"). */
+html.force-portrait {
+  font-size: clamp(12px, 1.1vw + 10px, 20px);
+}
+
+html.force-landscape {
+  font-size: clamp(12px, 1vw + 10px, 22px);
+}
+
 @media (orientation: portrait) {
   html {
     font-size: clamp(12px, 1.1vw + 10px, 20px);
