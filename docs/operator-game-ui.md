@@ -26,6 +26,30 @@ Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas d
 
 ## Configurar juego
 
+### Home raffle visibility
+
+**Settings > Sorteo > Mostrar sorteo en el home** has an ON/OFF toggle button,
+styled like the light/dark switch,
+that saves immediately per game and refreshes the home after a successful save.
+It defaults to enabled, including existing games without `showRaffleOnHome`.
+Disabling it removes the raffle card and its space in both orientations; it
+does not disable running the raffle from settings or change prize eligibility.
+The existing plan gate still applies.
+
+### Participant phone and photo
+
+Entering an email first checks for a returning participant in the same game.
+Complete registrations go straight to the email-code screen; missing required
+data or unproven/outdated consent is requested without revealing stored profile
+values. Verification restores the existing player and progress, not a new entry.
+
+The participant form offers European country calling codes, with Spain (+34)
+selected initially. The API receives a single international number; leaving an
+optional phone empty does not send its prefix. Pasted international numbers
+do not receive a second prefix. The optional profile photo is selected through
+a keyboard-accessible circular avatar with a generic silhouette and local
+preview. JPG, PNG and WebP files up to 5 MB remain supported.
+
 ### Kivly: connection and registration
 
 Home settings > **Integraciones** is a compact list with one collapsible Kivly
@@ -99,8 +123,11 @@ attempt. A STAND prize needs a name and may have a PNG. New Kivly selections use
 local IDs independent of the external reward ID. Edits stay drafts until the
 save succeeds.
 
-Each alternative group contains one or more prizes and quantities. A single
-group awards its available prizes. Multiple groups are selected with equal
+Each alternative group contains one or more prizes and quantities. Each
+rule keeps its condition and remove action in a compact header; alternative
+groups share a two-column desktop grid (one column on mobile), with inline
+prize names, quantities and remove buttons. AND/OR labels retain their meaning.
+A single group awards its available prizes. Multiple groups are selected with equal
 probability among groups with some eligible stock. An exhausted group cannot
 win; partial stock delivers only available units from the selected group.
 There is no weighting control or flat All/Random grouping selector.

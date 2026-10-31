@@ -2,6 +2,10 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 
 type Language = 'es' | 'en'
 const translations: Record<string, string> = {
+  'País y prefijo': 'Country and calling code',
+  'Elegir foto de perfil': 'Choose profile photo',
+  'Vista previa de la foto de perfil': 'Profile photo preview',
+  'Pulsa la imagen para elegir tu foto.': 'Tap the image to choose your photo.',
   'Tu teléfono se compartirá con el club al crear tu ficha.': 'Your phone will be shared with the club when creating your record.',
   'Preparando el email de tu premio. No necesitas wallet.': 'Preparing your reward email. No wallet needed.',
   'Enviando el email de tu premio.': 'Sending your reward email.',

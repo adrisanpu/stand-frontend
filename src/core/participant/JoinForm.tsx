@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { PublicApiError, publicApi, type EmailChallengeResponse, type EmailRegistration, type PlayerAssignment, type PublicGameResponse } from '../../api/publicApi'
+import { PublicApiError, publicApi, type EmailChallengeResponse, type EmailRegistration, type EmailDetailsResponse, type ResumeEmailRequest, type PlayerAssignment, type PublicGameResponse } from '../../api/publicApi'
 import { savePlayerSession } from './playerSession'
 import { PARTICIPANT_PRIVACY_NOTICE, PRIVACY_POLICY_URL } from '../ui/gameLegalCopy'
 import { useParticipantLanguage } from './participantLanguage'
 import { resolveParticipantFields } from '../lib/participantFields'
+import { PHONE_COUNTRIES, internationalPhone, splitInternationalPhone, type PhoneCountryCode } from './phoneCountries'
 
 type Props = {
   gameId: string
@@ -55,31 +56,51 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [phone, setPhone] = useState('')
+  const [phoneCountry, setPhoneCountry] = useState<PhoneCountryCode>('ES')
   const [consent, setConsent] = useState(false)
   const [clubConsent, setClubConsent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [challenge, setChallenge] = useState<(EmailChallengeResponse & { registration: EmailRegistration }) | null>(null)
+  const [challenge, setChallenge] = useState<(EmailChallengeResponse & { registration: EmailRegistration | ResumeEmailRequest }) | null>(null)
+  const [details, setDetails] = useState<EmailDetailsResponse | null>(null)
   const [code, setCode] = useState('')
   const [invalidChallenge, setInvalidChallenge] = useState(false)
   const [now, setNow] = useState(Date.now)
   const [retryAt, setRetryAt] = useState(0)
   const [photo, setPhoto] = useState<File | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const photoInput = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState(1)
   const busy = useRef(false)
   const generation = useRef(0)
+  const regionNames = new Intl.DisplayNames([language], { type: 'region' })
+  const countries = [...PHONE_COUNTRIES].sort((a, b) =>
+    (regionNames.of(a.code) ?? a.code).localeCompare(regionNames.of(b.code) ?? b.code, language))
+
+  useEffect(() => {
+    if (!photo) {
+      setPhotoPreview(null)
+      return
+    }
+    const url = URL.createObjectURL(photo)
+    setPhotoPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [photo])
 
   useEffect(() => {
     generation.current += 1
     setChallenge(null)
+    setDetails(null)
     setStep(1)
     setCode('')
     setInvalidChallenge(false)
     setError(null)
     setRetryAt(0)
     setClubConsent(false)
-  }, [gameId, phoneEnabled, gameMeta.loyalty?.consentVersion])
+  }, [gameId, phoneEnabled, pf.phone.required, gameMeta.loyalty?.consentVersion])
+
+  useEffect(() => () => { generation.current += 1 }, [])
 
   useEffect(() => {
     if (!challenge && !retryAt) return
@@ -111,8 +132,11 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     }
   }
 
-  const requestCode = async (registration: EmailRegistration) => {
-    const response = await publicApi.requestEmailCode({ ...registration, consent, language })
+  const requestCode = async (registration: EmailRegistration | ResumeEmailRequest) => {
+    const response = 'mode' in registration
+      ? await publicApi.resumeEmailRegistration({ ...registration, language })
+      : await publicApi.requestEmailCode({ ...registration, language })
+    if ('detailsRequired' in response) return response
     return { ...response, registration }
   }
 
@@ -127,7 +151,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   }
 
   const resend = async () => {
-    if (!challenge || busy.current || cooldown > 0 || !consent || (gameMeta.loyalty && !clubConsent)) return
+    if (!challenge || busy.current || cooldown > 0) return
     busy.current = true
     setLoading(true)
     setError(null)
@@ -135,6 +159,12 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     try {
       const next = await requestCode(challenge.registration)
       if (version !== generation.current) return
+      if ('detailsRequired' in next) {
+        setDetails(next)
+        setChallenge(null)
+        setStep(2)
+        return
+      }
       setChallenge(next)
       setRetryAt(Date.parse(next.resendAvailableAt))
       setCode('')
@@ -153,6 +183,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     if (busy.current) return
     setError(null)
     const trimmedUsername = username.trim()
+    const fullPhone = internationalPhone(phoneCountry, phone)
     if (step === 1) {
       const trimmedEmail = email.trim()
       if (!trimmedEmail) {
@@ -164,7 +195,34 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         return
       }
       setEmail(trimmedEmail)
-      setStep(2)
+      if (cooldown > 0) return
+      busy.current = true
+      setLoading(true)
+      const version = generation.current
+      try {
+        const registration: ResumeEmailRequest = { mode: 'resume', gameId, email: trimmedEmail }
+        const response = await publicApi.resumeEmailRegistration({ ...registration, language })
+        if (version !== generation.current) return
+        if ('detailsRequired' in response) {
+          setDetails(response)
+          if (response.existingPlayer) setPhoto(null)
+          setStep(2)
+        } else {
+          setDetails(null)
+          setPhoto(null)
+          setChallenge({ ...response, registration })
+          setStep(3)
+          setCode('')
+          setInvalidChallenge(false)
+          setRetryAt(Date.parse(response.resendAvailableAt))
+          setNow(Date.now())
+        }
+      } catch (err) {
+        if (version === generation.current) showError(err)
+      } finally {
+        busy.current = false
+        setLoading(false)
+      }
       return
     }
     if (step === 2) {
@@ -178,7 +236,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         setStep(1)
         return
       }
-      if (!trimmedUsername) {
+      if (showName && !trimmedUsername) {
         setError(verificationErrors.missing_username)
         return
       }
@@ -187,24 +245,24 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         const codePoint = character.codePointAt(0)!
         return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)
       })
-      if (usernameCharacters.length > 100 || hasControlCharacter) {
+      if (showName && (usernameCharacters.length > 100 || hasControlCharacter)) {
         setError(verificationErrors.invalid_username)
         return
       }
-      if (pf.phone.required && !phone.trim()) {
+      if (showPhone && pf.phone.required && !phone.trim()) {
         setError(verificationErrors.missing_phone)
         return
       }
-      if (pf.phone.required && (!/^\+?[0-9][0-9 ()-]*$/.test(phone.trim())
-        || (phone.match(/[0-9]/g)?.length ?? 0) < 3 || phone.trim().length > 64)) {
+      if (showPhone && phone.trim() && (!/^\+?[0-9][0-9 ()-]*$/.test(fullPhone)
+        || (phone.match(/[0-9]/g)?.length ?? 0) < 3 || fullPhone.length > 64)) {
         setError(verificationErrors.invalid_phone)
         return
       }
-      if (!consent) {
+      if (showConsent && !consent) {
         setError('Debes aceptar la política de privacidad.')
         return
       }
-      if (gameMeta.loyalty && !clubConsent) {
+      if (showClubConsent && !clubConsent) {
         setError(verificationErrors.KivlyConsentRequired)
         return
       }
@@ -219,17 +277,28 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     setLoading(true)
     const version = generation.current
     try {
-      const registration = {
+      const registration: EmailRegistration | ResumeEmailRequest = details?.existingPlayer ? {
+        mode: 'resume',
+        gameId, email: email.trim(),
+        ...(showName ? { username: trimmedUsername } : {}),
+        ...(showPhone ? { phone: fullPhone } : {}),
+        ...(showConsent ? { consent } : {}),
+        ...(showClubConsent && gameMeta.loyalty ? { loyaltyConsentVersion: gameMeta.loyalty.consentVersion } : {}),
+      } : {
         gameId,
         email: email.trim(),
         username: trimmedUsername,
-        ...(phoneEnabled && phone.trim() ? { phone: phone.trim() } : {}),
+        ...(phoneEnabled && fullPhone ? { phone: fullPhone } : {}),
         consent,
         ...(gameMeta.loyalty ? { loyaltyConsentVersion: gameMeta.loyalty.consentVersion } : {}),
       }
       if (step === 2) {
         const next = await requestCode(registration)
         if (version !== generation.current) return
+        if ('detailsRequired' in next) {
+          setDetails(next)
+          return
+        }
         setChallenge(next)
         setStep(3)
         setRetryAt(Date.parse(next.resendAvailableAt))
@@ -262,6 +331,11 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     }
   }
 
+  const showName = !details?.existingPlayer || details.fields.username
+  const showPhone = phoneEnabled && (!details?.existingPlayer || details.fields.phone)
+  const showConsent = !details?.existingPlayer || details.fields.consent
+  const showClubConsent = !!gameMeta.loyalty && (!details?.existingPlayer || details.fields.loyaltyConsent)
+
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       {step === 1 && <>
@@ -286,7 +360,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
 
       {step === 2 && <>
       <fieldset disabled={loading} className="space-y-4">
-      <div>
+      {showName && <div>
         <label className="block text-sm mb-1" htmlFor="join-username">
           {t('Nombre completo')} *
         </label>
@@ -300,20 +374,37 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
           className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3"
         />
         <p className="mt-1 text-xs text-textSub">{t('Usa el nombre con el que quieres aparecer en el juego.')}</p>
-      </div>
-      {phoneEnabled && <div>
+      </div>}
+      {showPhone && <div>
         <label className="block text-sm mb-1" htmlFor="join-phone">{t(pf.phone.required ? 'Teléfono' : 'Teléfono (opcional)')}</label>
-        <input id="join-phone" type="tel" autoComplete="tel" value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+        <div className="flex gap-2">
+        <select aria-label={t('País y prefijo')} value={phoneCountry}
+          onChange={(event) => {
+            const selected = PHONE_COUNTRIES.find((item) => item.code === event.target.value)
+            if (selected) setPhoneCountry(selected.code)
+          }}
+          className="min-w-0 w-2/5 rounded-2xl border border-white/20 bg-surface px-2 py-3">
+          {countries.map((country) => <option key={country.code} value={country.code}>
+            {regionNames.of(country.code) ?? country.code} ({country.prefix})
+          </option>)}
+        </select>
+        <input id="join-phone" type="tel" autoComplete="tel-national" value={phone}
+          onChange={(e) => {
+            const next = splitInternationalPhone(e.target.value, phoneCountry)
+            setPhoneCountry(next.country)
+            setPhone(next.number)
+          }}
           className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3"
           maxLength={64} required={pf.phone.required} />
+        </div>
       </div>}
-      <div>
+      {!details?.existingPlayer && <div>
         <label className="block text-sm mb-1" htmlFor="join-photo">
           {t('Foto de perfil (opcional)')}
         </label>
         <input
           id="join-photo"
+          ref={photoInput}
           type="file"
           accept="image/jpeg,image/png,image/webp"
           onChange={(event) => {
@@ -328,12 +419,23 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
             setPhoto(file)
             setPhotoError(null)
           }}
-          className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3"
+          className="sr-only"
         />
+        <button type="button" onClick={() => photoInput.current?.click()}
+          aria-label={t('Elegir foto de perfil')}
+          className="mx-auto flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+          {photoPreview
+            ? <img src={photoPreview} alt={t('Vista previa de la foto de perfil')} className="h-full w-full object-cover" />
+            : <svg viewBox="0 0 64 64" aria-hidden="true" className="h-20 w-20 text-textSub" fill="currentColor">
+                <circle cx="32" cy="22" r="12" />
+                <path d="M8 60a24 24 0 0 1 48 0Z" />
+              </svg>}
+        </button>
+        <p className="mt-2 text-center text-xs text-textSub">{t('Pulsa la imagen para elegir tu foto.')}</p>
         {photoError && <p role="alert" className="mt-1 text-xs text-amber-300">{photoError}</p>}
-      </div>
+      </div>}
 
-      <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-xs text-textSub items-start">
+      {showConsent && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-xs text-textSub items-start">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1" />
         <span>
           {t(PARTICIPANT_PRIVACY_NOTICE)}{' '}
@@ -341,8 +443,8 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
             {t('Política de privacidad')}
           </a>
         </span>
-      </label>
-      {gameMeta.loyalty && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-xs text-textSub items-start">
+      </label>}
+      {showClubConsent && gameMeta.loyalty && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-xs text-textSub items-start">
         <input type="checkbox" checked={clubConsent} onChange={(event) => setClubConsent(event.target.checked)} className="mt-1" required />
         <span>{t('Acepto registrarme en el club')} <strong>{gameMeta.loyalty.clubName}</strong>.{' '}
           {t('Acepto las condiciones y la política de privacidad del club. El registro es necesario para jugar.')}{' '}
@@ -369,20 +471,21 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         <p id="join-code-help" className="text-sm text-textSub">
           {t(expired ? 'El código ha caducado. Solicita uno nuevo.' : 'Introduce los 6 dígitos del email.')}
         </p>
-        <button type="button" onClick={resend} disabled={loading || cooldown > 0 || !consent || (gameMeta.loyalty != null && !clubConsent)}
+        <button type="button" onClick={resend} disabled={loading || cooldown > 0}
           className="rounded-xl border border-[rgba(var(--color-accent-rgb),0.4)] px-4 py-3 text-accent disabled:opacity-50">
           {t('Reenviar código')}{cooldown > 0 ? ` (${cooldown}s)` : ''}
         </button>
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={loading} onClick={() => discardChallenge(2)}
+          {!('mode' in challenge.registration) && <button type="button" disabled={loading} onClick={() => discardChallenge(2)}
             className="rounded-xl px-4 py-3 text-accent disabled:opacity-50">{t('Cambiar datos')}</button>
+          }
           <button type="button" disabled={loading} onClick={() => discardChallenge(1)}
             className="rounded-xl px-4 py-3 text-accent disabled:opacity-50">{t('Cambiar email')}</button>
         </div>
       </div>}
 
       {error && <p role="alert" className="text-sm text-red-300">{t(error)}</p>}
-      {step === 2 && cooldown > 0 && <p role="status" className="text-sm text-textSub">
+      {step !== 3 && cooldown > 0 && <p role="status" className="text-sm text-textSub">
         {t('Puedes solicitar otro código en')}: {cooldown}s
       </p>}
 
@@ -390,10 +493,10 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         className="w-full rounded-xl py-3 text-accent disabled:opacity-50">{t('Volver')}</button>}
       <button
         type="submit"
-        disabled={loading || (step === 2 && cooldown > 0) || (step === 3 && (expired || invalidChallenge || !consent || (gameMeta.loyalty != null && !clubConsent)))}
+        disabled={loading || (step !== 3 && cooldown > 0) || (step === 3 && (expired || invalidChallenge))}
         className="w-full rounded-2xl py-3.5 font-semibold text-primary bg-[rgba(var(--color-primary-rgb),0.25)] border border-[rgba(var(--color-primary-rgb),0.4)] disabled:opacity-50"
       >
-        {t(loading ? (step === 2 ? 'Enviando código...' : 'Registrando...')
+        {t(loading ? (step !== 3 ? 'Enviando código...' : 'Registrando...')
           : step === 1 ? 'Continuar' : step === 2 ? 'Enviar código' : 'Verificar y empezar')}
       </button>
     </form>

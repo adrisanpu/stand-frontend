@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../../api/api'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 
@@ -7,6 +7,7 @@ type RaffleProps = {
   onClose: () => void
   gameId?: string
   gameType?: string
+  onVisibilitySaved?: () => void
 }
 
 type RaffleResponse = {
@@ -56,8 +57,55 @@ function translateRaffleError(message: string, t: (spanish: string, english?: st
   return Object.prototype.hasOwnProperty.call(knownErrors, message) ? knownErrors[message] : message
 }
 
-export default function Raffle({ onBack, onClose, gameId, gameType }: RaffleProps) {
+export default function Raffle({ onBack, onClose, gameId, gameType, onVisibilitySaved }: RaffleProps) {
   const { t } = useOperatorLanguage()
+  const [homeVisibility, setHomeVisibility] = useState<{ gameId: string; enabled: boolean } | null>(null)
+  const [visibilityError, setVisibilityError] = useState<string | null>(null)
+  const [visibilitySaving, setVisibilitySaving] = useState(false)
+  const [visibilityLoadVersion, setVisibilityLoadVersion] = useState(0)
+  const visibilityBusy = useRef(false)
+  const visibilityGeneration = useRef(0)
+
+  useEffect(() => {
+    const generation = ++visibilityGeneration.current
+    setHomeVisibility(null)
+    setVisibilityError(null)
+    if (!gameId) return
+    void api.get<{ ok: boolean; game?: { showRaffleOnHome?: boolean } }>(
+      `/v1/game?gameId=${encodeURIComponent(gameId)}`,
+    ).then((response) => {
+      if (visibilityGeneration.current !== generation) return
+      if (!response.ok || !response.game) throw new Error('Invalid game response')
+      setHomeVisibility({ gameId, enabled: response.game.showRaffleOnHome !== false })
+    }).catch(() => {
+      if (visibilityGeneration.current === generation) {
+        setVisibilityError(t('No se pudo cargar la configuración del sorteo.', 'Could not load raffle settings.'))
+      }
+    })
+    return () => { visibilityGeneration.current += 1 }
+  }, [gameId, visibilityLoadVersion, t])
+
+  const saveHomeVisibility = async (enabled: boolean) => {
+    if (!gameId || homeVisibility?.gameId !== gameId || visibilityBusy.current) return
+    const generation = visibilityGeneration.current
+    visibilityBusy.current = true
+    setVisibilitySaving(true)
+    setVisibilityError(null)
+    try {
+      const response = await api.put<{ ok?: boolean }>('/v1/game', { gameId, showRaffleOnHome: enabled })
+      if (response.ok === false) throw new Error('Raffle visibility save failed')
+      if (visibilityGeneration.current !== generation) return
+      setHomeVisibility({ gameId, enabled })
+      onVisibilitySaved?.()
+    } catch {
+      if (visibilityGeneration.current === generation) {
+        setVisibilityError(t('No se pudo guardar la configuración del sorteo.', 'Could not save raffle settings.'))
+      }
+    } finally {
+      visibilityBusy.current = false
+      setVisibilitySaving(false)
+    }
+  }
   const [numberOfWinners, setNumberOfWinners] = useState<number>(1)
   const [eligibilityMode, setEligibilityMode] = useState<EligibilityMode>('all')
   const [isRunning, setIsRunning] = useState(false)
@@ -275,6 +323,28 @@ export default function Raffle({ onBack, onClose, gameId, gameType }: RaffleProp
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="mb-5 space-y-2">
+            <span id="raffle-home-label" className="block text-sm font-medium">
+              {t('Mostrar sorteo en el home', 'Show raffle on the home screen')}
+            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-textSub">OFF</span>
+              <button type="button" role="switch" aria-labelledby="raffle-home-label"
+                aria-checked={homeVisibility?.enabled !== false}
+                disabled={homeVisibility?.gameId !== gameId || !gameId || visibilitySaving}
+                onClick={() => void saveHomeVisibility(homeVisibility?.enabled === false)}
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:opacity-50 ${homeVisibility?.enabled === false ? 'bg-gray-600' : 'bg-primary'}`}>
+                <span aria-hidden="true"
+                  className={`absolute left-[2px] top-[2px] h-5 w-5 rounded-full border border-gray-300 bg-white transition-transform ${homeVisibility?.enabled === false ? '' : 'translate-x-full'}`} />
+              </button>
+              <span className="text-sm text-textSub">ON</span>
+            </div>
+            {visibilitySaving && <p role="status" className="text-sm text-textSub">{t('Guardando...', 'Saving...')}</p>}
+            {visibilityError && <p role="alert" className="text-sm text-red-300">{visibilityError}</p>}
+            {visibilityError && !homeVisibility && <button type="button"
+              onClick={() => setVisibilityLoadVersion((version) => version + 1)}
+              className="text-sm underline">{t('Reintentar carga', 'Retry loading')}</button>}
+          </div>
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
               {translateRaffleError(error, t)}
