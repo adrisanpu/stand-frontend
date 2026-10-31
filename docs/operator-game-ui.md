@@ -44,7 +44,10 @@ data or unproven/outdated consent is requested without revealing stored profile
 values. Verification restores the existing player and progress, not a new entry.
 
 The participant form offers European country calling codes, with Spain (+34)
-selected initially. The API receives a single international number; leaving an
+selected initially. Options show flags and calling codes, with the prize-settings
+dropdown style and accessible country names. The avatar picker sits alongside
+the full-name input. Both consent rows use the same 13px text and 20px checkboxes.
+The API receives a single international number; leaving an
 optional phone empty does not send its prefix. Pasted international numbers
 do not receive a second prefix. The optional profile photo is selected through
 a keyboard-accessible circular avatar with a generic silhouette and local

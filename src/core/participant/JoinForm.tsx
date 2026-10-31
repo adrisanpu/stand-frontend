@@ -360,7 +360,8 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
 
       {step === 2 && <>
       <fieldset disabled={loading} className="space-y-4">
-      {showName && <div>
+      <div className={`flex items-start gap-3 ${showName ? '' : 'hidden'}`}>
+      {showName && <div className="min-w-0 flex-1">
         <label className="block text-sm mb-1" htmlFor="join-username">
           {t('Nombre completo')} *
         </label>
@@ -375,31 +376,8 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         />
         <p className="mt-1 text-xs text-textSub">{t('Usa el nombre con el que quieres aparecer en el juego.')}</p>
       </div>}
-      {showPhone && <div>
-        <label className="block text-sm mb-1" htmlFor="join-phone">{t(pf.phone.required ? 'Teléfono' : 'Teléfono (opcional)')}</label>
-        <div className="flex gap-2">
-        <select aria-label={t('País y prefijo')} value={phoneCountry}
-          onChange={(event) => {
-            const selected = PHONE_COUNTRIES.find((item) => item.code === event.target.value)
-            if (selected) setPhoneCountry(selected.code)
-          }}
-          className="min-w-0 w-2/5 rounded-2xl border border-white/20 bg-surface px-2 py-3">
-          {countries.map((country) => <option key={country.code} value={country.code}>
-            {regionNames.of(country.code) ?? country.code} ({country.prefix})
-          </option>)}
-        </select>
-        <input id="join-phone" type="tel" autoComplete="tel-national" value={phone}
-          onChange={(e) => {
-            const next = splitInternationalPhone(e.target.value, phoneCountry)
-            setPhoneCountry(next.country)
-            setPhone(next.number)
-          }}
-          className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3"
-          maxLength={64} required={pf.phone.required} />
-        </div>
-      </div>}
-      {!details?.existingPlayer && <div>
-        <label className="block text-sm mb-1" htmlFor="join-photo">
+      {!details?.existingPlayer && <div className="w-20 shrink-0">
+        <label className="sr-only" htmlFor="join-photo">
           {t('Foto de perfil (opcional)')}
         </label>
         <input
@@ -423,20 +401,45 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         />
         <button type="button" onClick={() => photoInput.current?.click()}
           aria-label={t('Elegir foto de perfil')}
-          className="mx-auto flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+          className="mx-auto mt-6 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
           {photoPreview
             ? <img src={photoPreview} alt={t('Vista previa de la foto de perfil')} className="h-full w-full object-cover" />
-            : <svg viewBox="0 0 64 64" aria-hidden="true" className="h-20 w-20 text-textSub" fill="currentColor">
+            : <svg viewBox="0 0 64 64" aria-hidden="true" className="h-14 w-14 text-textSub" fill="currentColor">
                 <circle cx="32" cy="22" r="12" />
                 <path d="M8 60a24 24 0 0 1 48 0Z" />
               </svg>}
         </button>
-        <p className="mt-2 text-center text-xs text-textSub">{t('Pulsa la imagen para elegir tu foto.')}</p>
+        <p className="mt-1 text-center text-xs text-textSub">{t('Foto de perfil (opcional)')}</p>
         {photoError && <p role="alert" className="mt-1 text-xs text-amber-300">{photoError}</p>}
       </div>}
+      </div>
+      {showPhone && <div>
+        <label className="block text-sm mb-1" htmlFor="join-phone">{t(pf.phone.required ? 'Teléfono' : 'Teléfono (opcional)')}{pf.phone.required && ' *'}</label>
+        <div className="flex gap-2">
+        <select aria-label={t('País y prefijo')} value={phoneCountry}
+          onChange={(event) => {
+            const selected = PHONE_COUNTRIES.find((item) => item.code === event.target.value)
+            if (selected) setPhoneCountry(selected.code)
+          }}
+          className="stack-prize-select min-w-0 w-28 shrink-0 rounded-xl border border-white/15 bg-transparent px-3 py-3 text-sm">
+          {countries.map((country) => <option key={country.code} value={country.code}
+            aria-label={`${regionNames.of(country.code) ?? country.code} (${country.prefix})`}>
+            {String.fromCodePoint(...Array.from(country.code, (letter) => 0x1f1e6 + letter.charCodeAt(0) - 65))} {country.prefix}
+          </option>)}
+        </select>
+        <input id="join-phone" type="tel" autoComplete="tel-national" value={phone}
+          onChange={(e) => {
+            const next = splitInternationalPhone(e.target.value, phoneCountry)
+            setPhoneCountry(next.country)
+            setPhone(next.number)
+          }}
+          className="min-w-0 w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3"
+          maxLength={64} required={pf.phone.required} />
+        </div>
+      </div>}
 
-      {showConsent && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-xs text-textSub items-start">
-        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1" />
+      {showConsent && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-[13px] leading-relaxed text-textSub items-start">
+        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-primary" />
         <span>
           {t(PARTICIPANT_PRIVACY_NOTICE)}{' '}
           <a href={language === 'es' ? PRIVACY_POLICY_URL : '/pages/privacy.html'} target="_blank" rel="noopener noreferrer" className="underline text-accent">
@@ -444,8 +447,8 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
           </a>
         </span>
       </label>}
-      {showClubConsent && gameMeta.loyalty && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-xs text-textSub items-start">
-        <input type="checkbox" checked={clubConsent} onChange={(event) => setClubConsent(event.target.checked)} className="mt-1" required />
+      {showClubConsent && gameMeta.loyalty && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-[13px] leading-relaxed text-textSub items-start">
+        <input type="checkbox" checked={clubConsent} onChange={(event) => setClubConsent(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-primary" required />
         <span>{t('Acepto registrarme en el club')} <strong>{gameMeta.loyalty.clubName}</strong>.{' '}
           {t('Acepto las condiciones y la política de privacidad del club. El registro es necesario para jugar.')}{' '}
           {phoneEnabled && <>{t(pf.phone.required

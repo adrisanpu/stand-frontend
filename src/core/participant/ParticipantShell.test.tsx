@@ -336,7 +336,7 @@ describe('ParticipantShell STACK integration', () => {
     expect(screen.queryByText(/Escena STACK/)).not.toBeInTheDocument()
     await advanceToParticipantDetails('player@example.com')
     fireEvent.change(screen.getByLabelText(/Nombre completo/), { target: { value: 'Player' } })
-    fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '+34 612345678' } })
+    fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '+34 612345678' } })
     fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
     const input = await screen.findByLabelText('Código de verificación')

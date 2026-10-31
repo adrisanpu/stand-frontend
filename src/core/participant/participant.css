@@ -25,7 +25,7 @@
 }
 
 .play-shell .play-logo {
-  height: clamp(40px, calc(var(--play-viewport-height) * 0.12), 96px);
+  height: clamp(48px, calc(var(--play-viewport-height) * 0.14), 112px);
 }
 
 /* A minimum 16px computed font prevents iOS focus zoom without disabling pinch zoom. */
