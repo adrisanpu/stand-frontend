@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { stackPrizeApi, type StackPrizeCondition, type StackPrizeItem, type StackPrizeProgram, type StackPrizeRule, type StackPrizeSettingsResponse } from '../../api/stackPrizes'
+import { stackPrizeApi, type StackPrizeCondition, type StackPrizeItem, type StackPrizeProgram, type StackPrizeRule, type StackPrizeScoreOperator, type StackPrizeSettingsResponse } from '../../api/stackPrizes'
 import { kivlyApi, type KivlyReward, type KivlyRewardDraft } from '../../api/kivlyApi'
 import { PrizeImageError, uploadPrizeImage, validatePrizeImage } from '../../api/prizeMedia'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
@@ -7,7 +7,8 @@ import { useOperatorLanguage } from '../shell/operatorLanguage'
 const field = 'rounded-xl border border-white/15 bg-surface px-3 py-2 text-sm min-w-0'
 const selectField = 'stack-prize-select rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm min-w-0'
 const action = 'rounded-xl border border-primary/30 bg-primary/20 px-3 py-2 text-sm hover:bg-primary/30 disabled:opacity-40'
-const conditions: StackPrizeCondition[] = ['completed', 'top_finish', 'top_final', 'raffle']
+const conditions: StackPrizeCondition[] = ['completed', 'top_finish', 'top_final', 'raffle', 'score']
+const scoreOperators: StackPrizeScoreOperator[] = ['>', '>=', '=', '<=', '<', 'between']
 const newId = () => crypto.randomUUID()
 
 type KivlyRewardForm = {
@@ -89,6 +90,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     top_finish: t('entre en el top al terminar su partida', 'a player finishes in the top'),
     top_final: t('esté en el top al cerrar el juego', 'a player is in the top when the game closes'),
     raffle: t('gane un sorteo', 'a player wins a raffle'),
+    score: t('consiga una puntuación', 'a player reaches a score'),
   })[condition]
   useEffect(() => {
     let cancelled = false
@@ -363,7 +365,13 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     return !Number.isInteger(prize.stockTotal) || prize.stockTotal < Math.max(1, allocated) || prize.stockTotal > 1000
   }) || program.rules.some((rule) => rule.groups.length === 0 || rule.groups.some((group) =>
     group.allocations.length === 0 || group.allocations.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 10))
-    || (rule.condition.startsWith('top_') && (!Number.isInteger(rule.topX) || (rule.topX ?? 0) < 1 || (rule.topX ?? 101) > 100)))
+    || (rule.condition.startsWith('top_') && (!Number.isInteger(rule.topX) || (rule.topX ?? 0) < 1 || (rule.topX ?? 101) > 100))
+    || (rule.condition === 'score' && (
+      !Number.isSafeInteger(rule.scoreValue) || (rule.scoreValue ?? -1) < 0
+      || (rule.scoreOperator === 'between' && (
+        !Number.isSafeInteger(rule.scoreMaxValue) || (rule.scoreMaxValue ?? -1) < (rule.scoreValue ?? 0)
+      ))
+    )))
   const updateRule = (index: number, rule: StackPrizeRule) => change({
     ...program, rules: program.rules.map((previous, i) => i === index ? { ...rule, id: newId() } : previous),
   })
@@ -648,52 +656,77 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       </section>
       <h3 className="text-sm font-semibold">{t('Cuándo y qué entregar', 'When and what to award')}</h3>
       {program.rules.map((rule, index) => <section key={index} aria-label={`${t('Regla', 'Rule')} ${index + 1}`}
-        className="rounded-xl border border-primary/25 bg-primary/5 p-3 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-primary">{t('Regla', 'Rule')} {index + 1}</span>
-          <button type="button" className="text-xs text-textSub underline" aria-label={`${t('Quitar regla', 'Remove rule')} ${index + 1}`}
-            onClick={() => change({ ...program, rules: program.rules.filter((_, i) => i !== index) })}>{t('Quitar regla', 'Remove rule')}</button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        className="rounded-xl border border-primary/25 bg-primary/5 p-2 space-y-2 [&_select]:h-8 [&_select]:px-2 [&_select]:py-1 [&_select]:text-xs [&_input]:h-8 [&_input]:px-2 [&_input]:py-1 [&_input]:text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="shrink-0 font-semibold text-primary">{t('Regla', 'Rule')} {index + 1}</span>
           <span>{t('Cuando', 'When')}</span>
-          <select aria-label={`${t('Condición', 'Condition')} ${index + 1}`} className={`${selectField} flex-1`} value={rule.condition}
+          <select aria-label={`${t('Condición', 'Condition')} ${index + 1}`} className={`${selectField} flex-1 basis-48`} value={rule.condition}
             onChange={(event) => {
               const condition = event.target.value as StackPrizeCondition
-              updateRule(index, { ...rule, condition, topX: condition.startsWith('top_') ? 10 : undefined })
+              updateRule(index, { ...rule, condition, topX: condition.startsWith('top_') ? 10 : undefined,
+                scoreOperator: condition === 'score' ? '>=' : undefined,
+                scoreValue: undefined, scoreMaxValue: undefined })
             }}>
             {conditions.filter((condition) => condition !== 'raffle' || raffles || rule.condition === 'raffle')
               .map((condition) => <option key={condition} value={condition}>{label(condition)}</option>)}
           </select>
           {rule.condition.startsWith('top_') && <label className="flex items-center gap-2">top
-            <input type="number" min={1} max={100} value={Number.isFinite(rule.topX) ? rule.topX : ''} className={`${field} w-20`} aria-label={`Top ${index + 1}`}
+            <input type="number" min={1} max={100} value={Number.isFinite(rule.topX) ? rule.topX : ''} className={`${field} w-14`} aria-label={`Top ${index + 1}`}
               onChange={(event) => updateRule(index, { ...rule, topX: event.target.valueAsNumber })} />
           </label>}
+          {rule.condition === 'score' && <>
+            <label className="flex items-center gap-1">
+              <span>{t('Puntuación', 'Score')}</span>
+              <select aria-label={`${t('Operador de puntuación', 'Score operator')} ${index + 1}`}
+                className={selectField} value={rule.scoreOperator ?? '>='}
+                onChange={(event) => updateRule(index, {
+                  ...rule, scoreOperator: event.target.value as StackPrizeScoreOperator,
+                  scoreMaxValue: event.target.value === 'between' ? rule.scoreMaxValue : undefined,
+                })}>
+                {scoreOperators.map((operator) => <option key={operator} value={operator}>
+                  {operator === 'between' ? t('entre', 'between') : operator}
+                </option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-1">
+              <span>{rule.scoreOperator === 'between' ? t('Desde', 'From') : t('Valor', 'Value')}</span>
+              <input type="number" min={0} step={1} value={Number.isSafeInteger(rule.scoreValue) ? rule.scoreValue : ''}
+                className={`${field} w-20`} aria-label={`${t('Puntuación mínima', 'Score value')} ${index + 1}`}
+                onChange={(event) => updateRule(index, { ...rule, scoreValue: event.target.valueAsNumber })} />
+            </label>
+            {rule.scoreOperator === 'between' && <label className="flex items-center gap-1">
+              <span>{t('Hasta', 'To')}</span>
+              <input type="number" min={0} step={1} value={Number.isSafeInteger(rule.scoreMaxValue) ? rule.scoreMaxValue : ''}
+                className={`${field} w-20`} aria-label={`${t('Puntuación máxima', 'Score maximum')} ${index + 1}`}
+                onChange={(event) => updateRule(index, { ...rule, scoreMaxValue: event.target.valueAsNumber })} />
+            </label>}
+          </>}
+          <button type="button" className="ml-auto shrink-0 text-xs text-textSub underline" aria-label={`${t('Quitar regla', 'Remove rule')} ${index + 1}`}
+            onClick={() => change({ ...program, rules: program.rules.filter((_, i) => i !== index) })}>{t('Quitar regla', 'Remove rule')}</button>
         </div>
-        {rule.groups.map((group, groupIndex) => <div key={groupIndex}>
-          {groupIndex > 0 && <p className="py-2 text-center text-xs font-bold text-primary">{t('O · un grupo al azar', 'OR · one random group')}</p>}
-          <div className="rounded-xl border border-white/15 bg-surface/50 p-3 space-y-2">
-            <div className="flex justify-between gap-2 text-xs">
-              <span>{t('Grupo', 'Group')} {groupIndex + 1}</span>
+        <div className="grid items-start gap-2 sm:grid-cols-2">
+        {rule.groups.map((group, groupIndex) => <div key={groupIndex}
+          className="min-w-0 rounded-lg border border-white/15 bg-surface/50 p-2 space-y-1">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="font-medium">{groupIndex > 0 && <span className="mr-1 font-bold text-primary">{t('O', 'OR')}</span>}{t('Grupo', 'Group')} {groupIndex + 1}</span>
               {rule.groups.length > 1 && <button type="button" className="underline" aria-label={`${t('Quitar grupo', 'Remove group')} ${index + 1}.${groupIndex + 1}`}
                 onClick={() => updateRule(index, { ...rule, groups: rule.groups.filter((_, i) => i !== groupIndex) })}>{t('Quitar grupo', 'Remove group')}</button>}
             </div>
             {group.allocations.map((allocation, allocationIndex) => {
               const prize = program.catalog.find((item) => item.id === allocation.prizeId)
-              return <div key={allocation.prizeId}>
-                {allocationIndex > 0 && <p className="text-xs font-bold text-primary py-1">{t('Y', 'AND')}</p>}
-                <div className="flex flex-wrap items-center gap-2 text-sm">
+              return <div key={allocation.prizeId} className="flex items-center gap-1 text-xs">
+                {allocationIndex > 0 && <span className="font-bold text-primary">{t('Y', 'AND')}</span>}
                   <span className="min-w-0 flex-1 break-words">{prize?.name}</span>
-                  <label className="flex items-center gap-1 text-xs text-textSub">{t('Unid.', 'Qty.')}
-                    <input type="number" min={1} max={10} value={Number.isFinite(allocation.quantity) ? allocation.quantity : ''} className={`${field} w-16`}
+                  <label className="flex shrink-0 items-center gap-1 text-xs text-textSub">{t('Unid.', 'Qty.')}
+                    <input type="number" min={1} max={10} value={Number.isFinite(allocation.quantity) ? allocation.quantity : ''} className={`${field} w-12`}
                       aria-label={`${t('Cantidad de', 'Quantity of')} ${prize?.name} · ${index + 1}.${groupIndex + 1}`}
                       onChange={(event) => updateRule(index, { ...rule, groups: rule.groups.map((item, i) => i === groupIndex ? {
                         allocations: item.allocations.map((entry, n) => n === allocationIndex ? { ...entry, quantity: event.target.valueAsNumber } : entry),
                       } : item) })} />
                   </label>
-                  <button type="button" className="px-2 py-1 text-textSub" aria-label={`${t('Quitar premio', 'Remove prize')} ${prize?.name} · ${index + 1}.${groupIndex + 1}`}
+                  <button type="button" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-base text-textSub hover:bg-white/10" aria-label={`${t('Quitar premio', 'Remove prize')} ${prize?.name} · ${index + 1}.${groupIndex + 1}`}
                     onClick={() => updateRule(index, { ...rule, groups: rule.groups.map((item, i) => i === groupIndex
                       ? { allocations: item.allocations.filter((_, n) => n !== allocationIndex) } : item) })}>×</button>
-                </div>
               </div>
             })}
             {group.allocations.length === 0 && <p className="text-xs text-amber-300">{t('Selecciona al menos un premio.', 'Select at least one prize.')}</p>}
@@ -705,9 +738,9 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
                   .map((prize) => <option key={prize.id} value={prize.id} disabled={program.catalog.length >= 32 && !program.catalog.some((item) => item.id === prize.id)}>{prize.name}</option>)}
               </optgroup>)}
             </select>
-          </div>
         </div>)}
-        <button type="button" className={action} disabled={rule.groups.length >= 8}
+        </div>
+        <button type="button" className={`${action} px-2 py-1 text-xs`} disabled={rule.groups.length >= 8}
           onClick={() => updateRule(index, { ...rule, groups: [...rule.groups, { allocations: [] }] })}>{t('O añadir grupo', 'OR add group')}</button>
         <p className="text-xs text-textSub">{t('Sale un grupo al azar, con la misma probabilidad. Se entregan sus premios disponibles; los grupos agotados no participan.',
           'One group is chosen at random with equal probability. Its available prizes are awarded; exhausted groups are excluded.')}</p>

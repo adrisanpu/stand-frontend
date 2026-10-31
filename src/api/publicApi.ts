@@ -259,6 +259,24 @@ export type EmailChallengeResponse = {
   resendAvailableAt: string
 }
 
+export type ResumeEmailRequest = {
+  mode: 'resume'
+  gameId: string
+  email: string
+  username?: string
+  phone?: string
+  consent?: boolean
+  loyaltyConsentVersion?: string
+  language?: 'es' | 'en'
+}
+
+export type EmailDetailsResponse = {
+  ok: true
+  detailsRequired: true
+  existingPlayer: boolean
+  fields: { username: boolean; phone: boolean; consent: boolean; loyaltyConsent: boolean }
+}
+
 export type JoinRequest =
   | (Omit<EmailRegistration, 'language'> & { challengeId?: never; code?: never })
   | { gameId: string; challengeId: string; code: string; consent?: boolean; email?: never; username?: never; phone?: never }
@@ -344,6 +362,9 @@ export const publicApi = {
 
   requestEmailCode: (body: EmailRegistration) =>
     publicRequest<EmailChallengeResponse>('/v1/public/email/request', { method: 'POST', body: JSON.stringify(body) }),
+
+  resumeEmailRegistration: (body: ResumeEmailRequest) =>
+    publicRequest<EmailChallengeResponse | EmailDetailsResponse>('/v1/public/email/request', { method: 'POST', body: JSON.stringify(body) }),
 
   join: (body: JoinRequest) =>
     publicRequest<JoinResponse>('/v1/public/join', { method: 'POST', body: JSON.stringify(body) }),

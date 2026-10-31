@@ -68,6 +68,30 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('game home identity and configuration', () => {
+  it.each([true, false])('omits the raffle card and wrapper when disabled (portrait=%s)', async (portrait) => {
+    state.portrait = portrait
+    vi.mocked(api.get).mockResolvedValue({
+      ok: true, game: { gameType: 'SEMAFORO', showRaffleOnHome: false },
+    })
+    render(<AppShell />)
+    await screen.findByLabelText('QR de acceso al juego')
+    expect(screen.queryByTestId('raffle')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Sorteo del evento')).not.toBeInTheDocument()
+    expect(screen.getByTestId('players')).toBeInTheDocument()
+  })
+
+  it('refreshes raffle visibility from the server without leaving the home', async () => {
+    vi.useFakeTimers()
+    await act(async () => { render(<AppShell />) })
+    expect(screen.getByTestId('raffle')).toBeInTheDocument()
+    vi.mocked(api.get).mockResolvedValue({ ok: true, game: { gameType: 'SEMAFORO', showRaffleOnHome: false } })
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(screen.queryByTestId('raffle')).not.toBeInTheDocument()
+    vi.mocked(api.get).mockResolvedValue({ ok: true, game: { gameType: 'SEMAFORO', showRaffleOnHome: true } })
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(screen.getByTestId('raffle')).toBeInTheDocument()
+  })
+
   it.each([true, false])('places STACK completion prizes in the ranking carousel, not over players (portrait=%s)', async (portrait) => {
     state.portrait = portrait
     localStorage.setItem('gameType', 'STACK')

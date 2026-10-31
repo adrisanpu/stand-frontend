@@ -109,6 +109,16 @@ describe('mobile event links', () => {
 })
 
 describe('unified game configuration save', () => {
+  it('does not edit raffle visibility from general game configuration', async () => {
+    vi.mocked(api.get).mockResolvedValue(gameResponse({ showRaffleOnHome: false }))
+    const { onSaved } = mount(definition('T1MER'))
+    await waitFor(() => expect(footer()).toBeEnabled())
+    expect(screen.queryByLabelText('Mostrar sorteo en el home')).not.toBeInTheDocument()
+    fireEvent.click(footer())
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(api.put).toHaveBeenCalledWith('/v1/game', expect.not.objectContaining({ showRaffleOnHome: expect.anything() }))
+  })
+
   it.each(['EMPAREJA2', 'T1MER', 'RULET4'])('does not load club registration for %s', async (id) => {
     mount(definition(id))
     await waitFor(() => expect(footer()).toBeEnabled())

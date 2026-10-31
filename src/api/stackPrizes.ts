@@ -1,6 +1,7 @@
 import { api } from './api'
 
-export type StackPrizeCondition = 'completed' | 'top_finish' | 'top_final' | 'raffle'
+export type StackPrizeCondition = 'completed' | 'top_finish' | 'top_final' | 'raffle' | 'score'
+export type StackPrizeScoreOperator = '>' | '>=' | '=' | '<=' | '<' | 'between'
 export type StackPrizeItem = {
   id: string
   source: 'stand' | 'kivly'
@@ -17,10 +18,16 @@ export type StackPrizeRule = {
   condition: StackPrizeCondition
   groups: { allocations: { prizeId: string; quantity: number }[] }[]
   topX?: number
+  scoreOperator?: StackPrizeScoreOperator
+  scoreValue?: number
+  scoreMaxValue?: number
 }
 export type StackPrizePromotion = {
   condition: StackPrizeCondition
   topX?: number
+  scoreOperator?: StackPrizeScoreOperator
+  scoreValue?: number
+  scoreMaxValue?: number
   names: string[]
   prizes?: { id: string; name: string; imageUrl?: string | null }[]
 }

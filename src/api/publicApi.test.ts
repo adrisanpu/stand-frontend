@@ -3,6 +3,23 @@ import { PublicApiError, publicApi } from './publicApi'
 import { DEFAULT_STACK_CONFIG } from '../games/stack/stackLogic'
 import { DEFAULT_RULET4_CONFIG } from '../games/rulet4/rulet4Logic'
 
+describe('returning email registration contract', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+  it('uses the existing email endpoint without sending profile defaults', async () => {
+    const details = {
+      ok: true, detailsRequired: true, existingPlayer: true,
+      fields: { username: false, phone: false, consent: true, loyaltyConsent: false },
+    }
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify(details)))
+    vi.stubGlobal('fetch', request)
+    const body = { mode: 'resume' as const, gameId: 'ABC123', email: 'player@example.com' }
+    expect(await publicApi.resumeEmailRegistration(body)).toEqual(details)
+    expect(request).toHaveBeenCalledWith(expect.stringContaining('/v1/public/email/request'), expect.objectContaining({
+      method: 'POST', body: JSON.stringify(body),
+    }))
+  })
+})
+
 describe('RULET4 spin contract', () => {
   afterEach(() => { vi.unstubAllGlobals() })
   const result = {

@@ -230,6 +230,26 @@ it('offers both ranking conditions and requires a prize in each added rule', asy
   expect(screen.getAllByRole('option', { name: 'entre en el top al terminar su partida' })).toHaveLength(2)
 })
 
+it('configures a score range prize rule with inclusive bounds', async () => {
+  mount()
+  await screen.findByText('Catálogo de premios')
+  fireEvent.change(screen.getByLabelText('Condición 1'), { target: { value: 'score' } })
+  expect(screen.getByRole('button', { name: 'Guardar reglas de premios' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Operador de puntuación 1'), { target: { value: 'between' } })
+  fireEvent.change(screen.getByLabelText('Puntuación mínima 1'), { target: { value: '10' } })
+  fireEvent.change(screen.getByLabelText('Puntuación máxima 1'), { target: { value: '20' } })
+  expect(screen.getByRole('button', { name: 'Guardar reglas de premios' })).toBeEnabled()
+  fireEvent.change(screen.getByLabelText('Puntuación máxima 1'), { target: { value: '9' } })
+  expect(screen.getByRole('button', { name: 'Guardar reglas de premios' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Puntuación máxima 1'), { target: { value: '20' } })
+  expect(screen.getByRole('button', { name: 'Guardar reglas de premios' })).toBeEnabled()
+  save()
+  await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalled())
+  expect(vi.mocked(stackPrizeApi.save).mock.calls[0][1].rules[0]).toMatchObject({
+    condition: 'score', scoreOperator: 'between', scoreValue: 10, scoreMaxValue: 20,
+  })
+})
+
 it('retries the external catalog without replacing unsaved edits', async () => {
   vi.mocked(kivlyApi.listRewards).mockRejectedValueOnce(new Error('Unavailable'))
   mount()

@@ -14,7 +14,7 @@ vi.mock('../../api/publicApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/publicApi')>()
   return {
     ...actual,
-    publicApi: { getGame: vi.fn(), getPlayer: vi.fn(), join: vi.fn(), requestEmailCode: vi.fn(), uploadParticipantPhoto: vi.fn(), validate: vi.fn() },
+    publicApi: { getGame: vi.fn(), getPlayer: vi.fn(), join: vi.fn(), requestEmailCode: vi.fn(), resumeEmailRegistration: vi.fn(), uploadParticipantPhoto: vi.fn(), validate: vi.fn() },
   }
 })
 vi.mock('../../games/stack/ParticipantPlay', () => ({
@@ -22,6 +22,18 @@ vi.mock('../../games/stack/ParticipantPlay', () => ({
     <div>Escena STACK: {assignment.attempt ? 'consumido' : 'disponible'}</div>
   ),
 }))
+
+beforeEach(() => {
+  vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValue({
+    ok: true, detailsRequired: true, existingPlayer: false,
+    fields: { username: true, phone: true, consent: true, loyaltyConsent: false },
+  })
+  vi.stubGlobal('URL', class extends URL {
+    static createObjectURL = vi.fn(() => 'blob:profile-preview')
+    static revokeObjectURL = vi.fn()
+  })
+})
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const assignment: StackAssignment = { gameType: 'STACK', playerId: 1, displayName: 'Jugador', attempt: null }
 
@@ -36,7 +48,7 @@ function renderParticipant(strict = false) {
 
 async function advanceToParticipantDetails(email = 'player@example.test') {
   fireEvent.change(await screen.findByLabelText(/Email/), { target: { value: email } })
-  fireEvent.click(await screen.findByRole('button', { name: 'Continuar' }))
+  await act(async () => { fireEvent.click(await screen.findByRole('button', { name: 'Continuar' })) })
 }
 
 describe('ParticipantShell STACK integration', () => {
@@ -521,7 +533,7 @@ describe('ParticipantShell STACK integration', () => {
       expect(screen.getByRole('link', { name: 'Privacy policy' })).toHaveAttribute('href', '/pages/privacy.html')
       fireEvent.click(screen.getByRole('button', { name: 'Back' }))
       expect(screen.getByLabelText(/Email/)).toHaveValue('ana@example.test')
-      fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continue' })) })
       expect(screen.getByRole('checkbox')).toBeChecked()
       fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), { target: { value: 'es' } })
       expect(screen.getByRole('button', { name: 'Enviar código' })).toBeInTheDocument()
