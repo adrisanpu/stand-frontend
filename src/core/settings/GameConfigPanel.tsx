@@ -192,7 +192,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
             </section>
           )}
         </fieldset>
-        {isStack && <KivlySettings key={gameId} draft={kivly} />}
+        {isStack && <KivlySettings key={gameId} draft={kivly} gameSettings={settings} onSettingChange={(patch) => onSettingsChange(patch)} />}
         {GameConfigComponent && (
           <fieldset disabled={saving} className="min-w-0">
             <GameConfigComponent

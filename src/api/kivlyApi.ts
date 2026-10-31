@@ -5,6 +5,7 @@ export type KivlySettings = {
   clubName: string
   privacyUrl: string
   termsUrl: string
+  bypassValidation?: boolean
 }
 
 export type KivlyClubSettings = Omit<KivlySettings, 'enabled'> & { storefrontUrl?: string }
