@@ -128,7 +128,7 @@ describe('same-game returning participant', () => {
     await submitEmail()
     expect(screen.getByLabelText('País y prefijo')).toHaveValue('ES')
     fireEvent.change(screen.getByLabelText('País y prefijo'), { target: { value: 'FR' } })
-    fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '612345678' } })
+    fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '612345678' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Enviar código' })) })
     expect(publicApi.resumeEmailRegistration).toHaveBeenLastCalledWith({
       mode: 'resume', gameId: 'ABC123', email: 'player@example.com', phone: '+33 612345678', language: 'es',
@@ -185,7 +185,7 @@ it('requires a phone for STACK even when old metadata disables it', async () => 
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
   fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: 'Player' } })
   fireEvent.click(screen.getAllByRole('checkbox')[0])
-  const phone = screen.getByLabelText('Teléfono')
+  const phone = screen.getByLabelText('Teléfono *')
   expect(phone).toBeRequired()
   fireEvent.submit(phone.closest('form')!)
   expect(screen.getByRole('alert')).toHaveTextContent('El teléfono es obligatorio.')
