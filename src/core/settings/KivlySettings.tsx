@@ -77,9 +77,11 @@ export default function KivlySettings({ draft }: {
       <p role="alert" className="text-xs text-red-300">{t('No se pudo comprobar Kivly.', 'Could not check Kivly.')}</p>
       <button type="button" className={actionClass} onClick={draft.reload}>{t('Comprobar estado', 'Check status')}</button>
     </>}
-    {draft.status === 'ready' && connection && <div className="flex items-center gap-2 text-xs">
-      <img src="/images/kivly-logo.svg" alt="Kivly" className="h-5 w-auto" />
-      <span>{connection.connected ? t('Conectado', 'Connected') : t('Desconectado', 'Not connected')}</span>
+    {draft.status === 'ready' && connection && <div className="space-y-2 text-xs">
+      <div className="flex items-center gap-2">
+        <img src="/images/kivly-logo.svg" alt="Kivly" className="h-5 w-auto" />
+        <span>{connection.connected ? t('Conectado', 'Connected') : t('Desconectado', 'Not connected')}</span>
+      </div>
     </div>}
   </section>
 }

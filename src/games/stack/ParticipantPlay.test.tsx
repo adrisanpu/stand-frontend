@@ -82,7 +82,8 @@ describe('STACK participant gameplay', () => {
     const { unmount } = renderGame()
     await ready()
     const header = screen.getByText('@rekete').closest('header')
-    expect(header).toHaveClass('justify-between')
+    expect(header).toHaveClass('justify-between', 'flex-wrap', 'min-w-0')
+    expect(screen.getByRole('region', { name: 'STACK' })).toHaveClass('min-w-0', 'max-w-full')
     expect(header?.firstElementChild).toHaveTextContent('Bloques: 0')
     expect(header?.lastElementChild).toContainElement(screen.getByText('@rekete'))
     expect(header).toContainElement(screen.getByText('@rekete'))
@@ -92,6 +93,18 @@ describe('STACK participant gameplay', () => {
     expect(screen.getByRole('button', { name: 'EMPEZAR' })).toBeEnabled()
     unmount()
     expect(controller.dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps long player names constrained without hiding the score or start control', async () => {
+    const name = 'Jugador '.repeat(30).trim()
+    renderGame({ ...assignment, displayName: name })
+    await ready()
+    const identity = screen.getByTitle(name)
+    expect(identity).toHaveClass('truncate')
+    expect(identity.parentElement).toHaveClass('min-w-0', 'max-w-full')
+    expect(screen.getByText('Bloques:')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'EMPEZAR' })).toBeEnabled()
+    expect(publicApi.startStackAttempt).not.toHaveBeenCalled()
   })
 
   it('requests the club reward only after the server confirms the STACK finish', async () => {
@@ -108,12 +121,15 @@ describe('STACK participant gameplay', () => {
     expect(publicApi.completionReward).toHaveBeenCalledWith('GAME1234', 'token')
   })
 
-  it('does not offer an available attempt when the server reports it consumed', async () => {
-    renderGame({ ...assignment, attempt: { attemptId: 'old', status: 'started', startedAt: '2026-10-16T10:00:00Z', configVersion: '1' } })
+  it.each(['started', 'finished', 'excluded'] as const)('does not restart a %s attempt without recoverable progress, even without a score', async (status) => {
+    renderGame({ ...assignment, attempt: { attemptId: 'old', status, startedAt: '2026-10-16T10:00:00Z', configVersion: '1' } })
     await ready()
     expect(screen.queryByRole('button', { name: 'EMPEZAR' })).not.toBeInTheDocument()
     expect(screen.getByText(/Tu intento no está disponible/)).toBeInTheDocument()
     expect(controller.start).not.toHaveBeenCalled()
+    expect(publicApi.startStackAttempt).not.toHaveBeenCalled()
+    expect(publicApi.finishStackAttempt).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Reintentar confirmación' })).not.toBeInTheDocument()
   })
 
   it('does not consume attempts against the old phase-one backend', async () => {

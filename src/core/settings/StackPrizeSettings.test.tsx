@@ -7,7 +7,10 @@ import StackPrizeSettings from './StackPrizeSettings'
 
 vi.mock('../../api/stackPrizes', () => ({ stackPrizeApi: { get: vi.fn(), save: vi.fn(), close: vi.fn(), retryEmail: vi.fn() } }))
 vi.mock('../../api/kivlyApi', () => ({
-  kivlyApi: { getAccountConnection: vi.fn(), listRewards: vi.fn(), createReward: vi.fn() },
+  kivlyApi: {
+    getAccountConnection: vi.fn(), listRewards: vi.fn(), getReward: vi.fn(),
+    createReward: vi.fn(), updateReward: vi.fn(),
+  },
 }))
 vi.mock('../../api/prizeMedia', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/prizeMedia')>(),
@@ -28,7 +31,15 @@ beforeEach(() => {
     connected: true, locationId: 'loc', locations: [{ id: 'loc', name: 'Club' }],
   })
   vi.mocked(kivlyApi.listRewards).mockResolvedValue([{ id: 'coffee', name: 'Coffee' }])
+  vi.mocked(kivlyApi.getReward).mockResolvedValue({
+    id: 'coffee', title: 'Coffee', description: 'A coffee', rewardType: 'free_item',
+    value: 1, pointsRequired: 20, image: null, termsAndConditions: null,
+    validFrom: null, validUntil: null, maxRedemptions: null, maxRedemptionsPerUser: null,
+  })
   vi.mocked(kivlyApi.createReward).mockResolvedValue({ id: 'new-reward', name: 'New reward' })
+  vi.mocked(kivlyApi.updateReward).mockImplementation(async (_, rewardId, reward) => ({
+    id: rewardId, name: reward.title,
+  }))
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 function mount() {
@@ -101,6 +112,24 @@ it('shows missing Kivly phone and retries only the email, including after closur
   expect(stackPrizeApi.close).not.toHaveBeenCalled()
 })
 
+it.each([
+  ['blocked', 'queued', 'Premio pendiente de confirmación; correo aún no encolado'],
+  ['reconciliation_required', 'confirmed', 'Envío incierto: comprobar antes de reenviar'],
+  ['accepted', 'confirmed', 'Aceptado por SES; entrega en bandeja no confirmada'],
+] as const)('displays %s emails without offering a resend', async (emailState, state, message) => {
+  vi.mocked(stackPrizeApi.get).mockResolvedValue({
+    ...structuredClone(response), emailAvailable: true,
+    awards: [{
+      id: 'award_one', playerId: 7, name: 'Coffee', source: 'kivly', condition: 'completed',
+      state, deliveryChannel: 'email', emailState,
+    }],
+  })
+  mount()
+  expect(await screen.findByText(new RegExp(message))).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Reintentar email sin reasignar premio' })).not.toBeInTheDocument()
+  expect(stackPrizeApi.retryEmail).not.toHaveBeenCalled()
+})
+
 it('shows the full external catalog without publishing it until selected', async () => {
   mount()
   await screen.findByRole('option', { name: 'Coffee' })
@@ -130,6 +159,117 @@ it('creates a Kivly reward with minimal required details and refreshes the catal
   expect(screen.queryByRole('region', { name: 'Crear premio' })).not.toBeInTheDocument()
   await waitFor(() => expect(kivlyApi.listRewards).toHaveBeenCalledTimes(2))
   expect(stackPrizeApi.save).not.toHaveBeenCalled()
+})
+
+it('opens a STAND prize card in the populated edit form and stages its local changes', async () => {
+  mount()
+  await screen.findByRole('article', { name: 'Pizza' })
+  fireEvent.click(screen.getByRole('button', { name: 'Editar premio Pizza' }))
+  const form = screen.getByRole('region', { name: 'Editar premio' })
+  expect(within(form).getByLabelText('Nombre del premio STAND')).toHaveValue('Pizza')
+  expect(within(form).getByLabelText('Stock')).toHaveValue(100)
+
+  fireEvent.change(within(form).getByLabelText('Nombre del premio STAND'), { target: { value: 'Tarta' } })
+  fireEvent.change(within(form).getByLabelText('Stock'), { target: { value: '75' } })
+  fireEvent.click(within(form).getByRole('button', { name: 'Guardar cambios' }))
+
+  const card = await screen.findByRole('article', { name: 'Tarta' })
+  expect(card).toHaveTextContent('Disponibles: 75')
+  expect(stackPrizeApi.save).not.toHaveBeenCalled()
+  save()
+  await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalled())
+  expect(vi.mocked(stackPrizeApi.save).mock.calls[0][1].catalog[0])
+    .toMatchObject({ id: 'pizza', name: 'Tarta', stockTotal: 75 })
+})
+
+it('loads and updates every editable Kivly field from the prize card', async () => {
+  const configured: StackPrizeSettingsResponse = {
+    ...structuredClone(response),
+    program: {
+      ...structuredClone(response.program),
+      catalog: [...structuredClone(response.program.catalog), {
+        id: 'coffee-card', source: 'kivly', rewardId: 'coffee', locationId: 'loc',
+        name: 'Coffee', stockTotal: 30, imageUrl: null,
+      }],
+    },
+    inventory: [...structuredClone(response.inventory), { prizeId: 'coffee-card', total: 30, remaining: 30 }],
+  }
+  vi.mocked(stackPrizeApi.get).mockResolvedValue(configured)
+  vi.mocked(kivlyApi.getReward).mockResolvedValue({
+    id: 'coffee', title: 'Coffee', description: 'A coffee', rewardType: 'free_item',
+    value: 1, pointsRequired: 20, image: 'https://cdn.kivly.store/coffee.png',
+    termsAndConditions: 'Use once', validFrom: '2030-01-01T10:00:00Z',
+    validUntil: '2030-03-01T10:00:00Z', maxRedemptions: 100, maxRedemptionsPerUser: 2,
+  })
+  mount()
+  await screen.findByRole('article', { name: 'Coffee' })
+  fireEvent.click(screen.getByRole('button', { name: 'Editar premio Coffee' }))
+  const form = await screen.findByRole('region', { name: 'Editar premio' })
+  expect(kivlyApi.getReward).toHaveBeenCalledWith('ABC123', 'coffee')
+  expect(within(form).getByLabelText('Nombre')).toHaveValue('Coffee')
+  expect(within(form).getByLabelText('Descripción')).toHaveValue('A coffee')
+  expect(within(form).getByLabelText('Stock')).toHaveValue(30)
+  fireEvent.click(within(form).getByText('Opciones avanzadas'))
+  expect(within(form).getByLabelText('Condiciones')).toHaveValue('Use once')
+  expect(within(form).getByLabelText('Canjes máximos en total')).toHaveValue(100)
+  expect(within(form).getByLabelText('Canjes máximos por usuario')).toHaveValue(2)
+
+  fireEvent.change(within(form).getByLabelText('Nombre'), { target: { value: 'Tea' } })
+  fireEvent.change(within(form).getByLabelText('Descripción'), { target: { value: 'A cup of tea' } })
+  fireEvent.change(within(form).getByLabelText('Tipo de premio'), { target: { value: 'discount_fixed' } })
+  fireEvent.change(within(form).getByLabelText('Valor'), { target: { value: '5' } })
+  fireEvent.change(within(form).getByLabelText('Puntos necesarios'), { target: { value: '40' } })
+  fireEvent.change(within(form).getByLabelText('Stock'), { target: { value: '50' } })
+  fireEvent.change(within(form).getByLabelText('Condiciones'), { target: { value: 'New terms' } })
+  fireEvent.change(within(form).getByLabelText('Válido desde'), { target: { value: '2030-02-01T10:00' } })
+  fireEvent.change(within(form).getByLabelText('Válido hasta'), { target: { value: '2030-04-01T10:00' } })
+  fireEvent.change(within(form).getByLabelText('Canjes máximos en total'), { target: { value: '150' } })
+  fireEvent.change(within(form).getByLabelText('Canjes máximos por usuario'), { target: { value: '3' } })
+  fireEvent.click(within(form).getByRole('button', { name: 'Guardar cambios en Kivly' }))
+
+  await waitFor(() => expect(kivlyApi.updateReward).toHaveBeenCalledWith('ABC123', 'coffee', {
+    title: 'Tea', description: 'A cup of tea', rewardType: 'discount_fixed',
+    value: 5, pointsRequired: 40, image: 'https://cdn.kivly.store/coffee.png',
+    termsAndConditions: 'New terms', validFrom: new Date('2030-02-01T10:00').toISOString(),
+    validUntil: new Date('2030-04-01T10:00').toISOString(),
+    maxRedemptions: 150, maxRedemptionsPerUser: 3,
+  }))
+  expect(await screen.findByText('Premio actualizado en Kivly. Guarda para aplicar el inventario y la imagen al juego.'))
+    .toBeInTheDocument()
+  save()
+  await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalled())
+  expect(vi.mocked(stackPrizeApi.save).mock.calls[0][1].catalog.find((item) => item.id === 'coffee-card'))
+    .toMatchObject({ name: 'Tea', stockTotal: 50, rewardId: 'coffee' })
+})
+
+it('requires a detail refresh before retrying an uncertain Kivly reward update', async () => {
+  vi.mocked(stackPrizeApi.get).mockResolvedValue({
+    ...structuredClone(response),
+    program: {
+      ...structuredClone(response.program),
+      catalog: [...structuredClone(response.program.catalog), {
+        id: 'coffee-card', source: 'kivly', rewardId: 'coffee', locationId: 'loc',
+        name: 'Coffee', stockTotal: 30,
+      }],
+    },
+  })
+  vi.mocked(kivlyApi.updateReward).mockRejectedValueOnce(Object.assign(
+    new Error('Kivly API error: 503'), { code: 'KivlyRewardUpdateUncertain' },
+  ))
+  mount()
+  await screen.findByRole('article', { name: 'Coffee' })
+  fireEvent.click(screen.getByRole('button', { name: 'Editar premio Coffee' }))
+  const form = await screen.findByRole('region', { name: 'Editar premio' })
+  fireEvent.click(within(form).getByRole('button', { name: 'Guardar cambios en Kivly' }))
+  expect(await within(form).findByRole('alert')).toHaveTextContent('No se pudo confirmar la actualización')
+  expect(within(form).getByRole('button', { name: 'Guardar cambios en Kivly' })).toBeDisabled()
+  expect(stackPrizeApi.save).not.toHaveBeenCalled()
+
+  fireEvent.click(within(form).getByRole('button', { name: 'Actualizar datos de Kivly y revisar' }))
+  await within(form).findByText('Datos actualizados desde Kivly. Revisa antes de volver a guardar.')
+  expect(kivlyApi.getReward).toHaveBeenCalledTimes(2)
+  expect(within(form).getByRole('button', { name: 'Guardar cambios en Kivly' })).toBeEnabled()
+  expect(kivlyApi.updateReward).toHaveBeenCalledTimes(1)
 })
 
 it('hides Kivly reward creation when the account is disconnected', async () => {

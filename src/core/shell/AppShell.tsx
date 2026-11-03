@@ -255,7 +255,8 @@ function AppContent() {
 
   // Use game definition if available, otherwise use a default theme (no specific game)
   const currentGame = gameDefinition
-  const isPortrait = useOrientation()
+  const isStack = currentGame?.id === 'STACK'
+  const isPortrait = useOrientation(isStack)
 
   // Derive prize labels for minicontainers from game settings
   const gs = gameSettings as Record<string, unknown> | null
@@ -385,7 +386,9 @@ function AppContent() {
                 {accessError && <button type="button" onClick={() => setGameConfigVersion((v) => v + 1)}>{t('Reintentar carga', 'Retry loading')}</button>}
               </div>
             ) : playMode === 'mobile' ? (
-              <div className={isPortrait
+              <div className={isStack
+                ? 'h-dvh w-full overflow-y-auto overflow-x-hidden px-3 sm:px-6 pt-16 pb-20'
+                : isPortrait
                 ? 'h-dvh w-screen overflow-y-auto px-6 sm:px-8 pt-[8dvh] pb-[10dvh]'
                 : 'h-dvh w-screen overflow-hidden pt-[7dvh] pb-[max(7dvh,4rem)] px-[4dvw]'}>
                 <MobileGameHome
@@ -393,6 +396,7 @@ function AppContent() {
                   gameName={gameName}
                   joinChannel={access.joinChannel}
                   portrait={isPortrait}
+                  responsive={isStack}
                   logoSrc={customLogo ?? currentGame.assets?.logo}
                   logoAlt={customLogo ? t('Logo del cliente', 'Client logo') : currentGame.name}
                   players={

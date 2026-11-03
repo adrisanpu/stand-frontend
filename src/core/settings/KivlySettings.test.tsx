@@ -28,6 +28,7 @@ describe('Kivly game connection indicator', () => {
     expect(screen.getByText('Conectado')).toBeInTheDocument()
     expect(screen.queryByText(/Demo/)).not.toBeInTheDocument()
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 

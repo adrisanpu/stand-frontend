@@ -13,6 +13,11 @@ type Props = {
 }
 
 const verificationErrors: Record<string, string> = {
+  KivlyRegistrationPending: 'Se está confirmando tu alta en el club. Espera el plazo indicado y reintenta con el mismo código verificado.',
+  KivlyIdentityConflict: 'Tu email y teléfono corresponden a perfiles diferentes del club. Consulta al equipo del evento.',
+  KivlyIdentityReviewRequired: 'Tu teléfono coincide con una ficha del club con otro email o sin email. El organizador debe comprobar tu identidad antes de vincularla.',
+  KivlyAlreadyPlayed: 'Ya has participado en este juego con tu perfil del club. No puedes volver a jugar.',
+  KivlyDuplicateParticipation: 'Hay participaciones anteriores duplicadas que requieren comprobación. Consulta al equipo del evento; no vuelvas a registrarte.',
   KivlyConsentRequired: 'Debes aceptar las condiciones del club para jugar. Si han cambiado, recarga la página.',
   KivlyMembershipRequired: 'Completa el registro en el club antes de jugar.',
   KivlyRegistrationBusy: 'Se está confirmando tu alta en el club. Espera y reintenta con el mismo código.',
@@ -67,6 +72,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   const [invalidChallenge, setInvalidChallenge] = useState(false)
   const [now, setNow] = useState(Date.now)
   const [retryAt, setRetryAt] = useState(0)
+  const [verificationRetryAt, setVerificationRetryAt] = useState(0)
   const [photo, setPhoto] = useState<File | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -97,6 +103,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     setInvalidChallenge(false)
     setError(null)
     setRetryAt(0)
+    setVerificationRetryAt(0)
     setClubConsent(false)
   }, [gameId, phoneEnabled, pf.phone.required, gameMeta.loyalty?.consentVersion])
 
@@ -110,6 +117,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
 
   const expired = !!challenge && now >= Date.parse(challenge.expiresAt)
   const cooldown = Math.max(0, Math.ceil((Math.max(retryAt, challenge ? Date.parse(challenge.resendAvailableAt) : 0) - now) / 1000))
+  const verificationCooldown = Math.max(0, Math.ceil((verificationRetryAt - now) / 1000))
 
   const continueToGame = (playerToken: string, assignment: PlayerAssignment, photoUploadFailed = false) => {
     savePlayerSession(gameId, playerToken, assignment)
@@ -123,8 +131,11 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         ? 'No se pudo confirmar tu registro en el club. Consulta al equipo del evento.'
         : 'No se pudo completar el registro. Inténtalo de nuevo más tarde.'))
       if (invalidChallenges.has(err.code ?? '')) setInvalidChallenge(true)
-      if (err.status === 429 && err.retryAfter) {
-        setRetryAt(Date.now() + err.retryAfter * 1000)
+      if ((err.status === 429 || (err.code === 'KivlyRegistrationPending'
+        && (err.status === 409 || err.status === 503))) && err.retryAfter) {
+        const nextRetryAt = Date.now() + err.retryAfter * 1000
+        setRetryAt(nextRetryAt)
+        setVerificationRetryAt(nextRetryAt)
         setNow(Date.now())
       }
     } else {
@@ -147,6 +158,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     setInvalidChallenge(false)
     setError(null)
     setRetryAt(0)
+    setVerificationRetryAt(0)
     setStep(nextStep)
   }
 
@@ -268,7 +280,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       }
       if (cooldown > 0) return
     }
-    if (step === 3 && (!challenge || expired || invalidChallenge)) return
+    if (step === 3 && (!challenge || expired || invalidChallenge || verificationCooldown > 0)) return
     if (step === 3 && !/^[0-9]{6}$/.test(code)) {
       setError('Introduce un código de 6 dígitos.')
       return
@@ -335,6 +347,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   const showPhone = phoneEnabled && (!details?.existingPlayer || details.fields.phone)
   const showConsent = !details?.existingPlayer || details.fields.consent
   const showClubConsent = !!gameMeta.loyalty && (!details?.existingPlayer || details.fields.loyaltyConsent)
+  const nameColumn = details?.existingPlayer ? 'col-start-1' : 'col-start-2'
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -360,23 +373,8 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
 
       {step === 2 && <>
       <fieldset disabled={loading} className="space-y-4">
-      <div className={`flex items-start gap-3 ${showName ? '' : 'hidden'}`}>
-      {showName && <div className="min-w-0 flex-1">
-        <label className="block text-sm mb-1" htmlFor="join-username">
-          {t('Nombre completo')} *
-        </label>
-        <input
-          id="join-username"
-          type="text"
-          autoComplete="name"
-          required
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3"
-        />
-        <p className="mt-1 text-xs text-textSub">{t('Usa el nombre con el que quieres aparecer en el juego.')}</p>
-      </div>}
-      {!details?.existingPlayer && <div className="w-20 shrink-0">
+      <div className={`${showName ? 'grid' : 'hidden'} ${details?.existingPlayer ? 'grid-cols-1' : 'grid-cols-[5rem_minmax(0,1fr)] gap-x-3'}`}>
+      {!details?.existingPlayer && <div className="contents">
         <label className="sr-only" htmlFor="join-photo">
           {t('Foto de perfil (opcional)')}
         </label>
@@ -401,16 +399,31 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         />
         <button type="button" onClick={() => photoInput.current?.click()}
           aria-label={t('Elegir foto de perfil')}
-          className="mx-auto mt-6 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+          className="col-start-1 row-start-2 mx-auto flex h-16 w-16 self-center items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
           {photoPreview
             ? <img src={photoPreview} alt={t('Vista previa de la foto de perfil')} className="h-full w-full object-cover" />
-            : <svg viewBox="0 0 64 64" aria-hidden="true" className="h-14 w-14 text-textSub" fill="currentColor">
-                <circle cx="32" cy="22" r="12" />
-                <path d="M8 60a24 24 0 0 1 48 0Z" />
+            : <svg viewBox="0 0 24 24" aria-hidden="true" className="h-7 w-7 text-textSub" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z" />
+                <circle cx="12" cy="13" r="3.5" />
               </svg>}
         </button>
-        <p className="mt-1 text-center text-xs text-textSub">{t('Foto de perfil (opcional)')}</p>
-        {photoError && <p role="alert" className="mt-1 text-xs text-amber-300">{photoError}</p>}
+        <p className="col-start-1 row-start-3 mt-1 text-center text-xs text-textSub">{t('Foto de perfil (opcional)')}</p>
+        {photoError && <p role="alert" className="col-span-full row-start-4 mt-1 text-xs text-amber-300">{photoError}</p>}
+      </div>}
+      {showName && <div className="contents">
+        <label className={`${nameColumn} row-start-1 block text-sm mb-1`} htmlFor="join-username">
+          {t('Nombre completo')} *
+        </label>
+        <input
+          id="join-username"
+          type="text"
+          autoComplete="name"
+          required
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          className={`${nameColumn} row-start-2 min-w-0 w-full self-center rounded-2xl border border-white/20 bg-white/5 px-4 py-3`}
+        />
+        <p className={`${nameColumn} row-start-3 mt-1 text-xs text-textSub`}>{t('Usa el nombre con el que quieres aparecer en el juego.')}</p>
       </div>}
       </div>
       {showPhone && <div>
@@ -438,24 +451,36 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         </div>
       </div>}
 
-      {showConsent && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-[13px] leading-relaxed text-textSub items-start">
-        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-primary" />
+      {(showConsent || showClubConsent) && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-[13px] leading-relaxed text-textSub items-start">
+        <input
+          type="checkbox"
+          checked={showConsent && showClubConsent ? consent && clubConsent : showConsent ? consent : clubConsent}
+          onChange={(event) => {
+            const next = event.target.checked
+            if (showConsent) setConsent(next)
+            if (showClubConsent) setClubConsent(next)
+          }}
+          required={showConsent || showClubConsent}
+          className="mt-1 h-5 w-5 shrink-0 accent-primary"
+        />
         <span>
-          {t(PARTICIPANT_PRIVACY_NOTICE)}{' '}
-          <a href={language === 'es' ? PRIVACY_POLICY_URL : '/pages/privacy.html'} target="_blank" rel="noopener noreferrer" className="underline text-accent">
-            {t('Política de privacidad')}
-          </a>
-        </span>
-      </label>}
-      {showClubConsent && gameMeta.loyalty && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-[13px] leading-relaxed text-textSub items-start">
-        <input type="checkbox" checked={clubConsent} onChange={(event) => setClubConsent(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-primary" required />
-        <span>{t('Acepto registrarme en el club')} <strong>{gameMeta.loyalty.clubName}</strong>.{' '}
-          {t('Acepto las condiciones y la política de privacidad del club. El registro es necesario para jugar.')}{' '}
-          {phoneEnabled && <>{t(pf.phone.required
-            ? 'Tu teléfono se compartirá con el club al crear tu ficha.'
-            : 'Si añades tu teléfono, también se compartirá con el club al crear tu ficha.')}{' '}</>}
-          <a href={gameMeta.loyalty.termsUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Condiciones del club')}</a>{' · '}
-          <a href={gameMeta.loyalty.privacyUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Privacidad del club')}</a>
+          {showConsent && showClubConsent && t('Acepto el uso de mis datos por Stand y el organizador y, si subo una foto, mostrarla en el juego.')}{' '}
+          {showConsent && !showClubConsent && t(PARTICIPANT_PRIVACY_NOTICE)}{' '}
+          {showConsent && (
+            <a href={language === 'es' ? PRIVACY_POLICY_URL : '/pages/privacy.html'} target="_blank" rel="noopener noreferrer" className="underline text-accent">
+              {t('Política de privacidad')}
+            </a>
+          )}
+          {showClubConsent && gameMeta.loyalty && <>
+            {showConsent && ' · '}
+            {t('Acepto el alta en el club')} <strong>{gameMeta.loyalty.clubName}</strong>{' '}
+            {t('y sus condiciones y privacidad para jugar.')}{' '}
+            {phoneEnabled && <>{t(pf.phone.required
+              ? 'Mi teléfono se compartirá con el club.'
+              : 'Si añado mi teléfono, se compartirá con el club.')}{' '}</>}
+            <a href={gameMeta.loyalty.termsUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Condiciones del club')}</a>{' · '}
+            <a href={gameMeta.loyalty.privacyUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Privacidad del club')}</a>
+          </>}
         </span>
       </label>}
       </fieldset>
@@ -474,16 +499,16 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         <p id="join-code-help" className="text-sm text-textSub">
           {t(expired ? 'El código ha caducado. Solicita uno nuevo.' : 'Introduce los 6 dígitos del email.')}
         </p>
-        <button type="button" onClick={resend} disabled={loading || cooldown > 0}
-          className="rounded-xl border border-[rgba(var(--color-accent-rgb),0.4)] px-4 py-3 text-accent disabled:opacity-50">
-          {t('Reenviar código')}{cooldown > 0 ? ` (${cooldown}s)` : ''}
-        </button>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-1 text-xs sm:gap-2 sm:text-sm">
+          <button type="button" onClick={resend} disabled={loading || cooldown > 0}
+            className="min-w-0 flex-1 rounded-xl border border-[rgba(var(--color-accent-rgb),0.4)] px-1 py-3 text-accent disabled:opacity-50 sm:px-2">
+            {t('Reenviar código')}{cooldown > 0 ? ` (${cooldown}s)` : ''}
+          </button>
           {!('mode' in challenge.registration) && <button type="button" disabled={loading} onClick={() => discardChallenge(2)}
-            className="rounded-xl px-4 py-3 text-accent disabled:opacity-50">{t('Cambiar datos')}</button>
+            className="min-w-0 flex-1 rounded-xl px-1 py-3 text-accent disabled:opacity-50 sm:px-2">{t('Cambiar datos')}</button>
           }
           <button type="button" disabled={loading} onClick={() => discardChallenge(1)}
-            className="rounded-xl px-4 py-3 text-accent disabled:opacity-50">{t('Cambiar email')}</button>
+            className="min-w-0 flex-1 rounded-xl px-1 py-3 text-accent disabled:opacity-50 sm:px-2">{t('Cambiar email')}</button>
         </div>
       </div>}
 
@@ -491,12 +516,15 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       {step !== 3 && cooldown > 0 && <p role="status" className="text-sm text-textSub">
         {t('Puedes solicitar otro código en')}: {cooldown}s
       </p>}
+      {step === 3 && verificationCooldown > 0 && <p role="status" className="text-sm text-textSub">
+        {t('Puedes reintentar con el mismo código en')}: {verificationCooldown}s
+      </p>}
 
       {step === 2 && <button type="button" disabled={loading} onClick={() => setStep(1)}
         className="w-full rounded-xl py-3 text-accent disabled:opacity-50">{t('Volver')}</button>}
       <button
         type="submit"
-        disabled={loading || (step !== 3 && cooldown > 0) || (step === 3 && (expired || invalidChallenge))}
+        disabled={loading || (step !== 3 && cooldown > 0) || (step === 3 && (expired || invalidChallenge || verificationCooldown > 0))}
         className="w-full rounded-2xl py-3.5 font-semibold text-primary bg-[rgba(var(--color-primary-rgb),0.25)] border border-[rgba(var(--color-primary-rgb),0.4)] disabled:opacity-50"
       >
         {t(loading ? (step !== 3 ? 'Enviando código...' : 'Registrando...')

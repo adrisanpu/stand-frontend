@@ -28,6 +28,27 @@ it('does not show a QR for an already collected prize', () => {
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
   expect(screen.getByText('Premio recogido. ¡Disfrútalo!')).toBeInTheDocument()
 })
+it.each(['queued', 'sending', 'reconciliation_required'] as const)('shows email blocked before the %s reward is confirmed without offering retry', (state) => {
+  render(<ParticipantLanguageProvider><ParticipantLanguageSelector /><StackAwardList data={{
+    ...data, deliveryChannel: 'email', awards: [{
+      ...data.awards[2], state, deliveryChannel: 'email', emailState: 'blocked',
+    }],
+  }} /></ParticipantLanguageProvider>)
+  expect(screen.getByText('Premio pendiente de confirmación; correo aún no encolado')).toBeInTheDocument()
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Idioma'), { target: { value: 'en' } })
+  expect(screen.getByText('Reward awaiting confirmation; email not yet queued')).toBeInTheDocument()
+})
+it('distinguishes SES acceptance from confirmed inbox delivery in both languages', () => {
+  render(<ParticipantLanguageProvider><ParticipantLanguageSelector /><StackAwardList data={{
+    ...data, deliveryChannel: 'email', awards: [{
+      ...data.awards[2], deliveryChannel: 'email', emailState: 'accepted',
+    }],
+  }} /></ParticipantLanguageProvider>)
+  expect(screen.getByText(/aceptado por SES; entrega en bandeja no confirmada/)).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Idioma'), { target: { value: 'en' } })
+  expect(screen.getByText(/accepted by SES; inbox delivery is not confirmed/)).toBeInTheDocument()
+})
 it('opens the official wallet page without requiring a reward', () => {
   render(<StackWallet url={data.walletUrl} />)
   const wallet = screen.getByRole('link', { name: 'Añadir a mi wallet y desbloquear mi premio' })

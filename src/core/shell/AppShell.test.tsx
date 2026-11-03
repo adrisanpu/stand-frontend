@@ -68,6 +68,29 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('game home identity and configuration', () => {
+  it.each([true, false])('uses the shared orientation layout with scrollable content for STACK (portrait=%s)', async (portrait) => {
+    state.portrait = portrait
+    localStorage.setItem('gameType', 'STACK')
+    vi.mocked(api.get).mockResolvedValue({ ok: true, game: { gameType: 'STACK', playMode: 'mobile', joinChannel: 'web' } })
+    render(<AppShell />)
+    const qrPanel = await screen.findByLabelText('QR de acceso al juego')
+    const home = screen.getByLabelText('Pantalla del evento móvil')
+    expect(home).toHaveClass(portrait ? 'flex-col' : 'grid')
+    expect(home.parentElement).toHaveClass('overflow-y-auto', 'overflow-x-hidden')
+    expect(screen.getByRole('img', { name: 'STACK' })).toHaveClass('object-contain')
+    expect(qrPanel).toHaveClass('items-center')
+    expect(screen.getByTestId('qr')).toHaveAttribute('data-url', getJoinUrl('ABC123', 'web'))
+    expect(screen.getByTestId('raffle')).toHaveAttribute('data-compact', String(!portrait))
+    if (portrait) {
+      expect(screen.getByLabelText('Logo del evento')).toHaveClass('order-1')
+      expect(qrPanel).toHaveClass('order-2')
+      expect(screen.getByLabelText('Ranking del evento')).toHaveClass('order-5')
+    } else {
+      expect(home).toHaveClass('min-h-full')
+      expect(qrPanel).not.toHaveClass('overflow-hidden')
+    }
+  })
+
   it.each([true, false])('omits the raffle card and wrapper when disabled (portrait=%s)', async (portrait) => {
     state.portrait = portrait
     vi.mocked(api.get).mockResolvedValue({
@@ -289,7 +312,10 @@ describe('game home identity and configuration', () => {
     expect(center).toHaveClass('justify-evenly', 'p-4', 'gap-4', 'sm:p-6', 'sm:gap-6')
     const headline = screen.getByRole('heading', { name: 'ESCANEA PARA JUGAR.' })
     expect(headline).toHaveAttribute('lang', 'es')
-    expect(headline).toHaveClass('text-textMain', 'text-4xl', 'sm:text-5xl', 'lg:text-6xl')
+    expect(headline).toHaveClass('text-textMain')
+    expect(headline).toHaveClass(...(gameType === 'STACK'
+      ? ['text-[clamp(1.5rem,3vw,3.75rem)]', 'max-w-full']
+      : ['text-4xl', 'sm:text-5xl', 'lg:text-6xl']))
     expect(screen.getByText('ESCANEA')).toHaveClass('text-primary')
     expect(center.firstElementChild).toBe(headline)
     expect(headline.nextElementSibling).toBe(screen.getByTestId('qr'))

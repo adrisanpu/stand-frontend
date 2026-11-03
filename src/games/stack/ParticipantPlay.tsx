@@ -229,19 +229,19 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
   }
 
   return (
-    <section className="space-y-4 text-center" aria-label="STACK">
-      <header className="flex items-center justify-between gap-3 min-w-0">
+    <section className="space-y-4 text-center min-w-0 max-w-full" aria-label="STACK">
+      <header className="flex flex-wrap items-center justify-between gap-3 min-w-0">
         <p className="stack-score shrink-0 rounded-xl border border-primary/20 bg-primary/10 px-4 py-2 font-semibold tabular-nums" aria-live="polite" aria-atomic="true">
           {t('Bloques: ')}<span key={savedScore ?? localScore} className={playing ? 'stack-score-value' : undefined}>{savedScore ?? localScore}</span>
         </p>
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex flex-1 items-center justify-end gap-2 min-w-0 max-w-full">
           <ProfileAvatar username={assignment.displayName} profilePicUrl={assignment.profilePicUrl} size="md" />
           <p className="text-sm font-semibold truncate text-left" title={assignment.displayName}>{assignment.displayName}</p>
         </div>
       </header>
       {playing && (
         <div className="flex justify-end">
-          <button type="button" onClick={togglePause} className="rounded-xl border border-[rgba(var(--color-accent-rgb),0.35)] text-accent px-4 py-2 text-sm">
+          <button type="button" onClick={togglePause} className="min-h-[44px] rounded-xl border border-[rgba(var(--color-accent-rgb),0.35)] text-accent px-4 py-2 text-sm">
             {manualPause ? t('Reanudar') : t('Pausar')}
           </button>
         </div>

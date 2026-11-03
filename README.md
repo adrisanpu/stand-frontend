@@ -20,6 +20,16 @@ npm run dev
 
 ---
 
+## Kivly identity review
+
+In the authenticated event settings, open **Jugadores → Revisar identidades Kivly** to load pending identity reviews. Compare the participant and club profile with the participant before selecting **Revisar identidad → Confirmar identidad y vincular**. Loading or opening a review never changes an identity. Registration validation cannot be bypassed.
+
+The client uses authenticated `GET /v1/game/kivly/registrations?gameId=...` (`{requests:[{requestId,username,email,phone,customer:{name,email,phone},state:"review_required"}]}`) and `POST` to the same URL with only `{requestId}`; approval requires `{ok:true}`. The backend owns identity resolution and authorization. Pending registrations preserve the verified code and respect the server's `retryAfter` delay before allowing verification retries.
+
+STACK reentry never creates another attempt for an assignment already marked started, finished, or excluded. It can recover a locally stored final submission only for the same player and attempt ID; without recoverable evidence it displays that the attempt cannot be restarted.
+
+Reward emails remain `blocked` (not queued) until the Kivly reward assignment is confirmed. `accepted` means SES accepted the email, not confirmed inbox delivery. Operators may retry only `failed` emails, never blocked or uncertain (`reconciliation_required`) sends.
+
 ## Tech stack
 
 | Layer        | Tech |
@@ -106,6 +116,10 @@ Appearance logo uploads use `src/api/userMedia.ts`: request a signed URL from `P
 ### Game mode and participant access
 
 The `/home` Players panel displays **Jugadores** on the left and the player count on the right of the same vertically centered row, with larger text in both standard and compact layouts. Plan limits, limit warnings and prize details remain visible.
+
+STACK `/home` uses the shared event layout: stacked panels in narrow, portrait or short viewports, and logo/players/raffle, central QR and ranking columns when at least 1024px wide and 600px high in landscape. Explicit `portrait`/`forcePortrait` URL options and saved orientation preferences take precedence. Content can scroll vertically instead of being clipped; headings and the QR adapt to the available space. Other games keep their existing orientation defaults.
+
+STACK `/play` keeps the shared participant shell, safe areas, keyboard-aware viewport and vertical scrolling. Its player header can wrap, the canvas scales with the viewport, and ranking prize overlays remain scrollable from the top even on short screens. Resizing does not restart an attempt or recreate the scene.
 
 **Settings > Premios** supports an optional, independent PNG image for each validation, ranking and raffle prize (maximum 5 MB per image). The image control sits between the prize name and its numeric parameters, with preview, replacement and removal. File selection only edits the draft; **Guardar** uploads and publishes the catalog to the game backend, and failures keep the draft open with an error. Existing locally configured prize names and limits are published when saved; a server catalog takes precedence over that legacy cache.
 
