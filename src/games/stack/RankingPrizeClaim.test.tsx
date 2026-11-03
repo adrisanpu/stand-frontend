@@ -27,6 +27,16 @@ it('shows the server-issued ranking claim and generates its QR locally', async (
   expect(screen.getByText(/Muestra este QR/)).toBeInTheDocument()
 })
 
+it('keeps the result overlay scrollable from its beginning on short screens', async () => {
+  render(<RankingPrizeClaim gameId="GAME1" playerToken="session" rank={1} />)
+  const qr = await screen.findByRole('img', { name: 'QR Premio del ranking' })
+  const overlay = screen.getByRole('heading', { name: 'Posición: #1' }).parentElement
+  expect(overlay).toHaveClass('overflow-y-auto')
+  expect(overlay).not.toHaveClass('justify-center')
+  expect(overlay).toHaveClass("before:my-auto", "after:my-auto")
+  expect(qr.parentElement?.parentElement).toHaveClass('shrink-0')
+})
+
 it('shows no prize or QR when the server does not grant a ranking claim', async () => {
   vi.mocked(publicApi.getPlayer).mockResolvedValue({ ...response, prizes: [] })
   const { container } = render(<RankingPrizeClaim gameId="GAME1" playerToken="session" prizeCatalog={response.prizeCatalog} />)
@@ -50,7 +60,7 @@ it('does not require or offer wallet in email mode and preserves STAND QR access
   expect(await screen.findByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
   expect(screen.queryByRole('link', { name: /wallet/ })).not.toBeInTheDocument()
   expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
-  expect(screen.getByText(/Email de tu premio enviado/)).toBeInTheDocument()
+  expect(screen.getByText(/Email de tu premio aceptado por SES; entrega en bandeja no confirmada/)).toBeInTheDocument()
 })
 
 it('replaces the QR with delivery confirmation on the next poll', async () => {

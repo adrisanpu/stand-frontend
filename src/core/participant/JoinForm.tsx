@@ -13,6 +13,11 @@ type Props = {
 }
 
 const verificationErrors: Record<string, string> = {
+  KivlyRegistrationPending: 'Se está confirmando tu alta en el club. Espera el plazo indicado y reintenta con el mismo código verificado.',
+  KivlyIdentityConflict: 'Tu email y teléfono corresponden a perfiles diferentes del club. Consulta al equipo del evento.',
+  KivlyIdentityReviewRequired: 'Tu teléfono coincide con una ficha del club con otro email o sin email. El organizador debe comprobar tu identidad antes de vincularla.',
+  KivlyAlreadyPlayed: 'Ya has participado en este juego con tu perfil del club. No puedes volver a jugar.',
+  KivlyDuplicateParticipation: 'Hay participaciones anteriores duplicadas que requieren comprobación. Consulta al equipo del evento; no vuelvas a registrarte.',
   KivlyConsentRequired: 'Debes aceptar las condiciones del club para jugar. Si han cambiado, recarga la página.',
   KivlyMembershipRequired: 'Completa el registro en el club antes de jugar.',
   KivlyRegistrationBusy: 'Se está confirmando tu alta en el club. Espera y reintenta con el mismo código.',
@@ -67,6 +72,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   const [invalidChallenge, setInvalidChallenge] = useState(false)
   const [now, setNow] = useState(Date.now)
   const [retryAt, setRetryAt] = useState(0)
+  const [verificationRetryAt, setVerificationRetryAt] = useState(0)
   const [photo, setPhoto] = useState<File | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -97,6 +103,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     setInvalidChallenge(false)
     setError(null)
     setRetryAt(0)
+    setVerificationRetryAt(0)
     setClubConsent(false)
   }, [gameId, phoneEnabled, pf.phone.required, gameMeta.loyalty?.consentVersion])
 
@@ -110,6 +117,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
 
   const expired = !!challenge && now >= Date.parse(challenge.expiresAt)
   const cooldown = Math.max(0, Math.ceil((Math.max(retryAt, challenge ? Date.parse(challenge.resendAvailableAt) : 0) - now) / 1000))
+  const verificationCooldown = Math.max(0, Math.ceil((verificationRetryAt - now) / 1000))
 
   const continueToGame = (playerToken: string, assignment: PlayerAssignment, photoUploadFailed = false) => {
     savePlayerSession(gameId, playerToken, assignment)
@@ -123,8 +131,11 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         ? 'No se pudo confirmar tu registro en el club. Consulta al equipo del evento.'
         : 'No se pudo completar el registro. Inténtalo de nuevo más tarde.'))
       if (invalidChallenges.has(err.code ?? '')) setInvalidChallenge(true)
-      if (err.status === 429 && err.retryAfter) {
-        setRetryAt(Date.now() + err.retryAfter * 1000)
+      if ((err.status === 429 || (err.code === 'KivlyRegistrationPending'
+        && (err.status === 409 || err.status === 503))) && err.retryAfter) {
+        const nextRetryAt = Date.now() + err.retryAfter * 1000
+        setRetryAt(nextRetryAt)
+        setVerificationRetryAt(nextRetryAt)
         setNow(Date.now())
       }
     } else {
@@ -147,6 +158,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
     setInvalidChallenge(false)
     setError(null)
     setRetryAt(0)
+    setVerificationRetryAt(0)
     setStep(nextStep)
   }
 
@@ -268,7 +280,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       }
       if (cooldown > 0) return
     }
-    if (step === 3 && (!challenge || expired || invalidChallenge)) return
+    if (step === 3 && (!challenge || expired || invalidChallenge || verificationCooldown > 0)) return
     if (step === 3 && !/^[0-9]{6}$/.test(code)) {
       setError('Introduce un código de 6 dígitos.')
       return
@@ -439,23 +451,29 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         </div>
       </div>}
 
-      {showConsent && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-[13px] leading-relaxed text-textSub items-start">
-        <input type="checkbox" checked={showClubConsent ? consent && clubConsent : consent}
+      {(showConsent || showClubConsent) && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-[13px] leading-relaxed text-textSub items-start">
+        <input
+          type="checkbox"
+          checked={showConsent && showClubConsent ? consent && clubConsent : showConsent ? consent : clubConsent}
           onChange={(event) => {
-            setConsent(event.target.checked)
-            if (showClubConsent) setClubConsent(event.target.checked)
+            const next = event.target.checked
+            if (showConsent) setConsent(next)
+            if (showClubConsent) setClubConsent(next)
           }}
-          required={showClubConsent}
-          className="mt-1 h-5 w-5 shrink-0 accent-primary" />
+          required={showConsent || showClubConsent}
+          className="mt-1 h-5 w-5 shrink-0 accent-primary"
+        />
         <span>
-          {t(showClubConsent
-            ? 'Acepto el uso de mis datos por Stand y el organizador y, si subo una foto, mostrarla en el juego.'
-            : PARTICIPANT_PRIVACY_NOTICE)}{' '}
-          <a href={language === 'es' ? PRIVACY_POLICY_URL : '/pages/privacy.html'} target="_blank" rel="noopener noreferrer" className="underline text-accent">
-            {t('Política de privacidad')}
-          </a>
+          {showConsent && showClubConsent && t('Acepto el uso de mis datos por Stand y el organizador y, si subo una foto, mostrarla en el juego.')}{' '}
+          {showConsent && !showClubConsent && t(PARTICIPANT_PRIVACY_NOTICE)}{' '}
+          {showConsent && (
+            <a href={language === 'es' ? PRIVACY_POLICY_URL : '/pages/privacy.html'} target="_blank" rel="noopener noreferrer" className="underline text-accent">
+              {t('Política de privacidad')}
+            </a>
+          )}
           {showClubConsent && gameMeta.loyalty && <>
-            {' · '}{t('Acepto el alta en el club')} <strong>{gameMeta.loyalty.clubName}</strong>{' '}
+            {showConsent && ' · '}
+            {t('Acepto el alta en el club')} <strong>{gameMeta.loyalty.clubName}</strong>{' '}
             {t('y sus condiciones y privacidad para jugar.')}{' '}
             {phoneEnabled && <>{t(pf.phone.required
               ? 'Mi teléfono se compartirá con el club.'
@@ -463,17 +481,6 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
             <a href={gameMeta.loyalty.termsUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Condiciones del club')}</a>{' · '}
             <a href={gameMeta.loyalty.privacyUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Privacidad del club')}</a>
           </>}
-        </span>
-      </label>}
-      {showClubConsent && !showConsent && gameMeta.loyalty && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-[13px] leading-relaxed text-textSub items-start">
-        <input type="checkbox" checked={clubConsent} onChange={(event) => setClubConsent(event.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-primary" required />
-        <span>{t('Acepto el alta en el club')} <strong>{gameMeta.loyalty.clubName}</strong>{' '}
-          {t('y sus condiciones y privacidad para jugar.')}{' '}
-          {phoneEnabled && <>{t(pf.phone.required
-            ? 'Mi teléfono se compartirá con el club.'
-            : 'Si añado mi teléfono, se compartirá con el club.')}{' '}</>}
-          <a href={gameMeta.loyalty.termsUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Condiciones del club')}</a>{' · '}
-          <a href={gameMeta.loyalty.privacyUrl} target="_blank" rel="noopener noreferrer" className="underline text-accent">{t('Privacidad del club')}</a>
         </span>
       </label>}
       </fieldset>
@@ -509,12 +516,15 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       {step !== 3 && cooldown > 0 && <p role="status" className="text-sm text-textSub">
         {t('Puedes solicitar otro código en')}: {cooldown}s
       </p>}
+      {step === 3 && verificationCooldown > 0 && <p role="status" className="text-sm text-textSub">
+        {t('Puedes reintentar con el mismo código en')}: {verificationCooldown}s
+      </p>}
 
       {step === 2 && <button type="button" disabled={loading} onClick={() => setStep(1)}
         className="w-full rounded-xl py-3 text-accent disabled:opacity-50">{t('Volver')}</button>}
       <button
         type="submit"
-        disabled={loading || (step !== 3 && cooldown > 0) || (step === 3 && (expired || invalidChallenge))}
+        disabled={loading || (step !== 3 && cooldown > 0) || (step === 3 && (expired || invalidChallenge || verificationCooldown > 0))}
         className="w-full rounded-2xl py-3.5 font-semibold text-primary bg-[rgba(var(--color-primary-rgb),0.25)] border border-[rgba(var(--color-primary-rgb),0.4)] disabled:opacity-50"
       >
         {t(loading ? (step !== 3 ? 'Enviando código...' : 'Registrando...')

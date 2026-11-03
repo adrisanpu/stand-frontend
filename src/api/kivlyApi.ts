@@ -5,7 +5,6 @@ export type KivlySettings = {
   clubName: string
   privacyUrl: string
   termsUrl: string
-  bypassValidation?: boolean
 }
 
 export type KivlyClubSettings = Omit<KivlySettings, 'enabled'> & { storefrontUrl?: string }
@@ -22,6 +21,15 @@ export type KivlyAccountConnection = KivlyConnection & {
 
 export type KivlyReward = { id: string; name: string; imageUrl?: string }
 
+export type KivlyRegistrationReview = {
+  requestId: string
+  username: string
+  email: string
+  phone: string | null
+  customer: { name: string | null; email: string | null; phone: string | null }
+  state: 'review_required'
+}
+
 export type KivlyRewardDraft = {
   title: string
   description: string
@@ -36,7 +44,55 @@ export type KivlyRewardDraft = {
   maxRedemptionsPerUser?: number
 }
 
+export type KivlyRewardDetail = {
+  id: string
+  title: string
+  description: string
+  rewardType: KivlyRewardDraft['rewardType']
+  value: number
+  pointsRequired: number
+  image: string | null
+  termsAndConditions: string | null
+  validFrom: string | null
+  validUntil: string | null
+  maxRedemptions: number | null
+  maxRedemptionsPerUser: number | null
+}
+
+export type KivlyRewardUpdate = Pick<KivlyRewardDraft,
+  'title' | 'description' | 'rewardType' | 'value' | 'pointsRequired'> & {
+    image: string | null
+    termsAndConditions: string | null
+    validFrom: string | null
+    validUntil: string | null
+    maxRedemptions: number | null
+    maxRedemptionsPerUser: number | null
+  }
+
 export const kivlyApi = {
+  async listRegistrationReviews(gameId: string): Promise<KivlyRegistrationReview[]> {
+    const data = await api.get<{ requests: KivlyRegistrationReview[] }>(
+      `/v1/game/kivly/registrations?gameId=${encodeURIComponent(gameId)}`,
+    )
+    if (!Array.isArray(data?.requests) || !data.requests.every((item) =>
+      typeof item?.requestId === 'string' && !!item.requestId
+      && item.state === 'review_required' && typeof item.username === 'string'
+      && typeof item.email === 'string'
+      && (item.phone === null || typeof item.phone === 'string')
+      && item.customer && ['name', 'email', 'phone'].every((key) => {
+        const value = item.customer[key as keyof typeof item.customer]
+        return value === null || typeof value === 'string'
+      }))) {
+      throw new Error('Invalid Kivly registration reviews response')
+    }
+    return data.requests
+  },
+  async approveRegistration(gameId: string, requestId: string): Promise<void> {
+    const data = await api.post<{ ok: boolean }>(
+      `/v1/game/kivly/registrations?gameId=${encodeURIComponent(gameId)}`, { requestId },
+    )
+    if (data?.ok !== true) throw new Error('Kivly registration approval not confirmed')
+  },
   async listRewards(gameId: string): Promise<KivlyReward[]> {
     const data = await api.get<{ ok: boolean; rewards: KivlyReward[] }>(
       `/v1/game/kivly/rewards?gameId=${encodeURIComponent(gameId)}`,
@@ -49,6 +105,27 @@ export const kivlyApi = {
     }
     return data.rewards
   },
+  async getReward(gameId: string, rewardId: string): Promise<KivlyRewardDetail> {
+    const data = await api.get<{ ok: boolean; reward: KivlyRewardDetail }>(
+      `/v1/game/kivly/rewards?gameId=${encodeURIComponent(gameId)}&rewardId=${encodeURIComponent(rewardId)}`,
+    )
+    const reward = data?.reward
+    if (data?.ok !== true || reward?.id !== rewardId || typeof reward.title !== 'string'
+      || typeof reward.description !== 'string'
+      || !['discount_percentage', 'discount_fixed', 'free_item'].includes(reward.rewardType)
+      || typeof reward.value !== 'number' || !Number.isFinite(reward.value)
+      || !Number.isInteger(reward.pointsRequired) || reward.pointsRequired < 0
+      || (reward.image !== null && typeof reward.image !== 'string')
+      || (reward.termsAndConditions !== null && typeof reward.termsAndConditions !== 'string')
+      || (reward.validFrom !== null && typeof reward.validFrom !== 'string')
+      || (reward.validUntil !== null && typeof reward.validUntil !== 'string')
+      || (reward.maxRedemptions !== null && (!Number.isInteger(reward.maxRedemptions) || reward.maxRedemptions < 1))
+      || (reward.maxRedemptionsPerUser !== null
+        && (!Number.isInteger(reward.maxRedemptionsPerUser) || reward.maxRedemptionsPerUser < 1))) {
+      throw new Error('Invalid Kivly reward detail response')
+    }
+    return reward
+  },
   async createReward(gameId: string, reward: KivlyRewardDraft): Promise<KivlyReward> {
     const data = await api.post<{ ok: boolean; reward: KivlyReward }>(
       '/v1/game/kivly/rewards', { gameId, ...reward },
@@ -56,6 +133,16 @@ export const kivlyApi = {
     if (data?.ok !== true || typeof data.reward?.id !== 'string' || !data.reward.id
       || typeof data.reward.name !== 'string' || !data.reward.name) {
       throw new Error('Invalid Kivly reward creation response')
+    }
+    return data.reward
+  },
+  async updateReward(gameId: string, rewardId: string, reward: KivlyRewardUpdate): Promise<KivlyReward> {
+    const data = await api.put<{ ok: boolean; reward: KivlyReward }>(
+      '/v1/game/kivly/rewards', { gameId, rewardId, ...reward },
+    )
+    if (data?.ok !== true || data.reward?.id !== rewardId
+      || typeof data.reward.name !== 'string' || !data.reward.name) {
+      throw new Error('Invalid Kivly reward update response')
     }
     return data.reward
   },

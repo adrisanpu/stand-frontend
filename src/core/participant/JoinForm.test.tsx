@@ -251,7 +251,9 @@ describe('Kivly club registration', () => {
     expect(publicApi.join).not.toHaveBeenCalled()
   })
 
-  it.each(['KivlyRegistrationBusy', 'KivlyReconciliationRequired', 'KivlyUnavailable'])(
+  it.each(['KivlyRegistrationBusy', 'KivlyReconciliationRequired', 'KivlyUnavailable',
+    'KivlyRegistrationPending', 'KivlyIdentityConflict', 'KivlyIdentityReviewRequired',
+    'KivlyAlreadyPlayed', 'KivlyDuplicateParticipation'])(
     'does not grant access after %s and keeps verification details for recovery', async (code) => {
       const onJoined = vi.fn()
       vi.mocked(publicApi.join).mockRejectedValueOnce(new PublicApiError('Private upstream details', 409, code))
@@ -268,6 +270,54 @@ describe('Kivly club registration', () => {
       expect(publicApi.requestEmailCode).toHaveBeenCalledOnce()
     },
   )
+
+  it.each([409, 503, 429])('honors pending retryAfter on %s and retries the same verified code', async (status) => {
+    vi.useFakeTimers()
+    vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValue({
+      ok: true, challengeId: 'verified-code', emailMasked: 'a***@club.test',
+      expiresAt: new Date(Date.now() + 600_000).toISOString(),
+      resendAvailableAt: new Date(Date.now() + 60_000).toISOString(),
+    })
+    vi.mocked(publicApi.join).mockRejectedValueOnce(new PublicApiError('private', status, 'KivlyRegistrationPending', 10))
+    const onJoined = vi.fn()
+    render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty }} onJoined={onJoined} />)
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'ana@club.test' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' })) })
+    expect(screen.getByRole('alert')).toHaveTextContent('mismo código verificado')
+    expect(screen.getByRole('button', { name: 'Verificar y empezar' })).toBeDisabled()
+    expect(screen.getByText('Puedes reintentar con el mismo código en: 10s')).toBeInTheDocument()
+    fireEvent.submit(screen.getByLabelText('Código de verificación').closest('form')!)
+    expect(publicApi.join).toHaveBeenCalledOnce()
+    await act(async () => { vi.advanceTimersByTime(9_000) })
+    expect(screen.getByRole('button', { name: 'Verificar y empezar' })).toBeDisabled()
+    await act(async () => { vi.advanceTimersByTime(1_000) })
+    expect(screen.getByRole('button', { name: 'Verificar y empezar' })).toBeEnabled()
+    expect(screen.getByLabelText('Código de verificación')).toHaveValue('012345')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' })) })
+    expect(publicApi.join).toHaveBeenLastCalledWith({ gameId: 'ABC123', challengeId: 'verified-code', code: '012345' })
+    expect(onJoined).toHaveBeenCalledWith('token')
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['KivlyRegistrationPending', 'same verified code'],
+    ['KivlyIdentityConflict', 'different club profiles'],
+    ['KivlyIdentityReviewRequired', 'organizer must verify your identity'],
+    ['KivlyAlreadyPlayed', 'cannot play again'],
+    ['KivlyDuplicateParticipation', 'Duplicate historical participations'],
+  ])('localizes %s in English', async (code, message) => {
+    vi.mocked(publicApi.resumeEmailRegistration).mockRejectedValueOnce(new PublicApiError('private', 409, code))
+    render(<ParticipantLanguageProvider>
+      <ParticipantLanguageSelector />
+      <JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />
+    </ParticipantLanguageProvider>)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'ana@club.test' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continue' })) })
+    expect(screen.getByRole('alert')).toHaveTextContent(message)
+  })
 })
 
 describe('participant prize promotion', () => {

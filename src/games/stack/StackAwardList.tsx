@@ -55,9 +55,10 @@ export default function StackAwardList({ data, locked = false }: { data: StackPl
     connection_required: t('No se pudo vincular el premio al club. Consulta al equipo del evento.'),
   }
   const emailStates: Record<NonNullable<StackAward['emailState']>, string> = {
+    blocked: t('Premio pendiente de confirmación; correo aún no encolado'),
     pending: t('Preparando el email de tu premio. No necesitas wallet.'),
     sending: t('Enviando el email de tu premio.'),
-    accepted: t('Email de tu premio enviado. Revisa tu bandeja y spam; muestra su QR al personal para canjear en Kivly.'),
+    accepted: t('Email de tu premio aceptado por SES; entrega en bandeja no confirmada. Revisa tu bandeja y spam; muestra su QR al personal para canjear en Kivly.'),
     failed: t('No se pudo enviar el email del premio. Consulta al equipo del evento.'),
     reconciliation_required: t('El envío del email requiere comprobación del equipo. No vuelvas a solicitarlo.'),
   }
@@ -74,7 +75,7 @@ export default function StackAwardList({ data, locked = false }: { data: StackPl
         {!locked && award.source === 'stand' && award.state === 'available' && <AwardQR award={award} />}
         <p role="status" className={`text-sm ${award.state.includes('required') ? 'text-amber-300' : 'text-textSub'}`}>{states[award.state]}</p>
       </div>
-      {award.deliveryChannel === 'email' && award.state === 'confirmed' && award.emailState && <p role="status" className="text-sm text-textSub">
+      {award.deliveryChannel === 'email' && (award.state === 'confirmed' || award.emailState === 'blocked') && award.emailState && <p role="status" className="text-sm text-textSub">
         {emailStates[award.emailState]}
       </p>}
       {award.emailError === 'KivlyPhoneRequired' && <p role="alert" className="text-sm text-amber-300">

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { stackPrizeApi, type StackPrizeCondition, type StackPrizeItem, type StackPrizeProgram, type StackPrizeRule, type StackPrizeScoreOperator, type StackPrizeSettingsResponse } from '../../api/stackPrizes'
-import { kivlyApi, type KivlyReward, type KivlyRewardDraft } from '../../api/kivlyApi'
+import {
+  kivlyApi, type KivlyReward, type KivlyRewardDetail, type KivlyRewardDraft, type KivlyRewardUpdate,
+} from '../../api/kivlyApi'
 import { PrizeImageError, uploadPrizeImage, validatePrizeImage } from '../../api/prizeMedia'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 
@@ -30,9 +32,22 @@ const emptyKivlyRewardForm: KivlyRewardForm = {
   validUntil: '', maxRedemptions: '', maxRedemptionsPerUser: '',
 }
 
+function dateTimeLocal(value: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+}
+
 function isUncertainRewardCreation(error: unknown) {
   if (typeof error !== 'object' || error === null) return false
   if ('code' in error && error.code === 'KivlyRewardCreationUncertain') return true
+  return 'isNetworkError' in error && error.isNetworkError === true
+}
+
+function isUncertainRewardUpdate(error: unknown) {
+  if (typeof error !== 'object' || error === null) return false
+  if ('code' in error && error.code === 'KivlyRewardUpdateUncertain') return true
   return 'isNetworkError' in error && error.isNetworkError === true
 }
 
@@ -57,8 +72,12 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   const [rewardError, setRewardError] = useState('')
   const [rewardMessage, setRewardMessage] = useState('')
   const [rewardCreationUncertain, setRewardCreationUncertain] = useState(false)
+  const [rewardUpdateUncertain, setRewardUpdateUncertain] = useState(false)
+  const [editingPrize, setEditingPrize] = useState<StackPrizeItem | null>(null)
+  const [editingReward, setEditingReward] = useState<KivlyRewardDetail | null>(null)
   const [rewardImage, setRewardImage] = useState<File | null>(null)
   const [rewardImagePreview, setRewardImagePreview] = useState('')
+  const [imageRemoved, setImageRemoved] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [createSource, setCreateSource] = useState<'stand' | 'kivly'>('stand')
   const [initialStock, setInitialStock] = useState({ stand: 100, kivly: 100 })
@@ -155,8 +174,11 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     setKivlyConnected(false)
     setCatalogError('')
     setRewardForm(emptyKivlyRewardForm)
+    setEditingPrize(null)
+    setEditingReward(null)
     setRewardImage(null)
     setRewardImagePreview('')
+    setImageRemoved(false)
     setStandImage(null)
     setStandImagePreview('')
     setCreateOpen(false)
@@ -165,6 +187,8 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     setRewardError('')
     setRewardMessage('')
     setRewardCreationUncertain(false)
+    setRewardUpdateUncertain(false)
+    setName('')
     uncertainRewardTitle.current = null
   }, [gameId])
 
@@ -186,6 +210,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         setRewardImage(file)
         setRewardImagePreview(preview)
       }
+      setImageRemoved(false)
       setRewardError('')
     } catch (cause) {
       setRewardError(cause instanceof PrizeImageError
@@ -237,9 +262,13 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     setMessage(t('Imagen preparada; guarda para aplicarla.', 'Image ready; save to apply it.'))
   })
   const createKivlyReward = async () => {
+    const editing = editingPrize?.source === 'kivly' ? editingPrize : null
+    const configured = editing ? program?.catalog.some((item) => item.id === editing.id) : false
     if (busy || !Number.isInteger(initialStock.kivly) || initialStock.kivly < 1 || initialStock.kivly > 1000
-      || !program || program.catalog.length >= 32 || !kivlyConnected || !locationId
-      || data?.state !== 'open' || rewardCreationUncertain) return
+      || !program || (!editing && program.catalog.length >= 32)
+      || (editing && !configured && program.catalog.length >= 32)
+      || !kivlyConnected || !locationId || data?.state !== 'open'
+      || rewardCreationUncertain || rewardUpdateUncertain || (editing && !editingReward)) return
     const value = Number(rewardForm.value)
     const pointsRequired = Number(rewardForm.pointsRequired)
     if (!rewardForm.title.trim() || !rewardForm.description.trim()
@@ -287,31 +316,62 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       ...(maxRedemptions !== undefined ? { maxRedemptions } : {}),
       ...(maxRedemptionsPerUser !== undefined ? { maxRedemptionsPerUser } : {}),
     }
+    const update: KivlyRewardUpdate | null = editing && editingReward ? {
+      ...draft,
+      image: editingReward.image,
+      termsAndConditions: draft.termsAndConditions ?? null,
+      validFrom: draft.validFrom ?? null,
+      validUntil: draft.validUntil ?? null,
+      maxRedemptions: draft.maxRedemptions ?? null,
+      maxRedemptionsPerUser: draft.maxRedemptionsPerUser ?? null,
+    } : null
     setBusy(true)
     onSavingChange?.(true)
     setRewardError('')
     setRewardMessage('')
     let creationRequested = false
+    let updateRequested = false
     try {
       const imageKey = rewardImage ? await uploadPrizeImage(gameId, 'ranking', rewardImage) : undefined
-      creationRequested = true
-      const reward = await kivlyApi.createReward(gameId, draft)
-      const id = newId()
-      const imageUrl = rewardImage ? URL.createObjectURL(rewardImage) : reward.imageUrl
-      if (rewardImage && imageUrl) previews.current.set(id, imageUrl)
-      change({ ...program, catalog: [...program.catalog, {
-        id, source: 'kivly', rewardId: reward.id, locationId, name: reward.name,
-        stockTotal: initialStock.kivly, ...(imageKey ? { imageKey } : {}), imageUrl,
-      }] })
-      setRewardForm(emptyKivlyRewardForm)
-      setRewardImage(null)
-      setRewardImagePreview('')
-      setInitialStock((previous) => ({ ...previous, kivly: 100 }))
-      setCreateOpen(false)
-      uncertainRewardTitle.current = null
-      setRewardCreationUncertain(false)
-      setMessage(t('Premio creado en Kivly. Guarda para aplicar el inventario y la imagen al juego.',
-        'Reward created in Kivly. Save to apply stock and the image to the game.'))
+      if (editing && update) {
+        updateRequested = true
+        const reward = await kivlyApi.updateReward(gameId, editing.rewardId!, update)
+        const id = configured ? editing.id : newId()
+        const imageUrl = rewardImage ? URL.createObjectURL(rewardImage)
+          : imageRemoved ? null : editing.imageUrl ?? null
+        const oldPreview = previews.current.get(id)
+        if (oldPreview) URL.revokeObjectURL(oldPreview)
+        if (rewardImage && imageUrl) previews.current.set(id, imageUrl)
+        else previews.current.delete(id)
+        const nextPrize: StackPrizeItem = {
+          ...editing, id, name: reward.name, stockTotal: initialStock.kivly,
+          imageKey: imageKey ?? (imageRemoved ? null : editing.imageKey ?? null),
+          imageUrl,
+        }
+        change({ ...program, catalog: configured
+          ? program.catalog.map((item) => item.id === editing.id ? nextPrize : item)
+          : [...program.catalog, nextPrize] })
+        setRewards((previous) => previous.map((item) =>
+          item.id === reward.id ? { ...item, name: reward.name } : item))
+        resetPrizeForm()
+        setMessage(t('Premio actualizado en Kivly. Guarda para aplicar el inventario y la imagen al juego.',
+          'Reward updated in Kivly. Save to apply stock and the image to the game.'))
+      } else {
+        creationRequested = true
+        const reward = await kivlyApi.createReward(gameId, draft)
+        const id = newId()
+        const imageUrl = rewardImage ? URL.createObjectURL(rewardImage) : reward.imageUrl
+        if (rewardImage && imageUrl) previews.current.set(id, imageUrl)
+        change({ ...program, catalog: [...program.catalog, {
+          id, source: 'kivly', rewardId: reward.id, locationId, name: reward.name,
+          stockTotal: initialStock.kivly, ...(imageKey ? { imageKey } : {}), imageUrl,
+        }] })
+        resetPrizeForm()
+        uncertainRewardTitle.current = null
+        setRewardCreationUncertain(false)
+        setMessage(t('Premio creado en Kivly. Guarda para aplicar el inventario y la imagen al juego.',
+          'Reward created in Kivly. Save to apply stock and the image to the game.'))
+      }
       setCatalogRevision((revision) => revision + 1)
     } catch (cause) {
       if (creationRequested && isUncertainRewardCreation(cause)) {
@@ -319,12 +379,16 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         setRewardCreationUncertain(true)
         setRewardError(t('No se pudo confirmar la creación. Actualiza el catálogo antes de volver a enviarla.',
           'Creation could not be confirmed. Refresh the catalog before submitting again.'))
+      } else if (updateRequested && isUncertainRewardUpdate(cause)) {
+        setRewardUpdateUncertain(true)
+        setRewardError(t('No se pudo confirmar la actualización. Actualiza los datos del premio antes de volver a enviarla.',
+          'The update could not be confirmed. Refresh the reward details before submitting again.'))
       } else {
         const code = typeof cause === 'object' && cause !== null && 'code' in cause
           && typeof cause.code === 'string' ? cause.code : ''
         const codeMessages: Record<string, string> = {
-          KivlyWritesDisabled: t('La creación de premios Kivly está deshabilitada en este entorno.',
-            'Kivly reward creation is disabled in this environment.'),
+          KivlyWritesDisabled: t('Los cambios de premios Kivly están deshabilitados en este entorno.',
+            'Kivly reward changes are disabled in this environment.'),
           KivlyAccessDenied: t('La conexión de Kivly no tiene permiso para crear premios.',
             'The Kivly connection is not authorized to create rewards.'),
           KivlyConnectionRequired: t('Conecta Kivly antes de crear un premio.',
@@ -390,35 +454,126 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     })
   }
   const createStandPrize = () => run(async () => {
-    if (!program || !name.trim() || program.catalog.length >= 32
+    const editing = editingPrize?.source === 'stand' ? editingPrize : null
+    if (!program || !name.trim() || (!editing && program.catalog.length >= 32)
       || !Number.isInteger(initialStock.stand) || initialStock.stand < 1 || initialStock.stand > 1000) return
-    const id = newId()
-    let imageKey: string | null = null
-    if (standImage) imageKey = await uploadPrizeImage(gameId, 'ranking', standImage)
-    const imageUrl = standImage ? URL.createObjectURL(standImage) : null
-    if (imageUrl) previews.current.set(id, imageUrl)
+    const id = editing?.id ?? newId()
+    const imageKey = standImage ? await uploadPrizeImage(gameId, 'ranking', standImage)
+      : imageRemoved ? null : editing?.imageKey ?? null
+    const imageUrl = standImage ? URL.createObjectURL(standImage)
+      : imageRemoved ? null : editing?.imageUrl ?? null
+    const previousPreview = previews.current.get(id)
+    if (previousPreview) URL.revokeObjectURL(previousPreview)
+    if (standImage && imageUrl) previews.current.set(id, imageUrl)
+    else previews.current.delete(id)
     change({
       ...program,
-      catalog: [...program.catalog, {
+      catalog: editing ? program.catalog.map((item) => item.id === id ? {
+        ...item, name: name.trim(), stockTotal: initialStock.stand, imageKey, imageUrl,
+      } : item) : [...program.catalog, {
         id, source: 'stand', name: name.trim(), limit: null, stockTotal: initialStock.stand,
         imageKey, imageUrl,
       }],
     })
+    resetPrizeForm()
+    setMessage(editing
+      ? t('Premio STAND actualizado. Guarda para aplicar los cambios al juego.', 'STAND prize updated. Save to apply the changes to the game.')
+      : '')
+  })
+  const resetPrizeForm = () => {
+    setCreateOpen(false)
+    setEditingPrize(null)
+    setEditingReward(null)
+    setCreateSource('stand')
     setName('')
+    setRewardForm(emptyKivlyRewardForm)
+    setRewardImage(null)
+    setRewardImagePreview('')
     setStandImage(null)
     setStandImagePreview('')
-    setInitialStock((previous) => ({ ...previous, stand: 100 }))
-    setCreateOpen(false)
-  })
+    setImageRemoved(false)
+    setInitialStock((previous) => ({ ...previous, stand: 100, kivly: 100 }))
+    setRewardError('')
+    setRewardMessage('')
+    setRewardCreationUncertain(false)
+    setRewardUpdateUncertain(false)
+  }
+  const openCreateForm = () => {
+    resetPrizeForm()
+    setCreateOpen(true)
+  }
+  const setKivlyEditForm = (prize: StackPrizeItem, reward: KivlyRewardDetail) => {
+    setEditingPrize(prize)
+    setEditingReward(reward)
+    setCreateSource('kivly')
+    setName(reward.title)
+    setRewardForm({
+      title: reward.title,
+      description: reward.description,
+      rewardType: reward.rewardType,
+      value: String(reward.value),
+      pointsRequired: String(reward.pointsRequired),
+      termsAndConditions: reward.termsAndConditions ?? '',
+      validFrom: dateTimeLocal(reward.validFrom),
+      validUntil: dateTimeLocal(reward.validUntil),
+      maxRedemptions: reward.maxRedemptions == null ? '' : String(reward.maxRedemptions),
+      maxRedemptionsPerUser: reward.maxRedemptionsPerUser == null ? '' : String(reward.maxRedemptionsPerUser),
+    })
+    setInitialStock((previous) => ({ ...previous, kivly: prize.stockTotal }))
+    setRewardImage(null)
+    setRewardImagePreview(prize.imageUrl ?? '')
+    setImageRemoved(false)
+    setRewardError('')
+    setRewardMessage('')
+    setRewardUpdateUncertain(false)
+    setCreateOpen(true)
+  }
+  const openEdit = (prize: StackPrizeItem) => {
+    setError('')
+    setMessage('')
+    resetPrizeForm()
+    if (prize.source === 'stand') {
+      setEditingPrize(prize)
+      setEditingReward(null)
+      setCreateSource('stand')
+      setName(prize.name)
+      setInitialStock((previous) => ({ ...previous, stand: prize.stockTotal }))
+      setStandImage(null)
+      setStandImagePreview(prize.imageUrl ?? '')
+      setImageRemoved(false)
+      setRewardError('')
+      setCreateOpen(true)
+      return
+    }
+    if (!prize.rewardId) {
+      setError(t('No se puede identificar el premio de Kivly.', 'Could not identify the Kivly reward.'))
+      return
+    }
+    void run(async () => {
+      const detail = await kivlyApi.getReward(gameId, prize.rewardId!)
+      setKivlyEditForm(prize, detail)
+    })
+  }
+  const refreshEditingReward = () => {
+    const rewardId = editingPrize?.rewardId
+    if (!editingPrize || !rewardId) return
+    void run(async () => {
+      const detail = await kivlyApi.getReward(gameId, rewardId)
+      setKivlyEditForm(editingPrize, detail)
+      setRewardMessage(t('Datos actualizados desde Kivly. Revisa antes de volver a guardar.',
+        'Details refreshed from Kivly. Review them before saving again.'))
+    })
+  }
   const normalizedSearch = search.trim().toLocaleLowerCase()
   const filteredPrizes = available.filter((prize) =>
     prize.name.toLocaleLowerCase().includes(normalizedSearch))
   const validInitialStock = Number.isInteger(initialStock[createSource])
     && initialStock[createSource] >= 1 && initialStock[createSource] <= 1000
   const emailStates = {
+    blocked: t('Premio pendiente de confirmación; correo aún no encolado', 'Reward awaiting confirmation; email not yet queued'),
     pending: t('Pendiente de envío', 'Waiting to send'),
     sending: t('Enviando', 'Sending'),
-    accepted: t('Aceptado por el proveedor de email; entrega no confirmada', 'Accepted by email provider; delivery not confirmed'),
+    accepted: t('Aceptado por SES; entrega en bandeja no confirmada', 'Accepted by SES; inbox delivery not confirmed'),
     failed: t('Error de envío', 'Sending failed'),
     reconciliation_required: t('Envío incierto: comprobar antes de reenviar', 'Uncertain send: check before resending'),
   }
@@ -439,17 +594,20 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
             <p className="text-xs text-textSub">{t('Busca, crea y gestiona el inventario disponible.', 'Search, create, and manage available stock.')}</p>
           </div>
           <button type="button" className={`${action} font-semibold`} aria-expanded={createOpen}
-            onClick={() => setCreateOpen((open) => !open)}>
+            onClick={() => createOpen ? resetPrizeForm() : openCreateForm()}>
             {createOpen ? t('Cerrar', 'Close') : t('+ CREAR', '+ CREATE')}
           </button>
         </div>
-        {createOpen && <section aria-label={t('Crear premio', 'Create prize')}
+        {createOpen && <section aria-label={editingPrize ? t('Editar premio', 'Edit prize') : t('Crear premio', 'Create prize')}
           className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2 [&_input:not([type=file])]:h-8 [&_input]:px-2 [&_input]:py-1 [&_input]:text-xs [&_select]:h-8 [&_select]:px-2 [&_select]:py-1 [&_select]:text-xs [&_textarea]:px-2 [&_textarea]:py-1 [&_textarea]:text-xs">
+          <h4 className="text-sm font-semibold">{editingPrize
+            ? t('Editar premio', 'Edit prize') : t('Crear premio', 'Create prize')}</h4>
           {rewardError && <p role="alert" className="text-xs text-red-300">{rewardError}</p>}
           <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-4">
             <label className="space-y-1 text-xs text-textSub">
               <span>{t('Origen del premio', 'Prize source')}</span>
               <select className={`${selectField} w-full`} value={createSource}
+                disabled={!!editingPrize}
                 onChange={(event) => setCreateSource(event.target.value as 'stand' | 'kivly')}>
                 <option value="stand">STAND</option>
                 <option value="kivly" disabled={!kivlyConnected || !locationId}>Kivly</option>
@@ -463,37 +621,56 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
                   placeholder={t('Nombre del nuevo premio', 'New prize name')} />
               </label>
               <label className="space-y-1 text-xs text-textSub">
-                <span>{t('Stock inicial', 'Initial stock')}</span>
+                <span>{editingPrize ? t('Stock', 'Stock') : t('Stock inicial', 'Initial stock')}</span>
                 <input type="number" min={1} max={1000} step={1} className={`${field} w-full`}
                   value={Number.isFinite(initialStock[createSource]) ? initialStock[createSource] : ''}
                   onChange={(event) => setInitialStock({ ...initialStock, [createSource]: event.target.valueAsNumber })} />
               </label>
-              <label className="space-y-1 text-xs text-textSub">
-                <span>{t('Imagen PNG', 'PNG image')}</span>
-                <span className="flex h-8 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-white/25 px-2 text-xs hover:border-primary/60">
-                  {(createSource === 'stand' ? standImagePreview : rewardImagePreview) && <img
-                    src={createSource === 'stand' ? standImagePreview : rewardImagePreview}
-                    alt={t('Vista previa del nuevo premio', 'New prize preview')} className="h-6 w-6 shrink-0 object-contain" />}
-                  <span className="truncate">{(createSource === 'stand' ? standImage : rewardImage)?.name ?? t('Subir imagen', 'Upload image')}</span>
-                  <input type="file" accept="image/png" className="sr-only"
-                    aria-label={createSource === 'stand' ? t('Imagen del nuevo premio STAND', 'New STAND prize image') : t('Imagen del nuevo premio Kivly', 'New Kivly reward image')}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      event.target.value = ''
-                      if (file) void updateDraftImage(file, createSource)
-                    }} />
-                </span>
-              </label>
+              <div className="space-y-1 text-xs text-textSub">
+                <label className="block space-y-1">
+                  <span>{t('Imagen PNG', 'PNG image')}</span>
+                  <span className="flex h-8 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-white/25 px-2 text-xs hover:border-primary/60">
+                    {(createSource === 'stand' ? standImagePreview : rewardImagePreview) && <img
+                      src={createSource === 'stand' ? standImagePreview : rewardImagePreview}
+                      alt={editingPrize ? t('Vista previa del premio', 'Prize preview') : t('Vista previa del nuevo premio', 'New prize preview')}
+                      className="h-6 w-6 shrink-0 object-contain" />}
+                    <span className="truncate">{(createSource === 'stand' ? standImage : rewardImage)?.name ?? t('Subir imagen', 'Upload image')}</span>
+                    <input type="file" accept="image/png" className="sr-only"
+                      aria-label={createSource === 'stand' ? t('Imagen del nuevo premio STAND', 'New STAND prize image') : t('Imagen del nuevo premio Kivly', 'New Kivly reward image')}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        event.target.value = ''
+                        if (file) void updateDraftImage(file, createSource)
+                      }} />
+                  </span>
+                </label>
+                {(createSource === 'stand' ? standImagePreview : rewardImagePreview) && <button type="button"
+                  className="text-xs underline" onClick={() => {
+                    if (createSource === 'stand') {
+                      setStandImage(null)
+                      setStandImagePreview('')
+                    } else {
+                      setRewardImage(null)
+                      setRewardImagePreview('')
+                    }
+                    setImageRemoved(!!editingPrize)
+                  }}>{t('Quitar imagen', 'Remove image')}</button>}
+              </div>
             </div>
           {!validInitialStock && <p role="alert" className="text-xs text-red-300">{t('El stock debe ser un entero entre 1 y 1000.', 'Stock must be a whole number between 1 and 1000.')}</p>}
           {createSource === 'stand' ? <>
-            <button type="button" className={`${action} py-1 text-xs`} disabled={!name.trim() || !validInitialStock || program.catalog.length >= 32}
-              onClick={() => void createStandPrize()}>{t('Crear premio STAND', 'Create STAND prize')}</button>
+            <button type="button" className={`${action} py-1 text-xs`} disabled={!name.trim() || !validInitialStock || (!editingPrize && program.catalog.length >= 32)}
+              onClick={() => void createStandPrize()}>{editingPrize
+                ? t('Guardar cambios', 'Save changes') : t('Crear premio STAND', 'Create STAND prize')}</button>
           </> : <>
           {rewardMessage && <p role="status" className="text-xs text-textSub">{rewardMessage}</p>}
           {rewardCreationUncertain && <button type="button" className={action} disabled={busy}
             onClick={() => setCatalogRevision((revision) => revision + 1)}>
             {t('Actualizar catálogo y revisar', 'Refresh catalog and review')}
+          </button>}
+          {rewardUpdateUncertain && <button type="button" className={action} disabled={busy}
+            onClick={refreshEditingReward}>
+            {t('Actualizar datos de Kivly y revisar', 'Refresh Kivly details and review')}
           </button>}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <label className="space-y-1 text-xs text-textSub">
@@ -558,11 +735,20 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
               </label>
             </div>
           </details>
-          <button type="button" className={`${action} py-1 text-xs`} disabled={busy || !editable || !validInitialStock || !canCreateReward || rewardCreationUncertain || program.catalog.length >= 32}
+          <button type="button" className={`${action} py-1 text-xs`} disabled={busy || !editable || !validInitialStock || !canCreateReward
+            || rewardCreationUncertain || rewardUpdateUncertain
+            || (!editingPrize && program.catalog.length >= 32)
+            || (!!editingPrize && !program.catalog.some((item) => item.id === editingPrize.id) && program.catalog.length >= 32)}
             onClick={() => void createKivlyReward()}>
-            {busy ? t('Creando…', 'Creating…') : t('Crear en Kivly', 'Create in Kivly')}
+            {busy ? t('Guardando…', 'Saving…') : editingPrize
+              ? t('Guardar cambios en Kivly', 'Save changes in Kivly') : t('Crear en Kivly', 'Create in Kivly')}
           </button>
+          {editingPrize && <button type="button" className="text-xs underline" onClick={resetPrizeForm}>
+            {t('Cancelar', 'Cancel')}
+          </button>}
           </>}
+          {createSource === 'stand' && editingPrize && <button type="button" className="text-xs underline"
+            onClick={resetPrizeForm}>{t('Cancelar', 'Cancel')}</button>}
         </section>}
         <div className="flex items-center gap-2">
           <label className="relative min-w-0 flex-1">
@@ -624,6 +810,11 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
                     <img src={prize.source === 'kivly' ? '/images/logo-kivly-footer.png' : '/images/logo-stand-footer.png'}
                       alt={prize.source === 'kivly' ? 'Kivly' : 'STAND'} className="max-h-5 max-w-full object-contain" />
                   </span>
+                  <button type="button" className="shrink-0 text-xs underline"
+                    aria-label={`${t('Editar premio', 'Edit prize')} ${prize.name}`}
+                    onClick={() => openEdit(prize)}>
+                    {t('Editar', 'Edit')}
+                  </button>
                 </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <span className="rounded-lg bg-black/15 p-2 text-textSub">{t('Entregados', 'Delivered')}: <strong className="text-textMain">{delivered}</strong></span>

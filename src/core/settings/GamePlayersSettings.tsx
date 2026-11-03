@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/api'
 import { OperatorLanguageSelector, useOperatorLanguage } from '../shell/operatorLanguage'
+import KivlyRegistrationReviews from './KivlyRegistrationReviews'
 
 type GamePlayer = {
   playerId: number
@@ -170,6 +171,7 @@ export default function GamePlayersSettings({ gameId, onBack, onClose }: Props) 
               ))}
             </ul>
           )}
+          <KivlyRegistrationReviews key={gameId} gameId={gameId} />
         </div>
       </div>
     </div>

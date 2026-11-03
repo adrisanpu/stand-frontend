@@ -5,6 +5,28 @@ import { kivlyApi } from './kivlyApi'
 vi.mock('./api', () => ({ api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }))
 beforeEach(() => { vi.clearAllMocks() })
 
+describe('Kivly registration reviews', () => {
+  it('lists reviews and posts only the server request ID using the authenticated game route', async () => {
+    const request = {
+      requestId: 'review-1', username: 'Ana', email: 'ana@test.com', phone: '+34612345678',
+      customer: { name: 'Ana', email: '', phone: '+34612345678' }, state: 'review_required',
+    }
+    vi.mocked(api.get).mockResolvedValue({ ok: true, requests: [request] })
+    expect(await kivlyApi.listRegistrationReviews('GAME 1')).toEqual([request])
+    expect(api.get).toHaveBeenCalledWith('/v1/game/kivly/registrations?gameId=GAME%201')
+    vi.mocked(api.post).mockResolvedValue({ ok: true })
+    await kivlyApi.approveRegistration('GAME 1', 'review-1')
+    expect(api.post).toHaveBeenCalledWith('/v1/game/kivly/registrations?gameId=GAME%201', { requestId: 'review-1' })
+  })
+
+  it('rejects malformed lists and unconfirmed approvals', async () => {
+    vi.mocked(api.get).mockResolvedValue({ requests: [{ requestId: 'review-1' }] })
+    await expect(kivlyApi.listRegistrationReviews('GAME1')).rejects.toThrow('Invalid Kivly')
+    vi.mocked(api.post).mockResolvedValue({ ok: false })
+    await expect(kivlyApi.approveRegistration('GAME1', 'review-1')).rejects.toThrow('not confirmed')
+  })
+})
+
 describe('Kivly account location', () => {
   it('connects and saves club details through the account contract', async () => {
     vi.mocked(api.put).mockResolvedValue({ ok: true })
@@ -38,12 +60,49 @@ describe('Kivly account location', () => {
       expect(api.post).toHaveBeenCalledWith('/v1/game/kivly/rewards', { gameId: 'GAME1', ...draft })
     })
 
+    it('loads a reward detail and updates it through the authenticated catalog endpoint', async () => {
+      const reward = {
+        id: 'reward-1', title: 'Coffee', description: 'One coffee',
+        rewardType: 'free_item' as const, value: 1, pointsRequired: 25,
+        image: null, termsAndConditions: 'One per visit', validFrom: null, validUntil: null,
+        maxRedemptions: 100, maxRedemptionsPerUser: 1,
+      }
+      vi.mocked(api.get).mockResolvedValueOnce({ ok: true, reward })
+      await expect(kivlyApi.getReward('GAME 1', 'reward-1')).resolves.toEqual(reward)
+      expect(api.get).toHaveBeenCalledWith(
+        '/v1/game/kivly/rewards?gameId=GAME%201&rewardId=reward-1',
+      )
+
+      const update = {
+        ...reward, title: 'Tea', description: 'One tea', maxRedemptions: null,
+      }
+      vi.mocked(api.put).mockResolvedValueOnce({
+        ok: true, reward: { id: 'reward-1', name: 'Tea' },
+      })
+      await expect(kivlyApi.updateReward('GAME 1', 'reward-1', update))
+        .resolves.toEqual({ id: 'reward-1', name: 'Tea' })
+      expect(api.put).toHaveBeenCalledWith('/v1/game/kivly/rewards', {
+        gameId: 'GAME 1', rewardId: 'reward-1', ...update,
+      })
+    })
+
     it('rejects unconfirmed or malformed reward creation responses', async () => {
       vi.mocked(api.post).mockResolvedValueOnce({ ok: false, reward: { id: 'reward-1', name: 'Coffee' } })
       await expect(kivlyApi.createReward('GAME1', {
         title: 'Coffee', description: 'One coffee', rewardType: 'free_item',
         value: 1, pointsRequired: 0,
       })).rejects.toThrow('Invalid Kivly reward creation response')
+    })
+
+    it('rejects malformed detail and unconfirmed updates', async () => {
+      vi.mocked(api.get).mockResolvedValueOnce({ ok: true, reward: { id: 'reward-1' } })
+      await expect(kivlyApi.getReward('GAME1', 'reward-1')).rejects.toThrow('Invalid Kivly reward detail')
+      vi.mocked(api.put).mockResolvedValueOnce({ ok: false })
+      await expect(kivlyApi.updateReward('GAME1', 'reward-1', {
+        title: 'Tea', description: 'A cup', rewardType: 'free_item',
+        value: 1, pointsRequired: 0, image: null, termsAndConditions: null,
+        validFrom: null, validUntil: null, maxRedemptions: null, maxRedemptionsPerUser: null,
+      })).rejects.toThrow('Invalid Kivly reward update')
     })
   })
 

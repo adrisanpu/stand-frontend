@@ -87,14 +87,14 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
       <div className="stack-viewport relative w-full h-[45vh] min-h-[220px] max-h-[440px] rounded-xl overflow-hidden border border-primary/20">
         {children}
         {enabled && (rank != null || prize) && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/70 text-white p-3 sm:p-4" aria-live="polite">
+          <div className="absolute inset-0 flex flex-col items-center gap-3 overflow-y-auto bg-black/70 text-white p-3 sm:p-4 before:content-[''] before:my-auto after:content-[''] after:my-auto" aria-live="polite">
             {rank != null && (
               <h2 className="shrink-0 text-4xl sm:text-5xl font-bold tabular-nums">
                 {t('Posición: ')}<span>#{rank}</span>
               </h2>
             )}
             {prize && (
-              <div className="flex w-full max-w-sm min-h-0 items-center justify-center gap-4">
+              <div className="flex w-full max-w-sm shrink-0 items-center justify-center gap-4">
                 {rankingPrize && (
                   <div className="flex w-[clamp(100px,18vh,180px)] max-w-[calc(50%-0.5rem)] min-w-0 flex-col items-center gap-2 text-center">
                     <PrizeImage prize={rankingPrize} className="h-[clamp(48px,12vh,112px)] w-full object-contain" />

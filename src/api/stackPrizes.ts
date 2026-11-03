@@ -50,7 +50,7 @@ export type StackAward = {
   lastErrorStage?: string | null
   lastErrorHttpStatus?: number | null
   deliveryChannel?: 'wallet' | 'email'
-  emailState?: 'pending' | 'sending' | 'accepted' | 'failed' | 'reconciliation_required' | null
+  emailState?: 'blocked' | 'pending' | 'sending' | 'accepted' | 'failed' | 'reconciliation_required' | null
   emailError?: string | null
 }
 export type StackPlayerPrizes = {

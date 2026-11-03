@@ -18,30 +18,35 @@ function readForcedPortraitPreference(): boolean | null {
   if (stored === '0') return false
   if (stored === '1') return true
 
-  return true
+  return null
 }
 
-/**
- * Default to portrait for display devices used in presentation mode. This keeps the Stand UI
- * consistent on vertical screens even when the physical monitor is connected in landscape.
- */
-export function useOrientation(): boolean {
+function readOrientation(automatic: boolean): boolean {
+  const forced = readForcedPortraitPreference()
+  if (forced !== null) return forced
+  return !automatic || window.innerWidth < 1024 || window.innerHeight < 600 || window.innerWidth <= window.innerHeight
+}
+
+/** Presentation screens default to portrait; automatic layouts opt in without overriding explicit preferences. */
+export function useOrientation(automatic = false): boolean {
   const [isPortrait, setIsPortrait] = useState(() => {
     if (typeof window === 'undefined') return true
-    return readForcedPortraitPreference() ?? true
+    return readOrientation(automatic)
   })
 
   useEffect(() => {
-    const sync = () => setIsPortrait(readForcedPortraitPreference() ?? true)
+    const sync = () => setIsPortrait(readOrientation(automatic))
     const mql = window.matchMedia('(orientation: portrait)')
     sync()
     mql.addEventListener('change', sync)
     window.addEventListener('storage', sync)
+    window.addEventListener('resize', sync)
     return () => {
       mql.removeEventListener('change', sync)
       window.removeEventListener('storage', sync)
+      window.removeEventListener('resize', sync)
     }
-  }, [])
+  }, [automatic])
 
   useEffect(() => {
     document.documentElement.classList.toggle('force-portrait', isPortrait)
