@@ -1,3 +1,4 @@
+import IconButton from '../ui/IconButton'
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../../api/api'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
@@ -8,6 +9,7 @@ type RaffleProps = {
   gameId?: string
   gameType?: string
   onVisibilitySaved?: () => void
+  embedded?: boolean
 }
 
 type RaffleResponse = {
@@ -57,7 +59,7 @@ function translateRaffleError(message: string, t: (spanish: string, english?: st
   return Object.prototype.hasOwnProperty.call(knownErrors, message) ? knownErrors[message] : message
 }
 
-export default function Raffle({ onBack, onClose, gameId, gameType, onVisibilitySaved }: RaffleProps) {
+export default function Raffle({ onBack, onClose, gameId, gameType, onVisibilitySaved, embedded = false }: RaffleProps) {
   const { t } = useOperatorLanguage()
   const [homeVisibility, setHomeVisibility] = useState<{ gameId: string; enabled: boolean } | null>(null)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
@@ -291,13 +293,13 @@ export default function Raffle({ onBack, onClose, gameId, gameType, onVisibility
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
+      role={embedded ? undefined : 'dialog'}
+      aria-modal={embedded ? undefined : true}
       aria-labelledby="raffle-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      className={embedded ? 'space-y-4' : 'fixed inset-0 z-50 flex items-center justify-center p-6'}
     >
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} aria-hidden="true" />
-      <div className="relative card w-full max-w-lg p-6 max-h-[90vh] flex flex-col">
+      {!embedded && <div className="absolute inset-0 bg-black/70" onClick={onClose} aria-hidden="true" />}
+      <div className={embedded ? 'space-y-4' : 'relative card w-full max-w-lg p-6 max-h-[90vh] flex flex-col'}>
         <div className="flex items-center justify-between mb-6 flex-shrink-0">
           <div className="flex items-center gap-3">
             <button
@@ -311,15 +313,7 @@ export default function Raffle({ onBack, onClose, gameId, gameType, onVisibility
             </button>
             <h2 id="raffle-title" className="text-xl font-semibold">{t('Sorteo', 'Raffle')}</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            aria-label={t('Cerrar', 'Close')}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <IconButton icon="remove" label={t('Cerrar', 'Close')} onClick={onClose} />
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">

@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import { stackPrizeApi, type StackPrizeCondition, type StackPrizeItem, type StackPrizeProgram, type StackPrizeRule, type StackPrizeScoreOperator, type StackPrizeSettingsResponse } from '../../api/stackPrizes'
+import { stackPrizeApi, type StackPrizeItem, type StackPrizeProgram, type StackPrizeSettingsResponse } from '../../api/stackPrizes'
 import {
   kivlyApi, type KivlyReward, type KivlyRewardDetail, type KivlyRewardDraft, type KivlyRewardUpdate,
 } from '../../api/kivlyApi'
 import { PrizeImageError, uploadPrizeImage, validatePrizeImage } from '../../api/prizeMedia'
+import { fetchSharedPrizeCatalog, type SharedPrize } from '../../api/sharedPrizeCatalog'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
+import SaveButton from '../ui/SaveButton'
+import { inventoryReasonText } from '../inventoryReason'
 
 const field = 'rounded-xl border border-white/15 bg-surface px-3 py-2 text-sm min-w-0'
 const selectField = 'stack-prize-select rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm min-w-0'
 const action = 'rounded-xl border border-primary/30 bg-primary/20 px-3 py-2 text-sm hover:bg-primary/30 disabled:opacity-40'
-const conditions: StackPrizeCondition[] = ['completed', 'top_finish', 'top_final', 'raffle', 'score']
-const scoreOperators: StackPrizeScoreOperator[] = ['>', '>=', '=', '<=', '<', 'between']
 const newId = () => crypto.randomUUID()
+const validCap = (value: number | null) => value === null || (Number.isSafeInteger(value) && value >= 0)
 
 type KivlyRewardForm = {
   title: string
@@ -51,18 +53,21 @@ function isUncertainRewardUpdate(error: unknown) {
   return 'isNetworkError' in error && error.isNetworkError === true
 }
 
-export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavingChange }: {
+export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, onDirtyChange }: {
   gameId: string
   raffles: boolean
   onPersist: (patch: Record<string, unknown>) => void
   onSavingChange?: (saving: boolean) => void
+  onDirtyChange?: (dirty: boolean) => void
 }) {
-  const { t } = useOperatorLanguage()
+  const { t, language } = useOperatorLanguage()
   const text = useRef(t)
   text.current = t
   const [data, setData] = useState<StackPrizeSettingsResponse | null>(null)
   const [program, setProgram] = useState<StackPrizeProgram | null>(null)
   const [rewards, setRewards] = useState<KivlyReward[]>([])
+  const [sharedCatalog, setSharedCatalog] = useState<SharedPrize[]>([])
+  const [sharedPrizeId, setSharedPrizeId] = useState('')
   const [locationId, setLocationId] = useState<string | null>(null)
   const [kivlyConnected, setKivlyConnected] = useState(false)
   const [catalogError, setCatalogError] = useState('')
@@ -80,16 +85,13 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   const [imageRemoved, setImageRemoved] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [createSource, setCreateSource] = useState<'stand' | 'kivly'>('stand')
-  const [initialStock, setInitialStock] = useState({ stand: 100, kivly: 100 })
-  const [standImage, setStandImage] = useState<File | null>(null)
-  const [standImagePreview, setStandImagePreview] = useState('')
+  const [initialStock, setInitialStock] = useState<{ stand: number | null; kivly: number | null }>({ stand: null, kivly: null })
   const [validatingImage, setValidatingImage] = useState(false)
   const [search, setSearch] = useState('')
   const [activeImageActions, setActiveImageActions] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [revision, setRevision] = useState(0)
   const [catalogRevision, setCatalogRevision] = useState(0)
-  const [name, setName] = useState('')
   const [dirty, setDirty] = useState(false)
   const previews = useRef(new Map<string, string>())
   const catalogScroller = useRef<HTMLDivElement | null>(null)
@@ -101,32 +103,35 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   useEffect(() => () => {
     if (rewardImagePreview) URL.revokeObjectURL(rewardImagePreview)
   }, [rewardImagePreview])
-  useEffect(() => () => {
-    if (standImagePreview) URL.revokeObjectURL(standImagePreview)
-  }, [standImagePreview])
-  const label = (condition: StackPrizeCondition) => ({
-    completed: t('complete una partida', 'a player completes a game'),
-    top_finish: t('entre en el top al terminar su partida', 'a player finishes in the top'),
-    top_final: t('esté en el top al cerrar el juego', 'a player is in the top when the game closes'),
-    raffle: t('gane un sorteo', 'a player wins a raffle'),
-    score: t('consiga una puntuación', 'a player reaches a score'),
-  })[condition]
   useEffect(() => {
     let cancelled = false
     setData(null)
     setProgram(null)
     setError('')
     setDirty(false)
+    onDirtyChange?.(false)
     void stackPrizeApi.get(gameId).then((response) => {
       if (cancelled) return
       if (response.ok !== true || response.program?.version !== 3) throw new Error('Invalid prize configuration')
       setData(response)
-      setProgram(response.program)
+      setProgram({ ...response.program, deliveryChannel: 'wallet' })
     }).catch((cause: unknown) => {
       if (!cancelled) setError(cause instanceof Error ? cause.message : text.current('No se pudieron cargar los premios.', 'Could not load prizes.'))
     })
     return () => { cancelled = true }
-  }, [gameId, revision])
+  }, [gameId, revision, onDirtyChange])
+  useEffect(() => {
+    let cancelled = false
+    void fetchSharedPrizeCatalog().then(result => {
+      if (!cancelled) setSharedCatalog(result.catalog)
+    }).catch(() => {
+      if (!cancelled) setCatalogError(text.current(
+        'No se pudo cargar el catálogo general de premios.',
+        'Could not load the shared prize catalog.',
+      ))
+    })
+    return () => { cancelled = true }
+  }, [gameId, catalogRevision])
   useEffect(() => {
     let cancelled = false
     setRewards([])
@@ -179,37 +184,34 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     setRewardImage(null)
     setRewardImagePreview('')
     setImageRemoved(false)
-    setStandImage(null)
-    setStandImagePreview('')
     setCreateOpen(false)
-    setInitialStock({ stand: 100, kivly: 100 })
+    setInitialStock({ stand: null, kivly: null })
     setSearch('')
     setRewardError('')
     setRewardMessage('')
     setRewardCreationUncertain(false)
     setRewardUpdateUncertain(false)
-    setName('')
     uncertainRewardTitle.current = null
   }, [gameId])
 
-  const change = (next: StackPrizeProgram) => { setProgram(next); setDirty(true); setMessage('') }
+  const change = (next: StackPrizeProgram) => {
+    setProgram(next)
+    setDirty(true)
+    onDirtyChange?.(true)
+    setMessage('')
+  }
   const updateRewardForm = (patch: Partial<KivlyRewardForm>) => {
     setRewardForm((previous) => ({ ...previous, ...patch }))
     setRewardError('')
     setRewardMessage('')
   }
-  const updateDraftImage = async (file: File, source: 'stand' | 'kivly') => {
+  const updateDraftImage = async (file: File) => {
     setValidatingImage(true)
     try {
       await validatePrizeImage(file)
       const preview = URL.createObjectURL(file)
-      if (source === 'stand') {
-        setStandImage(file)
-        setStandImagePreview(preview)
-      } else {
-        setRewardImage(file)
-        setRewardImagePreview(preview)
-      }
+      setRewardImage(file)
+      setRewardImagePreview(preview)
       setImageRemoved(false)
       setRewardError('')
     } catch (cause) {
@@ -231,19 +233,19 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   }
   const save = () => run(async () => {
     if (!program) return
-    const saved = await stackPrizeApi.save(gameId, program)
+    const saved = await stackPrizeApi.save(gameId, { ...program, deliveryChannel: 'wallet' })
     setProgram(saved)
     setDirty(false)
+    onDirtyChange?.(false)
     setData((previous) => previous ? {
       ...previous, program: saved, enabled: true,
-      inventory: saved.catalog.map((prize) => {
-        const old = previous.inventory.find((item) => item.prizeId === prize.id)
-        const consumed = old ? Math.max(0, old.total - old.remaining) : 0
-        return { prizeId: prize.id, total: prize.stockTotal, remaining: Math.max(0, prize.stockTotal - consumed) }
-      }),
     } : previous)
     onPersist({ stackPrizeProgram: saved, prizeCatalog: {} })
     setMessage(t('Premios guardados. Los premios ya ganados se conservan.', 'Prizes saved. Previously earned prizes are preserved.'))
+    try { setData(await stackPrizeApi.get(gameId)) } catch {
+      setMessage(t('Premios guardados. No se pudo refrescar la disponibilidad; recarga para verla actualizada.',
+        'Prizes saved. Availability could not be refreshed; reload to see updated balances.'))
+    }
   })
   const chooseImage = (prize: StackPrizeItem, file: File) => run(async () => {
     if (!program) return
@@ -264,7 +266,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   const createKivlyReward = async () => {
     const editing = editingPrize?.source === 'kivly' ? editingPrize : null
     const configured = editing ? program?.catalog.some((item) => item.id === editing.id) : false
-    if (busy || !Number.isInteger(initialStock.kivly) || initialStock.kivly < 1 || initialStock.kivly > 1000
+    if (busy || !validCap(initialStock.kivly)
       || !program || (!editing && program.catalog.length >= 32)
       || (editing && !configured && program.catalog.length >= 32)
       || !kivlyConnected || !locationId || data?.state !== 'open'
@@ -354,8 +356,8 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         setRewards((previous) => previous.map((item) =>
           item.id === reward.id ? { ...item, name: reward.name } : item))
         resetPrizeForm()
-        setMessage(t('Premio actualizado en Kivly. Guarda para aplicar el inventario y la imagen al juego.',
-          'Reward updated in Kivly. Save to apply stock and the image to the game.'))
+        setMessage(t('Premio actualizado en Kivly. Guarda para aplicar el límite por evento y la imagen.',
+          'Reward updated in Kivly. Save to apply the event cap and image.'))
       } else {
         creationRequested = true
         const reward = await kivlyApi.createReward(gameId, draft)
@@ -369,8 +371,8 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         resetPrizeForm()
         uncertainRewardTitle.current = null
         setRewardCreationUncertain(false)
-        setMessage(t('Premio creado en Kivly. Guarda para aplicar el inventario y la imagen al juego.',
-          'Reward created in Kivly. Save to apply stock and the image to the game.'))
+        setMessage(t('Premio creado en Kivly. Guarda para aplicar el límite por evento y la imagen.',
+          'Reward created in Kivly. Save to apply the event cap and image.'))
       }
       setCatalogRevision((revision) => revision + 1)
     } catch (cause) {
@@ -412,10 +414,15 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     {error && <button className={action} onClick={() => setRevision((value) => value + 1)}>{t('Reintentar', 'Retry')}</button>}
   </div>
   const editable = data.state === 'open'
-  const available = [...program.catalog, ...rewards.filter((reward) => !program.catalog.some((prize) =>
+  const available = [...program.catalog, ...sharedCatalog.filter((prize) =>
+    !program.catalog.some((item) => item.source === 'stand' && item.sharedPrizeId === prize.id))
+    .map((prize): StackPrizeItem => ({
+      id: `shared_${prize.id}`, source: 'stand', sharedPrizeId: prize.id, name: prize.name,
+      imageKey: prize.imageKey, imageUrl: prize.imageUrl ?? null, stockTotal: null,
+    })), ...rewards.filter((reward) => !program.catalog.some((prize) =>
     prize.source === 'kivly' && prize.rewardId === reward.id && prize.locationId === locationId)).map((reward): StackPrizeItem => ({
       id: `kivly_${reward.id}`, source: 'kivly', rewardId: reward.id, name: reward.name,
-      locationId: locationId ?? '', stockTotal: 100, imageUrl: reward.imageUrl,
+      locationId: locationId ?? '', stockTotal: null, imageUrl: reward.imageUrl,
     }))]
   const parsedRewardValue = Number(rewardForm.value)
   const parsedPointsRequired = Number(rewardForm.pointsRequired)
@@ -424,9 +431,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     && Number.isFinite(parsedRewardValue)
     && Number.isInteger(parsedPointsRequired) && parsedPointsRequired >= 0
   const invalidProgram = program.catalog.some((prize) => {
-    const stock = data.inventory.find((item) => item.prizeId === prize.id)
-    const allocated = stock ? stock.total - stock.remaining : 0
-    return !Number.isInteger(prize.stockTotal) || prize.stockTotal < Math.max(1, allocated) || prize.stockTotal > 1000
+    return !validCap(prize.stockTotal)
   }) || program.rules.some((rule) => rule.groups.length === 0 || rule.groups.some((group) =>
     group.allocations.length === 0 || group.allocations.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 10))
     || (rule.condition.startsWith('top_') && (!Number.isInteger(rule.topX) || (rule.topX ?? 0) < 1 || (rule.topX ?? 101) > 100))
@@ -436,42 +441,23 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         !Number.isSafeInteger(rule.scoreMaxValue) || (rule.scoreMaxValue ?? -1) < (rule.scoreValue ?? 0)
       ))
     )))
-  const updateRule = (index: number, rule: StackPrizeRule) => change({
-    ...program, rules: program.rules.map((previous, i) => i === index ? { ...rule, id: newId() } : previous),
-  })
-  const addPrize = (ruleIndex: number, groupIndex: number, id: string) => {
-    const selected = available.find((item) => item.id === id)
-    if (!selected) return
-    const existing = program.catalog.some((item) => item.id === id)
-    if (!existing && program.catalog.length >= 32) return
-    const prize = existing ? selected : { ...selected, id: newId() }
-    change({
-      ...program, catalog: existing ? program.catalog : [...program.catalog, prize],
-      rules: program.rules.map((rule, index) => index === ruleIndex ? { ...rule, id: newId(),
-        groups: rule.groups.map((group, i) => i === groupIndex
-          ? { allocations: [...group.allocations, { prizeId: prize.id, quantity: 1 }] } : group),
-      } : rule),
-    })
-  }
   const createStandPrize = () => run(async () => {
     const editing = editingPrize?.source === 'stand' ? editingPrize : null
-    if (!program || !name.trim() || (!editing && program.catalog.length >= 32)
-      || !Number.isInteger(initialStock.stand) || initialStock.stand < 1 || initialStock.stand > 1000) return
+    const shared = sharedCatalog.find((prize) => prize.id === sharedPrizeId)
+    if (!program || !shared || (!editing && program.catalog.length >= 32)
+      || !validCap(initialStock.stand)) return
     const id = editing?.id ?? newId()
-    const imageKey = standImage ? await uploadPrizeImage(gameId, 'ranking', standImage)
-      : imageRemoved ? null : editing?.imageKey ?? null
-    const imageUrl = standImage ? URL.createObjectURL(standImage)
-      : imageRemoved ? null : editing?.imageUrl ?? null
+    const imageKey = shared.imageKey
+    const imageUrl = shared.imageUrl ?? null
     const previousPreview = previews.current.get(id)
     if (previousPreview) URL.revokeObjectURL(previousPreview)
-    if (standImage && imageUrl) previews.current.set(id, imageUrl)
-    else previews.current.delete(id)
+    previews.current.delete(id)
     change({
       ...program,
       catalog: editing ? program.catalog.map((item) => item.id === id ? {
-        ...item, name: name.trim(), stockTotal: initialStock.stand, imageKey, imageUrl,
+        ...item, name: shared.name, sharedPrizeId: shared.id, stockTotal: initialStock.stand, imageKey, imageUrl,
       } : item) : [...program.catalog, {
-        id, source: 'stand', name: name.trim(), limit: null, stockTotal: initialStock.stand,
+        id, source: 'stand', name: shared.name, sharedPrizeId: shared.id, limit: null, stockTotal: initialStock.stand,
         imageKey, imageUrl,
       }],
     })
@@ -485,14 +471,12 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     setEditingPrize(null)
     setEditingReward(null)
     setCreateSource('stand')
-    setName('')
+    setSharedPrizeId('')
     setRewardForm(emptyKivlyRewardForm)
     setRewardImage(null)
     setRewardImagePreview('')
-    setStandImage(null)
-    setStandImagePreview('')
     setImageRemoved(false)
-    setInitialStock((previous) => ({ ...previous, stand: 100, kivly: 100 }))
+    setInitialStock({ stand: null, kivly: null })
     setRewardError('')
     setRewardMessage('')
     setRewardCreationUncertain(false)
@@ -506,7 +490,6 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     setEditingPrize(prize)
     setEditingReward(reward)
     setCreateSource('kivly')
-    setName(reward.title)
     setRewardForm({
       title: reward.title,
       description: reward.description,
@@ -536,10 +519,9 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
       setEditingPrize(prize)
       setEditingReward(null)
       setCreateSource('stand')
-      setName(prize.name)
+      setSharedPrizeId(prize.sharedPrizeId ?? sharedCatalog.find((item) =>
+        item.name === prize.name && item.imageKey === prize.imageKey)?.id ?? '')
       setInitialStock((previous) => ({ ...previous, stand: prize.stockTotal }))
-      setStandImage(null)
-      setStandImagePreview(prize.imageUrl ?? '')
       setImageRemoved(false)
       setRewardError('')
       setCreateOpen(true)
@@ -567,8 +549,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
   const normalizedSearch = search.trim().toLocaleLowerCase()
   const filteredPrizes = available.filter((prize) =>
     prize.name.toLocaleLowerCase().includes(normalizedSearch))
-  const validInitialStock = Number.isInteger(initialStock[createSource])
-    && initialStock[createSource] >= 1 && initialStock[createSource] <= 1000
+  const validInitialStock = validCap(initialStock[createSource])
   const emailStates = {
     blocked: t('Premio pendiente de confirmación; correo aún no encolado', 'Reward awaiting confirmation; email not yet queued'),
     pending: t('Pendiente de envío', 'Waiting to send'),
@@ -591,7 +572,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold">{t('Catálogo de premios', 'Prize catalog')}</h3>
-            <p className="text-xs text-textSub">{t('Busca, crea y gestiona el inventario disponible.', 'Search, create, and manage available stock.')}</p>
+            <p className="text-xs text-textSub">{t('Selecciona premios y configura límites opcionales por evento.', 'Select prizes and configure optional event caps.')}</p>
           </div>
           <button type="button" className={`${action} font-semibold`} aria-expanded={createOpen}
             onClick={() => createOpen ? resetPrizeForm() : openCreateForm()}>
@@ -613,55 +594,70 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
                 <option value="kivly" disabled={!kivlyConnected || !locationId}>Kivly</option>
               </select>
             </label>
-              <label className="space-y-1 text-xs text-textSub">
+              {createSource === 'stand'
+                ? <label className="space-y-1 text-xs text-textSub">
+                  <span>{t('Premio del catálogo general', 'Shared catalog prize')}</span>
+                  <select className={`${selectField} w-full`} value={sharedPrizeId} disabled={!!editingPrize}
+                    onChange={(event) => {
+                      const selected = sharedCatalog.find((prize) => prize.id === event.target.value)
+                      setSharedPrizeId(selected?.id ?? '')
+                    }}>
+                    <option value="">{t('Selecciona un premio', 'Select a prize')}</option>
+                    {sharedCatalog.map((prize) => <option key={prize.id} value={prize.id}>{prize.name}</option>)}
+                  </select>
+                </label>
+                : <label className="space-y-1 text-xs text-textSub">
                 <span>{t('Nombre', 'Name')}</span>
-                <input aria-label={createSource === 'stand' ? t('Nombre del premio STAND', 'STAND prize name') : t('Nombre', 'Name')}
-                  value={createSource === 'stand' ? name : rewardForm.title} maxLength={200}
-                  onChange={(event) => createSource === 'stand' ? setName(event.target.value) : updateRewardForm({ title: event.target.value })} className={`${field} w-full`}
+                <input aria-label={t('Nombre', 'Name')}
+                  value={rewardForm.title} maxLength={200}
+                  onChange={(event) => updateRewardForm({ title: event.target.value })} className={`${field} w-full`}
                   placeholder={t('Nombre del nuevo premio', 'New prize name')} />
-              </label>
+                </label>}
               <label className="space-y-1 text-xs text-textSub">
-                <span>{editingPrize ? t('Stock', 'Stock') : t('Stock inicial', 'Initial stock')}</span>
-                <input type="number" min={1} max={1000} step={1} className={`${field} w-full`}
-                  value={Number.isFinite(initialStock[createSource]) ? initialStock[createSource] : ''}
-                  onChange={(event) => setInitialStock({ ...initialStock, [createSource]: event.target.valueAsNumber })} />
+                <span>{t('Límite opcional por evento', 'Optional event cap')}</span>
+                <input type="number" min={0} step={1} className={`${field} w-full`} placeholder={t('Sin límite', 'Unlimited')}
+                  value={initialStock[createSource] ?? ''}
+                  onChange={(event) => setInitialStock({ ...initialStock, [createSource]: event.target.value === '' ? null : event.target.valueAsNumber })} />
               </label>
-              <div className="space-y-1 text-xs text-textSub">
+              {createSource === 'stand'
+                ? <div className="space-y-1 text-xs text-textSub">
+                  <span>{t('Imagen del catálogo general', 'Shared catalog image')}</span>
+                  {sharedCatalog.find((prize) => prize.id === sharedPrizeId)?.imageUrl
+                    ? <img src={sharedCatalog.find((prize) => prize.id === sharedPrizeId)?.imageUrl ?? ''}
+                        alt="" className="h-8 w-8 rounded object-contain" />
+                    : <span className="text-xs">{t('Sin imagen', 'No image')}</span>}
+                </div>
+                : <div className="space-y-1 text-xs text-textSub">
                 <label className="block space-y-1">
                   <span>{t('Imagen PNG', 'PNG image')}</span>
                   <span className="flex h-8 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-white/25 px-2 text-xs hover:border-primary/60">
-                    {(createSource === 'stand' ? standImagePreview : rewardImagePreview) && <img
-                      src={createSource === 'stand' ? standImagePreview : rewardImagePreview}
+                    {rewardImagePreview && <img
+                      src={rewardImagePreview}
                       alt={editingPrize ? t('Vista previa del premio', 'Prize preview') : t('Vista previa del nuevo premio', 'New prize preview')}
                       className="h-6 w-6 shrink-0 object-contain" />}
-                    <span className="truncate">{(createSource === 'stand' ? standImage : rewardImage)?.name ?? t('Subir imagen', 'Upload image')}</span>
+                    <span className="truncate">{rewardImage?.name ?? t('Subir imagen', 'Upload image')}</span>
                     <input type="file" accept="image/png" className="sr-only"
-                      aria-label={createSource === 'stand' ? t('Imagen del nuevo premio STAND', 'New STAND prize image') : t('Imagen del nuevo premio Kivly', 'New Kivly reward image')}
+                      aria-label={t('Imagen del nuevo premio Kivly', 'New Kivly reward image')}
                       onChange={(event) => {
                         const file = event.target.files?.[0]
                         event.target.value = ''
-                        if (file) void updateDraftImage(file, createSource)
+                        if (file) void updateDraftImage(file)
                       }} />
                   </span>
                 </label>
-                {(createSource === 'stand' ? standImagePreview : rewardImagePreview) && <button type="button"
+                {rewardImagePreview && <button type="button"
                   className="text-xs underline" onClick={() => {
-                    if (createSource === 'stand') {
-                      setStandImage(null)
-                      setStandImagePreview('')
-                    } else {
-                      setRewardImage(null)
-                      setRewardImagePreview('')
-                    }
+                    setRewardImage(null)
+                    setRewardImagePreview('')
                     setImageRemoved(!!editingPrize)
                   }}>{t('Quitar imagen', 'Remove image')}</button>}
-              </div>
+                </div>}
             </div>
-          {!validInitialStock && <p role="alert" className="text-xs text-red-300">{t('El stock debe ser un entero entre 1 y 1000.', 'Stock must be a whole number between 1 and 1000.')}</p>}
+          {!validInitialStock && <p role="alert" className="text-xs text-red-300">{t('El límite debe ser un entero ≥ 0 o vacío (sin límite).', 'Cap must be a whole number ≥ 0 or empty (unlimited).')}</p>}
           {createSource === 'stand' ? <>
-            <button type="button" className={`${action} py-1 text-xs`} disabled={!name.trim() || !validInitialStock || (!editingPrize && program.catalog.length >= 32)}
+            <SaveButton disabled={!sharedPrizeId || !validInitialStock || (!editingPrize && program.catalog.length >= 32)}
               onClick={() => void createStandPrize()}>{editingPrize
-                ? t('Guardar cambios', 'Save changes') : t('Crear premio STAND', 'Create STAND prize')}</button>
+                ? t('Guardar cambios', 'Save changes') : t('Crear premio STAND', 'Create STAND prize')}</SaveButton>
           </> : <>
           {rewardMessage && <p role="status" className="text-xs text-textSub">{rewardMessage}</p>}
           {rewardCreationUncertain && <button type="button" className={action} disabled={busy}
@@ -700,11 +696,9 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
                 onChange={(event) => updateRewardForm({ description: event.target.value })} />
             </label>
           </div>
-          <details className="space-y-2">
-            <summary className="cursor-pointer text-xs text-textSub">
-              {t('Opciones avanzadas', 'Advanced options')}
-            </summary>
-            <div className="grid grid-cols-2 gap-2 pt-2 sm:grid-cols-4">
+          <div className="space-y-2 rounded-lg border border-white/10 p-2">
+            <h5 className="text-xs font-medium text-textSub">{t('Vigencia y límites de canje', 'Validity and redemption limits')}</h5>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <label className="space-y-1 text-xs text-textSub col-span-2 sm:col-span-4">
                 <span>{t('Condiciones', 'Terms and conditions')}</span>
                 <textarea className={`${field} w-full`} maxLength={4096} rows={1}
@@ -734,15 +728,15 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
                   onChange={(event) => updateRewardForm({ maxRedemptionsPerUser: event.target.value })} />
               </label>
             </div>
-          </details>
-          <button type="button" className={`${action} py-1 text-xs`} disabled={busy || !editable || !validInitialStock || !canCreateReward
+          </div>
+          <SaveButton disabled={busy || !editable || !validInitialStock || !canCreateReward
             || rewardCreationUncertain || rewardUpdateUncertain
             || (!editingPrize && program.catalog.length >= 32)
             || (!!editingPrize && !program.catalog.some((item) => item.id === editingPrize.id) && program.catalog.length >= 32)}
             onClick={() => void createKivlyReward()}>
             {busy ? t('Guardando…', 'Saving…') : editingPrize
               ? t('Guardar cambios en Kivly', 'Save changes in Kivly') : t('Crear en Kivly', 'Create in Kivly')}
-          </button>
+          </SaveButton>
           {editingPrize && <button type="button" className="text-xs underline" onClick={resetPrizeForm}>
             {t('Cancelar', 'Cancel')}
           </button>}
@@ -767,8 +761,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
           {filteredPrizes.map((prize) => {
             const configured = program.catalog.some((item) => item.id === prize.id)
             const stock = data.inventory.find((item) => item.prizeId === prize.id)
-            const delivered = stock ? Math.max(0, stock.total - stock.remaining) : 0
-            const remaining = Math.max(0, prize.stockTotal - delivered)
+            const shared = data.globalInventory?.find(item => item.prizeId === prize.id)
             const actionsVisible = activeImageActions === prize.id
             return <article key={prize.id} aria-label={prize.name}
               className="min-w-0 shrink-0 basis-[78%] snap-start overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] text-sm sm:basis-[calc((100%_-_0.5rem)/2)] lg:basis-[calc((100%_-_1.5rem)/4)]">
@@ -777,12 +770,12 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
               <button type="button" className="block h-full w-full"
                 aria-label={`${t('Opciones de imagen para', 'Image options for')} ${prize.name}`}
                 aria-expanded={actionsVisible} onClick={() => setActiveImageActions(actionsVisible ? null : prize.id)}
-                disabled={!configured && program.catalog.length >= 32}>
+                disabled={prize.source === 'stand' || (!configured && program.catalog.length >= 32)}>
                 {prize.imageUrl
                   ? <img src={prize.imageUrl} alt={`${t('Vista previa del premio', 'Prize preview')} ${prize.name}`} className="h-full w-full object-contain" />
                   : <span className="flex h-full items-center justify-center text-4xl font-black text-gray-300">{prize.name.slice(0, 1).toUpperCase()}</span>}
               </button>
-                <div className={`absolute inset-0 flex flex-wrap content-center items-center justify-center gap-2 bg-black/65 p-2 transition-opacity group-focus-within:opacity-100 group-focus-within:pointer-events-auto ${actionsVisible ? 'opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
+                {prize.source === 'kivly' && <div className={`absolute inset-0 flex flex-wrap content-center items-center justify-center gap-2 bg-black/65 p-2 transition-opacity group-focus-within:opacity-100 group-focus-within:pointer-events-auto ${actionsVisible ? 'opacity-100' : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'}`}>
                   <label className="cursor-pointer rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-950 focus-within:ring-2 focus-within:ring-primary">
                     {t('Subir', 'Upload')}
                     <input type="file" accept="image/png" className="sr-only" disabled={!configured && program.catalog.length >= 32}
@@ -801,7 +794,7 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
                       change({ ...program, catalog: program.catalog.map((item) =>
                         item.id === prize.id ? { ...item, imageKey: null, imageUrl: null } : item) })
                     }}>{t('Quitar', 'Remove')}</button>}
-                </div>
+                </div>}
               </div>
               <div className="space-y-3 p-3">
                 <div className="flex items-start gap-2">
@@ -810,28 +803,34 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
                     <img src={prize.source === 'kivly' ? '/images/logo-kivly-footer.png' : '/images/logo-stand-footer.png'}
                       alt={prize.source === 'kivly' ? 'Kivly' : 'STAND'} className="max-h-5 max-w-full object-contain" />
                   </span>
-                  <button type="button" className="shrink-0 text-xs underline"
+                  <button type="button" className="shrink-0 text-xs underline" disabled={!configured}
                     aria-label={`${t('Editar premio', 'Edit prize')} ${prize.name}`}
                     onClick={() => openEdit(prize)}>
                     {t('Editar', 'Edit')}
                   </button>
                 </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <span className="rounded-lg bg-black/15 p-2 text-textSub">{t('Entregados', 'Delivered')}: <strong className="text-textMain">{delivered}</strong></span>
-                    <span className="rounded-lg bg-black/15 p-2 text-textSub">{t('Disponibles', 'Available')}: <strong className="text-textMain">{Number.isFinite(remaining) ? remaining : '—'}</strong></span>
+                    <span className="rounded-lg bg-black/15 p-2 text-textSub">{t('Margen del evento', 'Event allowance')}: <strong className="text-textMain">{prize.stockTotal === null ? t('Sin límite', 'Unlimited') : stock?.remaining ?? '—'}</strong></span>
+                    <span className="rounded-lg bg-black/15 p-2 text-textSub">{t('Disponible compartido', 'Shared available')}: <strong className="text-textMain">{shared ? shared.reason ? t('No disponible', 'Unavailable') : shared.remaining : '—'}</strong></span>
                   </div>
-                  <label className="block text-xs text-textSub">{t('Stock', 'Stock')}
-                    <input type="number" min={1} max={1000} value={Number.isFinite(prize.stockTotal) ? prize.stockTotal : ''}
+                  {shared?.reason && <p className="text-xs text-textSub">{inventoryReasonText(shared.reason, language)} ({shared.reason})</p>}
+                  {prize.stockTotal === 0 && <p className="text-xs text-amber-300">{t('Límite por evento: 0. Esta partida no repartirá este premio.',
+                    'Event cap: 0. This event will not award this prize.')}</p>}
+                  {shared && !shared.reason && shared.remaining === 0 && <p className="text-xs text-amber-300">
+                    {inventoryReasonText('out_of_stock', language)}
+                  </p>}
+                  <label className="block text-xs text-textSub">{t('Límite opcional por evento', 'Optional event cap')}
+                    <input type="number" min={0} value={prize.stockTotal ?? ''} placeholder={t('Sin límite', 'Unlimited')}
                       disabled={!configured && program.catalog.length >= 32}
                       className={`${field} mt-1 w-full text-textMain`}
-                      aria-label={`${t('Inventario total Y de', 'Total stock Y for')} ${prize.name}`}
+                      aria-label={`${t('Límite por evento de', 'Event cap for')} ${prize.name}`}
                       onChange={(event) => change({ ...program, catalog: configured
-                        ? program.catalog.map((item) => item.id === prize.id ? { ...item, stockTotal: event.target.valueAsNumber } : item)
-                        : [...program.catalog, { ...prize, id: newId(), stockTotal: event.target.valueAsNumber }] })} />
+                        ? program.catalog.map((item) => item.id === prize.id ? { ...item, stockTotal: event.target.value === '' ? null : event.target.valueAsNumber } : item)
+                        : [...program.catalog, { ...prize, id: newId(), stockTotal: event.target.value === '' ? null : event.target.valueAsNumber }] })} />
                   </label>
                 {!configured && <button type="button" className={`${action} w-full`} disabled={program.catalog.length >= 32}
                   onClick={() => change({ ...program, catalog: [...program.catalog, { ...prize, id: newId() }] })}>
-                  {t('Añadir al inventario', 'Add to stock')}
+                  {t('Añadir a la partida', 'Add to event')}
                 </button>}
               </div>
             </article>
@@ -840,129 +839,44 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
         {filteredPrizes.length === 0 && <p className="py-6 text-center text-sm text-textSub">
           {t('No hay premios que coincidan con la búsqueda.', 'No prizes match your search.')}
         </p>}
-        <p className="text-xs text-textSub">{t('Stock compartido entre reglas. Imágenes PNG, máx. 5 MB.',
-          'Stock is shared between rules. PNG images, max. 5 MB.')}</p>
-        <p className="text-xs text-textSub">{t('Las imágenes subidas se aplican a este juego; no modifican el catálogo externo de Kivly.',
-          'Uploaded images apply to this game; they do not change the external Kivly catalog.')}</p>
+        <p className="text-xs text-textSub">{t('El límite es opcional y solo restringe esta partida; vacío significa sin límite. El stock físico se gestiona en Administración > Premios.',
+          'The optional cap only restricts this event; blank means unlimited. Manage physical stock in Administration > Prizes.')}{' '}
+          <a href="/admin/prizes" className="underline">{t('Abrir inventario general', 'Open general inventory')}</a></p>
+        {data.globalInventory == null && <p className="text-xs text-amber-300">{t('Modo anterior: la partida mantiene su stock previo hasta activar el inventario general.',
+          'Legacy mode: this event keeps its previous stock until general inventory activation.')}</p>}
+        <p className="text-xs text-textSub">{t('El nombre y la imagen se administran en el catálogo general de Premios.',
+          'Names and images are managed in the shared Prizes catalog.')}</p>
       </section>
-      <h3 className="text-sm font-semibold">{t('Cuándo y qué entregar', 'When and what to award')}</h3>
-      {program.rules.map((rule, index) => <section key={index} aria-label={`${t('Regla', 'Rule')} ${index + 1}`}
-        className="rounded-xl border border-primary/25 bg-primary/5 p-2 space-y-2 [&_select]:h-8 [&_select]:px-2 [&_select]:py-1 [&_select]:text-xs [&_input]:h-8 [&_input]:px-2 [&_input]:py-1 [&_input]:text-xs">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="shrink-0 font-semibold text-primary">{t('Regla', 'Rule')} {index + 1}</span>
-          <span>{t('Cuando', 'When')}</span>
-          <select aria-label={`${t('Condición', 'Condition')} ${index + 1}`} className={`${selectField} flex-1 basis-48`} value={rule.condition}
-            onChange={(event) => {
-              const condition = event.target.value as StackPrizeCondition
-              updateRule(index, { ...rule, condition, topX: condition.startsWith('top_') ? 10 : undefined,
-                scoreOperator: condition === 'score' ? '>=' : undefined,
-                scoreValue: undefined, scoreMaxValue: undefined })
-            }}>
-            {conditions.filter((condition) => condition !== 'raffle' || raffles || rule.condition === 'raffle')
-              .map((condition) => <option key={condition} value={condition}>{label(condition)}</option>)}
-          </select>
-          {rule.condition.startsWith('top_') && <label className="flex items-center gap-2">top
-            <input type="number" min={1} max={100} value={Number.isFinite(rule.topX) ? rule.topX : ''} className={`${field} w-14`} aria-label={`Top ${index + 1}`}
-              onChange={(event) => updateRule(index, { ...rule, topX: event.target.valueAsNumber })} />
-          </label>}
-          {rule.condition === 'score' && <>
-            <label className="flex items-center gap-1">
-              <span>{t('Puntuación', 'Score')}</span>
-              <select aria-label={`${t('Operador de puntuación', 'Score operator')} ${index + 1}`}
-                className={selectField} value={rule.scoreOperator ?? '>='}
-                onChange={(event) => updateRule(index, {
-                  ...rule, scoreOperator: event.target.value as StackPrizeScoreOperator,
-                  scoreMaxValue: event.target.value === 'between' ? rule.scoreMaxValue : undefined,
-                })}>
-                {scoreOperators.map((operator) => <option key={operator} value={operator}>
-                  {operator === 'between' ? t('entre', 'between') : operator}
-                </option>)}
-              </select>
-            </label>
-            <label className="flex items-center gap-1">
-              <span>{rule.scoreOperator === 'between' ? t('Desde', 'From') : t('Valor', 'Value')}</span>
-              <input type="number" min={0} step={1} value={Number.isSafeInteger(rule.scoreValue) ? rule.scoreValue : ''}
-                className={`${field} w-20`} aria-label={`${t('Puntuación mínima', 'Score value')} ${index + 1}`}
-                onChange={(event) => updateRule(index, { ...rule, scoreValue: event.target.valueAsNumber })} />
-            </label>
-            {rule.scoreOperator === 'between' && <label className="flex items-center gap-1">
-              <span>{t('Hasta', 'To')}</span>
-              <input type="number" min={0} step={1} value={Number.isSafeInteger(rule.scoreMaxValue) ? rule.scoreMaxValue : ''}
-                className={`${field} w-20`} aria-label={`${t('Puntuación máxima', 'Score maximum')} ${index + 1}`}
-                onChange={(event) => updateRule(index, { ...rule, scoreMaxValue: event.target.valueAsNumber })} />
-            </label>}
-          </>}
-          <button type="button" className="ml-auto shrink-0 text-xs text-textSub underline" aria-label={`${t('Quitar regla', 'Remove rule')} ${index + 1}`}
-            onClick={() => change({ ...program, rules: program.rules.filter((_, i) => i !== index) })}>{t('Quitar regla', 'Remove rule')}</button>
-        </div>
-        <div className="grid items-start gap-2 sm:grid-cols-2">
-        {rule.groups.map((group, groupIndex) => <div key={groupIndex}
-          className="min-w-0 rounded-lg border border-white/15 bg-surface/50 p-2 space-y-1">
-            <div className="flex items-center justify-between gap-2 text-xs">
-              <span className="font-medium">{groupIndex > 0 && <span className="mr-1 font-bold text-primary">{t('O', 'OR')}</span>}{t('Grupo', 'Group')} {groupIndex + 1}</span>
-              {rule.groups.length > 1 && <button type="button" className="underline" aria-label={`${t('Quitar grupo', 'Remove group')} ${index + 1}.${groupIndex + 1}`}
-                onClick={() => updateRule(index, { ...rule, groups: rule.groups.filter((_, i) => i !== groupIndex) })}>{t('Quitar grupo', 'Remove group')}</button>}
-            </div>
-            {group.allocations.map((allocation, allocationIndex) => {
-              const prize = program.catalog.find((item) => item.id === allocation.prizeId)
-              return <div key={allocation.prizeId} className="flex items-center gap-1 text-xs">
-                {allocationIndex > 0 && <span className="font-bold text-primary">{t('Y', 'AND')}</span>}
-                  <span className="min-w-0 flex-1 break-words">{prize?.name}</span>
-                  <label className="flex shrink-0 items-center gap-1 text-xs text-textSub">{t('Unid.', 'Qty.')}
-                    <input type="number" min={1} max={10} value={Number.isFinite(allocation.quantity) ? allocation.quantity : ''} className={`${field} w-12`}
-                      aria-label={`${t('Cantidad de', 'Quantity of')} ${prize?.name} · ${index + 1}.${groupIndex + 1}`}
-                      onChange={(event) => updateRule(index, { ...rule, groups: rule.groups.map((item, i) => i === groupIndex ? {
-                        allocations: item.allocations.map((entry, n) => n === allocationIndex ? { ...entry, quantity: event.target.valueAsNumber } : entry),
-                      } : item) })} />
-                  </label>
-                  <button type="button" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-base text-textSub hover:bg-white/10" aria-label={`${t('Quitar premio', 'Remove prize')} ${prize?.name} · ${index + 1}.${groupIndex + 1}`}
-                    onClick={() => updateRule(index, { ...rule, groups: rule.groups.map((item, i) => i === groupIndex
-                      ? { allocations: item.allocations.filter((_, n) => n !== allocationIndex) } : item) })}>×</button>
-              </div>
-            })}
-            {group.allocations.length === 0 && <p className="text-xs text-amber-300">{t('Selecciona al menos un premio.', 'Select at least one prize.')}</p>}
-            <select className={`${selectField} w-full`} aria-label={`${t('Añadir premio al grupo', 'Add prize to group')} ${index + 1}.${groupIndex + 1}`}
-              value="" disabled={group.allocations.length >= 8} onChange={(event) => addPrize(index, groupIndex, event.target.value)}>
-              <option value="">{group.allocations.length ? t('Y añadir premio…', 'AND add prize…') : t('Seleccionar premio…', 'Select prize…')}</option>
-              {(['stand', 'kivly'] as const).map((source) => <optgroup key={source} label={source === 'stand' ? 'STAND' : 'Kivly'}>
-                {available.filter((prize) => prize.source === source && !group.allocations.some((item) => item.prizeId === prize.id))
-                  .map((prize) => <option key={prize.id} value={prize.id} disabled={program.catalog.length >= 32 && !program.catalog.some((item) => item.id === prize.id)}>{prize.name}</option>)}
-              </optgroup>)}
-            </select>
-        </div>)}
-        </div>
-        <button type="button" className={`${action} px-2 py-1 text-xs`} disabled={rule.groups.length >= 8}
-          onClick={() => updateRule(index, { ...rule, groups: [...rule.groups, { allocations: [] }] })}>{t('O añadir grupo', 'OR add group')}</button>
-        <p className="text-xs text-textSub">{t('Sale un grupo al azar, con la misma probabilidad. Se entregan sus premios disponibles; los grupos agotados no participan.',
-          'One group is chosen at random with equal probability. Its available prizes are awarded; exhausted groups are excluded.')}</p>
-      </section>)}
-      <button type="button" className={action} disabled={program.rules.length >= 8} onClick={() => change({ ...program,
-        rules: [...program.rules, { id: newId(), condition: 'completed', groups: [{ allocations: [] }] }],
-      })}>{t('Añadir regla', 'Add rule')}</button>
-      <section className="rounded-xl border border-white/10 p-3 space-y-3">
-        <label className="block text-sm font-semibold" htmlFor="stack-delivery-channel">
-          {t('Entrega de premios Kivly', 'Kivly reward delivery')}
-        </label>
-        <select id="stack-delivery-channel" className={`${selectField} w-full`} value={program.deliveryChannel ?? 'wallet'}
-          onChange={(event) => {
-            if (event.target.value === 'wallet' || event.target.value === 'email')
-              change({ ...program, deliveryChannel: event.target.value })
-          }}>
-          <option value="wallet">Wallet</option>
-          <option value="email" disabled={!data.emailAvailable}>Email</option>
-        </select>
-        <p className="text-xs text-textSub">{t('Solo un canal. Los cambios se aplican a nuevas partidas; los premios STAND mantienen su QR.',
-          'One channel only. Changes apply to new games; STAND prizes keep their QR.')}</p>
-        {program.deliveryChannel === 'email' && <p className="text-xs text-textSub">{t(
-          'Enviaremos el premio al email verificado con un QR del teléfono registrado en Kivly. No se necesita wallet.',
-          'We will email the reward to the verified address with a QR of the phone registered in Kivly. No wallet needed.')}</p>}
-        {!data.emailAvailable && <p className="text-xs text-amber-300">{t('El envío de premios por email aún no está habilitado en este entorno.',
-          'Reward email delivery is not enabled in this environment yet.')}</p>}
+      {data.allocations.some(item => item.inventoryReasons && Object.keys(item.inventoryReasons).length > 0) && <section className="space-y-2 text-sm"
+        aria-label={t('Premios no asignados por inventario', 'Prizes not assigned due to inventory')}>
+        <h3 className="font-semibold">{t('Incidencias de inventario por participante', 'Participant inventory issues')}</h3>
+        {data.allocations.map(item => {
+          const reasons = Array.isArray(item.inventoryReasons) ? item.inventoryReasons
+            : Object.entries(item.inventoryReasons ?? {}).map(([prizeId, reason]) => ({ prizeId, reason }))
+          return reasons.map(({ prizeId, reason }) => <p key={`${item.playerId}:${item.ruleId}:${prizeId}`}>
+            #{item.playerId} · {program.catalog.find(prize => prize.id === prizeId)?.name ?? prizeId} · {inventoryReasonText(reason, language)} ({reason})
+          </p>)
+        })}
+      </section>}
+      <p className="text-sm text-textSub">{t(
+        'Las condiciones se configuran desde el icono de ajustes de la partida en Administración > Juegos.',
+        'Configure conditions using the event settings icon in Administration > Games.',
+      )}</p>
+      <section className="rounded-xl border border-white/10 p-3 space-y-2">
+        <h3 className="text-sm font-semibold">{t('Entrega de premios', 'Reward delivery')}</h3>
+        <p className="text-xs text-textSub">{t(
+          'STAND entrega sus premios mediante su tarjeta Wallet y envía el enlace al correo verificado. Si Kivly está conectado, los premios Kivly usan automáticamente su enlace Wallet.',
+          'STAND delivers its prizes through a STAND Wallet pass and emails the link to the verified address. When Kivly is connected, Kivly rewards automatically use their Kivly Wallet link.',
+        )}</p>
+        {!data.emailAvailable && <p className="text-xs text-amber-300">{t(
+          'El envío de premios por correo aún no está habilitado en este entorno.',
+          'Reward email delivery is not enabled in this environment yet.',
+        )}</p>}
       </section>
     </fieldset>
-    {data.awards.some((award) => award.deliveryChannel === 'email') && <section className="rounded-xl border border-white/10 p-3 space-y-3">
+    {data.awards.some((award) => award.emailState) && <section className="rounded-xl border border-white/10 p-3 space-y-3">
       <h3 className="text-sm font-semibold">{t('Envíos de premios por email', 'Reward emails')}</h3>
-      {data.awards.filter((award) => award.deliveryChannel === 'email').map((award) => <div key={award.id} className="text-sm space-y-1">
+      {data.awards.filter((award) => award.emailState).map((award) => <div key={award.id} className="text-sm space-y-1">
         <p>#{award.playerId} · {award.name} · {award.emailState ? emailStates[award.emailState] : award.state}</p>
         {award.emailError && <p role="alert" className="text-amber-300">{award.emailError === 'KivlyPhoneRequired'
           ? t('Falta un teléfono válido en Kivly. Corrige la ficha allí y reintenta el email.',
@@ -983,8 +897,8 @@ export default function StackPrizeSettings({ gameId, raffles, onPersist, onSavin
     </section>}
     </div>
     <div className="settings-footer border-t border-white/10 pt-3">
-      <button type="button" className={`${action} w-full font-semibold`} disabled={busy || validatingImage || !editable || invalidProgram || (!dirty && data.enabled)}
-        onClick={() => void save()}>{busy ? t('Guardando…', 'Saving…') : t('Guardar reglas de premios', 'Save prize rules')}</button>
+      <SaveButton className="w-full" disabled={busy || validatingImage || !editable || invalidProgram || (!dirty && data.enabled)}
+        onClick={() => void save()}>{busy ? t('Guardando…', 'Saving…') : t('Guardar premios', 'Save prizes')}</SaveButton>
     </div>
   </div>
 }

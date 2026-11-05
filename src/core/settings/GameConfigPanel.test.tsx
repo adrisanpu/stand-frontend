@@ -36,7 +36,7 @@ beforeEach(() => {
   vi.mocked(kivlyApi.getAccountConnection).mockResolvedValue({ connected: false, locationId: null, locations: [] })
   vi.mocked(kivlyApi.listRewards).mockResolvedValue([])
   vi.mocked(api.get).mockImplementation(async (url: string) => {
-    if (url.startsWith('/v1/game/infocards')) return { ok: true, cards: [{ id: 'c1', title: 'Hola', body: 'Texto', order: 0 }] }
+    if (url.startsWith('/v1/game/infocards')) return { ok: true, gameId: 'ABC123', cards: [{ id: 'c1', title: 'Hola', body: 'Texto', order: 0 }] }
     return gameResponse()
   })
   vi.mocked(api.put).mockResolvedValue({ ok: true })
@@ -396,7 +396,8 @@ describe('unified game configuration save', () => {
     fireEvent.click(footer())
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(onSaved.mock.calls[0][0]).toMatchObject({ cardLayouts: { c1: 'left' }, playMode: 'mobile', joinChannel: 'web' })
-    expect(api.put).toHaveBeenCalledTimes(1)
+    expect(api.put).toHaveBeenCalledTimes(2)
+    expect(api.put).toHaveBeenCalledWith('/v1/game/infocards', expect.objectContaining({ cardLayouts: { c1: 'left' } }))
   })
 
   it('saves edited INFOCARDS cards through their endpoint before applying', async () => {

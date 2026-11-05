@@ -1,3 +1,4 @@
+import IconButton from '../ui/IconButton'
 import { useEffect, useRef, useState } from 'react'
 import { stackPrizeApi, type StackPrizeSettingsResponse } from '../../api/stackPrizes'
 import { OperatorLanguageSelector, useOperatorLanguage } from '../shell/operatorLanguage'
@@ -13,7 +14,7 @@ export default function StackCloseSettings({ gameId, onBack, onClose, onLeave, o
   const [data, setData] = useState<StackPrizeSettingsResponse | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [confirmation, setConfirmation] = useState<'close' | 'exclude' | null>(null)
+  const [confirmation, setConfirmation] = useState(false)
   const [revision, setRevision] = useState(0)
   const text = useRef(t)
   text.current = t
@@ -23,7 +24,7 @@ export default function StackCloseSettings({ gameId, onBack, onClose, onLeave, o
       try {
         const next = await stackPrizeApi.get(gameId)
         if (next.ok !== true) throw new Error('Invalid closure response')
-        if (!cancelled) { setData(next); setConfirmation(null); setError('') }
+        if (!cancelled) { setData(next); setConfirmation(false); setError('') }
       } catch {
         if (!cancelled) setError(text.current('No se pudo consultar el cierre del juego.', 'Could not load game closure.'))
       }
@@ -31,14 +32,14 @@ export default function StackCloseSettings({ gameId, onBack, onClose, onLeave, o
     void refresh()
     return () => { cancelled = true }
   }, [gameId, revision])
-  const close = async (exclude: boolean) => {
+  const close = async () => {
     if (busy) return
     setBusy(true); onSavingChange(true); setError('')
     try {
-      const next = await stackPrizeApi.close(gameId, exclude ? data?.pendingPlayers.map((player) => player.playerId) : [])
+      const next = await stackPrizeApi.close(gameId)
       if (next.ok !== true) throw new Error('Invalid closure response')
       setData(next)
-      setConfirmation(null)
+      setConfirmation(false)
     } catch {
       setError(t('No se pudo confirmar el cierre. Comprueba el estado antes de reintentar.',
         'Could not confirm closure. Check the state before retrying.'))
@@ -52,32 +53,25 @@ export default function StackCloseSettings({ gameId, onBack, onClose, onLeave, o
         <button type="button" disabled={busy} onClick={onBack} aria-label={t('Volver', 'Back')} className="p-2">←</button>
         <h2 id="stack-close-title" className="text-xl font-semibold flex-1">{t('Cerrar juego', 'Close game')}</h2>
         <OperatorLanguageSelector />
-        <button type="button" disabled={busy} onClick={onClose} aria-label={t('Cerrar', 'Close')} className="p-2">×</button>
+        <IconButton icon="remove" label={t('Cerrar', 'Close')} type="button" disabled={busy} onClick={onClose} />
       </header>
       {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       {!data && !error && <p role="status">{t('Cargando...', 'Loading...')}</p>}
       {data && <>
         <p role="status" className="text-sm text-textSub">{data.state === 'closed'
-          ? t('Juego cerrado. El ranking es definitivo y los premios se conservan.', 'Game closed. The ranking is final and prizes are preserved.')
+          ? t('Partida desactivada. Los premios se conservan; puedes reactivarla desde administración sin reiniciar intentos.', 'Event inactive. Prizes are preserved; reactivate it from administration without resetting attempts.')
           : data.state === 'closing' ? t('Cerrando: las partidas en curso pueden terminar. No se admiten nuevos intentos.', 'Closing: active games may finish. New attempts are blocked.')
-            : t('El cierre es definitivo. Las partidas en curso podrán terminar antes de fijar el ranking y entregar los premios finales.',
-              'Closure is final. Active games may finish before the ranking is finalized and final prizes are awarded.')}</p>
+            : t('Desactivar bloqueará nuevos intentos y esperará los iniciados antes de adjudicar los premios. Podrás reactivar sin reiniciar resultados ni intentos.',
+              'Deactivation blocks new attempts and waits for started attempts before allocating prizes. Reactivation preserves results and consumed attempts.')}</p>
         {data.state === 'closing' && data.pendingPlayers.map((player) => <p key={player.playerId} className="text-sm">{player.name}</p>)}
-        {data.state === 'open' && <button type="button" disabled={busy} className={action} onClick={() => setConfirmation('close')}>{t('Cerrar juego', 'Close game')}</button>}
-        {data.state === 'closing' && <button type="button" disabled={busy} className={action} onClick={() => void close(false)}>{t('Comprobar y finalizar cierre', 'Check and finish closure')}</button>}
-        {data.state === 'closing' && data.pendingPlayers.length > 0 && <button type="button" disabled={busy} className="block text-sm text-amber-300 underline" onClick={() => setConfirmation('exclude')}>
-          {t('Excluir los intentos pendientes', 'Exclude pending attempts')}
-        </button>}
+        {data.state === 'open' && <button type="button" disabled={busy} className={action} onClick={() => setConfirmation(true)}>{t('Desactivar partida', 'Deactivate event')}</button>}
         {confirmation && <div role="alert" className="space-y-3 text-sm">
-          <p>{confirmation === 'exclude'
-            ? t('Los intentos pendientes mostrados se excluirán sin puntuación ni premios. Sus resultados tardíos serán rechazados.',
-              'The pending attempts shown will be excluded without scores or prizes. Late results will be rejected.')
-            : t('Se bloquearán nuevos intentos. Al terminar los pendientes, el ranking será definitivo. Esta acción no se puede deshacer.',
-              'New attempts will be blocked. Once pending games finish, the ranking becomes final. This cannot be undone.')}</p>
-          <button type="button" disabled={busy} className="rounded-xl bg-red-500/20 border border-red-500/30 p-2" onClick={() => void close(confirmation === 'exclude')}>
-            {confirmation === 'exclude' ? t('Confirmar exclusión y cierre', 'Confirm exclusion and close') : t('Confirmar cierre', 'Confirm closure')}
+          <p>{t('Se bloquearán nuevos intentos y se adjudicarán premios al terminar los pendientes. No se celebrarán sorteos automáticamente.',
+            'New attempts will be blocked and prizes allocated after pending attempts finish. Raffles will not run automatically.')}</p>
+          <button type="button" disabled={busy} className="rounded-xl bg-red-500/20 border border-red-500/30 p-2" onClick={() => void close()}>
+            {t('Confirmar desactivación', 'Confirm deactivation')}
           </button>
-          <button type="button" disabled={busy} className="ml-3 underline" onClick={() => setConfirmation(null)}>{t('Cancelar', 'Cancel')}</button>
+          <button type="button" disabled={busy} className="ml-3 underline" onClick={() => setConfirmation(false)}>{t('Cancelar', 'Cancel')}</button>
         </div>}
       </>}
       <div className="flex flex-wrap gap-3">

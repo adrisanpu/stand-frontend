@@ -3,6 +3,7 @@ import { api } from '../../api/api'
 import type { GameConfigProps } from '../../core/types'
 import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
 import { DEFAULT_STACK_CONFIG, isStackConfig, STACK_SKINS, type StackConfig, type StackSkin } from './stackLogic'
 import BlockPreview from './BlockPreview'
@@ -20,13 +21,14 @@ const SKIN_LABELS: Record<StackSkin, string> = {
   baklava: 'Baklava de pistacho',
 }
 
-export default function StackGameConfig({ gameId, onChange, registerSave }: GameConfigProps) {
+export default function StackGameConfig({ gameId, settings, settingsLoaded, onChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
-  const [config, setConfig] = useState<StackConfig>(DEFAULT_STACK_CONFIG)
-  const [status, setStatus] = useState<'loading' | 'ready' | 'saving' | 'saved' | 'error'>('loading')
+  const [config, setConfig] = useState<StackConfig>(settingsLoaded && isStackConfig(settings) ? settings : DEFAULT_STACK_CONFIG)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'saving' | 'saved' | 'error'>(settingsLoaded ? 'ready' : 'loading')
   const [message, setMessage] = useState('')
 
   useEffect(() => {
+    if (settingsLoaded) return
     let cancelled = false
     if (!gameId) {
       setStatus('ready')
@@ -46,7 +48,7 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
         setMessage(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración.')
       })
     return () => { cancelled = true }
-  }, [gameId])
+  }, [gameId, settingsLoaded])
 
   const validate = () => {
     if (status === 'loading') return t('La configuración de STACK aún se está cargando.', 'The STACK configuration is still loading.')
@@ -108,9 +110,7 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
       </label>
       <BlockPreview skin={config.skin ?? 'blocks'} />
       </div>
-      <details className="rounded-xl border border-white/10 p-3">
-      <summary className="cursor-pointer text-sm font-medium">{t('Ajustes avanzados', 'Advanced settings')}</summary>
-      <div className="grid grid-cols-2 gap-4 pt-3">
+      <div className="grid grid-cols-2 gap-3 rounded-xl border border-white/10 p-3">
         {FIELDS.map(({ key, label, min, step }) => (
           <label key={key} className="min-w-0 flex flex-col gap-1">
             <span className="text-sm">{t(label, key === 'initialSpeed' ? 'Initial speed' : key === 'speedIncrement' ? 'Increment per block' : key === 'maxSpeed' ? 'Maximum speed' : 'Perfect tolerance')}</span>
@@ -129,17 +129,16 @@ export default function StackGameConfig({ gameId, onChange, registerSave }: Game
           </label>
         ))}
       </div>
-      </details>
       {message && <p role={status === 'saved' ? 'status' : 'alert'} className="text-sm">{localizeOperatorMessage(message, t)}</p>}
       {!embedded && (
-        <button
+        <SaveButton
           type="button"
           onClick={() => void save()}
           disabled={!gameId || status === 'loading' || status === 'error' || status === 'saving' || !isStackConfig(config)}
-          className="w-full rounded-xl py-3 font-semibold bg-primary/20 border border-primary/30 disabled:opacity-50"
+          className="w-full"
         >
           {status === 'saving' ? t('Guardando...', 'Saving...') : t('Guardar configuración', 'Save configuration')}
-        </button>
+        </SaveButton>
       )}
     </div>
   )

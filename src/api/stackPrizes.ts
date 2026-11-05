@@ -6,10 +6,11 @@ export type StackPrizeItem = {
   id: string
   source: 'stand' | 'kivly'
   name: string
+  sharedPrizeId?: string
   imageKey?: string | null
   imageUrl?: string | null
   limit?: number | null
-  stockTotal: number
+  stockTotal: number | null
   rewardId?: string
   locationId?: string
 }
@@ -55,6 +56,7 @@ export type StackAward = {
 }
 export type StackPlayerPrizes = {
   awards: StackAward[]
+  inventoryReasons?: Record<string, string>
   walletUrl: string | null
   walletExpected?: boolean
   deliveryChannel?: 'wallet' | 'email'
@@ -66,16 +68,32 @@ export type StackPrizeSettingsResponse = {
   enabled: boolean
   emailAvailable?: boolean
   program: StackPrizeProgram
+  programRevision?: string
   state: StackPlayerPrizes['state']
   pendingPlayers: { playerId: number; name: string }[]
   awards: (Omit<StackAward, 'token'> & { playerId: number })[]
-  inventory: { prizeId: string; total: number; remaining: number }[]
-  allocations: { playerId: number; ruleId: string; awarded: { prizeId: string; quantity: number; name: string }[]; state: 'allocated' | 'out_of_stock' | 'not_eligible' }[]
+  inventory: { prizeId: string; total: number | null; remaining: number }[]
+  globalInventory: { prizeId: string; inventoryPrizeId: string | null; remaining: number; reason: string | null }[] | null
+  allocations: {
+    playerId: number
+    ruleId: string
+    awarded: { prizeId: string; quantity: number; name: string }[]
+    state: 'allocated' | 'out_of_stock' | 'not_eligible'
+    inventoryReasons?: Record<string, string> | { prizeId: string; reason: string }[]
+  }[]
 }
 export const stackPrizeApi = {
   get: (gameId: string) => api.get<StackPrizeSettingsResponse>(`/v1/game/stack/prizes?gameId=${encodeURIComponent(gameId)}`),
+  async saveRules(gameId: string, rules: StackPrizeRule[], expectedRevision: string) {
+    const data = await api.put<{ ok: boolean; program: StackPrizeProgram; programRevision: string }>(
+      '/v1/game/stack/prizes', { gameId, action: 'rules', rules, expectedRevision },
+    )
+    if (data?.ok !== true || data.program?.version !== 3 || typeof data.programRevision !== 'string')
+      throw new Error('Reward conditions update not confirmed')
+    return data
+  },
   async save(gameId: string, program: StackPrizeProgram) {
-    const data = await api.put<{ ok: boolean; program: StackPrizeProgram }>('/v1/game/stack/prizes', { gameId, program })
+    const data = await api.put<{ ok: boolean; program: StackPrizeProgram }>('/v1/game/stack/prizes', { gameId, action: 'catalog', program })
     if (data.ok !== true || data.program?.version !== 3) throw new Error('Invalid Stack prize response')
     return data.program
   },

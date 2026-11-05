@@ -11,6 +11,9 @@ export type FrontendPlan = 'free' | 'event' | 'enterprise'
 export interface BackendUser {
   userId: string
   email?: string
+  name?: string
+  profilePhotoKey?: string | null
+  profilePicUrl?: string | null
   plan: BackendPlan
   activeUntil?: string | null
   createdAt?: string
@@ -21,6 +24,9 @@ export interface BackendUser {
 export interface User {
   id: string
   email?: string
+  name?: string
+  profilePhotoKey?: string | null
+  profilePicUrl?: string | null
   plan: FrontendPlan
   activeUntil?: string | null
   createdAt?: string
@@ -33,6 +39,7 @@ interface UseCurrentUserReturn {
   plan: FrontendPlan | null
   loading: boolean
   error: Error | null
+  updateProfile: (profile: Pick<BackendUser, 'name' | 'profilePhotoKey' | 'profilePicUrl' | 'updatedAt'>) => void
 }
 
 export function useCurrentUser(): UseCurrentUserReturn {
@@ -91,6 +98,9 @@ export function useCurrentUser(): UseCurrentUserReturn {
         const frontendUser: User = {
           id: backendUser.userId,
           email: backendUser.email,
+          name: backendUser.name,
+          profilePhotoKey: backendUser.profilePhotoKey,
+          profilePicUrl: backendUser.profilePicUrl,
           plan: normalizedPlan,
           activeUntil: backendUser.activeUntil,
           createdAt: backendUser.createdAt,
@@ -134,6 +144,7 @@ export function useCurrentUser(): UseCurrentUserReturn {
     plan: user?.plan || null,
     loading,
     error,
+    updateProfile: ({ name, profilePhotoKey, profilePicUrl, updatedAt }) => setUser(current =>
+      current ? { ...current, name, profilePhotoKey, profilePicUrl, updatedAt: updatedAt ?? current.updatedAt } : current),
   }
 }
-

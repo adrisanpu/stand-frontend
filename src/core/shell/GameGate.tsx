@@ -15,6 +15,7 @@ const GAME_RE = /^[A-Za-z0-9._-]{1,40}$/
 
 type GameGateProps = {
   onGameCreated: (gameName: string, gameId: string, gameType?: string) => void
+  showHeaderLogo?: boolean
 }
 
 interface UserGame {
@@ -25,7 +26,7 @@ interface UserGame {
   maxPlayers: number
 }
 
-export default function GameGate({ onGameCreated }: GameGateProps){
+export default function GameGate({ onGameCreated, showHeaderLogo = true }: GameGateProps){
   const { t } = useOperatorLanguage()
   const { plan, user } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
@@ -248,7 +249,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
     return (
       <div className="w-full space-y-6">
         {/* Header with Logo */}
-        <div className="flex flex-col items-center mb-6">
+        {showHeaderLogo && <div className="flex flex-col items-center mb-6">
           <div className="h-32 flex items-center justify-center">
             {headerLogoSrc ? (
               <img
@@ -265,7 +266,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
               />
             ) : null}
           </div>
-        </div>
+        </div>}
 
         {/* Games Grid */}
         <div className="space-y-4">
@@ -278,7 +279,7 @@ export default function GameGate({ onGameCreated }: GameGateProps){
                   onClick={() => handleGameSelect(game)}
                   type="button"
                   aria-label={game.name}
-                  className="w-full max-w-[120px] sm:max-w-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-3xl transition-transform duration-150 ease-out hover:scale-[1.04]"
+                  className="w-full max-w-[120px] sm:max-w-[140px] border-0 bg-transparent hover:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-3xl transition-transform duration-150 ease-out hover:scale-[1.04]"
                 >
                   <div className="flex flex-col items-center">
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-[rgba(255,255,255,0.08)] border border-white/10 shadow-[0_10px_25px_rgba(0,0,0,0.55)] flex items-center justify-center overflow-hidden mb-2">

@@ -204,52 +204,84 @@ html.light-mode {
   --color-text-sub: #475569;
 }
 
-/* Light mode button styles - gray background for buttons with text */
-html.light-mode button {
-  background-color: #E5E7EB !important; /* gray-200 - light gray background */
+/* Destructive controls share a tone; other buttons keep their own variants. */
+html body :is(button, [role="button"], a[class*="rounded"][class*="border"], a[class*="rounded"][class*="bg-"]):is(
+  [class^="text-red-"], [class*=" text-red-"],
+  [class^="bg-red-"], [class*=" bg-red-"],
+  [class^="border-red-"], [class*=" border-red-"],
+  [data-tone="danger"]
+) {
+  border-color: rgba(239, 68, 68, 0.4);
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #F87171;
 }
 
-/* Override for buttons that should have transparent background */
-html.light-mode button[class*="bg-transparent"],
-html.light-mode button[class*="bg-none"] {
-  background-color: transparent !important;
+html.light-mode body :is(button, [role="button"], a[class*="rounded"][class*="border"], a[class*="rounded"][class*="bg-"]):is(
+  [class^="text-red-"], [class*=" text-red-"],
+  [class^="bg-red-"], [class*=" bg-red-"],
+  [class^="border-red-"], [class*=" border-red-"],
+  [data-tone="danger"]
+) {
+  color: #B91C1C;
 }
 
-/* Keep hover states for buttons */
-html.light-mode button:hover:not(:disabled):not([class*="bg-transparent"]):not([class*="bg-none"]) {
-  background-color: #D1D5DB !important; /* gray-300 - slightly darker on hover */
+html body [data-tone="danger"]:hover:not(:disabled) {
+  background-color: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.7);
 }
 
-/* Disabled buttons */
-html.light-mode button:disabled {
-  background-color: #F3F4F6 !important; /* gray-100 - lighter when disabled */
-  opacity: 0.6 !important;
+html body nav:not([role="tablist"]) :is(button, a)[class],
+html body nav:not([role="tablist"]) :is(button, a)[class]:is(:hover, :focus-visible, [aria-current="page"]) {
+  background-color: transparent;
+  border-color: transparent;
 }
 
-/* Light mode input/textbox styles - visible border */
-html.light-mode input[type="text"],
-html.light-mode input[type="number"],
-html.light-mode input[type="email"],
-html.light-mode input[type="password"],
-html.light-mode input[type="color"],
-html.light-mode textarea {
-  background-color: #FFFFFF !important; /* white background */
-  border: 2px solid #9CA3AF !important; /* gray-400 - visible border */
-  color: #1F2937 !important; /* gray-800 - dark text */
+html body nav[role="tablist"] button[role="tab"],
+html body nav[role="tablist"] button[role="tab"]:is(:hover, :focus-visible, [aria-selected="true"]) {
+  background-color: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
 }
 
-/* Inputs with specific classes */
-html.light-mode input[class*="bg-"],
-html.light-mode textarea[class*="bg-"] {
-  background-color: #FFFFFF !important;
-  border: 2px solid #9CA3AF !important;
+html body nav[role="tablist"] button[role="tab"][aria-selected="true"] {
+  border-bottom-color: var(--color-primary, #B026FF);
 }
 
-html.light-mode input:focus,
-html.light-mode textarea:focus {
-  border-color: #6366F1 !important; /* indigo-500 - focus color */
-  outline: none !important;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important; /* subtle focus ring */
+/* Match the event-configuration fields without restyling non-text controls. */
+html body :is(
+  input:not([type]),
+  input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
+  textarea
+) {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-main, #F9FAFB);
+  padding: 0.75rem;
+}
+
+html.light-mode body :is(
+  input:not([type]),
+  input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
+  textarea
+) {
+  border-color: #9CA3AF;
+  background-color: #FFFFFF;
+  color: var(--color-text-main, #0F172A);
+}
+
+html body :is(
+  input:not([type]),
+  input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
+  textarea
+):focus {
+  border-color: var(--color-primary, #B026FF);
+  outline: 2px solid rgba(var(--color-primary-rgb, 176, 38, 255), 0.3);
+  outline-offset: 2px;
 }
 
 /* Hide number input spinners (validation code inputs - numeric keyboard on webOS/mobile) */

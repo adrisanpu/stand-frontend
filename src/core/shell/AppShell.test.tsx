@@ -68,6 +68,25 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('game home identity and configuration', () => {
+  it('uses the explicitly selected event instead of the browser cache and returns without terminating it', async () => {
+    const onReturn = vi.fn()
+    vi.mocked(api.get).mockResolvedValue({
+      ok: true, game: { gameType: 'STACK', playMode: 'mobile', joinChannel: 'web' },
+    })
+    render(<AppShell initialGame={{ gameId: 'NEW', gameName: 'NEW_EVENT', gameType: 'STACK' }} onReturnToAdmin={onReturn} />)
+    await screen.findByLabelText('QR de acceso al juego')
+    expect(screen.getByTestId('qr')).toHaveAttribute('data-url', getJoinUrl('NEW', 'web'))
+    expect(localStorage.getItem('gameId')).toBe('NEW')
+    expect(localStorage.getItem('gameName')).toBe('NEW_EVENT')
+    expect(localStorage.getItem('gameType')).toBe('STACK')
+    expect(api.get).toHaveBeenCalledWith('/v1/game?gameId=NEW')
+    expect(api.get).not.toHaveBeenCalledWith('/v1/game?gameId=ABC123')
+    fireEvent.click(screen.getByRole('button', { name: 'Administración' }))
+    expect(onReturn).toHaveBeenCalledOnce()
+    expect(api.put).not.toHaveBeenCalled()
+    expect(localStorage.getItem('gameId')).toBe('NEW')
+  })
+
   it.each([true, false])('uses the shared orientation layout with scrollable content for STACK (portrait=%s)', async (portrait) => {
     state.portrait = portrait
     localStorage.setItem('gameType', 'STACK')
@@ -263,8 +282,8 @@ describe('game home identity and configuration', () => {
     render(<AppShell />)
     await screen.findByLabelText('QR de acceso al juego')
     fireEvent.click(screen.getByRole('button', { name: 'Configuración' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Configurar juego' }))
-    expect(screen.getByRole('dialog', { name: 'Configurar juego' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Registro y acceso' }))
+    expect(screen.getByRole('dialog', { name: 'Registro y acceso' })).toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('region', { name: 'Enlaces del evento' })).toBeInTheDocument())
     expect(screen.queryByText('∞ móviles')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '1 pantalla' })).not.toBeInTheDocument()

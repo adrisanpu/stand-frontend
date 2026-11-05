@@ -3,6 +3,7 @@ import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
 import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
 
 interface GameDataResponse {
@@ -39,7 +40,7 @@ const DEFAULT_SETTINGS: L3trasSettings = {
   validationTimeLimitSeconds: DEFAULT_VALIDATION_TIME_LIMIT_SECONDS,
 }
 
-export default function L3trasGameConfig({ gameId, settings, onChange, registerSave }: GameConfigProps) {
+export default function L3trasGameConfig({ gameId, settings, settingsLoaded, onChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   const [objectiveWord, setObjectiveWord] = useState<string>(
     (settings as L3trasSettings | null)?.objectiveWord || DEFAULT_SETTINGS.objectiveWord
@@ -61,7 +62,7 @@ export default function L3trasGameConfig({ gameId, settings, onChange, registerS
   }, [settings])
 
   useEffect(() => {
-    if (!gameId) return
+    if (!gameId || settingsLoaded) return
     let cancelled = false
     ;(async () => {
       try {
@@ -79,7 +80,7 @@ export default function L3trasGameConfig({ gameId, settings, onChange, registerS
       }
     })()
     return () => { cancelled = true }
-  }, [gameId])
+  }, [gameId, settingsLoaded])
 
   const handleObjectiveWordChange = (value: string) => {
     const cleaned = value.replace(/[^A-Za-z]/g, '').toUpperCase()
@@ -222,13 +223,13 @@ export default function L3trasGameConfig({ gameId, settings, onChange, registerS
       )}
 
       {!embedded && (
-        <button
+        <SaveButton
           onClick={() => void handleSave()}
           disabled={saveStatus === 'saving'}
-          className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors font-medium disabled:opacity-50"
+          className="w-full"
         >
           {t('Guardar configuración', 'Save configuration')}
-        </button>
+        </SaveButton>
       )}
     </div>
   )

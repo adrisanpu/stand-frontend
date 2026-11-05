@@ -23,7 +23,7 @@ describe('STACK operator configuration', () => {
     fireEvent.change(screen.getByLabelText('Velocidad inicial'), { target: { value: '2.5' } })
     fireEvent.change(screen.getByLabelText('Aspecto de las piezas'), { target: { value: 'baklava' } })
     expect(screen.getByTestId('block-preview')).toHaveTextContent('baklava')
-    expect(screen.getByText('Ajustes avanzados').closest('details')).not.toHaveAttribute('open')
+    expect(screen.getByLabelText('Velocidad inicial')).toBeVisible()
     fireEvent.click(save)
     await screen.findByText('Configuración guardada. Se aplicará a los nuevos intentos.')
     expect(api.put).toHaveBeenCalledWith('/v1/game', {

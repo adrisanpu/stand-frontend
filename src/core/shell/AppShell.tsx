@@ -24,27 +24,41 @@ import { usePolling } from '../../hooks/usePolling'
 import type { PrizeCatalog } from '../prizes'
 import type { StackPrizePromotion } from '../../api/stackPrizes'
 import { stackPrizePromotions } from '../widgets/stackPrizePromotions'
+import type { OperatorGame } from '../../api/operatorGames'
 // Logo size on game screens (portrait and landscape) — larger across breakpoints
 // Landscape: slightly smaller so left column fits
 const GAME_SCREEN_LOGO_CLASS_LANDSCAPE = 'h-28 sm:h-32 lg:h-36 xl:h-40 2xl:h-44 w-auto object-contain max-w-full'
 
-export default function AppShell() {
+type AppShellProps = { initialGame?: OperatorGame; onReturnToAdmin?: () => void }
+
+export default function AppShell(props: AppShellProps) {
   return (
     <OperatorLanguageProvider>
-      <AppContent />
+      {props.onReturnToAdmin && <ReturnToAdmin onReturn={props.onReturnToAdmin} />}
+      <AppContent {...props} />
     </OperatorLanguageProvider>
   )
 }
 
-function AppContent() {
+function ReturnToAdmin({ onReturn }: { onReturn: () => void }) {
+  const { t } = useOperatorLanguage()
+  return <button type="button" onClick={onReturn}
+    className="fixed left-3 top-3 z-40 rounded-xl border border-current/20 bg-[var(--color-background)] px-3 py-2 text-sm text-textMain">
+    {t('Administración', 'Administration')}
+  </button>
+}
+
+function AppContent({ initialGame, onReturnToAdmin }: AppShellProps) {
   const { language, t } = useOperatorLanguage()
   const { loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const [showSettings, setShowSettings] = useState(false)
-  const [gameId, setGameId] = useState<string | null>(null)
-  const [gameName, setGameName] = useState<string | null>(null)
-  const [gameType, setGameType] = useState<string | null>(null)
-  const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
+  const [gameId, setGameId] = useState<string | null>(initialGame?.gameId ?? null)
+  const [gameName, setGameName] = useState<string | null>(initialGame?.gameName ?? null)
+  const [gameType, setGameType] = useState<string | null>(initialGame?.gameType ?? null)
+  const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(
+    initialGame ? getGameById(normalizeGameType(initialGame.gameType)) ?? null : null,
+  )
   const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
   const [mediaLoading, setMediaLoading] = useState(true)
   const customLogo = userMedia ? resolveUserSelectedLogoUrl(userMedia) : null
@@ -102,9 +116,9 @@ function AppContent() {
 
   // Load gameId, gameName, and gameType from localStorage on mount
   useEffect(() => {
-    const savedGameId = localStorage.getItem('gameId')
-    const savedGameName = localStorage.getItem('gameName')
-    const savedGameType = localStorage.getItem('gameType')
+    const savedGameId = initialGame?.gameId ?? localStorage.getItem('gameId')
+    const savedGameName = initialGame?.gameName ?? localStorage.getItem('gameName')
+    const savedGameType = initialGame?.gameType ?? localStorage.getItem('gameType')
     
     if (savedGameId && savedGameName) {
       setGameId(savedGameId)
@@ -121,7 +135,7 @@ function AppContent() {
       }
     }
     // No default game - start with catalog
-  }, [])
+  }, [initialGame])
 
   // Persist gameId, gameName, and gameType on change
   useEffect(() => {
@@ -216,6 +230,10 @@ function AppContent() {
   }
 
   const handleLeaveGame = () => {
+    if (onReturnToAdmin) {
+      onReturnToAdmin()
+      return
+    }
     setGameId(null)
     setGameName(null)
     setGameType(null)

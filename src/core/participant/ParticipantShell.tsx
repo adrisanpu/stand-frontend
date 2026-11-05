@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
 import { normalizeGameType } from '../gameTypeMap'
-import { PublicApiError, publicApi, isStackAssignment, type PublicGameResponse, type PlayerAssignment, type T1merAssignment, type StackAssignment, type ImpostorAssignment } from '../../api/publicApi'
+import { PublicApiError, publicApi, isStackAssignment, type PublicGameResponse, type PlayerAssignment, type T1merAssignment, type StackAssignment, type ImpostorAssignment, type NativePrizeAward, type PlayerResponse } from '../../api/publicApi'
 import { clearPlayerSession, loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
 import { GAME_ACCESS_CAPABILITIES, resolveGameAccess } from '../settings/gameAccess'
 import JoinForm from './JoinForm'
@@ -11,6 +11,7 @@ import ParticipantPrizePromo from './ParticipantPrizePromo'
 import AssignmentView from './AssignmentView'
 import ValidateView from './ValidateView'
 import ResultView from './ResultView'
+import NativePrizeClaims from './NativePrizeClaims'
 import T1merParticipantPlay from '../../games/t1mer/ParticipantPlay'
 import T1merParticipantResult from '../../games/t1mer/ParticipantResult'
 import StackParticipantPlay from '../../games/stack/ParticipantPlay'
@@ -99,6 +100,8 @@ function ParticipantContent() {
     difference: number
     rank: number | null
   } | null>(null)
+  const [nativeAwards, setNativeAwards] = useState<NativePrizeAward[]>([])
+  const [prizeUnavailable, setPrizeUnavailable] = useState<NonNullable<PlayerResponse['prizeUnavailable']>>([])
 
   const currentGameMeta = gameMeta?.gameId === gameId ? gameMeta : null
   const gameType = currentGameMeta ? normalizeGameType(currentGameMeta.gameType) : ''
@@ -185,6 +188,8 @@ function ParticipantContent() {
     setStep('loading')
     setError(null)
     setPhotoUploadWarning(false)
+    setNativeAwards([])
+    setPrizeUnavailable([])
     setStackAssignment(null)
     setImpostorAssignment(null)
     setRulet4Assignment(null)
@@ -198,7 +203,7 @@ function ParticipantContent() {
         if (cancelled) return
         const closedStack = normalizeGameType(meta.gameType) === 'STACK'
           && (meta.stackPrizeState === 'closing' || meta.stackPrizeState === 'closed')
-        if (!meta.ok || meta.gameId !== gameId || (!meta.isActive && !closedStack)) {
+        if (!meta.ok || meta.gameId !== gameId || (!meta.isActive && !closedStack && !meta.lifecycleState)) {
           setStep('unsupported')
           return
         }
@@ -222,7 +227,7 @@ function ParticipantContent() {
               clearPlayerSession(gameId)
               setPlayerToken(null)
               setT1merResult(null)
-              setStep('join')
+              setStep(meta.isActive ? 'join' : 'unsupported')
               return
             }
             throw sessionError
@@ -231,9 +236,14 @@ function ParticipantContent() {
           if (!player.ok || player.gameId !== gameId || normalizeGameType(player.gameType) !== gt || !player.playerToken) {
             throw new Error('El enlace o la sesión de participante no es válido.')
           }
-          applyAssignment(meta, player.playerToken, player.assignment)
+          setNativeAwards(player.nativePrizes ?? [])
+          setPrizeUnavailable(player.prizeUnavailable ?? [])
+          if (!meta.isActive && gt !== 'STACK') {
+            setPlayerToken(player.playerToken)
+            setStep('registered')
+          } else applyAssignment(meta, player.playerToken, player.assignment)
         } else {
-          setStep('join')
+          setStep(meta.isActive ? 'join' : 'unsupported')
         }
       } catch (e) {
         if (!cancelled) {
@@ -317,8 +327,8 @@ function ParticipantContent() {
 
           {step === 'registered' && (
             <div className="text-center space-y-2">
-              <h1 className="text-xl font-bold">{t('¡Ya estás dentro!')}</h1>
-              <p className="text-sm text-textSub">{t('Sigue las instrucciones del evento para jugar.')}</p>
+              <h1 className="text-xl font-bold">{t(gameMeta?.isActive ? '¡Ya estás dentro!' : 'Juego no disponible')}</h1>
+              {gameMeta?.isActive && <p className="text-sm text-textSub">{t('Sigue las instrucciones del evento para jugar.')}</p>}
             </div>
           )}
 
@@ -381,6 +391,8 @@ function ParticipantContent() {
               showPrizePromo={false}
             />
           )}
+          {(gameType !== 'STACK' || !currentGameMeta?.lifecycleState || nativeAwards.length > 0) && playerToken
+            && <NativePrizeClaims key={`${gameId}:${playerToken}`} gameId={gameId} playerToken={playerToken} initialAwards={nativeAwards} initialUnavailable={prizeUnavailable} />}
         </div>
         </div>
         </div>

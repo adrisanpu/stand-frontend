@@ -73,6 +73,7 @@ export type PublicGameResponse = {
   appearance?: ParticipantAppearance
   gameType: string
   isActive: boolean
+  lifecycleState?: 'active' | 'closing' | 'inactive'
   playMode?: 'master' | 'mobile'
   joinChannel?: string
   participantFields?: ParticipantFieldsConfig
@@ -301,6 +302,16 @@ export type PlayerPrize = {
   delivered: boolean
 }
 
+export type NativePrizeAward = {
+  id: string
+  name: string
+  imageUrl?: string | null
+  state: 'available' | 'delivered'
+  token?: string | null
+  emailState?: 'pending' | 'sending' | 'accepted' | 'failed' | 'reconciliation_required' | null
+  emailError?: string | null
+}
+
 export type PlayerResponse = {
   ok: boolean
   gameId: string
@@ -310,6 +321,8 @@ export type PlayerResponse = {
   prizes: PlayerPrize[]
   prizeCatalog?: PrizeCatalog
   stackPrizes?: import('./stackPrizes').StackPlayerPrizes
+  nativePrizes?: NativePrizeAward[]
+  prizeUnavailable?: { condition: string; reason: string }[]
 }
 
 export type RedeemResponse = {
@@ -335,6 +348,17 @@ export type PublicScoreResponse = {
 }
 
 export const publicApi = {
+  walletPassUrl(token: string, platform: 'apple' | 'google'): string {
+    const base = (API_BASE_URL ?? '').replace(/\/+$/, '')
+    return `${base}/v1/public/wallet/pass?${new URLSearchParams({ token, platform })}`
+  },
+  async retryRewardEmail(gameId: string, playerToken: string, awardId: string): Promise<void> {
+    const data = await publicRequest<{ ok: boolean }>('/v1/public/reward-email/retry', {
+      method: 'POST',
+      body: JSON.stringify({ gameId, playerToken, awardId }),
+    })
+    if (data?.ok !== true) throw new Error('Reward email retry not confirmed')
+  },
   async completionReward(gameId: string, playerToken: string): Promise<KivlyCompletionReward> {
     const data = await publicRequest<{ ok: boolean; reward: KivlyCompletionReward }>('/v1/public/kivly/reward', {
       method: 'POST',

@@ -1,3 +1,4 @@
+import IconButton from '../ui/IconButton'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/api'
 import { OperatorLanguageSelector, useOperatorLanguage } from '../shell/operatorLanguage'
@@ -92,17 +93,7 @@ export default function GamePlayersSettings({ gameId, onBack, onClose }: Props) 
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <OperatorLanguageSelector />
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={busyPlayerId !== null}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40"
-              aria-label={t('Cerrar configuración', 'Close settings')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <IconButton icon="remove" label={t('Cerrar configuración', 'Close settings')} type="button" onClick={onClose} disabled={busyPlayerId !== null} />
           </div>
         </div>
 

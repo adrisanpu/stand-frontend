@@ -3,6 +3,7 @@ import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
 import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
 
 interface GameDataResponse {
@@ -129,14 +130,14 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange,
       )}
 
       {!embedded && (
-        <button
+        <SaveButton
           type="button"
           onClick={() => void handleSave()}
           disabled={!loaded || saveStatus === 'saving'}
-          className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full"
         >
           {saveStatus === 'saving' ? t('Guardando...', 'Saving...') : t('Guardar configuración', 'Save configuration')}
-        </button>
+        </SaveButton>
       )}
     </div>
   )

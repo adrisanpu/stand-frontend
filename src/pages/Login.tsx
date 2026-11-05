@@ -31,7 +31,7 @@ const linkClass = 'text-sm text-textSub hover:text-textMain underline-offset-2 h
 
 export default function Login() {
   const [searchParams] = useSearchParams()
-  const returnUrl = searchParams.get('returnUrl') || '/home'
+  const returnUrl = searchParams.get('returnUrl') || '/admin/games'
   const { setAuth } = useAuth()
   const navigate = useNavigate()
   const standLogo = useStandLogo()

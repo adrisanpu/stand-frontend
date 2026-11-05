@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
-import AppShell from './core/shell/AppShell'
+import AdminShell from './core/admin/AdminShell'
+import GameHomeEntry from './core/admin/GameHomeEntry'
 import Login from './pages/Login'
 import Logout from './auth/Logout'
 import BillingSuccess from './pages/BillingSuccess'
@@ -21,7 +22,7 @@ function RootRedirect() {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
-  return <Navigate to="/home" replace />
+  return <Navigate to="/admin/games" replace />
 }
 
 function AppRoutes() {
@@ -50,10 +51,14 @@ function AppRoutes() {
       <Route path="/display/:gameId" element={<Navigate to="/home" replace />} />
       <Route path="/redeem/:gameId" element={<ValidatorShell />} />
       <Route
+        path="/admin/*"
+        element={<ProtectedRoute><AdminShell /></ProtectedRoute>}
+      />
+      <Route
         path="/home/*"
         element={
           <ProtectedRoute>
-            <AppShell />
+            <GameHomeEntry />
           </ProtectedRoute>
         }
       />

@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { GameConfigSaveRegistration, GameDefinition } from '../types'
 import { getRedeemUrl, getWebPlayUrl } from '../lib/joinUrl'
 import QRCode from '../widgets/QRCode'
+import SaveButton from '../ui/SaveButton'
 import { translateGameAccessMessage, useGameAccessDraft } from './GameAccessSettings'
 import { GAME_ACCESS_CAPABILITIES, resolveGameAccess, type GameAccess } from './gameAccess'
 import { saveErrorMessage } from './gameConfigSave'
@@ -19,6 +20,7 @@ type Props = {
   /** Called once after access and game rules were all persisted successfully. */
   onSaved: (patch: GameConfigSavedPatch) => void
   onSavingChange?: (saving: boolean) => void
+  registrationOnly?: boolean
 }
 
 type SaveState =
@@ -32,13 +34,13 @@ export const GAME_CONFIG_SAVE_LABEL = 'Guardar y aplicar cambios'
  * Shared "Configurar juego" body: fixed mobile/Web access, optional game-specific config and one
  * footer button that persists everything together.
  */
-export default function GameConfigPanel({ gameId, gameDefinition, settings, onSettingsChange, onSaved, onSavingChange }: Props) {
+export default function GameConfigPanel({ gameId, gameDefinition, settings, onSettingsChange, onSaved, onSavingChange, registrationOnly = false }: Props) {
   const { t } = useOperatorLanguage()
   const accessDraft = useGameAccessDraft(gameId, gameDefinition.id)
   const isStack = gameDefinition.id.toUpperCase() === 'STACK'
   const kivly = useKivlyDraft(gameId, isStack)
   const participantFields = accessDraft.participantFields
-  const GameConfigComponent = gameDefinition.GameConfigComponent
+  const GameConfigComponent = registrationOnly ? undefined : gameDefinition.GameConfigComponent
   const rulesSaveRef = useRef<GameConfigSaveRegistration | null>(null)
   const savingRef = useRef(false)
   const pendingPatchRef = useRef<Record<string, unknown>>({})
@@ -211,14 +213,14 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
           <p role="alert" className="text-sm text-red-300">{translateSaveError(saveState.message)}</p>
         )}
         {saving && <p role="status" className="text-sm text-textSub">{t('Guardando cambios...', 'Saving changes...')}</p>}
-        <button
+        <SaveButton
           type="button"
           onClick={() => void handleSave()}
           disabled={saving || accessDraft.status !== 'ready'}
-          className="w-full rounded-xl p-3 font-medium bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full"
         >
           {saving ? t('Guardando...', 'Saving...') : t(GAME_CONFIG_SAVE_LABEL, 'Save and apply changes')}
-        </button>
+        </SaveButton>
       </div>
     </>
   )

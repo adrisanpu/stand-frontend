@@ -3,6 +3,7 @@ import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
 import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
 
 type ImpostorSettings = {
@@ -18,7 +19,7 @@ type GameDataResponse = {
 
 const DEFAULT_WORDS = ['playa', 'montana', 'pizza', 'cine', 'futbol', 'musica']
 
-export default function ImpostorGameConfig({ gameId, settings, onChange, registerSave }: GameConfigProps) {
+export default function ImpostorGameConfig({ gameId, settings, settingsLoaded, onChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   const s = (settings || {}) as ImpostorSettings
   const [maxPlayers, setMaxPlayers] = useState<number>(s.maxPlayers ?? 8)
@@ -34,7 +35,7 @@ export default function ImpostorGameConfig({ gameId, settings, onChange, registe
   )
 
   useEffect(() => {
-    if (!gameId) return
+    if (!gameId || settingsLoaded) return
     let cancelled = false
     ;(async () => {
       try {
@@ -51,7 +52,7 @@ export default function ImpostorGameConfig({ gameId, settings, onChange, registe
     return () => {
       cancelled = true
     }
-  }, [gameId])
+  }, [gameId, settingsLoaded])
 
   const persist = async () => {
     const payload: ImpostorSettings = {
@@ -108,13 +109,13 @@ export default function ImpostorGameConfig({ gameId, settings, onChange, registe
 
       {status && <p className="text-sm text-gray-300">{localizeOperatorMessage(status, t)}</p>}
       {!embedded && (
-        <button
+        <SaveButton
           type="button"
           onClick={save}
-          className="w-full p-3 rounded-xl bg-primary/25 border border-primary/45 hover:bg-primary/35 transition-colors font-medium"
+          className="w-full"
         >
           {t('Guardar configuración', 'Save configuration')}
-        </button>
+        </SaveButton>
       )}
     </div>
   )

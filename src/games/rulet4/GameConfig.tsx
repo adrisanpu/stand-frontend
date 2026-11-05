@@ -2,25 +2,27 @@ import { useState, useEffect, useRef } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import SaveButton from '../../core/ui/SaveButton'
 import { api } from '../../api/api'
 import { DEFAULT_RULET4_CONFIG, isRulet4Config, type Rulet4Settings, type Rulet4PanelConfig } from './rulet4Logic'
 
 export type { Rulet4PanelConfig, Rulet4Settings } from './rulet4Logic'
 
-export default function Rulet4GameConfig({ gameId, onChange, registerSave }: GameConfigProps) {
+export default function Rulet4GameConfig({ gameId, settings, settingsLoaded, onChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   const translateRef = useRef(t)
   translateRef.current = t
   const [panels, setPanels] = useState<Rulet4PanelConfig[]>(
-    DEFAULT_RULET4_CONFIG.panels
+    settingsLoaded && isRulet4Config(settings) ? settings.panels : DEFAULT_RULET4_CONFIG.panels
   )
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(settingsLoaded ? 'ready' : 'loading')
   const [message, setMessage] = useState('')
   const [saveFailed, setSaveFailed] = useState(false)
   const [reload, setReload] = useState(0)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
+    if (settingsLoaded) return
     let cancelled = false
     setStatus('loading')
     setMessage('')
@@ -44,7 +46,7 @@ export default function Rulet4GameConfig({ gameId, onChange, registerSave }: Gam
         setMessage(cause instanceof Error ? cause.message : translateRef.current('No se pudo cargar la configuración.', 'Could not load settings.'))
       })
     return () => { cancelled = true }
-  }, [gameId, reload])
+  }, [gameId, reload, settingsLoaded])
 
   const handleAddPanel = () => {
     const newId = String(Date.now())
@@ -185,12 +187,12 @@ export default function Rulet4GameConfig({ gameId, onChange, registerSave }: Gam
       </button>
 
       {!embedded && (
-        <button
+        <SaveButton
           onClick={() => void save()}
-          className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors font-medium"
+          className="w-full"
         >
           {t('Guardar configuración', 'Save configuration')}
-        </button>
+        </SaveButton>
       )}
       </fieldset>
     </div>

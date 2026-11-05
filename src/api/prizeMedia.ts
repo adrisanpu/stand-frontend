@@ -71,10 +71,11 @@ export async function savePrizeCatalog(gameId: string, catalog: PrizeCatalog): P
     const prize = catalog[slot]
     if (!prize) continue
     const durable: GamePrize = { name: prize.name, limit: prize.limit }
+    if (prize.sharedPrizeId !== undefined) durable.sharedPrizeId = prize.sharedPrizeId
     if (prize.topX !== undefined) durable.topX = prize.topX
     if (prize.imageKey !== undefined) durable.imageKey = prize.imageKey
     prizeCatalog[slot] = durable
   }
-  const result = await api.put<{ ok?: boolean }>('/v1/game', { gameId, prizeCatalog })
+  const result = await api.put<{ ok?: boolean }>('/v1/game', { gameId, prizeCatalog, preserveRewardConditions: true })
   if (result?.ok === false) throw new Error('Server rejected prize settings')
 }

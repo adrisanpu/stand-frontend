@@ -1,9 +1,11 @@
+import IconButton from '../ui/IconButton'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { kivlyApi, type KivlyAccountConnection, type KivlyClubSettings } from '../../api/kivlyApi'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import { PRIVACY_POLICY_URL } from '../ui/gameLegalCopy'
+import SaveButton from '../ui/SaveButton'
 
-type Props = { onBack: () => void; onClose: () => void }
+type Props = { onBack: () => void; onClose: () => void; embedded?: boolean }
 
 function defaultClub(connection: KivlyAccountConnection): KivlyClubSettings {
   return {
@@ -27,7 +29,7 @@ function connectionError(cause: unknown, t: (spanish: string, english?: string) 
   return t('No se pudo comprobar la conexión con Kivly. Vuelve a intentarlo.', 'Could not check the Kivly connection. Try again.')
 }
 
-export default function IntegrationsSettings({ onBack, onClose }: Props) {
+export default function IntegrationsSettings({ onBack, onClose, embedded = false }: Props) {
   const { t } = useOperatorLanguage()
   const text = useRef(t)
   text.current = t
@@ -123,14 +125,15 @@ export default function IntegrationsSettings({ onBack, onClose }: Props) {
   }
   const field = 'w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm'
   const action = 'rounded-xl border border-primary/30 bg-primary/20 px-3 py-2 text-sm hover:bg-primary/30 disabled:opacity-50'
-  return <div role="dialog" aria-modal="true" aria-labelledby="integrations-title" className="fixed inset-0 z-50 flex items-center justify-center p-6">
-    <div className="absolute inset-0 bg-black/70" onClick={() => { if (!busy) onClose() }} aria-hidden="true" />
-    <div className="relative card w-full max-w-md p-4 max-h-[90vh] flex flex-col">
-      <header className="flex items-center gap-2 mb-3">
+  return <div role={embedded ? 'region' : 'dialog'} aria-modal={embedded ? undefined : true} aria-label={embedded ? t('Conexiones disponibles', 'Available connections') : undefined}
+    aria-labelledby={embedded ? undefined : 'integrations-title'} className={embedded ? '' : 'fixed inset-0 z-50 flex items-center justify-center p-6'}>
+    {!embedded && <div className="absolute inset-0 bg-black/70" onClick={() => { if (!busy) onClose() }} aria-hidden="true" />}
+    <div className={`relative card w-full p-4 flex flex-col ${embedded ? 'max-w-2xl' : 'max-w-md max-h-[90vh]'}`}>
+      {!embedded && <header className="flex items-center gap-2 mb-3">
         <button type="button" disabled={busy} onClick={onBack} className="p-2 rounded-full hover:bg-white/10" aria-label={t('Volver', 'Back')}>←</button>
         <h2 id="integrations-title" className="text-xl font-semibold">{t('Integraciones', 'Integrations')}</h2>
-        <button type="button" disabled={busy} onClick={onClose} className="ml-auto p-2 rounded-full hover:bg-white/10" aria-label={t('Cerrar configuración', 'Close settings')}>×</button>
-      </header>
+        <IconButton icon="remove" label={t('Cerrar configuración', 'Close settings')} type="button" disabled={busy} onClick={onClose} className="ml-auto" />
+      </header>}
       <div className="overflow-y-auto">
         <details className="rounded-xl border border-white/10" onToggle={(event) => {
           if (!event.currentTarget.open) { setClientId(''); setClientSecret(''); setConfirmDisconnect(false) }
@@ -170,7 +173,7 @@ export default function IntegrationsSettings({ onBack, onClose }: Props) {
                     value={club.storefrontUrl ?? ''} onChange={(event) => setClub({ ...club, storefrontUrl: event.target.value })} />
                 </label>
                 <p className="text-xs text-textSub">{t('Compartida por todos tus STACK. Solo el origen, sin rutas ni identificadores.', 'Shared by all your STACK games. Origin only, without paths or identifiers.')}</p>
-                <button type="submit" disabled={busy} className={action}>{t('Guardar web del club', 'Save club website')}</button>
+                <SaveButton type="submit" disabled={busy}>{t('Guardar web del club', 'Save club website')}</SaveButton>
               </form>}
             </>}
             {confirmDisconnect && <div className="space-y-2 text-sm">

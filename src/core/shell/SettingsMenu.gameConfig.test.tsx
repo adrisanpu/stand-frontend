@@ -37,7 +37,7 @@ function openConfig() {
   const onClose = vi.fn()
   const onConfigSaved = vi.fn()
   render(<SettingsMenu onClose={onClose} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} onConfigSaved={onConfigSaved} />)
-  fireEvent.click(screen.getByText('Configurar juego'))
+  fireEvent.click(screen.getByText('Registro y acceso'))
   return { onClose, onConfigSaved }
 }
 
@@ -53,10 +53,10 @@ describe('SettingsMenu Configurar juego', () => {
     vi.mocked(api.post).mockResolvedValue({ ...state, state: 'closed' })
     render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="STACK" gameDefinition={{ ...l3tras, id: 'STACK' }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar juego' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Cerrar juego' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Desactivar partida' }))
     expect(api.post).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cierre' }))
-    await screen.findByText(/Juego cerrado. El ranking es definitivo/)
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar desactivación' }))
+    await screen.findByText(/Partida desactivada/)
     expect(api.post).toHaveBeenCalledWith('/v1/game/stack/prizes', { gameId: 'ABC123', excludePlayerIds: [] })
     expect(api.put).not.toHaveBeenCalled()
   })
@@ -67,7 +67,7 @@ describe('SettingsMenu Configurar juego', () => {
       locationId: 'location', locations: [{ id: 'location', name: 'Club' }],
     })
     render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="STACK" gameDefinition={{ ...l3tras, id: 'STACK' }} />)
-    expect(await screen.findByRole('button', { name: /Configurar juego/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Registro y acceso/ })).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: 'Kivly conectado' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Integraciones' })).not.toBeInTheDocument()
     account.mockRestore()
@@ -86,43 +86,43 @@ describe('SettingsMenu Configurar juego', () => {
     expect(screen.getByRole('button', { name: 'Integraciones' })).toBeInTheDocument()
   })
 
-  it('preserves menu icon colors while theming action buttons inside submenus', async () => {
+  it('keeps prize administration and raffle operations out of the home settings menu', async () => {
     render(<SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />)
-    const quiz = screen.getByRole('button', { name: /Quiz/ })
-    expect(quiz.querySelector('svg')).toHaveClass('text-green-400')
-    const raffle = screen.getByRole('button', { name: /Sorteo/ })
-    expect(raffle.querySelector('svg')).toHaveClass('text-purple-400')
-    fireEvent.click(screen.getByText('Configurar juego'))
+    expect(screen.queryByRole('button', { name: 'Premios' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Sorteo/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registro y acceso' })).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Registro y acceso'))
     await waitFor(() => expect(footer()).toBeEnabled())
     expect(footer()).toHaveClass('bg-primary/20', 'border-primary/30', 'hover:bg-primary/30')
   })
 
-  it('keeps unsaved rules when changing language beside the close button', async () => {
+  it('keeps unsaved registration when changing language without mounting game mechanics', async () => {
     render(
       <OperatorLanguageProvider>
         <SettingsMenu onClose={vi.fn()} gameId="ABC123" gameType="L3TRAS" gameDefinition={l3tras} />
       </OperatorLanguageProvider>
     )
-    fireEvent.click(screen.getByText('Configurar juego'))
+    fireEvent.click(screen.getByText('Registro y acceso'))
     await waitFor(() => expect(footer()).toBeEnabled())
-    fireEvent.change(screen.getByPlaceholderText('STAND'), { target: { value: 'PIZZA' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Mostrar teléfono (opcional)' }))
     const requests = vi.mocked(api.get).mock.calls.length
     fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
-    expect(screen.getByPlaceholderText('STAND')).toHaveValue('PIZZA')
+    expect(screen.getByRole('checkbox', { name: 'Show phone (optional)' })).toBeChecked()
+    expect(screen.queryByPlaceholderText('STAND')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save and apply changes' })).toBeEnabled()
     expect(api.put).not.toHaveBeenCalled()
     expect(api.get).toHaveBeenCalledTimes(requests)
     expect(JSON.parse(localStorage.getItem('L3TRAS_settings_ABC123') ?? '{}')).toEqual({ objectiveWord: 'STAND' })
     fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), { target: { value: 'es' } })
-    expect(screen.getByPlaceholderText('STAND')).toHaveValue('PIZZA')
+    expect(screen.getByRole('checkbox', { name: 'Mostrar teléfono (opcional)' })).toBeChecked()
     expect(footer()).toBeEnabled()
   })
 
-  it('saves access and rules with one button, then applies and closes', async () => {
+  it('saves only registration and access, preserving existing game rules', async () => {
     const { onClose, onConfigSaved } = openConfig()
     await waitFor(() => expect(footer()).toBeEnabled())
     expect(screen.getAllByRole('button', { name: /guardar/i })).toHaveLength(1)
-    fireEvent.change(screen.getByPlaceholderText('STAND'), { target: { value: 'pizza' } })
+    expect(screen.queryByPlaceholderText('STAND')).not.toBeInTheDocument()
     expect(api.put).not.toHaveBeenCalled()
     fireEvent.click(footer())
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
@@ -130,26 +130,23 @@ describe('SettingsMenu Configurar juego', () => {
       gameId: 'ABC123', playMode: 'mobile', joinChannel: 'web',
       participantFields: { email: { required: true }, phone: { required: false, enabled: false } },
     })
-    expect(api.put).toHaveBeenCalledWith('/v1/game', {
-      gameId: 'ABC123',
-      settings: { l3tras: { objectiveWord: 'PIZZA', validationTimeLimitSeconds: 60 } },
-    })
+    expect(api.put).toHaveBeenCalledTimes(1)
     expect(onConfigSaved).toHaveBeenCalledTimes(1)
     expect(JSON.parse(localStorage.getItem('L3TRAS_settings_ABC123') ?? '{}')).toEqual({
-      objectiveWord: 'PIZZA', validationTimeLimitSeconds: 60, playMode: 'mobile', joinChannel: 'web',
+      objectiveWord: 'STAND', playMode: 'mobile', joinChannel: 'web',
       participantFields: { email: { required: true }, phone: { required: false, enabled: false } },
     })
   })
 
-  it('stays open without applying when the rules save fails', async () => {
-    vi.mocked(api.put).mockResolvedValueOnce({ ok: true }).mockRejectedValueOnce(new Error('Servidor caído'))
+  it('stays open without applying when registration save fails', async () => {
+    vi.mocked(api.put).mockRejectedValueOnce(new Error('Servidor caído'))
     const { onClose, onConfigSaved } = openConfig()
     await waitFor(() => expect(footer()).toBeEnabled())
     fireEvent.click(footer())
     expect(await screen.findByRole('alert')).toHaveTextContent('Servidor caído')
     expect(onClose).not.toHaveBeenCalled()
     expect(onConfigSaved).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog', { name: 'Configurar juego' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Registro y acceso' })).toBeInTheDocument()
     expect(JSON.parse(localStorage.getItem('L3TRAS_settings_ABC123') ?? '{}')).toEqual({ objectiveWord: 'STAND' })
   })
 
@@ -161,7 +158,7 @@ describe('SettingsMenu Configurar juego', () => {
     await screen.findByRole('button', { name: 'Guardando...' })
     expect(screen.getByRole('button', { name: 'Cerrar y volver al juego' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar y volver al juego' }))
-    expect(screen.getByRole('dialog', { name: 'Configurar juego' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Registro y acceso' })).toBeInTheDocument()
   })
 
   it('lists players and removes one only after confirmation', async () => {

@@ -1,13 +1,14 @@
+import IconButton from '../ui/IconButton'
 import { useState, useEffect, useRef } from 'react'
-import Raffle from '../widgets/Raffle'
 import Quiz from '../widgets/Quiz'
 import AppearanceSettings from '../settings/AppearanceSettings'
+import AccountInformation from '../settings/AccountInformation'
 import IntegrationsSettings from '../settings/IntegrationsSettings'
 import StackCloseSettings from '../settings/StackCloseSettings'
 import GamePlayersSettings from '../settings/GamePlayersSettings'
-import OperatorPrizeSettings from '../settings/OperatorPrizeSettings'
 import type { GameDefinition } from '../types'
 import { api } from '../../api/api'
+import { setOperatorGameActive } from '../../api/operatorGames'
 import { useAuth } from '../../auth/AuthContext'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
@@ -25,48 +26,9 @@ type SettingsMenuProps = {
   onConfigSaved?: () => void
 }
 
-function Countdown({ targetDate }: { targetDate: string }) {
-  const { t } = useOperatorLanguage()
-  const [timeLeft, setTimeLeft] = useState<string>('')
-
-  useEffect(() => {
-    const updateCountdown = () => {
-      try {
-        const target = new Date(targetDate).getTime()
-        const difference = target - Date.now()
-
-        if (difference <= 0) {
-          setTimeLeft('expired')
-          return
-        }
-
-        const days = Math.floor(difference / (1000 * 60 * 60 * 24))
-        const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
-        const seconds = Math.floor((difference % (1000 * 60)) / 1000)
-
-        if (days > 0) setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`)
-        else if (hours > 0) setTimeLeft(`${hours}h ${minutes}m ${seconds}s`)
-        else if (minutes > 0) setTimeLeft(`${minutes}m ${seconds}s`)
-        else setTimeLeft(`${seconds}s`)
-      } catch {
-        setTimeLeft('error')
-      }
-    }
-
-    updateCountdown()
-    const interval = setInterval(updateCountdown, 1000)
-    return () => clearInterval(interval)
-  }, [targetDate])
-
-  return <span>{timeLeft === 'expired' ? t('Expirado', 'Expired') : timeLeft === 'error' ? t('Error', 'Error') : timeLeft}</span>
-}
-
 export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition, onLeaveGame, onExitApp, onConfigSaved }: SettingsMenuProps) {
-  const [showRaffle, setShowRaffle] = useState(false)
   const [showQuiz, setShowQuiz] = useState(false)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
-  /** tras 1er clic en «Terminar el juego» mostramos el aviso irreversible; 2º clic continúa */
   const [terminateIrreversibleAck, setTerminateIrreversibleAck] = useState(false)
   const [isTerminating, setIsTerminating] = useState(false)
   const closingBusyRef = useRef(false)
@@ -79,9 +41,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [exportQuizError, setExportQuizError] = useState<string | null>(null)
   const [showGameConfig, setShowGameConfig] = useState(false)
   const [showGamePlayers, setShowGamePlayers] = useState(false)
-  const [showOperatorPrizes, setShowOperatorPrizes] = useState(false)
-  const [prizeSaving, setPrizeSaving] = useState(false)
-  const prizeSavingRef = useRef(false)
   const [gameSettings, setGameSettings] = useState<any>(null)
   const gameSettingsRef = useRef(gameSettings)
   gameSettingsRef.current = gameSettings
@@ -91,9 +50,8 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const [showAppearanceSettings, setShowAppearanceSettings] = useState(false)
   const [showIntegrations, setShowIntegrations] = useState(false)
   const [showUserInfo, setShowUserInfo] = useState(false)
-  const [isStartingCheckout, setIsStartingCheckout] = useState(false)
   const { logout } = useAuth()
-  const { language, t } = useOperatorLanguage()
+  const { t } = useOperatorLanguage()
   const { user, loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
 
@@ -115,27 +73,23 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const settingsMainListRef = useRef<HTMLDivElement>(null)
 
   const modalSnapRef = useRef({
-    showRaffle: false,
     showQuiz: false,
     showExitConfirm: false,
     showExportQuiz: false,
     showExportShareOptions: false,
     showGameConfig: false,
     showGamePlayers: false,
-    showOperatorPrizes: false,
     showAppearanceSettings: false,
     showIntegrations: false,
     showUserInfo: false,
   })
   modalSnapRef.current = {
-    showRaffle,
     showQuiz,
     showExitConfirm,
     showExportQuiz,
     showExportShareOptions,
     showGameConfig,
     showGamePlayers,
-    showOperatorPrizes,
     showAppearanceSettings,
     showIntegrations,
     showUserInfo,
@@ -161,10 +115,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
         setTerminateIrreversibleAck(false)
         return true
       }
-      if (s.showOperatorPrizes) {
-        if (!prizeSavingRef.current) setShowOperatorPrizes(false)
-        return true
-      }
       if (s.showGamePlayers) {
         setShowGamePlayers(false)
         return true
@@ -187,10 +137,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
       }
       if (s.showQuiz) {
         setShowQuiz(false)
-        return true
-      }
-      if (s.showRaffle) {
-        setShowRaffle(false)
         return true
       }
       onCloseRef.current()
@@ -250,40 +196,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     handleGameConfigChange(patch)
     setShowGameConfig(false)
     onClose()
-  }
-
-  const handleOperatorPrizePersist = (patch: Record<string, unknown>) => {
-    if (!gameId || !gameDefinition?.id) return
-    const storageKey = `${gameDefinition.id}_settings_${gameId}`
-    const merged = { ...(gameSettingsRef.current || {}), ...patch }
-    const { close: shouldClose, refreshGameScreen, ...toPersist } = merged as Record<string, unknown> & {
-      close?: boolean
-      refreshGameScreen?: boolean
-    }
-    localStorage.setItem(storageKey, JSON.stringify(toPersist))
-    gameSettingsRef.current = toPersist
-    setGameSettings(toPersist)
-    onConfigSaved?.()
-    if (shouldClose === true) {
-      setShowOperatorPrizes(false)
-      onClose()
-    }
-  }
-
-  const handleStartCheckout = async () => {
-    setIsStartingCheckout(true)
-    try {
-      const data = await api.post<{ ok: boolean; checkoutUrl: string; sessionId: string }>('/v1/billing/checkout', {})
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl
-      } else {
-        throw new Error('No se recibió URL de pago')
-      }
-    } catch (error: any) {
-      console.error('Error starting checkout:', error)
-      alert(translateKnownError(error.message || 'Error al iniciar el pago. Por favor, intenta de nuevo.'))
-      setIsStartingCheckout(false)
-    }
   }
 
   const handleExportQuizBeforeTerminate = async () => {
@@ -367,7 +279,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
     setTerminateError(null)
 
     try {
-      await api.put('/v1/game', { gameId, isActive: false })
+      await setOperatorGameActive(gameId, false)
 
       // Close the popup and settings menu, then leave the game
       setShowExportQuiz(false)
@@ -387,10 +299,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   const handleTerminateGame = async () => {
     // Show export quiz popup first
     setShowExportQuiz(true)
-  }
-
-  if (showRaffle) {
-    return <Raffle onBack={() => setShowRaffle(false)} onClose={onClose} gameId={gameId} gameType={gameDefinition?.id} onVisibilitySaved={onConfigSaved} />
   }
 
   if (showQuiz) {
@@ -416,28 +324,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
   }
 
   if (showUserInfo) {
-    const formatDate = (dateString: string | undefined) => {
-      if (!dateString)       return t('N/A', 'N/A')
-      try {
-        const date = new Date(dateString)
-        return date.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      } catch {
-        return dateString
-      }
-    }
-
-    const planLabels: Record<string, string> = {
-      free: t('Gratis', 'Free'),
-      event: t('Evento 24h', 'Event 24h'),
-      enterprise: 'Enterprise'
-    }
-
     return (
       <div
         role="dialog"
@@ -465,94 +351,12 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             </div>
             <div className="flex items-center gap-2 shrink-0">
             <OperatorLanguageSelector />
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors shrink-0"
-              aria-label={t('Cerrar configuración', 'Close settings')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <IconButton icon="remove" label={t('Cerrar configuración', 'Close settings')} type="button" onClick={onClose} />
             </div>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
-            {userLoading ? (
-              <div className="text-center py-8">
-                <p className="text-textSub">{t('Cargando información...', 'Loading information...')}</p>
-              </div>
-            ) : user ? (
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
-                  <div className="space-y-3">
-                    <div>
-                      <div className="text-xs text-gray-400 mb-1">{t('Email', 'Email')}</div>
-                      <div className="text-textMain font-medium">{user.email || t('No disponible', 'Not available')}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-400 mb-1">{t('Plan', 'Plan')}</div>
-                      <div className="text-textMain font-medium">
-                        {planLabels[user.plan] || user.plan.toUpperCase()}
-                      </div>
-                    </div>
-                    {user.activeUntil && (
-                      <div>
-                        <div className="text-xs text-gray-400 mb-1">{t('Activo hasta', 'Active until')}</div>
-                        <div className="text-textMain">
-                          <Countdown targetDate={user.activeUntil} />
-                        </div>
-                      </div>
-                    )}
-                    <div>
-                      <div className="text-xs text-gray-400 mb-1">{t('Cuenta creada', 'Account created')}</div>
-                      <div className="text-textMain text-sm">{formatDate(user.createdAt)}</div>
-                    </div>
-                    {user.updatedAt && user.updatedAt !== user.createdAt && (
-                      <div>
-                        <div className="text-xs text-gray-400 mb-1">{t('Última actualización', 'Last updated')}</div>
-                        <div className="text-textMain text-sm">{formatDate(user.updatedAt)}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-red-300">{t('No se pudo cargar la información del usuario', 'Could not load user information')}</p>
-              </div>
-            )}
-
-            {/* Upgrade to Event Plan Button */}
-            {plan === 'free' && (
-              <div className="mt-2 p-4 rounded-xl bg-blue-500/20 border border-blue-500/30">
-                <p className="text-sm text-blue-300 mb-3">
-                  {t('Actualiza a Event 24h para desbloquear todas las funciones', 'Upgrade to Event 24h to unlock all features')}
-                </p>
-                <button
-                  onClick={handleStartCheckout}
-                  disabled={isStartingCheckout}
-                  className="w-full p-3 rounded-xl bg-primary/30 border border-primary/40 hover:bg-primary/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
-                >
-                  {isStartingCheckout ? (
-                    <>
-                      <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      {t('Procesando...', 'Processing...')}
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {t('Activar 24h', 'Activate 24h')}
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+            <AccountInformation user={user} loading={userLoading} />
 
             <button
               type="button"
@@ -567,66 +371,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
               </svg>
               {t('Cerrar sesión', 'Log out')}
             </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (showOperatorPrizes && gameId && gameDefinition) {
-    return (
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="operator-prizes-title"
-        className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      >
-        <div className="absolute inset-0 bg-black/70" onClick={() => { if (!prizeSavingRef.current) onClose() }} aria-hidden="true" />
-        <div className={`relative card w-full max-h-[90vh] flex flex-col overflow-hidden ${gameDefinition.id === 'STACK' ? 'max-w-5xl' : 'max-w-2xl'}`}>
-          <div className="flex items-center justify-between gap-3 p-6 pb-4 flex-shrink-0">
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                type="button"
-                onClick={() => { if (!prizeSavingRef.current) setShowOperatorPrizes(false) }}
-                disabled={prizeSaving}
-                className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
-                aria-label={t('Volver', 'Back')}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <h2 id="operator-prizes-title" className="text-xl font-semibold truncate">{t('Premios', 'Prizes')}</h2>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <OperatorLanguageSelector />
-            <button
-              type="button"
-              onClick={() => { if (!prizeSavingRef.current) onClose() }}
-              disabled={prizeSaving}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
-              aria-label={t('Cerrar', 'Close')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            </div>
-          </div>
-          <div className={gameDefinition.id === 'STACK'
-            ? 'flex-1 min-h-0 flex flex-col overflow-hidden px-6 pb-6'
-            : 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6'}>
-            <OperatorPrizeSettings
-              gameId={gameId}
-              gameDefinition={gameDefinition}
-              settings={gameSettings}
-              plan={plan}
-              onPersist={handleOperatorPrizePersist}
-              onSavingChange={(value) => {
-                prizeSavingRef.current = value
-                setPrizeSaving(value)
-              }}
-            />
           </div>
         </div>
       </div>
@@ -656,24 +400,15 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <h2 id="game-config-title" className="text-xl font-semibold truncate">{t('Configurar juego', 'Configure game')}</h2>
+              <h2 id="game-config-title" className="text-xl font-semibold truncate">{t('Registro y acceso', 'Registration and access')}</h2>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <OperatorLanguageSelector />
-            <button
-              type="button"
-              onClick={closeGameConfig}
-              disabled={gameConfigSaving}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40"
-              aria-label={t('Cerrar y volver al juego', 'Close and return to game')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <IconButton icon="remove" label={t('Cerrar y volver al juego', 'Close and return to game')} type="button" onClick={closeGameConfig} disabled={gameConfigSaving} />
             </div>
           </div>
           <GameConfigPanel
+            registrationOnly
             gameId={gameId}
             gameDefinition={gameDefinition}
             settings={gameSettings}
@@ -700,20 +435,12 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             <h2 id="export-quiz-title" className="text-xl font-semibold">{t('Exportar Datos del Quiz', 'Export Quiz Data')}</h2>
             <div className="flex items-center gap-2">
               <OperatorLanguageSelector />
-            <button
-              onClick={() => {
+            <IconButton icon="remove" label={t('Cerrar', 'Close')} onClick={() => {
                 setShowExportQuiz(false)
                 setExportQuizError(null)
                 setExportQuizData(null)
                 setShowExportShareOptions(false)
-              }}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
-              aria-label={t('Cerrar', 'Close')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+              }} />
             </div>
           </div>
 
@@ -879,16 +606,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <OperatorLanguageSelector />
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
-              aria-label={t('Cerrar', 'Close')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <IconButton icon="remove" label={t('Cerrar', 'Close')} type="button" onClick={onClose} />
             </div>
           </div>
 
@@ -942,14 +660,14 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     )}
                   </div>
                   <div className="text-left flex-1">
-                    <div className="font-medium">{isTerminating ? t('Terminando...', 'Ending...') : t('Terminar el juego', 'End game')}</div>
-                    <div className="text-sm text-gray-400">{t('Desactivar la partida permanentemente', 'Permanently deactivate the game')}</div>
+                    <div className="font-medium">{isTerminating ? t('Desactivando...', 'Deactivating...') : t('Desactivar partida', 'Deactivate event')}</div>
+                    <div className="text-sm text-gray-400">{t('Resolver premios y bloquear nuevas participaciones', 'Allocate prizes and block new participation')}</div>
                   </div>
                 </button>
                 {terminateIrreversibleAck && (
                   <div className="p-3 rounded-lg bg-red-500/15 border border-red-500/30">
                     <p className="text-red-300/90 text-sm">
-                      {t('Esta acción no se puede deshacer. Pulsa otra vez «Terminar el juego» para continuar.', 'This action cannot be undone. Press “End game” again to continue.')}
+                      {t('Se resolverán los premios con los resultados confirmados, sin celebrar sorteos. Podrás reactivar desde administración sin reiniciar intentos ni resultados. Pulsa otra vez «Desactivar partida» para continuar.', 'Prizes will be allocated from confirmed results, without drawing raffles. Reactivate from administration without resetting attempts or results. Press “Deactivate event” again to continue.')}
                     </p>
                   </div>
                 )}
@@ -980,15 +698,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
           <h2 id="settings-title" className="min-w-0 truncate text-xl font-semibold">{t('Configuración', 'Settings')}</h2>
           <div className="flex shrink-0 items-center gap-2">
             <OperatorLanguageSelector />
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            aria-label={t('Cerrar configuración', 'Close settings')}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <IconButton icon="remove" label={t('Cerrar configuración', 'Close settings')} onClick={onClose} />
           </div>
         </div>
 
@@ -1090,7 +800,7 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                     </svg>
                   </div>
                   <div className="text-left">
-                    <div className="font-medium">{t('Configurar juego', 'Configure game')}</div>
+                    <div className="font-medium">{t('Registro y acceso', 'Registration and access')}</div>
                   </div>
                   <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1117,56 +827,6 @@ export default function SettingsMenu({ onClose, gameId, gameType, gameDefinition
                   </svg>
                 </button>
               )}
-
-              {/* Premios — todos los juegos con partida */}
-              {gameId && gameDefinition && (
-                <button
-                  type="button"
-                  onClick={() => setShowOperatorPrizes(true)}
-                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
-                >
-                  <div className="p-2 rounded-lg bg-amber-500/20">
-                    <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112-2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-                    </svg>
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium">{t('Premios', 'Prizes')}</div>
-                  </div>
-                  <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              )}
-
-              {/* Raffle - Always shown, disabled for FREE plan */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    if (!features.raffles) return
-                    setShowRaffle(true)
-                  }}
-                  disabled={!features.raffles}
-                  className={`w-full flex items-center gap-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 transition-colors relative ${
-                    features.raffles 
-                      ? 'hover:bg-[rgba(255,255,255,0.1)]' 
-                      : 'opacity-50 cursor-not-allowed'
-                  }`}
-                  title={!features.raffles ? t('Disponible en el plan Event 24h', 'Available on the Event 24h plan') : undefined}
-                >
-                  <div className="p-2 rounded-lg bg-purple-500/20">
-                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                    </svg>
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium">{t('Sorteo', 'Raffle')}</div>
-                  </div>
-                  <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
 
               {/* Quiz - For all games, disabled for FREE plan */}
               <div className="relative">

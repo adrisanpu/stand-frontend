@@ -5,7 +5,8 @@ import { useParticipantLanguage } from '../../core/participant/participantLangua
 import type { PrizeCatalog } from '../../core/prizes'
 import { PrizeImage } from '../../core/widgets/PrizePresentation'
 import type { StackPlayerPrizes } from '../../api/stackPrizes'
-import StackAwardList, { isStackWalletUrl, StackWallet } from './StackAwardList'
+import WalletPassLinks from '../../core/participant/WalletPassLinks'
+import StackAwardList, { StackWallet } from './StackAwardList'
 
 type Props = {
   gameId: string
@@ -35,10 +36,6 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [revision, setRevision] = useState(0)
-  const [openedWallet, setOpenedWallet] = useState('')
-  const walletKey = JSON.stringify([gameId, playerToken, stackPrizes?.walletUrl])
-  const walletLocked = stackPrizes?.deliveryChannel !== 'email'
-    && isStackWalletUrl(stackPrizes?.walletUrl ?? null) && openedWallet !== walletKey
   const retry = useCallback(() => setRevision((previous) => previous + 1), [])
 
   useEffect(() => {
@@ -102,8 +99,9 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
                   </div>
                 )}
                 {!prize.delivered && (
-                  <div className="w-[clamp(100px,18vh,180px)] max-w-[calc(50%-0.5rem)] shrink-0">
+                  <div className="w-[clamp(100px,18vh,180px)] max-w-[calc(50%-0.5rem)] shrink-0 space-y-2">
                     <PrizeQR token={prize.token} label={`QR ${t('Premio del ranking')}`} />
+                    <WalletPassLinks token={prize.token} />
                   </div>
                 )}
               </div>
@@ -125,9 +123,8 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
           )
       )}
       {enabled && stackPrizes && <>
-        {stackPrizes.deliveryChannel !== 'email' && <StackWallet url={stackPrizes.walletUrl} expected={stackPrizes.walletExpected}
-          highlight={walletLocked} onOpen={() => setOpenedWallet(walletKey)} />}
-        <StackAwardList data={stackPrizes} locked={walletLocked} />
+        <StackWallet url={stackPrizes.walletUrl} expected={stackPrizes.walletExpected} />
+        <StackAwardList data={stackPrizes} gameId={gameId} playerToken={playerToken} onRefresh={retry} />
       </>}
     </>
   )

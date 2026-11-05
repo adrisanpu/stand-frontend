@@ -1,3 +1,4 @@
+import IconButton from '../ui/IconButton'
 import { useEffect, type ReactNode } from 'react'
 import { GAME_DATA_NOTICE_MODAL, PRIVACY_POLICY_URL } from '../ui/gameLegalCopy'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
@@ -34,16 +35,7 @@ export default function GameInstructionsModal({ open, onClose, children }: GameI
           <h2 id="game-instructions-title" className="text-lg font-semibold text-textMain">
             {t('Instrucciones', 'Instructions')}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            aria-label={t('Cerrar', 'Close')}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <IconButton icon="remove" label={t('Cerrar', 'Close')} type="button" onClick={onClose} />
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">

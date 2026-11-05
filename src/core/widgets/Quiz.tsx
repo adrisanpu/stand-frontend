@@ -1,3 +1,4 @@
+import IconButton from '../ui/IconButton'
 import { useState, useEffect } from 'react'
 import { api } from '../../api/api'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
@@ -420,15 +421,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
             </button>
             <h2 id="quiz-title" className="text-xl font-semibold">Quiz</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            aria-label={t('Cerrar', 'Close')}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <IconButton icon="remove" label={t('Cerrar', 'Close')} onClick={onClose} />
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0">
@@ -588,15 +581,7 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
                       className="flex-1 h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none"
                     />
                     {question.options.length > 1 && (
-                      <button
-                        onClick={() => removeOption(questionIndex, optionIndex)}
-                        className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
-                        aria-label={t('Eliminar opción', 'Delete option')}
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <IconButton icon="remove" label={t('Eliminar opción', 'Delete option')} onClick={() => removeOption(questionIndex, optionIndex)} />
                     )}
                   </div>
                 ))}
@@ -684,18 +669,10 @@ export default function Quiz({ onBack, onClose, gameId }: QuizProps) {
             <div className="flex-shrink-0 mt-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-gray-300">{t('Opciones de compartir', 'Sharing options')}</h3>
-                <button
-                  onClick={() => {
+                <IconButton icon="remove" label={t('Cerrar opciones de compartir', 'Close sharing options')} onClick={() => {
                     setShowShareOptions(false)
                     setExportData(null)
-                  }}
-                  className="p-1 rounded-lg hover:bg-primary/20 transition-colors"
-                  aria-label={t('Cerrar opciones de compartir', 'Close sharing options')}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                  }} />
               </div>
               <div className="flex gap-2">
                 <button

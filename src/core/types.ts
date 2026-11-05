@@ -55,6 +55,11 @@ export type GameConfigProps = {
   gameName: string
   // generic configuration state for a given game instance
   settings: any
+  /** The admin host already fetched this instance's settings from the server. */
+  settingsLoaded?: boolean
+  readOnly?: boolean
+  onBusyChange?: (busy: boolean) => void
+  onDirtyChange?: (dirty: boolean) => void
   onChange: (newSettings: any) => void
   /** Saved access, or the unsaved access draft when embedded in the shared config modal. */
   access?: GameAccess

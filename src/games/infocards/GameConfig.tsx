@@ -1,8 +1,10 @@
+import IconButton from '../../core/ui/IconButton'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
 import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
 
 type InfoCard = {
@@ -58,7 +60,7 @@ const LAYOUT_OPTIONS: { value: CardLayoutPosition; label: string }[] = [
   { value: 'bottom', label: 'Abajo' },
 ]
 
-export default function InfocardsGameConfig({ gameId, settings = {}, onChange, registerSave }: GameConfigProps) {
+export default function InfocardsGameConfig({ gameId, settings = {}, onChange, registerSave, readOnly = false, onBusyChange, onDirtyChange }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   // Section A — current cards
   const [cards, setCards] = useState<InfoCard[]>([])
@@ -100,7 +102,8 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
     setCardsLoadError('')
     try {
       const data = await api.get<GetResponse>(`/v1/game/infocards?gameId=${encodeURIComponent(gameId)}`)
-      const sorted = (data.cards || []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      if (!data.ok || data.gameId !== gameId || !Array.isArray(data.cards)) throw new Error('Invalid INFOCARDS response')
+      const sorted = data.cards.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       setCards(sorted)
       setCardsDirty(false)
       setAiExpanded(sorted.length === 0)
@@ -127,12 +130,13 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
   // ===== Per-card media upload =====
 
   const handleMediaClick = (cardId: string) => {
-    if (mediaUploadingCardId) return
+    if (readOnly || mediaUploadingCardId) return
     mediaInputCardIdRef.current = cardId
     mediaInputRef.current?.click()
   }
 
   const handleMediaChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (readOnly) return
     const file = e.target.files?.[0]
     if (!file || !mediaInputCardIdRef.current) return
 
@@ -190,19 +194,26 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
 
   const isAiLoading = aiStatus === 'uploading' || aiStatus === 'processing'
   const isSaving = saveStatus === 'uploading'
+  useEffect(() => {
+    onBusyChange?.(!!mediaUploadingCardId || isAiLoading)
+  }, [mediaUploadingCardId, isAiLoading, onBusyChange])
+  useEffect(() => {
+    if (cardsDirty || layoutsDirty) onDirtyChange?.(true)
+  }, [cardsDirty, layoutsDirty, onDirtyChange])
 
   const validate = () => {
+    if (readOnly) return t('Esta partida es de solo lectura.', 'This event is read only.')
     if (mediaUploadingCardId) return t('Espera a que termine la subida del archivo.', 'Wait for the file upload to finish.')
     if (isAiLoading) return t('Espera a que termine la generación con IA.', 'Wait for AI generation to finish.')
     if (loadingCards && gameId) return t('Las tarjetas aún se están cargando.', 'The cards are still loading.')
-    if (cardsDirty && cardsLoadError) return cardsLoadError
+    if (cardsLoadError) return cardsLoadError
     return null
   }
 
   const persist = async () => {
     const invalid = validate()
     if (invalid) throw new Error(invalid)
-    if (cardsDirty && gameId) {
+    if ((cardsDirty || layoutsDirty) && gameId) {
       // Strip ephemeral/computed fields before sending
       const cardsToSave = cards.map(({ _localImagePreview, _localVideoPreview, imageUrl, videoUrl, ...rest }) => rest)
       const res = await api.put<PutResponse>('/v1/game/infocards', {
@@ -210,6 +221,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
         cards: cardsToSave,
         requiresValidation,
         quizCompletedMessage: quizCompletedMessage.trim(),
+        cardLayouts,
       })
       if (!res?.ok) throw new Error(t('No se pudieron guardar las tarjetas.', 'Could not save the cards.'))
       await fetchCards()
@@ -246,7 +258,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
   }
 
   const handleGenerate = async () => {
-    if (!gameId) return
+    if (!gameId || readOnly) return
     if (!text.trim() && pdfFiles.length === 0) {
       setAiStatus('error')
       setAiMessage(t('Añade texto o un PDF antes de generar.', 'Add text or a PDF before generating.'))
@@ -306,6 +318,8 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
     } catch (err) {
       setAiStatus('error')
       setAiMessage(err instanceof Error ? err.message : t('Error desconocido.', 'Unknown error.'))
+    } finally {
+      onBusyChange?.(false)
     }
   }
 
@@ -331,15 +345,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
             className="w-full h-full object-cover rounded-lg"
             aria-label={card.title}
           />
-          <button
-            onClick={() => handleRemoveMedia(card.id, 'video')}
-            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-600 transition-colors"
-            aria-label={t('Eliminar vídeo', 'Delete video')}
-          >
-            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <IconButton icon="remove" label={t('Eliminar vídeo', 'Delete video')} onClick={() => handleRemoveMedia(card.id, 'video')} className="absolute -top-1.5 -right-1.5" />
         </div>
       )
     }
@@ -348,6 +354,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
       const posX = card.imagePositionX ?? 50
       const posY = card.imagePositionY ?? 50
       const handleFocalPointerDown = (e: React.PointerEvent) => {
+        if (readOnly) return
         e.preventDefault()
         draggingFocalCardIdRef.current = card.id
         document.addEventListener('pointermove', focalMoveHandlerRef.current)
@@ -373,15 +380,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
             style={{ left: `${posX}%`, top: `${posY}%` }}
             onPointerDown={handleFocalPointerDown}
           />
-          <button
-            onClick={() => handleRemoveMedia(card.id, 'image')}
-            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-600 transition-colors"
-            aria-label={t('Eliminar imagen', 'Delete image')}
-          >
-            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <IconButton icon="remove" label={t('Eliminar imagen', 'Delete image')} onClick={() => handleRemoveMedia(card.id, 'image')} className="absolute -top-1.5 -right-1.5" />
         </div>
       )
     }
@@ -549,13 +548,14 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
               </div>
               <div
                 role="button"
-                tabIndex={0}
-                onClick={() => !isAiLoading && pdfInputRef.current?.click()}
-                onKeyDown={e => e.key === 'Enter' && !isAiLoading && pdfInputRef.current?.click()}
+                tabIndex={readOnly ? -1 : 0}
+                aria-disabled={readOnly || isAiLoading}
+                onClick={() => !readOnly && !isAiLoading && pdfInputRef.current?.click()}
+                onKeyDown={e => e.key === 'Enter' && !readOnly && !isAiLoading && pdfInputRef.current?.click()}
                 onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
                 onDrop={e => {
                   e.preventDefault()
-                  if (isAiLoading) return
+                  if (readOnly || isAiLoading) return
                   const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf')
                   if (files.length) {
                     setPdfFiles(prev => {
@@ -587,16 +587,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
                 {pdfFiles.map((f, idx) => (
                   <li key={idx} className="flex items-center justify-between rounded-lg px-3 py-2 bg-white/5 text-sm">
                     <span className="truncate text-gray-400 mr-2">{f.name}</span>
-                    <button
-                      onClick={() => setPdfFiles(prev => prev.filter((_, i) => i !== idx))}
-                      disabled={isAiLoading}
-                      className="text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 disabled:opacity-50"
-                      aria-label={t(`Eliminar ${f.name}`, `Remove ${f.name}`)}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                    <IconButton icon="remove" label={t(`Eliminar ${f.name}`, `Remove ${f.name}`)} onClick={() => setPdfFiles(prev => prev.filter((_, i) => i !== idx))} disabled={isAiLoading} />
                   </li>
                 ))}
               </ul>
@@ -774,13 +765,13 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
         )}
 
         {!embedded && (cardsDirty || layoutsDirty) && !loadingCards && (
-          <button
+          <SaveButton
             onClick={handleSaveCards}
             disabled={isSaving}
-            className="mt-3 w-full py-2.5 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mt-3 w-full"
           >
             {isSaving ? t('Guardando...', 'Saving...') : t('Guardar cambios', 'Save changes')}
-          </button>
+          </SaveButton>
         )}
       </div>
 

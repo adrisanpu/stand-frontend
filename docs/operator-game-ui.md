@@ -86,13 +86,18 @@ automatically replayed. Installed-wallet propagation has not been live-verified.
 **+ CREAR** opening an inline creation form above the gallery, and a horizontal
 scroll-snap gallery with four cards on desktop, two on smaller screens and
 one on mobile. Arrow controls and native touch scrolling reveal more prizes.
-Cards put the image first, followed by name, source logo, consumed inventory
-as **Entregados**, editable total **Stock**, and **Disponibles = Stock - Entregados**.
-Hover, image click and keyboard focus reveal upload/remove actions, without
-exposing native file-input text. Uploaded PNGs (up to 5 MB) are game-local for
-both STAND and Kivly; they do not edit the external Kivly catalog.
-Both creation forms share a compact four-column desktop row for source, name,
-initial stock (1-1,000, default 100), and PNG upload with inline preview.
+Cards put the image first, followed by name, source logo, read-only event
+allowance and **shared available stock**. The editable value is an **optional
+event cap**, not physical stock; blank saves `null` (unlimited), zero prevents
+awards in that event. Shared availability comes from backend `globalInventory`;
+exhausted/uninitialized stock and zero caps have explicit explanations. A null
+global response displays the legacy-mode notice, never a guessed shared balance.
+Hover, image click and keyboard focus reveal Kivly upload/remove actions, without
+exposing native file-input text. Uploaded PNGs (up to 5 MB) remain game-local for
+Kivly and do not edit the external catalog. STAND names/images are read-only,
+selected from the general catalog in **Administration > Prizes**.
+Both creation forms share a compact row for source, shared-prize selection or
+Kivly name, optional event cap (blank by default), and image preview.
 Kivly-only fields and advanced options use the same compact controls and grid.
 Prize artwork has a transparent background; source badges use the footer logos.
 Rules follow the gallery; the exclusive **Wallet / Email** Kivly delivery
@@ -120,11 +125,60 @@ catalog without filtering. When connected, owners can create Kivly rewards here
 with the required name, description, type, value and points threshold; optional
 image upload is part of the creation form; terms, validity dates and redemption
 limits are under advanced options. Creation adds the reward to the local game
-inventory and refreshes the external catalog; the owner selects it in a rule
-separately. Image and inventory drafts require saving. An uncertain create requires a catalog refresh before another
-attempt. A STAND prize needs a name and may have a PNG. New Kivly selections use
+assignment catalog and refreshes the external catalog; the owner selects it in a rule
+separately. Image and event-cap drafts require saving. An uncertain create requires a catalog refresh before another
+attempt. A STAND selection references a shared prize. New Kivly selections use
 local IDs independent of the external reward ID. Edits stay drafts until the
 save succeeds.
+
+### General physical inventory
+
+**Administration > Prizes** shows one combined catalog/inventory table, ordered
+as **Selection, Photo, Name, Origin, Stock, Available, Redeemed, Assigned, Events**.
+The first column selects a single prize using radio controls. Edit, remove,
+balance and history actions sit above the table, aligned right, and target
+only that selection; they are disabled until a prize is selected. Selection
+cannot change during catalog editing or an unresolved stock request.
+There is no second catalog list or repeated inventory title. Compact actions
+open a single detail row immediately below the selected prize: STAND name/image
+editing, balance management or movement history. Creation remains above the
+table. Kivly retains its external catalog identity and inventory actions.
+Event associations use a read-only disclosure with name, active/inactive state
+and cap, including inactive events; it does not edit assignments.
+
+For STAND, Stock is available units plus recorded unredeemed awards; Assigned
+and Redeemed include current and historical counts. Stock stays unknown while
+history is incomplete or counts are inconsistent. Zero availability differs
+from uninitialized stock. Kivly physical stock and external redemptions remain
+unknown, even when its STAND-managed available balance is initialized.
+The historical/current breakdown lives inside movement details, not a table
+column. Movements load by cursor and state clearly that event/kind/state filters
+affect only loaded rows. Refreshing inventory or completing an import reloads
+open movements so their rows match the updated summary.
+
+Initialize with **free units for new awards**, not total physical units including
+outstanding awards, and never summed event stock. Historical imports do not
+deduct those units again. Initialize/replenish/adjust require an integer quantity
+and explicit reason; adjustments use signed deltas. Uncertain retries keep the
+request ID and payload; revision conflicts require reloading. While a request
+is pending, uncertain or requires reconciliation, prevent closing/switching
+the stock panel or starting catalog edits. Editing an uncertain draft explicitly
+creates a new request. General inventory stays editable when events are inactive.
+
+Legacy stock stays in effect until explicit activation. On opening the panel,
+automatically import all pending games from `imports`, including archives and
+games without current prizes. Consume all pages sequentially, also in active
+mode, without manual page advancement. Skip complete imports and continue with
+other games after a failure. Show errors/unresolved history and a retry action;
+do not retry indefinitely. Preserve opaque cursors for uncertain retries.
+Keep per-event import status inside a disclosure rather than permanently
+listing every event. Newly discovered games are imported after the current
+batch without automatically retrying failed games or losing their errors.
+Unlinked history requires reviewing the shared catalog selection in event
+settings and retrying; ambiguous names are never automatically merged.
+Activation requires complete imports, zero unresolved records and initialized
+assigned prizes. Its confirmation explains shared units across all games and
+that new uninitialized prizes cannot award.
 
 Each alternative group contains one or more prizes and quantities. Each
 rule keeps its condition and remove action in a compact header; alternative

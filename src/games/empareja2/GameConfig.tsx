@@ -3,6 +3,7 @@ import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
 import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
 
 export type Empareja2Settings = {
@@ -22,18 +23,18 @@ interface GameDataResponse {
   empareja2CatalogPairCount?: number
 }
 
-export default function Empareja2GameConfig({ gameId, gameName: _gameName, settings, onChange, registerSave }: GameConfigProps) {
+export default function Empareja2GameConfig({ gameId, gameName: _gameName, settings, settingsLoaded, onChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   const [numPairsInput, setNumPairsInput] = useState<string>(
     (settings as Empareja2Settings | null)?.numPairs != null
       ? String((settings as Empareja2Settings).numPairs)
       : ''
   )
-  const [catalogPairCount, setCatalogPairCount] = useState<number | null>(null)
+  const [catalogPairCount, setCatalogPairCount] = useState<number | null>(settingsLoaded ? settings?.catalogPairCount ?? null : null)
   const [emailRequired, setEmailRequired] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string>('')
-  const [loaded, setLoaded] = useState(!gameId)
+  const [loaded, setLoaded] = useState(settingsLoaded || !gameId)
   const [loadError, setLoadError] = useState('')
   const storedNumPairs = (settings as Empareja2Settings | null)?.numPairs
 
@@ -42,7 +43,7 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
   }, [storedNumPairs])
 
   useEffect(() => {
-    if (!gameId) return
+    if (!gameId || settingsLoaded) return
     let cancelled = false
     setLoaded(false)
     setLoadError('')
@@ -64,7 +65,7 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
     return () => {
       cancelled = true
     }
-  }, [gameId])
+  }, [gameId, settingsLoaded])
 
   const validate = () => (loaded ? null : loadError || t('La configuración del juego aún se está cargando.', 'The game configuration is still loading.'))
 
@@ -214,14 +215,14 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       )}
 
       {!embedded && (
-        <button
+        <SaveButton
           type="button"
           onClick={handleSave}
           disabled={!loaded || saveStatus === 'saving'}
-          className="w-full p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full"
         >
           {saveStatus === 'saving' ? t('Guardando...', 'Saving...') : t('Guardar configuración', 'Save configuration')}
-        </button>
+        </SaveButton>
       )}
     </div>
   )

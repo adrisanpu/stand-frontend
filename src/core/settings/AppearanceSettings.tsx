@@ -1,5 +1,7 @@
+import IconButton from '../ui/IconButton'
 import { useState, useEffect, useRef } from 'react'
 import type { ThemeColors, GameDefinition } from '../types'
+import SaveButton from '../ui/SaveButton'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { OperatorLanguageSelector, useOperatorLanguage } from '../shell/operatorLanguage'
@@ -318,16 +320,7 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
           </div>
           <div className="flex items-center gap-2 shrink-0">
           <OperatorLanguageSelector />
-          <button
-            type="button"
-            onClick={onCloseMenu}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors shrink-0"
-            aria-label={t('Cerrar configuración', 'Close settings')}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <IconButton icon="remove" label={t('Cerrar configuración', 'Close settings')} type="button" onClick={onCloseMenu} />
           </div>
         </div>
 
@@ -359,16 +352,7 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
                         className="h-[5.5rem] max-w-full w-auto object-contain rounded-lg border border-white/10"
                       />
                       {features.advancedCustomization && (
-                        <button
-                          type="button"
-                          onClick={handleRemoveLogo}
-                          className="absolute -top-2 -right-2 p-1 rounded-full bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
-                          aria-label={t('Quitar logo', 'Remove logo')}
-                        >
-                          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                        <IconButton icon="remove" label={t('Quitar logo', 'Remove logo')} type="button" onClick={handleRemoveLogo} className="absolute -top-2 -right-2" />
                       )}
                     </div>
                   ) : (
@@ -642,14 +626,13 @@ export default function AppearanceSettings({ onBack, onCloseMenu, gameDefinition
           >
             {t('Restaurar por Defecto', 'Restore defaults')}
           </button>
-          <button
-            type="button"
+          <SaveButton
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 p-3 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 transition-colors font-medium"
+            className="flex-1"
           >
             {saving ? t('Guardando...', 'Saving...') : t('Guardar Cambios', 'Save changes')}
-          </button>
+          </SaveButton>
         </div>
       </div>
     </div>

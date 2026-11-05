@@ -3,7 +3,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { publicApi, type PlayerResponse } from '../../api/publicApi'
 import RankingPrizeClaim from './RankingPrizeClaim'
 
-vi.mock('../../api/publicApi', () => ({ publicApi: { getPlayer: vi.fn() } }))
+vi.mock('../../api/publicApi', () => ({ publicApi: {
+  getPlayer: vi.fn(),
+  walletPassUrl: vi.fn((token: string, platform: string) => `/wallet/${platform}?token=${token}`),
+  retryRewardEmail: vi.fn(),
+} }))
 
 const response: PlayerResponse = {
   ok: true, gameId: 'GAME1', gameType: 'STACK', playerToken: 'session',
@@ -37,6 +41,26 @@ it('keeps the result overlay scrollable from its beginning on short screens', as
   expect(qr.parentElement?.parentElement).toHaveClass('shrink-0')
 })
 
+it('shows inventory reasons for a finished player without grants and clears them on the next poll', async () => {
+  vi.useFakeTimers()
+  const stackPrizes = {
+    walletUrl: null, state: 'closed' as const, finalPrizesPending: false, awards: [],
+    inventoryReasons: { pizza: 'InventoryOutOfStock' },
+  }
+  vi.mocked(publicApi.getPlayer).mockResolvedValue({ ...response, prizes: [], stackPrizes })
+  render(<RankingPrizeClaim gameId="GAME1" playerToken="session" rank={1} />)
+  await act(async () => {})
+  expect(screen.getByText('Se ha agotado el stock compartido del premio.')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Posición: #1' })).toBeInTheDocument()
+  expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  vi.mocked(publicApi.getPlayer).mockResolvedValue({
+    ...response, prizes: [], stackPrizes: { ...stackPrizes, inventoryReasons: {} },
+  })
+  await act(async () => { vi.advanceTimersByTime(30000) })
+  expect(screen.queryByText('Se ha agotado el stock compartido del premio.')).not.toBeInTheDocument()
+  expect(screen.getByText('Todavía no tienes premios asignados.')).toBeInTheDocument()
+})
+
 it('shows no prize or QR when the server does not grant a ranking claim', async () => {
   vi.mocked(publicApi.getPlayer).mockResolvedValue({ ...response, prizes: [] })
   const { container } = render(<RankingPrizeClaim gameId="GAME1" playerToken="session" prizeCatalog={response.prizeCatalog} />)
@@ -44,7 +68,7 @@ it('shows no prize or QR when the server does not grant a ranking claim', async 
   expect(container.querySelector('.stack-viewport')).toBeEmptyDOMElement()
 })
 
-it('does not require or offer wallet in email mode and preserves STAND QR access', async () => {
+it('preserves the Kivly Wallet link and STAND QR access with email delivery', async () => {
   vi.mocked(publicApi.getPlayer).mockResolvedValue({
     ...response, prizes: [], stackPrizes: {
       deliveryChannel: 'email', walletUrl: 'https://club.kivly.store/add-to-wallet',
@@ -58,7 +82,9 @@ it('does not require or offer wallet in email mode and preserves STAND QR access
   })
   render(<RankingPrizeClaim gameId="GAME1" playerToken="session" />)
   expect(await screen.findByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
-  expect(screen.queryByRole('link', { name: /wallet/ })).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Añadir a mi wallet del club' })).toHaveAttribute(
+    'href', 'https://club.kivly.store/add-to-wallet',
+  )
   expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
   expect(screen.getByText(/Email de tu premio aceptado por SES; entrega en bandeja no confirmada/)).toBeInTheDocument()
 })
@@ -101,7 +127,7 @@ it('does not show a claim from a mismatched game response', async () => {
   expect(screen.queryByRole('img', { name: 'QR Premio del ranking' })).not.toBeInTheDocument()
 })
 
-it('places the compact wallet after the result and before earned prizes', async () => {
+it('keeps Kivly Wallet and STAND Wallet passes accessible alongside ranking prizes', async () => {
   vi.mocked(publicApi.getPlayer).mockResolvedValue({
     ...response, prizes: [], stackPrizes: {
       walletUrl: 'https://club.kivly.store/add-to-wallet', state: 'open', finalPrizesPending: false,
@@ -111,19 +137,19 @@ it('places the compact wallet after the result and before earned prizes', async 
   const { rerender } = render(<RankingPrizeClaim gameId="GAME1" playerToken="session" enabled={false} rank={null} />)
   expect(screen.queryByRole('link')).not.toBeInTheDocument()
   rerender(<RankingPrizeClaim gameId="GAME1" playerToken="session" enabled rank={1} />)
-  const wallet = await screen.findByRole('link', { name: 'Añadir a mi wallet y desbloquear mi premio' })
+  const wallet = await screen.findByRole('link', { name: 'Añadir a mi wallet del club' })
   const position = screen.getByRole('heading', { name: 'Posición: #1' })
   const prize = screen.getByRole('heading', { name: 'Pizza' })
   expect(position.compareDocumentPosition(wallet) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(wallet.compareDocumentPosition(prize) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  expect(screen.queryByText('STAND · QR')).not.toBeInTheDocument()
-  expect(screen.queryByText('Por completar la partida')).not.toBeInTheDocument()
-  expect(screen.getByRole('img', { name: 'Abre la wallet para ver tu premio' })).toBeInTheDocument()
-  expect(screen.queryByRole('img', { name: 'QR Pizza' })).not.toBeInTheDocument()
-  fireEvent.click(wallet)
-  expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
   expect(screen.getByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
-  expect(wallet).not.toHaveClass('wallet-highlight')
+  expect(screen.getByRole('link', { name: 'Añadir a Apple Wallet' })).toHaveAttribute(
+    'href', '/wallet/apple?token=qr',
+  )
+  expect(screen.getByRole('link', { name: 'Añadir a Google Wallet' })).toHaveAttribute(
+    'href', '/wallet/google?token=qr',
+  )
+  expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
 })
 
 it.each([null, 'https://other.example/add-to-wallet'])('keeps prizes accessible without a usable wallet link (%s)', async (walletUrl) => {
@@ -138,7 +164,7 @@ it.each([null, 'https://other.example/add-to-wallet'])('keeps prizes accessible 
   expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
 })
 
-it('preserves the visual reveal across prize refreshes', async () => {
+it('keeps STAND and Kivly prize claims available across prize refreshes', async () => {
   vi.useFakeTimers()
   vi.mocked(publicApi.getPlayer).mockResolvedValue({
     ...response, prizes: [], stackPrizes: {
@@ -151,9 +177,11 @@ it('preserves the visual reveal across prize refreshes', async () => {
   })
   render(<RankingPrizeClaim gameId="GAME1" playerToken="session" enabled rank={1} />)
   await act(async () => {})
-  expect(screen.getAllByRole('img', { name: 'Abre la wallet para ver tu premio' })).toHaveLength(2)
-  fireEvent.click(screen.getByRole('link', { name: 'Añadir a mi wallet y desbloquear mi premio' }))
-  await act(async () => { vi.advanceTimersByTime(30000) })
-  expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
   expect(screen.getByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Añadir a Apple Wallet' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Añadir a mi wallet del club' })).toBeInTheDocument()
+  await act(async () => { vi.advanceTimersByTime(30000) })
+  expect(screen.getByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Añadir a Apple Wallet' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Añadir a mi wallet del club' })).toBeInTheDocument()
 })
