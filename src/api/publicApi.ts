@@ -1,5 +1,6 @@
 import type { StackConfig, StackPlacement } from '../games/stack/stackLogic'
 import type { ParticipantAppearance } from '../core/theme/appearance'
+import type { FormConfig } from '../core/formConfig'
 import type { GamePrize, PrizeCatalog } from '../core/prizes'
 import { isRulet4Result, type Rulet4Settings, type Rulet4Result, type Rulet4Assignment } from '../games/rulet4/rulet4Logic'
 
@@ -51,10 +52,12 @@ function isSafeWalletUrl(value: string | null | undefined): boolean {
   }
 }
 
+export type OptionalParticipantField = 'address' | 'company' | 'jobTitle' | 'birthDate'
+export type ParticipantProfile = Partial<Record<OptionalParticipantField, string>>
 export type ParticipantFieldsConfig = {
   email?: { required?: boolean }
   phone?: { required?: boolean; enabled?: boolean }
-}
+} & Partial<Record<OptionalParticipantField, { enabled?: boolean }>>
 
 export type PublicRankingEntry = {
   playerId: number
@@ -71,8 +74,12 @@ export type PublicGameResponse = {
   gameName?: string
   clientLogoUrl?: string | null
   appearance?: ParticipantAppearance
+  formConfig?: FormConfig
+  formLogoUrl?: string | null
+  formBannerUrl?: string | null
   gameType: string
   isActive: boolean
+  lifecycleState?: 'active' | 'closing' | 'inactive'
   playMode?: 'master' | 'mobile'
   joinChannel?: string
   participantFields?: ParticipantFieldsConfig
@@ -161,7 +168,56 @@ export type ImpostorAssignment = T1merAssignment & {
   impostor?: ImpostorParticipantState
 }
 
-export type PlayerAssignment = Empareja2Assignment | T1merAssignment | StackAssignment | ImpostorAssignment | Rulet4Assignment
+export type MobileGameType = 'L3TRAS' | 'SEMAFORO' | 'CUPIDO' | 'INFOCARDS'
+export type InfoCard = {
+  id: string
+  title: string
+  body: string
+  imageUrl?: string | null
+  videoUrl?: string | null
+  imagePositionX?: number
+  imagePositionY?: number
+}
+export type MobileAssignment = {
+  gameType: MobileGameType
+  playerId: number
+  displayName: string
+  validationCode?: number
+  validated: boolean
+  letter?: string
+  statusLabel?: string
+  cards?: InfoCard[]
+  play: {
+    revision: number
+    phase: 'idle' | 'collecting' | 'expired' | 'quiz' | 'finished'
+    word?: string
+    slots?: (string | null)[]
+    expiresAt?: number
+    serverNow?: number
+    strikes?: number
+    roundIndex?: number
+    lastCorrect?: boolean
+    result?: 'won' | 'lost'
+    participants?: string[]
+    turn?: {
+      guesser: string
+      target: string
+      ready: boolean
+      question?: { id: string; text: string; options: { title: string; payload: string }[] }
+    }
+  }
+}
+export type MobileMove = {
+  move: 'code' | 'reset' | 'pair' | 'ready' | 'answer'
+  code?: string
+  answer?: string | null
+}
+export function isMobileAssignment(assignment: PlayerAssignment | null): assignment is MobileAssignment {
+  return Boolean(assignment && 'gameType' in assignment
+    && ['L3TRAS', 'SEMAFORO', 'CUPIDO', 'INFOCARDS'].includes(assignment.gameType) && 'play' in assignment)
+}
+
+export type PlayerAssignment = Empareja2Assignment | T1merAssignment | StackAssignment | ImpostorAssignment | Rulet4Assignment | MobileAssignment
 
 export function isStackAssignment(assignment: PlayerAssignment): assignment is StackAssignment {
   return 'gameType' in assignment && assignment.gameType === 'STACK'
@@ -241,7 +297,7 @@ async function uploadParticipantPhoto(file: File, playerToken: string): Promise<
   return completed.profilePicUrl
 }
 
-export type EmailRegistration = {
+export type EmailRegistration = ParticipantProfile & {
   gameId: string
   email?: string
   username: string
@@ -259,7 +315,7 @@ export type EmailChallengeResponse = {
   resendAvailableAt: string
 }
 
-export type ResumeEmailRequest = {
+export type ResumeEmailRequest = ParticipantProfile & {
   mode: 'resume'
   gameId: string
   email: string
@@ -275,6 +331,7 @@ export type EmailDetailsResponse = {
   detailsRequired: true
   existingPlayer: boolean
   fields: { username: boolean; phone: boolean; consent: boolean; loyaltyConsent: boolean }
+    & Partial<Record<OptionalParticipantField, boolean>>
 }
 
 export type JoinRequest =
@@ -301,6 +358,25 @@ export type PlayerPrize = {
   delivered: boolean
 }
 
+export type NativePrizeAward = {
+  id: string
+  name: string
+  imageUrl?: string | null
+  state: 'available' | 'delivered'
+  token?: string | null
+  emailState?: 'pending' | 'sending' | 'accepted' | 'failed' | 'reconciliation_required' | null
+  emailError?: string | null
+}
+
+export type ParticipantQuizState = {
+  moment: 'disabled' | 'after_registration' | 'after_game' | 'prize' | 'raffle'
+  completed: boolean
+  finished: boolean
+  prizePending?: boolean
+  revision: string
+  questions: { id: string; text: string; options: { title: string; payload: string }[] }[]
+}
+
 export type PlayerResponse = {
   ok: boolean
   gameId: string
@@ -310,6 +386,9 @@ export type PlayerResponse = {
   prizes: PlayerPrize[]
   prizeCatalog?: PrizeCatalog
   stackPrizes?: import('./stackPrizes').StackPlayerPrizes
+  nativePrizes?: NativePrizeAward[]
+  prizeUnavailable?: { condition: string; reason: string }[]
+  quiz?: ParticipantQuizState
 }
 
 export type RedeemResponse = {
@@ -335,6 +414,17 @@ export type PublicScoreResponse = {
 }
 
 export const publicApi = {
+  walletPassUrl(token: string, platform: 'apple' | 'google'): string {
+    const base = (API_BASE_URL ?? '').replace(/\/+$/, '')
+    return `${base}/v1/public/wallet/pass?${new URLSearchParams({ token, platform })}`
+  },
+  async retryRewardEmail(gameId: string, playerToken: string, awardId: string): Promise<void> {
+    const data = await publicRequest<{ ok: boolean }>('/v1/public/reward-email/retry', {
+      method: 'POST',
+      body: JSON.stringify({ gameId, playerToken, awardId }),
+    })
+    if (data?.ok !== true) throw new Error('Reward email retry not confirmed')
+  },
   async completionReward(gameId: string, playerToken: string): Promise<KivlyCompletionReward> {
     const data = await publicRequest<{ ok: boolean; reward: KivlyCompletionReward }>('/v1/public/kivly/reward', {
       method: 'POST',
@@ -393,6 +483,18 @@ export const publicApi = {
     publicRequest<PlayerResponse>('/v1/public/player', {
       method: 'POST',
       body: JSON.stringify({ gameId, playerToken }),
+    }),
+
+  submitQuiz: (gameId: string, playerToken: string, answers: Record<string, string>, revision: string) =>
+    publicRequest<PlayerResponse>('/v1/public/player', {
+      method: 'POST',
+      body: JSON.stringify({ gameId, playerToken, action: 'quiz', answers, revision }),
+    }),
+
+  play: (gameId: string, playerToken: string, revision: number, requestId: string, move: MobileMove) =>
+    publicRequest<PlayerResponse>('/v1/public/player', {
+      method: 'POST',
+      body: JSON.stringify({ gameId, playerToken, action: 'play', revision, requestId, ...move }),
     }),
 
   redeem: async (prizeToken: string, gameId?: string): Promise<RedeemResponse> => {

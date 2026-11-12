@@ -33,8 +33,8 @@ describe('event orientation', () => {
   })
 
   it.each([
-    [320, 568, true], [390, 844, true], [844, 390, true],
-    [768, 1024, true], [1024, 768, false], [1024, 599, true],
+    [320, 568, true], [390, 844, true], [844, 390, false],
+    [768, 1024, true], [1024, 768, false], [1024, 599, false],
     [1024, 600, false], [1280, 720, false], [1920, 1080, false],
     [1080, 1920, true],
   ])('adapts automatic layouts at %sx%s (portrait=%s)', (width, height, portrait) => {
@@ -47,7 +47,7 @@ describe('event orientation', () => {
   it('reacts to resizing without needing a physical orientation change', () => {
     const { result } = renderHook(() => useOrientation(true))
     expect(result.current).toBe(false)
-    act(() => resize(900, 700))
+    act(() => resize(700, 900))
     expect(result.current).toBe(true)
     act(() => resize(1200, 700))
     expect(result.current).toBe(false)

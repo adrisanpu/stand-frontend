@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PublicApiError, publicApi, type StackAssignment, type PublicGameResponse, type PlayerResponse, type PlayerAssignment } from '../../api/publicApi'
+import { PublicApiError, publicApi, type MobileAssignment, type StackAssignment, type PublicGameResponse, type PlayerResponse, type PlayerAssignment } from '../../api/publicApi'
 import { DEFAULT_STACK_CONFIG } from '../../games/stack/stackLogic'
 import { DEFAULT_RULET4_CONFIG } from '../../games/rulet4/rulet4Logic'
 import { StrictMode } from 'react'
@@ -14,7 +14,9 @@ vi.mock('../../api/publicApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/publicApi')>()
   return {
     ...actual,
-    publicApi: { getGame: vi.fn(), getPlayer: vi.fn(), join: vi.fn(), requestEmailCode: vi.fn(), resumeEmailRegistration: vi.fn(), uploadParticipantPhoto: vi.fn(), validate: vi.fn() },
+    publicApi: { getGame: vi.fn(), getPlayer: vi.fn(), join: vi.fn(), requestEmailCode: vi.fn(), resumeEmailRegistration: vi.fn(), uploadParticipantPhoto: vi.fn(), validate: vi.fn(),
+      walletPassUrl: vi.fn((token: string, platform: string) => `/wallet/${platform}?token=${token}`),
+    },
   }
 })
 vi.mock('../../games/stack/ParticipantPlay', () => ({
@@ -52,6 +54,62 @@ async function advanceToParticipantDetails(email = 'player@example.test') {
 }
 
 describe('ParticipantShell STACK integration', () => {
+  it.each(['L3TRAS', 'SEMAFORO', 'CUPIDO', 'INFOCARDS'] as const)('restores %s into its real mobile experience', async gameType => {
+    const restored: MobileAssignment = {
+      gameType, playerId: 1, displayName: 'Alex', validationCode: 1234, validated: false,
+      letter: 'S', play: { revision: 0, phase: 'idle', word: 'STAND', slots: [null, null, null, null, null] },
+      cards: [{ id: 'welcome', title: 'Evento móvil', body: 'Información del evento' }],
+    }
+    vi.mocked(publicApi.getGame).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType, isActive: true, playMode: 'mobile',
+      playerCount: 1, validatedCount: 0, recentPairs: [], joinUrl: '',
+    })
+    vi.mocked(publicApi.getPlayer).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType, playerToken: 'token', assignment: restored, prizes: [],
+    })
+    savePlayerSession('GAME1234', 'token', restored)
+    renderParticipant()
+    if (gameType === 'INFOCARDS') expect(await screen.findByRole('heading', { name: 'Evento móvil' })).toBeInTheDocument()
+    else expect(await screen.findByRole('heading', { name: gameType })).toBeInTheDocument()
+    expect(screen.queryByText('Sigue las instrucciones del evento para jugar.')).not.toBeInTheDocument()
+  })
+  it.each(['EMPAREJA2', 'STACK'] as const)('renders cutover native awards for legacy %s without lifecycle metadata or legacy prizes', async gameType => {
+    vi.mocked(publicApi.getGame).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType, isActive: true,
+      playMode: 'mobile', joinChannel: 'web', playerCount: 1, validatedCount: 0,
+      recentPairs: [], joinUrl: '', ...(gameType === 'STACK' ? { stackConfig: DEFAULT_STACK_CONFIG } : {}),
+    })
+    const restored = gameType === 'STACK' ? assignment
+      : { playerId: 7, characterId: 1, characterName: 'Sol', partnerCharacterName: 'Luna', validationCode: 5678, validated: false }
+    savePlayerSession('GAME1234', 'token', restored)
+    vi.mocked(publicApi.getPlayer).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType, playerToken: 'token', assignment: restored, prizes: [],
+      nativePrizes: [{ id: 'original-award', name: 'Legacy medal', state: 'available', token: 'original-kind-v-token' }],
+    })
+    renderParticipant()
+    expect(await screen.findByText('Legacy medal')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'QR Legacy medal' })).toHaveAttribute('src', expect.stringContaining('data=original-kind-v-token'))
+    expect(screen.getByRole('link', { name: 'Añadir a Apple Wallet' })).toHaveAttribute('href', '/wallet/apple?token=original-kind-v-token')
+    if (gameType === 'STACK') expect(screen.getByText('Escena STACK: disponible')).toBeInTheDocument()
+    else expect(screen.getByRole('button', { name: 'Validar pareja' })).toBeEnabled()
+  })
+  it('passes unavailable native prize reasons through restored sessions without blocking gameplay', async () => {
+    vi.mocked(publicApi.getGame).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'EMPAREJA2', isActive: true,
+      playMode: 'mobile', joinChannel: 'web', playerCount: 1, validatedCount: 0,
+      recentPairs: [], joinUrl: '',
+    })
+    const pair = { playerId: 7, characterId: 1, characterName: 'Sol', partnerCharacterName: 'Luna', validationCode: 5678, validated: false }
+    savePlayerSession('GAME1234', 'token', pair)
+    vi.mocked(publicApi.getPlayer).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'EMPAREJA2', playerToken: 'token', assignment: pair, prizes: [],
+      prizeUnavailable: [{ condition: 'validation', reason: 'global_stock_exhausted' }],
+    })
+    renderParticipant()
+    expect(await screen.findByText('Se ha agotado el stock compartido del premio.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Validar pareja' })).toBeEnabled()
+    expect(screen.getByText('Sol')).toBeInTheDocument()
+  })
   it('restores an existing STACK session after definitive closure even when paused', async () => {
     vi.mocked(publicApi.getGame).mockResolvedValue({
       ok: true, gameId: 'GAME1234', gameType: 'STACK', isActive: false,
@@ -151,6 +209,7 @@ describe('ParticipantShell STACK integration', () => {
     const photo = new File([new Uint8Array([1, 2, 3])], 'profile.png', { type: 'image/png' })
     fireEvent.change(await screen.findByLabelText('Foto de perfil (opcional)'), { target: { files: [photo] } })
     fireEvent.change(screen.getByLabelText(/Nombre completo/), { target: { value: 'Ana' } })
+    fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '+34 612345678' } })
     vi.mocked(publicApi.requestEmailCode).mockResolvedValueOnce({
       ok: true, challengeId: 'photo-challenge', emailMasked: 'a***@club.test',
       expiresAt: new Date(Date.now() + 600000).toISOString(),
@@ -584,11 +643,13 @@ describe('ParticipantShell STACK integration', () => {
       expect(await screen.findByText('Pair validated!')).toBeInTheDocument()
       expect(await screen.findByRole('img', { name: 'QR Pair prize' })).toHaveAttribute('src', expect.stringContaining('data=prize-token'))
       expect(screen.queryByRole('button')).not.toBeInTheDocument()
-      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(screen.getAllByRole('link')).toHaveLength(2)
+      expect(screen.getByRole('link', { name: 'Add to Apple Wallet' })).toBeInTheDocument()
       fireEvent.change(screen.getByRole('combobox'), { target: { value: 'es' } })
       expect(screen.getByRole('img', { name: 'QR Premio por pareja' })).toBeInTheDocument()
       expect(screen.queryByRole('button')).not.toBeInTheDocument()
-      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(screen.getAllByRole('link')).toHaveLength(2)
+      expect(screen.getByRole('link', { name: 'Añadir a Apple Wallet' })).toBeInTheDocument()
       expect(publicApi.getGame).toHaveBeenCalledTimes(1)
       expect(publicApi.join).not.toHaveBeenCalled()
   })
@@ -667,6 +728,7 @@ describe('ParticipantShell STACK integration', () => {
     expect(await screen.findByRole('button', { name: 'Continuar' })).toBeInTheDocument()
     await advanceToParticipantDetails('ana@example.test')
     fireEvent.change(screen.getByLabelText(/Nombre completo/), { target: { value: 'Ana' } })
+    fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '+34 612345678' } })
     fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
     const code = await screen.findByLabelText('Código de verificación')
@@ -801,6 +863,7 @@ describe('ParticipantShell STACK integration', () => {
           appearance: { colors: custom ? { primary: '#ff0000', accent: '#00ff00' } : null, themeMode: 'light' },
           playerCount: 1, validatedCount: 0, recentPairs: [], joinUrl: '/play/GAME1234',
         })
+
         savePlayerSession('GAME1234', 'token', pairAssignment)
         vi.mocked(publicApi.getPlayer).mockResolvedValue(playerResponse('EMPAREJA2', pairAssignment))
         renderParticipant()
@@ -821,6 +884,28 @@ describe('ParticipantShell STACK integration', () => {
         if (previousMode === null) localStorage.removeItem(STORAGE_KEY_THEME_MODE)
         else localStorage.setItem(STORAGE_KEY_THEME_MODE, previousMode)
       }
+  })
+
+  it('keeps the event appearance, logo and banner during gameplay and validation', async () => {
+    vi.mocked(publicApi.getGame).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'EMPAREJA2', isActive: true,
+      playMode: 'mobile', joinChannel: 'web', clientLogoUrl: '/account-logo.png',
+      appearance: { colors: null, themeMode: 'dark' },
+      formConfig: { registrationTitle: '', registrationDescription: '', quizTitle: '', quizDescription: '',
+        logoKey: 'logo', bannerKey: 'banner', quizMoment: 'disabled',
+        appearance: { colors: { primary: '#123456', accent: '#654321' }, themeMode: 'light' } },
+      formLogoUrl: '/event-logo.png', formBannerUrl: '/event-banner.png',
+      playerCount: 1, validatedCount: 0, recentPairs: [], joinUrl: '/play/GAME1234',
+    })
+    savePlayerSession('GAME1234', 'token', pairAssignment)
+    vi.mocked(publicApi.getPlayer).mockResolvedValue(playerResponse('EMPAREJA2', pairAssignment))
+    renderParticipant()
+    fireEvent.click(await screen.findByRole('button', { name: 'Validar pareja' }))
+    expect(screen.getByRole('img', { name: 'Logo del cliente' })).toHaveAttribute('src', '/event-logo.png')
+    expect(document.querySelector('img[src="/event-banner.png"]')).toBeInTheDocument()
+    expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('#123456')
+    expect(document.documentElement).toHaveClass('light-mode')
+    expect(screen.getByRole('button', { name: 'Validar' })).toBeInTheDocument()
   })
 
   it('validates the immutable own code together with the entered partner code and preserves errors', async () => {
@@ -876,7 +961,8 @@ describe('ParticipantShell STACK integration', () => {
     expect(await screen.findByText('Premio del sorteo')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'QR Premio del sorteo' })).toHaveAttribute('src', expect.stringContaining('data=prize-token'))
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
-    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(2)
+    expect(screen.getByRole('link', { name: 'Añadir a Apple Wallet' })).toBeInTheDocument()
   })
 
   it.each(['EMPAREJA2', 'T1MER'])('normalizes legacy Instagram %s sessions to mobile gameplay', async (gameType) => {

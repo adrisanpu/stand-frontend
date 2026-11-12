@@ -1,4 +1,4 @@
-import { useEffect, createContext, useContext, ReactNode } from 'react'
+import { useEffect, useState, createContext, useContext, ReactNode } from 'react'
 import type { GameDefinition, ThemeColors } from '../types'
 import { STORAGE_KEY_COLORS, STORAGE_KEY_THEME_MODE } from '../storageKeys'
 import type { ParticipantAppearance } from './appearance'
@@ -38,6 +38,14 @@ export function ThemeProvider({
   appearance?: ParticipantAppearance
   children: ReactNode
 }) {
+  const [themeRevision, setThemeRevision] = useState(0)
+
+  useEffect(() => {
+    const updateTheme = () => setThemeRevision(revision => revision + 1)
+    window.addEventListener('app-theme-mode-changed', updateTheme)
+    return () => window.removeEventListener('app-theme-mode-changed', updateTheme)
+  }, [])
+
   useEffect(() => {
     // Check for custom color palette in localStorage
     let customColors: ThemeColors | null = null
@@ -61,7 +69,6 @@ export function ThemeProvider({
       id: 'default',
       name: 'Stand',
       colors: DEFAULT_STAND_PALETTE,
-      GameScreen: () => null,
     }
 
     const themeToApply = game || defaultTheme
@@ -133,7 +140,7 @@ export function ThemeProvider({
     root.style.setProperty('--color-accent-gradient', `rgba(${accentRgb.r},${accentRgb.g},${accentRgb.b},0.16)`)
     root.style.setProperty('--color-border-gradient-1', `rgba(${primaryRgb.r},${primaryRgb.g},${primaryRgb.b},0.65)`)
     root.style.setProperty('--color-border-gradient-2', `rgba(${accentRgb.r},${accentRgb.g},${accentRgb.b},0.65)`)
-  }, [game, appearance])
+  }, [game, appearance, themeRevision])
 
   return (
     <ThemeContext.Provider value={{ game }}>

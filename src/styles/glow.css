@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --stand-ink: #152F3A;
+  --stand-canvas: #F0F3EF;
+  --stand-surface: #FFFFFF;
+  --stand-signal: #B84833;
+  --stand-score: #236B59;
+  --stand-spotlight: #88620F;
+}
+
 @keyframes prize-catalog-slide {
   from { transform: translateX(1.5rem); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
@@ -84,19 +93,19 @@ html,body,#root { height: 100%; background: #0B0A12; }
 /* Mando / teclado: foco visible sin depender de hover (webOS, SRS23CW) */
 :focus { outline: none; }
 :focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.65);
+  outline: 2px solid var(--color-primary, #B84833);
   outline-offset: 2px;
 }
 button:focus-visible,
 a:focus-visible,
 [role="button"]:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline: 2px solid var(--color-primary, #B84833);
   outline-offset: 3px;
 }
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline: 2px solid var(--color-primary, #B84833);
   outline-offset: 1px;
 }
 
@@ -117,23 +126,17 @@ html.light-mode #root {
   position: relative;
   min-height: 100vh;
   background:
-    radial-gradient(1200px 600px at 20% 10%, var(--color-primary-gradient-1, rgba(176,38,255,0.18)), transparent 60%),
-    radial-gradient(900px 500px at 85% 80%, var(--color-accent-gradient, rgba(34,211,238,0.16)), transparent 55%),
-    radial-gradient(1000px 800px at 50% -10%, var(--color-primary-gradient-2, rgba(176,38,255,0.10)), transparent 50%),
+    radial-gradient(ellipse at 50% 0%, var(--color-primary-gradient-1, rgba(176,38,255,0.18)), transparent 48%),
     var(--color-background, #0B0A12);
 }
 .bg-club::after {
-  content:'';
-  position:absolute; inset:0;
-  pointer-events:none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 0 0 0.035'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  opacity:.8;
+  content: none;
 }
 .card {
   background: var(--color-surface, rgba(255,255,255,0.04));
-  border-radius: clamp(12px, 1.2rem, 24px);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  border: 1px solid rgba(var(--color-primary-rgb, 176,38,255), 0.2);
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.18);
   position: relative;
 }
 
@@ -163,25 +166,11 @@ html.light-mode #root {
 /* Light mode card styles */
 html.light-mode .card {
   background: var(--color-surface, #FFFFFF);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+  border-color: rgba(var(--color-primary-rgb, 176,38,255), 0.28);
+  box-shadow: 0 8px 22px rgba(21,47,58,0.08);
 }
 .card::before{
-  content:'';
-  position:absolute; inset:-1px;
-  border-radius: clamp(12px, 1.2rem, 24px);
-  padding:2px; pointer-events:none;
-  background: linear-gradient(120deg, var(--color-border-gradient-1, rgba(176,38,255,0.65)), var(--color-border-gradient-2, rgba(34,211,238,0.65)));
-  -webkit-mask:
-     linear-gradient(#000 0 0) content-box, 
-     linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
-}
-
-/* Light mode card border - more visible and prominent gradient */
-html.light-mode .card::before {
-  border-radius: clamp(12px, 1.2rem, 24px);
-  background: linear-gradient(120deg, var(--color-border-gradient-1, rgba(176,38,255,0.6)), var(--color-border-gradient-2, rgba(34,211,238,0.6)));
-  padding: 2px;
+  content: none;
 }
 
 /* Light mode text improvements - darker text for better readability */
@@ -204,52 +193,84 @@ html.light-mode {
   --color-text-sub: #475569;
 }
 
-/* Light mode button styles - gray background for buttons with text */
-html.light-mode button {
-  background-color: #E5E7EB !important; /* gray-200 - light gray background */
+/* Destructive controls share a tone; other buttons keep their own variants. */
+html body :is(button, [role="button"], a[class*="rounded"][class*="border"], a[class*="rounded"][class*="bg-"]):is(
+  [class^="text-red-"], [class*=" text-red-"],
+  [class^="bg-red-"], [class*=" bg-red-"],
+  [class^="border-red-"], [class*=" border-red-"],
+  [data-tone="danger"]
+) {
+  border-color: rgba(239, 68, 68, 0.4);
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #F87171;
 }
 
-/* Override for buttons that should have transparent background */
-html.light-mode button[class*="bg-transparent"],
-html.light-mode button[class*="bg-none"] {
-  background-color: transparent !important;
+html.light-mode body :is(button, [role="button"], a[class*="rounded"][class*="border"], a[class*="rounded"][class*="bg-"]):is(
+  [class^="text-red-"], [class*=" text-red-"],
+  [class^="bg-red-"], [class*=" bg-red-"],
+  [class^="border-red-"], [class*=" border-red-"],
+  [data-tone="danger"]
+) {
+  color: #B91C1C;
 }
 
-/* Keep hover states for buttons */
-html.light-mode button:hover:not(:disabled):not([class*="bg-transparent"]):not([class*="bg-none"]) {
-  background-color: #D1D5DB !important; /* gray-300 - slightly darker on hover */
+html body [data-tone="danger"]:hover:not(:disabled) {
+  background-color: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.7);
 }
 
-/* Disabled buttons */
-html.light-mode button:disabled {
-  background-color: #F3F4F6 !important; /* gray-100 - lighter when disabled */
-  opacity: 0.6 !important;
+html body nav:not([role="tablist"]) :is(button, a)[class],
+html body nav:not([role="tablist"]) :is(button, a)[class]:is(:hover, :focus-visible, [aria-current="page"]) {
+  background-color: transparent;
+  border-color: transparent;
 }
 
-/* Light mode input/textbox styles - visible border */
-html.light-mode input[type="text"],
-html.light-mode input[type="number"],
-html.light-mode input[type="email"],
-html.light-mode input[type="password"],
-html.light-mode input[type="color"],
-html.light-mode textarea {
-  background-color: #FFFFFF !important; /* white background */
-  border: 2px solid #9CA3AF !important; /* gray-400 - visible border */
-  color: #1F2937 !important; /* gray-800 - dark text */
+html body nav[role="tablist"] button[role="tab"],
+html body nav[role="tablist"] button[role="tab"]:is(:hover, :focus-visible, [aria-selected="true"]) {
+  background-color: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
 }
 
-/* Inputs with specific classes */
-html.light-mode input[class*="bg-"],
-html.light-mode textarea[class*="bg-"] {
-  background-color: #FFFFFF !important;
-  border: 2px solid #9CA3AF !important;
+html body nav[role="tablist"] button[role="tab"][aria-selected="true"] {
+  border-bottom-color: var(--color-primary, #B026FF);
 }
 
-html.light-mode input:focus,
-html.light-mode textarea:focus {
-  border-color: #6366F1 !important; /* indigo-500 - focus color */
-  outline: none !important;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important; /* subtle focus ring */
+/* Match the event-configuration fields without restyling non-text controls. */
+html body :is(
+  input:not([type]),
+  input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
+  textarea
+) {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-main, #F9FAFB);
+  padding: 0.75rem;
+}
+
+html.light-mode body :is(
+  input:not([type]),
+  input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
+  textarea
+) {
+  border-color: #9CA3AF;
+  background-color: #FFFFFF;
+  color: var(--color-text-main, #0F172A);
+}
+
+html body :is(
+  input:not([type]),
+  input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
+  textarea
+):focus {
+  border-color: var(--color-primary, #B026FF);
+  outline: 2px solid rgba(var(--color-primary-rgb, 176, 38, 255), 0.3);
+  outline-offset: 2px;
 }
 
 /* Hide number input spinners (validation code inputs - numeric keyboard on webOS/mobile) */
@@ -299,3 +320,576 @@ input[type="number"] {
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
 .animate-fade-in { animation: fadeIn 0.5s ease-out; }
 .animate-scale-in { animation: scaleIn 0.5s ease-out; }
+
+html.light-mode .admin-shell {
+  --color-background: var(--stand-canvas);
+  --color-surface: var(--stand-surface);
+  --color-text-main: var(--stand-ink);
+  --color-text-sub: #4B6168;
+  --color-primary: var(--stand-signal);
+  --color-primary-rgb: 184,72,51;
+  --color-accent: var(--stand-score);
+  --color-accent-rgb: 35,107,89;
+  color-scheme: light;
+  min-height: 100dvh;
+  background: var(--stand-canvas);
+  color: var(--stand-ink);
+}
+
+html.dark-mode .admin-shell {
+  min-height: 100dvh;
+  background: var(--color-background);
+  color: var(--color-text-main);
+}
+
+.admin-sidebar {
+  --color-text-main: #F7F7F2;
+  --color-text-sub: #C0CFCC;
+  --color-surface: rgba(255,255,255,0.1);
+  --color-primary: #E88563;
+  --color-primary-rgb: 232,133,99;
+  --color-accent: #A7D8C8;
+  --color-accent-rgb: 167,216,200;
+  background: var(--stand-ink);
+  color: var(--color-text-main);
+}
+
+.admin-brand-mark {
+  filter: brightness(0) invert(1);
+}
+
+.admin-nav-link {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--color-text-sub);
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.admin-sidebar nav .admin-nav-link:hover,
+.admin-sidebar nav .admin-nav-link:focus-visible {
+  background: rgba(255,255,255,0.08);
+  color: #FFFFFF;
+}
+
+.admin-sidebar nav .admin-nav-link[aria-current="page"] {
+  border-color: rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.12);
+  color: #FFFFFF;
+}
+
+html.light-mode .admin-topbar {
+  border-color: #D8E0DB;
+  background: rgba(255,255,255,0.82);
+}
+
+html.light-mode .admin-shell .card {
+  border-color: #D8E0DB;
+  background: var(--stand-surface);
+  box-shadow: 0 8px 22px rgba(21,47,58,0.06);
+}
+
+html.light-mode .admin-shell .text-gray-300,
+html.light-mode .admin-shell .text-gray-400 {
+  color: #4B6168;
+}
+
+html.light-mode .admin-shell .text-gray-500,
+html.light-mode .admin-shell .text-gray-600 {
+  color: #364D55;
+}
+
+html.light-mode .admin-shell .text-red-300,
+html.light-mode .admin-shell .text-red-400,
+html.light-mode .admin-shell .text-red-500 {
+  color: #A83228;
+}
+
+html.light-mode .admin-shell .text-green-300,
+html.light-mode .admin-shell .text-green-400 {
+  color: var(--stand-score);
+}
+
+html.light-mode .admin-shell .text-amber-300,
+html.light-mode .admin-shell .text-amber-400,
+html.light-mode .admin-shell .text-yellow-300 {
+  color: #765307;
+}
+
+html.light-mode .admin-shell :is(
+  input:not([type]), input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
+  textarea, select
+) {
+  border-color: #C6D1CC;
+  background-color: #FFFFFF;
+  color: var(--stand-ink);
+}
+
+html.light-mode .admin-shell input::placeholder,
+html.light-mode .admin-shell textarea::placeholder {
+  color: #617378;
+  opacity: 1;
+}
+
+html.light-mode .admin-shell :is(input, textarea, select):focus-visible {
+  border-color: var(--stand-signal);
+  outline-color: var(--stand-signal);
+}
+
+html.light-mode .admin-shell :is(button, [role="button"]) {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+html.light-mode .admin-shell :is(button, [role="button"]):hover:not(:disabled) {
+  border-color: var(--stand-signal);
+}
+
+html.light-mode .admin-shell button[class~="bg-primary/20"] {
+  border-color: var(--stand-signal);
+  background-color: var(--stand-signal);
+  color: #FFFFFF;
+}
+
+html.light-mode .admin-shell button[class~="bg-primary/20"]:hover:not(:disabled) {
+  border-color: #963824;
+  background-color: #963824;
+}
+
+.admin-dialog {
+  --color-background: var(--stand-canvas);
+  --color-surface: var(--stand-surface);
+  --color-text-main: var(--stand-ink);
+  --color-text-sub: #4B6168;
+  --color-primary: var(--stand-signal);
+  --color-primary-rgb: 184,72,51;
+  --color-accent: var(--stand-score);
+  --color-accent-rgb: 35,107,89;
+  color-scheme: light;
+  background: var(--stand-surface);
+  color: var(--stand-ink);
+}
+
+.admin-dialog :is(
+  input:not([type]), input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
+  textarea, select
+) {
+  border-color: #C6D1CC;
+  background-color: #FFFFFF;
+  color: var(--stand-ink);
+}
+
+.admin-dialog :is(button, [role="button"]):hover:not(:disabled) {
+  border-color: var(--stand-signal);
+}
+
+.admin-dialog button[class~="bg-primary/20"] {
+  border-color: var(--stand-signal);
+  background-color: var(--stand-signal);
+  color: #FFFFFF;
+}
+
+.admin-dialog .text-gray-300,
+.admin-dialog .text-gray-400 {
+  color: #4B6168;
+}
+
+.admin-dialog .text-gray-500 {
+  color: #364D55;
+}
+
+.admin-dialog .text-red-300,
+.admin-dialog .text-red-400,
+.admin-dialog .text-red-500 {
+  color: #A83228;
+}
+
+.admin-dialog .text-green-300,
+.admin-dialog .text-green-400 {
+  color: var(--stand-score);
+}
+
+.admin-dialog .text-amber-300,
+.admin-dialog .text-amber-400,
+.admin-dialog .text-yellow-300 {
+  color: #765307;
+}
+
+.admin-table {
+  border-collapse: collapse;
+}
+
+.admin-table thead {
+  background: #E8EEE9;
+  color: var(--stand-ink);
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.8rem 0.9rem;
+}
+
+.admin-table tbody tr {
+  border-color: #D8E0DB;
+}
+
+.admin-table tbody tr:hover {
+  background: #EAF0EC;
+}
+
+.admin-table tbody tr.bg-primary\/5 {
+  background: #F8EAE5;
+}
+
+.admin-table tbody tr.bg-primary\/5:hover {
+  background: #F4DFD8;
+}
+
+html.dark-mode .admin-table tbody tr.bg-primary\/5 {
+  color: var(--stand-ink);
+}
+
+.game-gate {
+  --color-background: var(--stand-canvas);
+  --color-surface: var(--stand-surface);
+  --color-text-main: var(--stand-ink);
+  --color-text-sub: #4B6168;
+  --color-primary: var(--stand-signal);
+  --color-primary-rgb: 184,72,51;
+  --color-accent: var(--stand-score);
+  --color-accent-rgb: 35,107,89;
+  color-scheme: light;
+  padding: clamp(1.25rem, 2.4vw, 2rem);
+  background: var(--stand-canvas);
+  color: var(--stand-ink);
+}
+
+.game-gate-brand-mark {
+  filter: brightness(0) invert(0.16);
+}
+
+.game-catalog-item {
+  color: var(--stand-ink);
+}
+
+.game-catalog-item:focus-visible {
+  outline: 2px solid var(--stand-signal);
+  outline-offset: 3px;
+}
+
+.game-catalog-mark {
+  border: 1px solid #D8E0DB;
+  border-radius: 7px;
+  background: #FFFFFF;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.game-catalog-item:hover .game-catalog-mark {
+  transform: translateY(-2px);
+  border-color: var(--stand-signal);
+}
+
+.game-gate-feature {
+  border: 1px solid #D8E0DB;
+  border-radius: 8px;
+  background: #FFFFFF;
+}
+
+.game-gate-placeholder {
+  border: 1px solid #D8E0DB;
+  border-radius: 8px;
+  background: #E8EEE9;
+}
+
+.game-gate-field {
+  border-color: #C6D1CC;
+  background: #FFFFFF;
+  color: var(--stand-ink);
+}
+
+.game-gate-field:focus-visible {
+  border-color: var(--stand-score);
+  outline: 2px solid var(--stand-score);
+  outline-offset: 2px;
+}
+
+.game-gate-options {
+  border-color: #C6D1CC;
+  background: #FFFFFF;
+}
+
+.game-gate-warning {
+  border-color: #88620F;
+  background: #F8F1D9;
+  color: #5D450E;
+}
+
+.game-gate-action {
+  min-height: 3rem;
+  color: #FFFFFF;
+}
+
+.game-gate-create {
+  border-color: var(--stand-signal);
+  background: var(--stand-signal);
+}
+
+.game-gate-create:hover:not(:disabled) {
+  border-color: #963824;
+  background: #963824;
+}
+
+.game-gate-join {
+  border-color: var(--stand-score);
+  background: var(--stand-score);
+}
+
+.game-gate-join:hover:not(:disabled) {
+  border-color: #174D40;
+  background: #174D40;
+}
+
+.game-gate [data-tone="danger"] {
+  border-color: #B33D32;
+  background: #F8E8E4;
+  color: #872A24;
+}
+
+.admin-topbar h1 {
+  color: var(--stand-ink);
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+}
+
+.auth-shell {
+  --color-background: var(--stand-canvas);
+  --color-surface: var(--stand-surface);
+  --color-text-main: var(--stand-ink);
+  --color-text-sub: #4B6168;
+  --color-primary: var(--stand-signal);
+  --color-primary-rgb: 184,72,51;
+  --color-accent: var(--stand-score);
+  --color-accent-rgb: 35,107,89;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+  align-items: stretch;
+  gap: clamp(1rem, 3vw, 3rem);
+  padding: clamp(1rem, 3vw, 3rem);
+  background: var(--stand-canvas);
+  color: var(--stand-ink);
+}
+
+.billing-shell {
+  grid-template-columns: minmax(0, min(100%, 38rem));
+  align-content: center;
+  justify-content: center;
+}
+
+.auth-status-card {
+  max-width: 38rem;
+}
+
+.auth-story {
+  display: flex;
+  min-height: min(52rem, calc(100dvh - 6rem));
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 3rem;
+  padding: clamp(2rem, 5vw, 5rem);
+  border-left: 8px solid var(--stand-signal);
+  background: var(--stand-ink);
+  color: #F7F7F2;
+}
+
+.auth-story img {
+  width: min(14rem, 60%);
+  height: 3rem;
+  object-position: left center;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.auth-story h2 {
+  max-width: 11ch;
+  font-size: clamp(2.6rem, 5.2vw, 5.7rem);
+  font-weight: 750;
+  letter-spacing: -0.065em;
+  line-height: 0.98;
+}
+
+.auth-story p {
+  max-width: 34rem;
+  color: #C0CFCC;
+  font-size: clamp(1rem, 1.2vw, 1.25rem);
+  line-height: 1.55;
+}
+
+.auth-story .auth-kicker {
+  color: #E88563;
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
+.auth-card {
+  align-self: center;
+  width: 100%;
+  max-width: 32rem;
+  margin-inline: auto;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid #D8E0DB;
+  border-radius: 10px;
+  background: #FFFFFF;
+  box-shadow: 0 18px 48px rgba(21,47,58,0.1);
+  color: var(--stand-ink);
+}
+
+.auth-card h1 {
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+}
+
+.auth-input {
+  width: 100%;
+  min-height: 3.1rem;
+  border: 1px solid #C6D1CC;
+  border-radius: 6px;
+  background: #FFFFFF;
+  color: var(--stand-ink);
+}
+
+.auth-input::placeholder {
+  color: #617378;
+  opacity: 1;
+}
+
+.auth-input:focus-visible {
+  border-color: var(--stand-score);
+  outline: 2px solid var(--stand-score);
+}
+
+.auth-submit {
+  min-height: 3.2rem;
+  border: 1px solid var(--stand-signal);
+  border-radius: 6px;
+  background: var(--stand-signal);
+  color: #FFFFFF;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.auth-submit:hover:not(:disabled) {
+  border-color: #963824;
+  background: #963824;
+}
+
+.auth-submit:disabled {
+  cursor: wait;
+}
+
+.auth-link {
+  color: #28695E;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.auth-link:hover {
+  color: var(--stand-signal);
+}
+
+.validator-shell {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+
+.validator-shell h1 {
+  letter-spacing: -0.04em;
+}
+
+.validator-frame {
+  border: 1px solid rgba(var(--color-primary-rgb, 176,38,255), 0.5);
+  background: #101216;
+  box-shadow: 0 18px 48px rgba(0,0,0,0.28);
+}
+
+.validator-action {
+  min-height: 3rem;
+  border: 1px solid rgba(var(--color-primary-rgb, 176,38,255), 0.55);
+  background: rgba(var(--color-primary-rgb, 176,38,255), 0.16);
+}
+
+.stage-control {
+  border-color: rgba(255,255,255,0.24);
+  background: rgba(21,47,58,0.82);
+  color: #FFFFFF;
+  backdrop-filter: blur(8px);
+}
+
+.stage-control:hover {
+  background: var(--stand-ink);
+}
+
+.play-shell .play-card {
+  border-color: rgba(var(--color-primary-rgb, 176,38,255), 0.32);
+  background: var(--color-surface, rgba(255,255,255,0.04));
+  box-shadow: 0 16px 38px rgba(0,0,0,0.24);
+}
+
+@media (max-width: 767px) {
+  .auth-shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .auth-story {
+    min-height: 0;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    border-left-width: 5px;
+  }
+
+  .auth-story img {
+    height: 2.25rem;
+  }
+
+  .auth-story h2 {
+    max-width: 18ch;
+    font-size: clamp(1.75rem, 8vw, 2.7rem);
+    line-height: 1.04;
+  }
+
+  .auth-story p {
+    font-size: 0.95rem;
+  }
+
+  .auth-card {
+    max-width: none;
+    padding: 1.5rem;
+  }
+
+  .billing-shell .auth-status-card {
+    max-width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-nav-link,
+  .auth-submit,
+  .game-catalog-item,
+  .game-catalog-mark,
+  .stage-control {
+    transition: none;
+  }
+
+  .game-catalog-item,
+  .game-catalog-item:hover .game-catalog-mark {
+    transform: none;
+  }
+}

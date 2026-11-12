@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/api'
+import SaveButton from '../ui/SaveButton'
 import type { ParticipantFieldsConfig } from '../../api/publicApi'
 import { resolveParticipantFields } from '../lib/participantFields'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
@@ -122,10 +123,10 @@ export default function GameAccessSettings({ gameId, gameType, onLoaded, onSaved
       {draft.status === 'error' ? (
         <button type="button" onClick={draft.reload}>{t('Reintentar carga', 'Retry loading')}</button>
       ) : (
-        <button type="button" disabled={!draft.access || saveStatus === 'saving'} onClick={() => void save()}
-          className="w-full rounded-xl p-3 bg-primary/20 border border-primary/30 disabled:opacity-50">
+        <SaveButton disabled={!draft.access || saveStatus === 'saving'} onClick={() => void save()}
+          className="w-full">
           {saveStatus === 'saving' ? t('Guardando...', 'Saving...') : t('Guardar modo y acceso', 'Save mode and access')}
-        </button>
+        </SaveButton>
       )}
       {saveStatus === 'saved' && <p role="status">{t('Modo y acceso guardados.', 'Game mode and access saved.')}</p>}
     </div>

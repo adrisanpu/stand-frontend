@@ -5,6 +5,7 @@ import QRCode from '../widgets/QRCode'
 import { useParticipantLanguage } from './participantLanguage'
 import type { PrizeCatalog } from '../prizes'
 import PrizePresentation from '../widgets/PrizePresentation'
+import WalletPassLinks from './WalletPassLinks'
 
 type Props = {
   gameId: string
@@ -90,6 +91,7 @@ export default function ResultView({ gameId, prizeCatalog }: Props) {
           <p className="text-sm font-medium">{t(PRIZE_LABEL[p.kind] || p.kind)}</p>
           <PrizePresentation prize={catalog?.[p.kind]} />
           <QRCode data={p.token} size={220} alt={`QR ${t(PRIZE_LABEL[p.kind] || p.kind)}`} className="!bg-white !p-3" />
+          <WalletPassLinks token={p.token} />
         </div>
       ))}
 

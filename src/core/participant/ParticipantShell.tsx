@@ -3,20 +3,26 @@ import { useParams } from 'react-router-dom'
 import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
 import { normalizeGameType } from '../gameTypeMap'
-import { PublicApiError, publicApi, isStackAssignment, type PublicGameResponse, type PlayerAssignment, type T1merAssignment, type StackAssignment, type ImpostorAssignment } from '../../api/publicApi'
+import { PublicApiError, publicApi, isStackAssignment, isMobileAssignment, type MobileAssignment, type PublicGameResponse, type PlayerAssignment, type T1merAssignment, type StackAssignment, type ImpostorAssignment, type NativePrizeAward, type PlayerResponse } from '../../api/publicApi'
 import { clearPlayerSession, loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
 import { GAME_ACCESS_CAPABILITIES, resolveGameAccess } from '../settings/gameAccess'
 import JoinForm from './JoinForm'
+import ParticipantQuiz from './ParticipantQuiz'
 import ParticipantPrizePromo from './ParticipantPrizePromo'
 import AssignmentView from './AssignmentView'
 import ValidateView from './ValidateView'
 import ResultView from './ResultView'
+import NativePrizeClaims from './NativePrizeClaims'
 import T1merParticipantPlay from '../../games/t1mer/ParticipantPlay'
 import T1merParticipantResult from '../../games/t1mer/ParticipantResult'
 import StackParticipantPlay from '../../games/stack/ParticipantPlay'
 import StackPrizePromo from '../../games/stack/StackPrizePromo'
 import ImpostorParticipantPlay from '../../games/impostor/ParticipantPlay'
 import Rulet4ParticipantPlay from '../../games/rulet4/ParticipantPlay'
+import L3trasParticipantPlay from '../../games/l3tras/ParticipantPlay'
+import SemaforoParticipantPlay from '../../games/semaforo/ParticipantPlay'
+import CupidoParticipantPlay from '../../games/cupido/ParticipantPlay'
+import InfocardsParticipantPlay from '../../games/infocards/ParticipantPlay'
 import { isRulet4Assignment, type Rulet4Assignment } from '../../games/rulet4/rulet4Logic'
 import { ParticipantLanguageProvider, ParticipantLanguageSelector, useParticipantLanguage } from './participantLanguage'
 import './participant.css'
@@ -89,21 +95,25 @@ function ParticipantContent() {
   const [photoUploadWarning, setPhotoUploadWarning] = useState(false)
   const [loadVersion, setLoadVersion] = useState(0)
   const [prizeRefreshFailed, setPrizeRefreshFailed] = useState(false)
+  const [quizActive, setQuizActive] = useState(false)
   const activeGameId = useRef(gameId)
   activeGameId.current = gameId
   const [stackAssignment, setStackAssignment] = useState<StackAssignment | null>(null)
   const [impostorAssignment, setImpostorAssignment] = useState<ImpostorAssignment | null>(null)
   const [rulet4Assignment, setRulet4Assignment] = useState<Rulet4Assignment | null>(null)
+  const [mobileAssignment, setMobileAssignment] = useState<MobileAssignment | null>(null)
   const [t1merResult, setT1merResult] = useState<{
     time: number
     difference: number
     rank: number | null
   } | null>(null)
+  const [nativeAwards, setNativeAwards] = useState<NativePrizeAward[]>([])
+  const [prizeUnavailable, setPrizeUnavailable] = useState<NonNullable<PlayerResponse['prizeUnavailable']>>([])
 
   const currentGameMeta = gameMeta?.gameId === gameId ? gameMeta : null
   const gameType = currentGameMeta ? normalizeGameType(currentGameMeta.gameType) : ''
   const game = getGameById(gameType)
-  const logo = currentGameMeta ? currentGameMeta.clientLogoUrl || game?.assets?.logo : undefined
+  const logo = currentGameMeta ? currentGameMeta.formLogoUrl || currentGameMeta.clientLogoUrl || game?.assets?.logo : undefined
   const isMobile = gameMeta && WEB_PLAY_TYPES.has(gameType)
     ? resolveGameAccess(gameType, gameMeta).playMode === 'mobile' : false
   const hasPrizeCatalog = currentGameMeta?.prizeCatalog !== undefined || currentGameMeta?.stackPrizeRules !== undefined
@@ -144,6 +154,14 @@ function ParticipantContent() {
   const applyAssignment = useCallback((meta: PublicGameResponse, token: string, assignment: PlayerAssignment | null) => {
     const gt = normalizeGameType(meta.gameType)
     if (!assignment) throw new Error('No se pudo recuperar tu participante. Solicita un nuevo enlace de participación.')
+    if (['L3TRAS', 'SEMAFORO', 'CUPIDO', 'INFOCARDS'].includes(gt)) {
+      if (!isMobileAssignment(assignment) || assignment.gameType !== gt) throw new Error('No se pudo recuperar tu participante.')
+      savePlayerSession(gameId, token, assignment)
+      setPlayerToken(token)
+      setMobileAssignment(assignment)
+      setStep('play')
+      return
+    }
     if (gt === 'RULET4') {
       if (!isRulet4Assignment(assignment)) throw new Error('No se pudo recuperar tu participante.')
       savePlayerSession(gameId, token, assignment)
@@ -185,9 +203,12 @@ function ParticipantContent() {
     setStep('loading')
     setError(null)
     setPhotoUploadWarning(false)
+    setNativeAwards([])
+    setPrizeUnavailable([])
     setStackAssignment(null)
     setImpostorAssignment(null)
     setRulet4Assignment(null)
+    setMobileAssignment(null)
     ;(async () => {
       if (!gameId) {
         setStep('unsupported')
@@ -198,7 +219,7 @@ function ParticipantContent() {
         if (cancelled) return
         const closedStack = normalizeGameType(meta.gameType) === 'STACK'
           && (meta.stackPrizeState === 'closing' || meta.stackPrizeState === 'closed')
-        if (!meta.ok || meta.gameId !== gameId || (!meta.isActive && !closedStack)) {
+        if (!meta.ok || meta.gameId !== gameId || (!meta.isActive && !closedStack && !meta.lifecycleState)) {
           setStep('unsupported')
           return
         }
@@ -222,7 +243,7 @@ function ParticipantContent() {
               clearPlayerSession(gameId)
               setPlayerToken(null)
               setT1merResult(null)
-              setStep('join')
+              setStep(meta.isActive ? 'join' : 'unsupported')
               return
             }
             throw sessionError
@@ -231,9 +252,14 @@ function ParticipantContent() {
           if (!player.ok || player.gameId !== gameId || normalizeGameType(player.gameType) !== gt || !player.playerToken) {
             throw new Error('El enlace o la sesión de participante no es válido.')
           }
-          applyAssignment(meta, player.playerToken, player.assignment)
+          setNativeAwards(player.nativePrizes ?? [])
+          setPrizeUnavailable(player.prizeUnavailable ?? [])
+          if (!meta.isActive && gt !== 'STACK') {
+            setPlayerToken(player.playerToken)
+            setStep('registered')
+          } else applyAssignment(meta, player.playerToken, player.assignment)
         } else {
-          setStep('join')
+          setStep(meta.isActive ? 'join' : 'unsupported')
         }
       } catch (e) {
         if (!cancelled) {
@@ -249,7 +275,7 @@ function ParticipantContent() {
   }, [gameId, loadVersion, applyAssignment])
 
   return (
-    <ThemeProvider game={game ?? null} appearance={gameMeta?.appearance}>
+    <ThemeProvider game={game ?? null} appearance={currentGameMeta?.formConfig?.appearance ?? currentGameMeta?.appearance}>
       <div
         ref={viewportRef}
         lang={language}
@@ -262,10 +288,13 @@ function ParticipantContent() {
           <div className="relative w-full">
           <ParticipantLanguageSelector />
         <div className="play-card card relative w-full">
-          {logo && (
+          {step !== 'join' && !quizActive && currentGameMeta?.formBannerUrl && (
+            <img src={currentGameMeta.formBannerUrl} alt="" className="max-h-44 w-full rounded-xl object-cover" />
+          )}
+          {logo && !((step === 'join' || quizActive) && (gameMeta?.formLogoUrl || gameMeta?.formBannerUrl)) && (
             <img
               src={logo}
-              alt={currentGameMeta?.clientLogoUrl ? t('Logo del cliente') : game?.name}
+              alt={currentGameMeta?.formLogoUrl || currentGameMeta?.clientLogoUrl ? t('Logo del cliente') : game?.name}
               className="play-logo mx-auto w-auto max-w-full object-contain"
             />
           )}
@@ -315,10 +344,12 @@ function ParticipantContent() {
             />
           )}
 
+          {gameMeta && <ParticipantQuiz key={`${gameId}:${playerToken}`} gameId={gameId} playerToken={playerToken}
+            gameMeta={gameMeta} onActiveChange={setQuizActive}>
           {step === 'registered' && (
             <div className="text-center space-y-2">
-              <h1 className="text-xl font-bold">{t('¡Ya estás dentro!')}</h1>
-              <p className="text-sm text-textSub">{t('Sigue las instrucciones del evento para jugar.')}</p>
+              <h1 className="text-xl font-bold">{t(gameMeta?.isActive ? '¡Ya estás dentro!' : 'Juego no disponible')}</h1>
+              {gameMeta?.isActive && <p className="text-sm text-textSub">{t('Sigue las instrucciones del evento para jugar.')}</p>}
             </div>
           )}
 
@@ -326,6 +357,13 @@ function ParticipantContent() {
             <Rulet4ParticipantPlay key={`${gameId}:${rulet4Assignment.playerId}`} gameId={gameId}
               playerToken={playerToken} config={currentGameMeta?.rulet4Config} assignment={rulet4Assignment} />
           )}
+
+          {step === 'play' && mobileAssignment && playerToken && (() => {
+            const Play = { L3TRAS: L3trasParticipantPlay, SEMAFORO: SemaforoParticipantPlay,
+              CUPIDO: CupidoParticipantPlay, INFOCARDS: InfocardsParticipantPlay }[mobileAssignment.gameType]
+            return <Play key={`${gameId}:${mobileAssignment.playerId}`} gameId={gameId}
+              playerToken={playerToken} initialAssignment={mobileAssignment} />
+          })()}
 
           {gameType === 'STACK' && step === 'play' && stackAssignment && playerToken && (
             <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} showPrizePromo={false} kivlyRewardEnabled={Boolean(gameMeta?.kivlyReward)} prizeState={gameMeta?.stackPrizeState} />
@@ -381,6 +419,9 @@ function ParticipantContent() {
               showPrizePromo={false}
             />
           )}
+          {(gameType !== 'STACK' || !currentGameMeta?.lifecycleState || nativeAwards.length > 0) && playerToken
+            && <NativePrizeClaims key={`${gameId}:${playerToken}`} gameId={gameId} playerToken={playerToken} initialAwards={nativeAwards} initialUnavailable={prizeUnavailable} />}
+          </ParticipantQuiz>}
         </div>
         </div>
         </div>

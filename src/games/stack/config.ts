@@ -1,5 +1,4 @@
 import type { GameDefinition } from '../../core/types'
-import StackGameScreen from './GameScreen'
 import StackGameConfig from './GameConfig'
 
 export const stackDefinition: GameDefinition = {
@@ -19,7 +18,6 @@ export const stackDefinition: GameDefinition = {
   assets: {
     logo: '/images/stack-logo.png',
   },
-  GameScreen: StackGameScreen,
   GameConfigComponent: StackGameConfig,
   showRanking: true,
 }

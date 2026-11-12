@@ -1,12 +1,11 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ThemeProvider } from '../theme'
 import GameGate from './GameGate'
-import SettingsMenu from './SettingsMenu'
 import Ranking from '../widgets/Ranking'
 import Players from '../widgets/Players'
 import RaffleData from '../widgets/RaffleData'
+import HomePrizes, { type HomePrize } from '../widgets/HomePrizes'
 import { getGameById } from '../../games'
-import type { GameDefinition } from '../types'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { useOrientation } from '../../hooks/useOrientation'
@@ -14,581 +13,183 @@ import { readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle } from 
 import { inputManager } from '../input/inputManager'
 import { normalizeGameType } from '../gameTypeMap'
 import { api } from '../../api/api'
-import GamePortraitHeaderJoin from '../widgets/GamePortraitHeaderJoin'
-import { getJoinInstructions } from '../ui/gameJoinInstructions'
 import { fetchUserMedia, resolveUserSelectedLogoUrl, type UserMediaResponse } from '../../api/userMedia'
-import { resolveGameAccess, type GameAccess } from '../settings/gameAccess'
-import MobileGameHome from '../widgets/MobileGameHome'
 import { OperatorLanguageProvider, useOperatorLanguage } from './operatorLanguage'
 import { usePolling } from '../../hooks/usePolling'
 import type { PrizeCatalog } from '../prizes'
 import type { StackPrizePromotion } from '../../api/stackPrizes'
 import { stackPrizePromotions } from '../widgets/stackPrizePromotions'
-// Logo size on game screens (portrait and landscape) — larger across breakpoints
-// Landscape: slightly smaller so left column fits
-const GAME_SCREEN_LOGO_CLASS_LANDSCAPE = 'h-28 sm:h-32 lg:h-36 xl:h-40 2xl:h-44 w-auto object-contain max-w-full'
+import type { OperatorGame } from '../../api/operatorGames'
+import type { GameFormConfig } from '../formConfig'
+import HomeCanvas from '../home/HomeCanvas'
+import { validateHomeCanvas, type HomeCanvasConfig, type HomeBackgroundUrls } from '../home/canvasModel'
 
-export default function AppShell() {
-  return (
-    <OperatorLanguageProvider>
-      <AppContent />
-    </OperatorLanguageProvider>
-  )
+type AppShellProps = { initialGame?: OperatorGame; onReturnToAdmin?: () => void }
+type Metadata = {
+  ok: boolean
+  game?: { gameType: string; showRaffleOnHome?: boolean }
+  formConfig?: GameFormConfig
+  formLogoUrl?: string | null
+  prizeCatalog?: PrizeCatalog
+  stackPrizeRules?: StackPrizePromotion[]
+  homeCanvas: HomeCanvasConfig
+  homeBackgroundUrls: HomeBackgroundUrls
 }
 
-function AppContent() {
+export default function AppShell(props: AppShellProps) {
+  return <OperatorLanguageProvider><AppContent {...props} /></OperatorLanguageProvider>
+}
+
+function AppContent({ initialGame, onReturnToAdmin }: AppShellProps) {
   const { language, t } = useOperatorLanguage()
   const { loading: userLoading, plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
-  const [showSettings, setShowSettings] = useState(false)
-  const [gameId, setGameId] = useState<string | null>(null)
-  const [gameName, setGameName] = useState<string | null>(null)
-  const [gameType, setGameType] = useState<string | null>(null)
-  const [gameDefinition, setGameDefinition] = useState<GameDefinition | null>(null)
+  const [gameId, setGameId] = useState<string | null>(() => initialGame?.gameId ?? localStorage.getItem('gameId'))
+  const [gameName, setGameName] = useState<string | null>(() => initialGame?.gameName ?? localStorage.getItem('gameName'))
+  const [gameType, setGameType] = useState<string | null>(() => initialGame?.gameType ?? localStorage.getItem('gameType'))
+  const gameDefinition = getGameById(normalizeGameType(gameType ?? gameId?.split('_')[0]))
   const [userMedia, setUserMedia] = useState<UserMediaResponse | null>(null)
   const [mediaLoading, setMediaLoading] = useState(true)
-  const customLogo = userMedia ? resolveUserSelectedLogoUrl(userMedia) : null
-  const [gameConfigVersion, setGameConfigVersion] = useState(0)
-  const [loadedAccess, setLoadedAccess] = useState<{ gameId: string; access: GameAccess } | null>(null)
-  const [accessError, setAccessError] = useState<string | null>(null)
-  const [loadedPrizes, setLoadedPrizes] = useState<{ gameId: string; catalog?: PrizeCatalog; stackRules?: StackPrizePromotion[]; showRaffleOnHome: boolean } | null>(null)
-  const showRaffle = features.raffles && loadedPrizes?.gameId === gameId && loadedPrizes.showRaffleOnHome
-  const prizeCatalog = loadedPrizes?.gameId === gameId ? loadedPrizes.catalog : undefined
-  const stackRules = normalizeGameType(gameType ?? undefined) === 'STACK' && loadedPrizes?.gameId === gameId ? loadedPrizes.stackRules : undefined
-  const stackPlayersPrizes = stackRules ? [] : undefined
-  const stackRankingPrizes = stackRules ? stackPrizePromotions(stackRules, t, ['completed', 'top_finish', 'top_final']) : undefined
-  const stackRafflePrizes = stackRules ? stackPrizePromotions(stackRules, t, ['raffle']) : undefined
-  const metadataKey = JSON.stringify([gameId, gameType, gameConfigVersion])
-  const metadataSource = useRef({ key: metadataKey })
-  if (metadataSource.current.key !== metadataKey) metadataSource.current = { key: metadataKey }
-  const access = loadedAccess?.gameId === gameId ? loadedAccess.access : null
-  const joinChannel = access?.joinChannel
-  const playMode = access?.playMode
-  const [gameSettings, setGameSettings] = useState<Record<string, unknown> | null>(null)
-  const [counterActive, setCounterActive] = useState(false)
-  const portraitContentRef = useRef<HTMLDivElement>(null)
-  const landscapeContentRef = useRef<HTMLDivElement>(null)
-  const [portraitPaddingTopDvh, setPortraitPaddingTopDvh] = useState(5)
-  const [portraitPaddingBottomDvh, setPortraitPaddingBottomDvh] = useState(10)
-  const [landscapeScale, setLandscapeScale] = useState(1)
-  const [landscapeContentSize, setLandscapeContentSize] = useState<{ width: number; height: number } | null>(null)
+  const [mediaError, setMediaError] = useState('')
+  const [version, setVersion] = useState(0)
+  const [loaded, setLoaded] = useState<{ gameId: string; data: Metadata } | null>(null)
+  const [loadError, setLoadError] = useState('')
+  const current = loaded?.gameId === gameId ? loaded.data : null
+  const sourceKey = `${gameId}:${version}`
+  const source = useRef(sourceKey)
+  source.current = sourceKey
+  const isPortrait = useOrientation(true)
+  const orientation = isPortrait ? 'portrait' : 'landscape'
 
-  // Load custom logo from backend.
   useEffect(() => {
-    let cancelled = false
-    const load = async () => {
+    if (!initialGame) return
+    setGameId(initialGame.gameId)
+    setGameName(initialGame.gameName)
+    setGameType(initialGame.gameType)
+  }, [initialGame])
+  useEffect(() => {
+    for (const [key, value] of [['gameId', gameId], ['gameName', gameName], ['gameType', gameType]]) {
+      if (value) localStorage.setItem(key!, value)
+      else localStorage.removeItem(key!)
+    }
+  }, [gameId, gameName, gameType])
+  useEffect(() => {
+    let active = true
+    const loadMedia = async () => {
       try {
-        const media = await fetchUserMedia()
-        if (cancelled) return
-        if (!media.ok) throw new Error('Unable to load appearance media')
-        setUserMedia(media)
-      } catch (error) {
-        if (cancelled) return
-        console.error('Unable to load appearance media:', error)
-        setUserMedia(null)
-      } finally {
-        if (!cancelled) setMediaLoading(false)
-      }
+        const result = await fetchUserMedia()
+        if (!result.ok) throw new Error('No se pudo cargar el aspecto.')
+        if (active) { setUserMedia(result); setMediaError('') }
+      } catch (reason) {
+        if (active) setMediaError(reason instanceof Error ? reason.message : String(reason))
+      } finally { if (active) setMediaLoading(false) }
     }
-    void load()
-
-    const onMediaUpdate = () => void load()
-    window.addEventListener('user-media-updated', onMediaUpdate)
-    return () => {
-      cancelled = true
-      window.removeEventListener('user-media-updated', onMediaUpdate)
-    }
-  }, [])
-
-  // Load gameId, gameName, and gameType from localStorage on mount
+    void loadMedia()
+    window.addEventListener('user-media-updated', loadMedia)
+    return () => { active = false; window.removeEventListener('user-media-updated', loadMedia) }
+  }, [version])
   useEffect(() => {
-    const savedGameId = localStorage.getItem('gameId')
-    const savedGameName = localStorage.getItem('gameName')
-    const savedGameType = localStorage.getItem('gameType')
-    
-    if (savedGameId && savedGameName) {
-      setGameId(savedGameId)
-      setGameName(savedGameName)
-      
-      // Try to load game definition using saved gameType or extract from gameId
-      const gameIdToUse = normalizeGameType(savedGameType || savedGameId.split('_')[0])
-      if (gameIdToUse) {
-        const game = getGameById(gameIdToUse)
-        if (game) {
-          setGameDefinition(game)
-          setGameType(gameIdToUse)
-        }
-      }
+    const refresh = (event: Event) => {
+      const updated = (event as CustomEvent<{ gameId?: string }>).detail?.gameId
+      if (updated === gameId) setVersion(value => value + 1)
     }
-    // No default game - start with catalog
-  }, [])
-
-  // Persist gameId, gameName, and gameType on change
-  useEffect(() => {
-    if (gameId) {
-      localStorage.setItem('gameId', gameId)
-    } else {
-      localStorage.removeItem('gameId')
-    }
+    window.addEventListener('home-canvas-updated', refresh)
+    return () => window.removeEventListener('home-canvas-updated', refresh)
   }, [gameId])
-
-  useEffect(() => {
-    if (gameName) {
-      localStorage.setItem('gameName', gameName)
-    } else {
-      localStorage.removeItem('gameName')
-    }
-  }, [gameName])
-
-  useEffect(() => {
-    if (gameType) {
-      localStorage.setItem('gameType', gameType)
-    } else {
-      localStorage.removeItem('gameType')
-    }
-  }, [gameType])
-
-  // Update game definition when gameType changes
-  useEffect(() => {
-    if (gameType) {
-      const game = getGameById(gameType)
-      if (game) {
-        setGameDefinition(game)
-      }
-    }
-  }, [gameType])
-
-  // Load game settings from localStorage (for prize labels in minicontainers)
-  useEffect(() => {
-    if (gameId && gameDefinition?.id) {
-      const storageKey = `${gameDefinition.id}_settings_${gameId}`
-      const saved = localStorage.getItem(storageKey)
-      if (saved) {
-        try {
-          setGameSettings(JSON.parse(saved))
-        } catch {
-          setGameSettings(null)
-        }
-      } else {
-        setGameSettings(null)
-      }
-    } else {
-      setGameSettings(null)
-    }
-  }, [gameId, gameDefinition?.id, gameConfigVersion])
-
-  useEffect(() => {
-    setAccessError(null)
-    setLoadedAccess(null)
-    setLoadedPrizes(null)
-  }, [gameId, gameType, gameConfigVersion])
-
-  // Server metadata, not cached signed URLs, is authoritative. Refresh without remounting gameplay.
+  useEffect(() => { setLoadError('') }, [gameId, version])
   usePolling(async () => {
     if (!gameId) return
-    const source = metadataSource.current
+    const requested = source.current
     try {
-      const data = await api.get<{ ok: boolean; prizeCatalog?: PrizeCatalog; stackPrizeRules?: StackPrizePromotion[]; game?: { joinChannel?: string; playMode?: string; gameType?: string; showRaffleOnHome?: boolean } }>(
-        `/v1/game?gameId=${encodeURIComponent(gameId)}`
-      )
-      if (metadataSource.current !== source) return
-      if (!data.ok || !data.game) throw new Error('No se pudo cargar el acceso del juego.')
-      const nextAccess = resolveGameAccess(data.game.gameType || gameType || '', data.game)
-      setLoadedAccess(previous => previous?.gameId === gameId
-        && previous.access.joinChannel === nextAccess.joinChannel
-        && previous.access.playMode === nextAccess.playMode
-        ? previous : { gameId, access: nextAccess })
-      setLoadedPrizes({ gameId, catalog: data.prizeCatalog, stackRules: data.stackPrizeRules, showRaffleOnHome: data.game.showRaffleOnHome !== false })
-      setAccessError(null)
-    } catch (cause) {
-      if (metadataSource.current === source) {
-        setAccessError(cause instanceof Error ? cause.message : 'No se pudo cargar el acceso del juego.')
+      const data = await api.get<Metadata>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
+      if (requested !== source.current) return
+      if (!data.ok || !data.game || !validateHomeCanvas(data.homeCanvas) || !data.homeBackgroundUrls) {
+        throw new Error(t('No se pudo cargar el lienzo de la partida. Actualiza el backend y reintenta.', 'Could not load the event canvas. Update the backend and retry.'))
       }
-      throw cause
+      setLoaded({ gameId, data })
+      setLoadError('')
+    } catch (reason) {
+      if (requested === source.current) setLoadError(reason instanceof Error ? reason.message : String(reason))
+      throw reason
     }
-  }, [gameId, gameType, gameConfigVersion], { interval: gameId ? 60_000 : 0 })
+  }, [gameId, version], { interval: gameId ? 60_000 : 0 })
 
-  const handleGameCreated = (name: string, id: string, type?: string) => {
-    setGameName(name)
-    setGameId(id)
-    const gameIdToUse = normalizeGameType(type)
-    setGameType(gameIdToUse)
-  }
-
-  const handleLeaveGame = () => {
+  const leaveGame = () => {
+    if (onReturnToAdmin) { onReturnToAdmin(); return }
     setGameId(null)
     setGameName(null)
     setGameType(null)
-    setGameDefinition(null)
-    setShowSettings(false)
+    setLoaded(null)
   }
-
-  const backShellRef = useRef({ showSettings: false, inGame: false })
-  const leaveGameRef = useRef(handleLeaveGame)
-  leaveGameRef.current = handleLeaveGame
+  const backState = useRef({ gameId, leaveGame })
+  backState.current = { gameId, leaveGame }
+  useEffect(() => inputManager.registerBackInterceptor(() => {
+    if (!backState.current.gameId) return false
+    backState.current.leaveGame()
+    return true
+  }), [])
+  const [gameSettings, setGameSettings] = useState<Record<string, unknown> | null>(null)
+  const definitionId = gameDefinition?.id
   useEffect(() => {
-    backShellRef.current = {
-      showSettings,
-      inGame: !!(gameId && gameName && gameDefinition),
-    }
-  }, [showSettings, gameId, gameName, gameDefinition])
+    if (!gameId || !definitionId) { setGameSettings(null); return }
+    const saved = localStorage.getItem(`${definitionId}_settings_${gameId}`)
+    try { setGameSettings(saved ? JSON.parse(saved) : null) } catch { setGameSettings(null) }
+  }, [gameId, definitionId, version])
 
-  useEffect(() => {
-    return inputManager.registerBackInterceptor(() => {
-      if (backShellRef.current.showSettings) {
-        return false
-      }
-      if (backShellRef.current.inGame) {
-        leaveGameRef.current()
-        return true
-      }
-      return false
-    })
-  }, [])
+  const catalog = current?.prizeCatalog
+  const rules = gameDefinition?.id === 'STACK' ? current?.stackPrizeRules : undefined
+  const showRaffle = features.raffles && current?.game?.showRaffleOnHome !== false
+  const showRanking = !!gameDefinition?.showRanking
+  const label = (key: string) => typeof gameSettings?.[key] === 'string' ? gameSettings[key] as string : undefined
+  const topX = rules ? Math.max(0, ...rules.filter(rule => rule.condition === 'top_finish' || rule.condition === 'top_final').map(rule => rule.topX ?? 0)) || undefined
+    : catalog !== undefined ? catalog.ranking?.topX
+    : typeof gameSettings?.topX === 'number' ? gameSettings.topX : undefined
+  const homePrizes: HomePrize[] = rules
+    ? stackPrizePromotions(rules, t, ['completed', 'score', 'top_finish', 'top_final', ...(showRaffle ? ['raffle' as const] : [])])
+      .map(prize => ({ ...prize, heading: prize.heading || (prize.id.startsWith('raffle:') ? t('Sorteo', 'Raffle') : t('Premio', 'Prize')) }))
+    : [
+        { slot: 'validation' as const, heading: t('Premio', 'Prize'), prize: catalog !== undefined ? catalog.validation
+          : label('prizeValidation') && { name: label('prizeValidation')!, limit: readMaxPrizeValidation(gameSettings) ?? null } },
+        ...(showRanking ? [{ slot: 'ranking' as const, heading: topX ? `${t('Premio top', 'Top prize')} ${topX}` : t('Ranking', 'Leaderboard'),
+          prize: catalog !== undefined ? catalog.ranking
+            : label('prizeTopX') && { name: label('prizeTopX')!, limit: readMaxPrizeRanking(gameSettings) ?? null } }] : []),
+        ...(showRaffle ? [{ slot: 'raffle' as const, heading: t('Sorteo', 'Raffle'), prize: catalog !== undefined ? catalog.raffle
+          : label('prizeRaffle') && { name: label('prizeRaffle')!, limit: readMaxPrizeRaffle(gameSettings) ?? null } }] : []),
+      ].flatMap(({ slot, heading, prize }) => prize && (prize.name || prize.imageUrl) ? [{ ...prize, id: slot, slot, heading }] : [])
+  const logo = current?.formLogoUrl ?? (userMedia ? resolveUserSelectedLogoUrl(userMedia) : null) ?? gameDefinition?.assets?.logo
+  const hasGame = !!(gameId && gameName && gameDefinition)
+  const ready = hasGame && current && !mediaLoading && !userLoading
+  const error = loadError || mediaError
+  const retry = () => setVersion(value => value + 1)
 
-  const handleExitApp = () => {
-    // Clear all localStorage
-    localStorage.clear()
-    // Optionally reload the page or close the app
-    window.location.reload()
-  }
-
-  // Use game definition if available, otherwise use a default theme (no specific game)
-  const currentGame = gameDefinition
-  const isStack = currentGame?.id === 'STACK'
-  const isPortrait = useOrientation(isStack)
-
-  // Derive prize labels for minicontainers from game settings
-  const gs = gameSettings as Record<string, unknown> | null
-  const playersPrizeLabel =
-    prizeCatalog !== undefined ? prizeCatalog.validation?.name :
-    gs && typeof gs.prizeValidation === 'string' && gs.prizeValidation.trim()
-      ? gs.prizeValidation.trim()
-      : undefined
-  const rankingPrizeLabel =
-    prizeCatalog !== undefined ? prizeCatalog.ranking?.name :
-    currentGame?.showRanking && gs && typeof gs.prizeTopX === 'string' && gs.prizeTopX.trim()
-      ? gs.prizeTopX.trim()
-      : undefined
-  const rankingTopX =
-    stackRules ? Math.max(0, ...stackRules.filter((rule) => rule.condition === 'top_finish' || rule.condition === 'top_final').map((rule) => rule.topX ?? 0)) || undefined :
-    prizeCatalog !== undefined ? prizeCatalog.ranking?.topX :
-    currentGame?.showRanking && gs && typeof gs.topX === 'number' && gs.topX >= 1
-      ? gs.topX
-      : undefined
-  const maxPrizeValidationFromSettings = prizeCatalog !== undefined ? prizeCatalog.validation?.limit ?? undefined : readMaxPrizeValidation(gs)
-  const maxPrizeRankingFromSettings = prizeCatalog !== undefined ? prizeCatalog.ranking?.limit ?? undefined : readMaxPrizeRanking(gs)
-  const maxPrizeRaffleFromSettings = prizeCatalog !== undefined ? prizeCatalog.raffle?.limit ?? undefined : readMaxPrizeRaffle(gs)
-  const rafflePrizeLabel =
-    prizeCatalog !== undefined ? prizeCatalog.raffle?.name :
-    gs && typeof gs.prizeRaffle === 'string' && gs.prizeRaffle.trim() ? gs.prizeRaffle.trim() : undefined
-
-  // Portrait: 5% air at top (logo), 10% at bottom; reduce bottom when content overflows so nothing is hidden
-  useEffect(() => {
-    if (!isPortrait) {
-      setPortraitPaddingTopDvh(5)
-      setPortraitPaddingBottomDvh(10)
-      return
-    }
-    const el = portraitContentRef.current
-    if (!el) return
-    const HYSTERESIS_PX = 40
-    const checkOverflow = () => {
-      const sh = el.scrollHeight
-      const vh = window.innerHeight
-      setPortraitPaddingBottomDvh((prev) => {
-        if (sh > vh) return 5
-        if (sh <= vh - HYSTERESIS_PX) return 10
-        return prev
-      })
-    }
-    setPortraitPaddingTopDvh(5)
-    checkOverflow()
-    const ro = new ResizeObserver(checkOverflow)
-    ro.observe(el)
-    window.addEventListener('resize', checkOverflow)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', checkOverflow)
-    }
-  }, [isPortrait, gameId, gameConfigVersion, access, userLoading])
-
-  // Scale-to-fit in landscape: content fits in the central 80% (10% air each side and top/bottom)
-  useEffect(() => {
-    if (isPortrait) {
-      setLandscapeScale(1)
-      setLandscapeContentSize(null)
-      return
-    }
-    const el = landscapeContentRef.current
-    if (!el) return
-    const updateScale = () => {
-      const sh = el.scrollHeight
-      const sw = el.scrollWidth
-      const vh = window.innerHeight
-      const vw = window.innerWidth
-      const availableW = vw * 0.9
-      const availableH = vh * 0.8
-      setLandscapeContentSize({ width: sw, height: sh })
-      let scale = Math.min(1, availableH / sh, availableW / sw)
-      if (sh <= availableH && sw <= availableW) scale = Math.min(scale, 0.85)
-      scale = Math.min(scale, 0.9)
-      setLandscapeScale(scale)
-    }
-    updateScale()
-    const ro = new ResizeObserver(updateScale)
-    ro.observe(el)
-    window.addEventListener('resize', updateScale)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', updateScale)
-    }
-  }, [isPortrait, gameId, gameConfigVersion, access, userLoading])
-  if (userLoading) {
-    return (
-      <ThemeProvider game={currentGame}>
-        <div lang={language} className="bg-club text-textMain font-sans min-h-screen flex items-center justify-center px-6">
-          <div className="card w-full max-w-md p-8 text-center">
-            <p className="text-textMain">{t('Cargando...', 'Loading...')}</p>
-          </div>
-        </div>
-      </ThemeProvider>
-    )
-  }
-
-  return (
-    <ThemeProvider game={currentGame}>
-      <div lang={language} className="bg-club text-textMain font-sans">
-        {/* Settings Icon */}
-        <button
-          type="button"
-          onClick={() => setShowSettings(true)}
-          className={`fixed top-4 left-4 z-40 p-2 rounded-full bg-black/20 backdrop-blur-sm border border-white/10 hover:bg-black/30 transition-all duration-200 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 ${isPortrait ? 'min-w-[44px] min-h-[44px]' : 'min-w-[36px] min-h-[36px]'}`}
-          aria-label={t('Configuración', 'Settings')}
-        >
-          <svg className={`${isPortrait ? 'w-6 h-6 lg:w-7 lg:h-7' : 'w-5 h-5'} text-white/70`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
-
-        <div className={gameId && gameName && currentGame ? 'h-screen overflow-hidden' : 'min-h-screen grid place-items-center px-4 sm:px-6 lg:px-6 xl:px-8'}>
-          {gameId && gameName && currentGame ? (
-            !access || mediaLoading ? (
-              <div className="h-dvh flex flex-col items-center justify-center gap-4 px-6">
-                <p role={accessError ? 'alert' : 'status'}>{accessError
-                  ? accessError === 'No se pudo cargar el acceso del juego.'
-                    ? t(accessError, 'Unable to load game access.')
-                    : accessError
-                  : mediaLoading
-                    ? t('Cargando aspecto del juego...', 'Loading game appearance...')
-                    : t('Cargando acceso del juego...', 'Loading game access...')}</p>
-                {accessError && <button type="button" onClick={() => setGameConfigVersion((v) => v + 1)}>{t('Reintentar carga', 'Retry loading')}</button>}
-              </div>
-            ) : playMode === 'mobile' ? (
-              <div className={isStack
-                ? 'h-dvh w-full overflow-y-auto overflow-x-hidden px-3 sm:px-6 pt-16 pb-20'
-                : isPortrait
-                ? 'h-dvh w-screen overflow-y-auto px-6 sm:px-8 pt-[8dvh] pb-[10dvh]'
-                : 'h-dvh w-screen overflow-hidden pt-[7dvh] pb-[max(7dvh,4rem)] px-[4dvw]'}>
-                <MobileGameHome
-                  gameId={gameId}
-                  gameName={gameName}
-                  joinChannel={access.joinChannel}
-                  portrait={isPortrait}
-                  responsive={isStack}
-                  logoSrc={customLogo ?? currentGame.assets?.logo}
-                  logoAlt={customLogo ? t('Logo del cliente', 'Client logo') : currentGame.name}
-                  players={
-                    <Players stackPrizes={stackPlayersPrizes} gameName={gameName} gameId={gameId} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={10000} />
-                  }
-                  raffle={showRaffle ? (
-                    <RaffleData stackPrizes={stackRafflePrizes} gameId={gameId} gameName={gameName} compact={!isPortrait} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={10000} />
-                  ) : undefined}
-                  ranking={currentGame.showRanking ? (
-                    <Ranking stackPrizes={stackRankingPrizes} gameId={gameId} gameType={gameType ?? undefined} prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={10000} />
-                  ) : undefined}
-                />
-              </div>
-            ) : isPortrait ? (
-              /* Portrait: fixed height (100dvh) so footer (Sorteo, Validador de Parejas) is always visible without scroll */
-              <div className="h-dvh w-screen overflow-hidden flex flex-col">
-                <div
-                  ref={portraitContentRef}
-                  className={`px-4 sm:px-6 flex-1 min-h-0 flex flex-col overflow-hidden ${portraitPaddingBottomDvh === 5 ? 'gap-2' : 'gap-4'}`}
-                  style={{
-                    paddingTop: `${portraitPaddingTopDvh}dvh`,
-                    paddingBottom: `${portraitPaddingBottomDvh}dvh`,
-                  }}
-                >
-                  <GamePortraitHeaderJoin
-                    gameId={gameId}
-                    joinChannel={joinChannel}
-                    logoElement={
-                      customLogo || currentGame.assets?.logo ? (
-                        <img
-                          src={customLogo ?? currentGame.assets!.logo}
-                          alt={customLogo ? t('Logo del cliente', 'Client logo') : currentGame.name}
-                          className="max-h-20 sm:max-h-24 w-auto object-contain"
-                        />
-                      ) : null
-                    }
-                    footerChildren={getJoinInstructions(currentGame.id, access, t)}
-                  />
-                  {/* Main: con ranking, repartimos altura (juego : panel inferior) para que el ranking use el hueco */}
-                  {currentGame.showRanking ? (
-                    <div className="flex-1 min-h-0 flex flex-col gap-2 min-w-0 overflow-hidden">
-                      <div className="card grow-[3] basis-0 shrink min-h-0 w-full overflow-hidden flex flex-col p-4 sm:p-5">
-                        <currentGame.GameScreen
-                          key={`game-${gameId}-${gameConfigVersion}`}
-                          gameId={gameId}
-                          orientation="portrait"
-                          topX={rankingTopX}
-                          prizeLabel={rankingPrizeLabel}
-                          prizeCatalog={prizeCatalog}
-                          onCounterActiveChange={setCounterActive}
-                          joinChannel={joinChannel}
-                          playMode={playMode}
-                        />
-                      </div>
-                      <div className="grow-[2] basis-0 shrink min-h-0 flex flex-col gap-3 min-w-0 overflow-hidden">
-                        <div className="flex-shrink-0 w-full">
-                          <Players stackPrizes={stackPlayersPrizes} gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
-                        </div>
-                        <div className="min-h-0 flex-1 flex flex-col min-w-0">
-                          <Ranking stackPrizes={stackRankingPrizes} gameId={gameId} gameType={gameType ?? undefined} prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
-                        </div>
-                        {showRaffle && (
-                          <div className="flex-shrink-0 w-full">
-                            <RaffleData stackPrizes={stackRafflePrizes} gameId={gameId} gameName={gameName} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="card flex-1 min-h-0 w-full overflow-hidden flex flex-col p-4 sm:p-5">
-                        <currentGame.GameScreen
-                          key={`game-${gameId}-${gameConfigVersion}`}
-                          gameId={gameId}
-                          orientation="portrait"
-                          topX={rankingTopX}
-                          prizeLabel={rankingPrizeLabel}
-                          prizeCatalog={prizeCatalog}
-                          onCounterActiveChange={setCounterActive}
-                          joinChannel={joinChannel}
-                          playMode={playMode}
-                        />
-                      </div>
-                      <div className="flex flex-row gap-3 flex-wrap items-stretch min-w-0 flex-shrink-0">
-                        <div className="flex-1 min-w-[200px]">
-                          <Players stackPrizes={stackPlayersPrizes} gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
-                        </div>
-                        {showRaffle && (
-                          <div className="flex-1 min-w-[200px]">
-                            <RaffleData stackPrizes={stackRafflePrizes} gameId={gameId} gameName={gameName} prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* Landscape: menos aire lateral, algo más pegado al borde derecho */
-              <div className="h-dvh w-screen overflow-hidden flex justify-center items-center py-[10dvh] pl-[3dvw] pr-[1.5dvw]">
-                <div
-                  className="flex-shrink-0 max-w-full max-h-full"
-                  style={{
-                    ...(landscapeContentSize
-                      ? { width: landscapeContentSize.width, height: landscapeContentSize.height }
-                      : { width: '100%', height: '100%' }),
-                    transform: `scale(${landscapeScale})`,
-                    transformOrigin: 'center center',
-                  }}
-                >
-                    <div
-                      ref={landscapeContentRef}
-                      className="h-full w-full overflow-hidden flex flex-col"
-                    >
-                    <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                      <currentGame.GameScreen
-                        key={`game-${gameId}-${gameConfigVersion}`}
-                        gameId={gameId}
-                        orientation="landscape"
-                        topX={rankingTopX}
-                        prizeLabel={rankingPrizeLabel}
-                        prizeCatalog={prizeCatalog}
-                        onCounterActiveChange={setCounterActive}
-                        joinChannel={joinChannel}
-                        playMode={playMode}
-                        logoElement={
-                          (customLogo || currentGame.assets?.logo) ? (
-                            <div className="flex justify-center items-center w-full min-w-0">
-                              <img
-                                src={customLogo ?? currentGame.assets!.logo}
-                                alt={customLogo ? t('Logo del cliente', 'Client logo') : currentGame.name}
-                                className={GAME_SCREEN_LOGO_CLASS_LANDSCAPE}
-                              />
-                            </div>
-                          ) : null
-                        }
-                        playersElement={
-                          <Players stackPrizes={stackPlayersPrizes} gameName={gameName} gameId={gameId ?? undefined} gameType={gameType ?? undefined} compact countersOnly={normalizeGameType(gameType ?? undefined) === 'EMPAREJA2'} prize={prizeCatalog?.validation} prizeLabel={playersPrizeLabel} maxPrizeValidationLimit={maxPrizeValidationFromSettings} refreshInterval={counterActive ? 0 : 10000} />
-                        }
-                        sidebarElement={
-                          <div className="flex flex-col gap-2 w-full min-w-0 min-h-0 flex-1 h-full overflow-y-auto self-stretch">
-                            {currentGame.showRanking && (
-                              <div className="min-h-0 flex-1 flex flex-col w-full overflow-hidden">
-                                <Ranking stackPrizes={stackRankingPrizes} gameId={gameId} gameType={gameType ?? undefined} compact prize={prizeCatalog?.ranking} prizeLabel={rankingPrizeLabel} topX={rankingTopX} maxPrizeRanking={maxPrizeRankingFromSettings} refreshInterval={counterActive ? 0 : 10000} />
-                              </div>
-                            )}
-                            {showRaffle && (
-                              <div className="flex-shrink-0 w-full min-h-[min(32vh,220px)] flex flex-col">
-                                <RaffleData stackPrizes={stackRafflePrizes} gameId={gameId} gameName={gameName} compact prize={prizeCatalog?.raffle} prizeLabel={rafflePrizeLabel} maxPrizeRaffle={maxPrizeRaffleFromSettings} refreshInterval={counterActive ? 0 : 10000} />
-                              </div>
-                            )}
-                          </div>
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          ) : (
-            /* GameGate Catalog */
-            <div
-              data-focus-root
-              className="card w-full max-w-md sm:max-w-xl lg:max-w-2xl xl:max-w-3xl 2xl:max-w-4xl p-6 sm:p-8 lg:p-10"
-            >
-              <GameGate onGameCreated={handleGameCreated} />
-            </div>
-          )}
-        </div>
-
-        {/* Settings Menu */}
-        {showSettings && (
-          <SettingsMenu 
-            onClose={() => setShowSettings(false)} 
-            gameId={gameId ?? undefined}
-            gameType={gameType ?? undefined}
-            gameDefinition={gameDefinition ?? undefined}
-            onLeaveGame={handleLeaveGame}
-            onExitApp={handleExitApp}
-            onConfigSaved={() => setGameConfigVersion(v => v + 1)}
-          />
-        )}
-
-        {/* Logo fijo de footer (inmutable) en esquina inferior derecha */}
-        <div className={`fixed right-4 bottom-4 opacity-80 hover:opacity-100 transition-opacity z-10 ${isPortrait ? 'w-14 h-14 lg:w-16 lg:h-16 2xl:w-20 2xl:h-20' : 'w-10 h-10 lg:w-12 lg:h-12'}`}>
-          <img 
-            src="/images/logo-stand-footer.png" 
-            alt="Stand" 
-            className="w-full h-full object-contain" 
-          />
-        </div>
-      </div>
-    </ThemeProvider>
-  )
+  return <ThemeProvider game={gameDefinition ?? null} appearance={current?.formConfig?.appearance ?? userMedia?.appearance ?? undefined}>
+    <div lang={language} className="relative bg-club text-textMain font-sans h-dvh w-full flex flex-col overflow-hidden">
+      <main className="flex-1 min-h-0 min-w-0">
+        {ready && gameId && gameName ? <HomeCanvas composition={current.homeCanvas[orientation]} orientation={orientation}
+          gameId={gameId} gameName={gameName} logoSrc={logo} backgroundUrl={current.homeBackgroundUrls[orientation]} fit stretch
+          players={<Players gameName={gameName} gameId={gameId} gameType={gameType ?? undefined}
+            compact countersOnly={gameDefinition?.id === 'EMPAREJA2'} />}
+          ranking={showRanking ? <Ranking gameId={gameId} gameType={gameType ?? undefined} compact
+            prize={catalog?.ranking} topX={topX}
+            maxPrizeRanking={catalog !== undefined ? catalog.ranking?.limit ?? undefined : readMaxPrizeRanking(gameSettings)} /> : undefined}
+          raffle={showRaffle ? <RaffleData gameId={gameId} gameName={gameName} compact /> : undefined}
+          prizes={<HomePrizes prizes={homePrizes} gameId={gameId} gameName={gameName} />} />
+          : hasGame || userLoading ? <div className="h-full flex flex-col items-center justify-center gap-4 p-6">
+            <p role={error ? 'alert' : 'status'}>{error || t('Cargando partida…', 'Loading event…')}</p>
+            {error && <button type="button" className="underline" onClick={retry}>{t('Reintentar carga', 'Retry loading')}</button>}
+          </div> : <div className="h-full overflow-auto grid place-items-center p-6">
+            <div className="card w-full max-w-3xl p-6"><GameGate onGameCreated={(name, id, type) => {
+              setGameName(name); setGameId(id); setGameType(normalizeGameType(type))
+            }} /></div>
+          </div>}
+      </main>
+      {onReturnToAdmin && <button type="button" onClick={onReturnToAdmin}
+        className="stage-control absolute left-3 top-3 z-20 min-h-11 rounded-md border bg-black/60 px-3 py-2 text-sm opacity-60 backdrop-blur transition-opacity hover:opacity-100 focus-visible:opacity-100">
+        {t('Administración', 'Administration')}
+      </button>}
+      {ready && error && <p role="alert" className="absolute bottom-3 right-3 z-20 rounded-md bg-black/70 px-3 py-2 text-sm">
+        {error} <button type="button" className="underline" onClick={retry}>{t('Reintentar', 'Retry')}</button>
+      </p>}
+    </div>
+  </ThemeProvider>
 }

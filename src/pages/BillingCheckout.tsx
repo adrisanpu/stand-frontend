@@ -65,38 +65,38 @@ export default function BillingCheckout() {
   if (error) {
     return (
       <ThemeProvider game={null}>
-        <div className="min-h-screen flex items-center justify-center bg-club text-textMain px-6">
-          <div className="card w-full max-w-md p-8 text-center space-y-4">
-            <p className="text-red-500">{error}</p>
+        <main className="auth-shell billing-shell">
+          <div className="auth-card auth-status-card space-y-4 text-center">
+            <p role="alert" className="text-red-700">{error}</p>
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => navigate('/home')}
-                className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)]"
+                className="auth-submit w-full p-3 font-semibold"
               >
                 Ir al inicio
               </button>
               <button
                 onClick={() => navigate('/login')}
-                className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)]"
+                className="w-full border border-[#C6D1CC] p-3 font-semibold text-[#152F3A] hover:bg-[#F0F3EF]"
               >
                 Volver a iniciar sesión
               </button>
             </div>
           </div>
-        </div>
+        </main>
       </ThemeProvider>
     )
   }
 
   return (
     <ThemeProvider game={null}>
-      <div className="min-h-screen flex items-center justify-center bg-club text-textMain px-6">
-        <div className="card w-full max-w-md p-8 text-center">
-          <p className="text-textMain">
+      <main className="auth-shell billing-shell">
+        <div className="auth-card auth-status-card text-center">
+          <p role="status" className="text-textMain">
             {status === 'redirecting' ? 'Redirigiendo al pago...' : 'Completando...'}
           </p>
         </div>
-      </div>
+      </main>
     </ThemeProvider>
   )
 }

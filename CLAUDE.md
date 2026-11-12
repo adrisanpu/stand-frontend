@@ -24,14 +24,16 @@ Canonical game id strings: `normalizeGameType()` in `src/core/gameTypeMap.ts` (u
 
 **Game module structure** (`src/games/<id>/`):
 - `index.ts` — exports GameDefinition (id, name, type, colors, components)
-- `GameScreen.tsx` — main player-facing game component
+- `ParticipantPlay.tsx` — mobile gameplay, connected by `ParticipantShell`
 - `GameConfig.tsx` — operator configuration panel
 
 **Operator game UI** (margins, layout tokens, validation): [`docs/operator-game-ui.md`](docs/operator-game-ui.md)
 
 ## HOW
 - **Agent rules:** workspace [software-rule.md](../software-rule.md) + [infrastructure-rule.md](../infrastructure-rule.md)
-- Register new game: add GameDefinition to `src/games/index.ts`, wire routing in `src/core/shell/AppShell.tsx`
+- Register new game: add GameDefinition to `src/games/index.ts`, connect mobile gameplay in `src/core/participant/ParticipantShell.tsx`
+- Stand Home: shared `src/core/home/HomeCanvas.tsx`, with separate landscape/portrait compositions edited in Appearance. Never mount gameplay in `AppShell`. The live Home uses `fit stretch` (grid stretched to the real viewport) with no header, footer or settings menu, just a floating "Administración" button; all configuration lives in Administración. Prizes are only shown by the placeable `prizes` component (`src/core/widgets/HomePrizes.tsx`), never as stickers on Players/Ranking/Raffle. Removing a player from a game is done in Administración → Clientes.
+- Participant actions use `src/api/publicApi.ts` and participant tokens, never operator credentials.
 - Feature gates: `getFeaturesByPlan(plan)` from `src/auth/featureFlags.ts`
 - Plans: `'free'` (1 game, 25 players) | `'event'` | `'enterprise'` (unlimited)
 - Storage rule: auth tokens → sessionStorage; gameId/gameName/gameType → localStorage

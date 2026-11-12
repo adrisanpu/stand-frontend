@@ -1,11 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { api } from '../../api/api'
 import { usePolling } from '../../hooks/usePolling'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
-import type { GamePrize } from '../prizes'
-import PrizeSticker from './PrizeSticker'
-import type { StickerPrize } from './stackPrizePromotions'
 import { HOME_TITLE_TEXT, HOME_BODY_TEXT } from '../ui/homeTypography'
 
 interface RaffleWinner {
@@ -39,14 +35,10 @@ interface AutoRaffleConfig {
 }
 
 interface RaffleDataProps {
-  stackPrizes?: StickerPrize[]
   gameId: string
   gameName: string
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and show fewer items
-  prizeLabel?: string // Legacy prize name, shown in the prize sticker
-  prize?: GamePrize
-  maxPrizeRaffle?: number
 }
 
 const getStorageKey = (gameId: string) => `raffle_auto_${gameId}`
@@ -63,10 +55,8 @@ const loadAutoRaffleConfig = (gameId: string): AutoRaffleConfig | null => {
   return null
 }
 
-export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false, prizeLabel: legacyPrizeLabel, prize, maxPrizeRaffle: legacyMax, stackPrizes }: RaffleDataProps) {
+export default function RaffleData({ gameId, gameName, refreshInterval = 10000, compact = false }: RaffleDataProps) {
   const { t } = useOperatorLanguage()
-  const prizeLabel = prize ? prize.name : legacyPrizeLabel
-  const maxPrizeRaffle = prize ? prize.limit ?? undefined : legacyMax
   const [winners, setWinners] = useState<RaffleWinner[]>([])
   const [updatingDelivered, setUpdatingDelivered] = useState(false)
   const [nextRaffleTime, setNextRaffleTime] = useState<Date | null>(null)
@@ -75,57 +65,6 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
   const [gameType, setGameType] = useState<string | null>(null)
   const [autoRaffleConfig, setAutoRaffleConfig] = useState<AutoRaffleConfig | null>(null)
   const autoRaffleInProgressRef = useRef(false)
-  const [winnersDropdownOpen, setWinnersDropdownOpen] = useState(false)
-  const winnersDropdownRef = useRef<HTMLDivElement>(null)
-  const winnersButtonRef = useRef<HTMLButtonElement>(null)
-  const dropdownPortalRef = useRef<HTMLDivElement>(null)
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number; minWidth: number } | null>(null)
-
-  const updateDropdownPosition = useCallback(() => {
-    const btn = winnersButtonRef.current
-    if (!btn) return
-    const rect = btn.getBoundingClientRect()
-    setDropdownPosition({
-      top: rect.bottom + 4,
-      right: window.innerWidth - rect.right,
-      minWidth: rect.width,
-    })
-  }, [])
-
-  // Set dropdown position before paint so the portal appears in the right place immediately
-  useLayoutEffect(() => {
-    if (!winnersDropdownOpen) {
-      setDropdownPosition(null)
-      return
-    }
-    updateDropdownPosition()
-  }, [winnersDropdownOpen, updateDropdownPosition])
-
-  useEffect(() => {
-    if (!winnersDropdownOpen) return
-    const onScrollOrResize = () => updateDropdownPosition()
-    window.addEventListener('scroll', onScrollOrResize, true)
-    window.addEventListener('resize', onScrollOrResize)
-    return () => {
-      window.removeEventListener('scroll', onScrollOrResize, true)
-      window.removeEventListener('resize', onScrollOrResize)
-    }
-  }, [winnersDropdownOpen, updateDropdownPosition])
-
-  useEffect(() => {
-    if (!winnersDropdownOpen) return
-    const onOutside = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (
-        !winnersDropdownRef.current?.contains(target) &&
-        !dropdownPortalRef.current?.contains(target)
-      ) {
-        setWinnersDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onOutside)
-    return () => document.removeEventListener('mousedown', onOutside)
-  }, [winnersDropdownOpen])
 
   const calculateNextAutoRaffleTime = (config: AutoRaffleConfig): Date | null => {
     if (!config.enabled) return null
@@ -325,93 +264,46 @@ export default function RaffleData({ gameId, gameName, refreshInterval = 10000, 
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 min-w-0 flex-1">
-      <PrizeSticker items={stackPrizes} prize={prize} label={prizeLabel} current={winners.length} max={maxPrizeRaffle} compact={compact} />
-      <div
-        className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col relative flex-1 min-h-0 ${compact ? 'p-2 sm:p-3 min-w-0' : 'p-3 sm:p-4 lg:p-6'} ${winnersDropdownOpen ? 'overflow-visible' : 'overflow-hidden'}`}
-        ref={winnersDropdownRef}
-      >
-        <h2 className={`font-bold text-textMain mb-1 sm:mb-2 flex flex-wrap items-center gap-2 flex-shrink-0 ${HOME_TITLE_TEXT}`}>
-          {t('Sorteo', 'Raffle')}
-          {isStale && <span className={`${HOME_BODY_TEXT} font-normal text-yellow-500`}>● {t('sin señal', 'offline')}</span>}
-        </h2>
-        <div className={`flex-1 min-h-0 flex flex-col ${compact ? 'gap-1' : 'gap-3 sm:gap-4'}`}>
-          {/* Next Raffle Countdown */}
-          {timeUntilNext !== null && timeUntilNext > 0 && autoRaffleConfig?.enabled && (
-            <div className={`rounded-lg bg-surface border border-white/10 flex-shrink-0 ${compact ? 'p-2' : 'p-2 sm:p-3'}`}>
-              <div className={`flex flex-row flex-wrap items-baseline justify-start gap-x-2 gap-y-0 ${HOME_BODY_TEXT}`}>
-                <span className="text-textSub shrink-0">{t('Próximo en:', 'Next in:')}</span>
-                <span className={`font-semibold text-[var(--color-primary)] ${HOME_BODY_TEXT}`}>
-                  {formatTime(timeUntilNext)}
-                </span>
-              </div>
+    <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col h-full min-h-0 min-w-0 overflow-hidden ${compact ? 'p-2 sm:p-3' : 'p-3 sm:p-4 lg:p-6'}`}>
+      <h2 className={`font-bold text-textMain mb-1 sm:mb-2 flex flex-wrap items-center gap-2 flex-shrink-0 ${HOME_TITLE_TEXT}`}>
+        {t('Sorteo', 'Raffle')}
+        {isStale && <span className={`${HOME_BODY_TEXT} font-normal text-yellow-500`}>● {t('sin señal', 'offline')}</span>}
+      </h2>
+      <div className={`flex-1 min-h-0 flex flex-col ${compact ? 'gap-1' : 'gap-3 sm:gap-4'}`}>
+        {timeUntilNext !== null && timeUntilNext > 0 && autoRaffleConfig?.enabled && (
+          <div className={`rounded-lg bg-surface border border-white/10 flex-shrink-0 ${compact ? 'p-2' : 'p-2 sm:p-3'}`}>
+            <div className={`flex flex-row flex-wrap items-baseline justify-start gap-x-2 gap-y-0 ${HOME_BODY_TEXT}`}>
+              <span className="text-textSub shrink-0">{t('Próximo en:', 'Next in:')}</span>
+              <span className={`font-semibold text-[var(--color-primary)] ${HOME_BODY_TEXT}`}>
+                {formatTime(timeUntilNext)}
+              </span>
             </div>
-          )}
-
-          {/* Winners dropdown: panel from Ganadores button, above the Sorteo container */}
-          {winners.length > 0 ? (
-            <div className="relative flex-shrink-0">
-              <button
-                ref={winnersButtonRef}
-                type="button"
-                onClick={() => setWinnersDropdownOpen(open => !open)}
-                className={`w-full rounded-lg bg-surface border border-white/10 px-3 py-2 text-left text-textMain flex items-center justify-between ${HOME_BODY_TEXT}`}
-                aria-expanded={winnersDropdownOpen}
-                aria-haspopup="listbox"
-                aria-label={`${t('Ganadores', 'Winners')} (${winners.length}). ${winnersDropdownOpen ? t('Cerrar lista', 'Close list') : t('Ver lista', 'View list')}`}
-              >
-                <span>{t('Ganadores', 'Winners')} ({winners.length})</span>
-                <span className="text-textSub ml-2">{winnersDropdownOpen ? '▲' : '▼'}</span>
-              </button>
-              {winnersDropdownOpen &&
-                dropdownPosition &&
-                createPortal(
-                  <div
-                    ref={dropdownPortalRef}
-                    className="fixed z-[9999] rounded-xl border border-primary/30 bg-[var(--color-background,#0B0A12)] bg-[linear-gradient(var(--color-surface),var(--color-surface))] text-textMain shadow-lg overflow-hidden flex flex-col w-max min-w-0"
-                    style={{
-                      top: dropdownPosition.top,
-                      right: dropdownPosition.right,
-                      minWidth: dropdownPosition.minWidth,
-                      maxWidth: 'calc(100vw - 2rem)',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--color-primary-rgb,147,51,234),0.25)',
-                    }}
-                    role="listbox"
-                    aria-label={t('Lista de ganadores', 'Winners list')}
-                  >
-                    <div
-                      className="overflow-y-auto overflow-x-auto overscroll-contain p-1.5 min-w-0 max-h-40"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      {winnersSortedByName.map((w, index) => (
-                        <label
-                          key={w.raffleId ?? index}
-                          role="option"
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg min-w-0 cursor-pointer border-b border-white/5 last:border-b-0 hover:bg-white/10 transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={!!w.prizeDelivered}
-                            onChange={() => handleToggleDelivered(w.raffleId!, w.prizeDelivered ?? false)}
-                            disabled={updatingDelivered || !gameType}
-                            className="w-4 h-4 flex-shrink-0 rounded border-white/20 accent-[var(--color-primary)] text-primary focus:ring-primary"
-                            onClick={e => e.stopPropagation()}
-                            aria-label={`${t('Premio entregado para', 'Prize delivered for')} ${w.username}`}
-                          />
-                          <span className={`text-textMain font-medium whitespace-nowrap shrink-0 ${HOME_BODY_TEXT}`} title={w.username}>
-                            {w.username}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>,
-                  document.body
-                )}
-            </div>
-          ) : (
-            <p className={`text-textSub ${HOME_BODY_TEXT}`}>{t('No hay ganadores aún', 'No winners yet')}</p>
-          )}
-        </div>
+          </div>
+        )}
+        <h3 className={`font-semibold text-textMain flex-shrink-0 ${HOME_BODY_TEXT}`}>
+          <span>{t('Ganadores', 'Winners')} ({winners.length})</span>
+        </h3>
+        {winners.length > 0 ? (
+          <ul className="flex-1 min-h-0 overflow-y-auto space-y-1" aria-label={t('Lista de ganadores', 'Winners list')}>
+            {winnersSortedByName.map((w, index) => (
+              <li key={w.raffleId ?? index}>
+                <label className="flex items-center gap-2 px-2 py-1.5 rounded-lg min-w-0 cursor-pointer bg-surface border border-white/10">
+                  <input
+                    type="checkbox"
+                    checked={!!w.prizeDelivered}
+                    onChange={() => handleToggleDelivered(w.raffleId!, w.prizeDelivered ?? false)}
+                    disabled={updatingDelivered || !gameType}
+                    className="w-4 h-4 flex-shrink-0 rounded border-white/20 accent-[var(--color-primary)]"
+                    aria-label={`${t('Premio entregado para', 'Prize delivered for')} ${w.username}`}
+                  />
+                  <span className={`text-textMain font-medium truncate ${HOME_BODY_TEXT}`} title={w.username}>{w.username}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={`text-textSub ${HOME_BODY_TEXT}`}>{t('No hay ganadores aún', 'No winners yet')}</p>
+        )}
       </div>
     </div>
   )

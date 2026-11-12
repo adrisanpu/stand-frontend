@@ -48,7 +48,10 @@ export default function ValidatorShell() {
       setMessage(`${kindLabel} entregado${res.label ? ` a ${res.label}` : ''}.`)
     } catch (e) {
       const err = e as Error & { status?: number }
-      if (err.status === 409 || err.message === 'AlreadyDelivered') {
+      if (err.message === 'QuizRequired') {
+        setStatus('error')
+        setMessage('El participante debe completar el cuestionario antes de recibir el premio.')
+      } else if (err.status === 409 || err.message === 'AlreadyDelivered') {
         setStatus('already')
         setMessage('Este premio ya se había entregado.')
       } else {
@@ -125,13 +128,13 @@ export default function ValidatorShell() {
   return (
     <ThemeProvider game={game ?? null}>
       <div
-        className="min-h-dvh text-textMain font-sans px-4 py-6"
+        className="validator-shell text-textMain font-sans"
         style={{ background: colors?.background ?? '#0B0A12', color: colors?.textMain ?? '#EAEAF2' }}
       >
-        <div className="mx-auto max-w-md w-full space-y-4">
+        <div className="validator-content mx-auto max-w-md w-full space-y-4">
           <h1 className="text-xl font-bold text-center">Validador de premios</h1>
 
-          <div className="relative overflow-hidden rounded-xl border border-white/15 bg-black/40 aspect-[3/4]">
+          <div className="validator-frame relative overflow-hidden rounded-xl aspect-[3/4]">
             <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted />
             <canvas ref={canvasRef} className="hidden" />
             {(status === 'redeeming' || status === 'ok' || status === 'already' || status === 'error') && (
@@ -160,7 +163,7 @@ export default function ValidatorShell() {
             <button
               type="button"
               onClick={() => void startScan()}
-              className="w-full rounded-xl py-3 font-semibold border border-white/15"
+              className="validator-action w-full rounded-md py-3 font-semibold"
             >
               Escanear otro
             </button>

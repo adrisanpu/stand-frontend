@@ -6,6 +6,157 @@ This repo is the **frontend only**. Backend lives in a separate repo: [stand-bac
 
 ---
 
+## Administration and event home
+
+The Clients panel lists one person per owner and normalized verified email,
+grouping their event participations. It requests 25 clients at a time, with
+previous/next arrows and an exact `1-25 of total` range above the list.
+The debounced filter searches names, emails and phones across the owner's
+entire client directory, ignoring case and name accents. Filtering resets to
+the first page; stale requests cannot replace newer search results.
+Participation and prize history is requested only when opening a person and
+expands directly below their row. Clicking the row again closes it; opening
+another person closes the previous detail.
+Expanded rows omit repeated contact details, show a small game logo for each
+participation and a prize thumbnail when available, and use the shared red
+cross close button.
+Existing participants require the backend's explicit historical index rebuild;
+loading the panel does not scan all game participants.
+
+Normal sign-in and the authenticated root now open `/admin/games`.
+The protected administration has **Juegos / Games** and **Integraciones /
+Integrations**, with desktop navigation and a compact mobile menu.
+
+Games lists the authenticated owner's events from `GET /v1/game`. Each card
+shows the game logo, event name, creation date and player count.
+The search above the list matches names, game type, creation date (ISO or
+displayed date) and player count, without additional API calls. Missing legacy
+metadata is displayed as unavailable, not a fictional date or zero.
+**Crear partida / Create event** opens the existing catalog and creation flow
+in a scrollable modal above the list, retaining the current search. It supports
+Escape, focus containment and return focus; the old `/admin/games/catalog`
+URL opens this overlay rather than a separate catalog screen.
+**Entrar en la partida / Open event** opens
+`/home?gameId=...`, outside the administration layout. The selected ID is
+verified through the owner API before mounting the home; a failed lookup never
+opens an old cached event. Returning to administration does not terminate or
+restart the event. Direct legacy `/home` links still work.
+
+Actions are displayed as icons with localized accessible labels and hover titles.
+Cards provide **Entrar**, **Configurar partida**, **Activar/Desactivar** and **Archivar**. Deactivation
+requires confirmation and preserves players/results; it is not a reset.
+All games use the common active/closing/inactive lifecycle. Deactivation
+blocks new participation and allocates pending prizes: STACK waits for started
+attempts; other games use confirmed results. Raffles remain manual. Cards
+refresh while closing and disable activation/deletion until calculations finish.
+Reactivation retains scores, consumed attempts, rewards and consumed stock.
+**Archivar** archives an inactive event instead of deleting its data; history,
+queued deliveries and prize claims remain available. Native prize claims use
+individual award QRs in the existing supported public participant flows.
+The accessible archive icon next to **Crear partida** switches the same
+searchable list to archived events (`?archived=1`). Archived cards offer
+**Desarchivar** (returns inactive, without resetting or activating) and
+**Borrar definitivamente**. Permanent deletion requires typing the event name,
+warns about irreversible local data loss, and is blocked server-side while
+prizes, deliveries, emails or reconciliation remain pending. External Kivly
+customers and rewards are untouched. An interrupted deletion cannot be restored:
+reload and repeat the confirmed deletion to finish cleanup. The backend retains
+only the deleted join-code tombstone to prevent old links from being reused.
+Unconfirmed writes require reloading before retry. Deploy the matching shared
+layer, lifecycle/prize worker and game/public/score/validate/raffle backend
+changes together before publishing this frontend. This is not a frontend-only
+toggle change; old backend activity responses are rejected.
+The catalog overlay omits the branding header while retaining game icons.
+Save actions share one button style across account, appearance, integrations,
+prize catalogs and game configuration. Reward-condition actions use icon-only
+buttons with localized accessible names and hover titles, including save,
+reload, add rule/group and remove controls.
+Buttons retain their contextual variants rather than a global background or
+border override. Navigation and game-catalog selectors are transparent; save
+actions share their own style. Destructive/red actions use a red border and
+background in both themes.
+Cross-only close/remove buttons use the same shared red icon control, including
+dialogs, settings, quiz/raffle overlays and INFOCARDS media controls.
+
+Integrations reuses the existing account-wide Kivly connection UI as a page.
+Connection/disconnection, club website and the existing STACK integration
+keep their current behavior; this does not add Kivly capabilities.
+
+The bottom-left account block shows the operator's name and profile photo
+(initial when unavailable). Hovering over this identity reveals icon-only
+account-settings and sign-out actions, also available on keyboard focus and
+always visible on touch devices. **Configurar cuenta / Account settings** opens
+`/admin/account` to save a name and upload or remove a JPG, PNG or WebP photo
+up to 5 MB. Email is read-only. Profile changes persist on the account and
+update the sidebar after saving; they do not change game logos or participant
+photos. Deploy the matching `PUT /v1/user/me` and `profile-photo` upload support
+before publishing this frontend.
+The account form sits directly below the page title and subtitle, without an
+outer card. It also shows the same plan, validity countdown, creation/update
+dates and Event 24h activation action as the Home account information view;
+both surfaces share the same component and checkout flow.
+
+Delivery **1B** adds an event-settings overlay, opened by the settings icon
+on each non-archived card. **Configuración** reuses each mechanic's existing
+editor and goals; **Condiciones de recompensa** edits only supported conditions.
+STACK reuses its existing completion, ranking, score and manual-raffle rules,
+OR groups and AND allocations, selecting only prizes already in this event's
+catalog. T1MER can change the top positions for an existing ranking reward;
+other mechanics display their existing fixed conditions without a universal
+victory-rule engine. T1MER's registration-only component is not mounted here.
+
+The selected event is loaded from the owner API, never from the browser's
+selected event. Only active events are editable; inactive/closing events
+are read-only, including INFOCARDS generation, media and custom interactions.
+Mechanics and conditions have independent saves, errors and draft guards.
+Closing warns before discarding drafts and is blocked during writes.
+INFOCARDS card layouts now persist with cards in the existing server blob.
+Server settings take precedence; the new editor does not import historical
+browser-only RULET4 settings automatically.
+
+The operational home's former configuration entry is now **Registro y acceso**:
+it retains registration, participant links and the existing integration, but
+does not mount or save mechanics, prize catalogs or raffles. Prize catalogs and
+manual raffles are managed through the event administration panels described
+in delivery 1C. The catalog no longer edits conditions; catalog saves preserve
+server-side rules.
+Publish the matching game/shared-layer and INFOCARDS/quiz backend changes before
+this frontend. These local changes do not perform a deployment.
+
+Delivery **1C** adds prize assignment and raffle administration and a unified
+participant delivery flow. On an available STAND award, the verified email
+address receives the award and Apple/Google Wallet links when those providers
+are configured. A failed email does not block the prize QR or Wallet pass;
+the email status is visible and can be retried. Kivly awards retain their Kivly
+Wallet link. Configure SES and optional provider credentials in the backend
+before expecting email or provider passes; no credentials belong in this
+frontend. Deploy the backend 1C stack before publishing this frontend.
+
+The **Configurar partida** overlay uses horizontal sections for **Configuración**,
+**Condiciones** and **Premios y sorteo**. The last section contains manual raffle
+operations and links to the dedicated **Administración > Premios** panel. That
+panel owns the organizer-wide prize catalog; names and images are shared across
+the organizer's events. Physical inventory is managed inline in that same panel;
+only optional event caps and conditions remain event-specific. Inactive events
+remain read-only in their event settings, but general inventory remains editable.
+
+Delivery **1D** adds **Clientes** to the authenticated administration. It
+groups only existing participants with a verified email, within the operator,
+and shows their all-game participation and persisted prize history. Kivly
+assignment, email status and STAND collection are distinct; the UI does not
+infer external Kivly redemption. Points, levels and campaigns are not included.
+Deploy the matching backend and complete its explicit historical-index
+migration before publishing this frontend. Publishing remains a separate,
+authorized step. Public `/play/:gameId` and `/redeem/:gameId` routes and
+explicit billing return URLs are unchanged.
+
+Deploy the backend's complete owner-game listing, including `playerCount`,
+before publishing this
+frontend when an owner's games can span multiple DynamoDB pages. Local checks
+do not deploy either repository or verify live Kivly behavior.
+
+---
+
 ## Quick start
 
 ```bash
@@ -82,7 +233,7 @@ stand-frontend/
 │   ├── auth/         # Cognito IdP (in-app login), tokens, protected routes, user hook
 │   ├── api/          # API client (base URL, auth headers)
 │   ├── core/         # App shell, game gate, settings, ranking, quiz, raffle, theme, types
-│   ├── games/        # One folder per game (config + GameScreen)
+│   ├── games/        # One folder per game (config + ParticipantPlay)
 │   ├── pages/        # Login, BillingSuccess, BillingCancel
 │   ├── styles/       # Global styles (e.g. glow.css)
 │   ├── App.tsx       # Routes and auth provider
@@ -97,7 +248,11 @@ stand-frontend/
 
 ## Games (in this frontend)
 
-Each game is a **module**: `src/games/<game-id>/` with `config.ts` (game definition + theme + assets) and `GameScreen.tsx` (UI and logic). They are registered in `src/games/index.ts`.
+Each game is a **module**: `src/games/<game-id>/` with `config.ts` (game definition + theme + assets) and `ParticipantPlay.tsx` (mobile gameplay). Definitions are registered in `src/games/index.ts`; mobile experiences are connected through `ParticipantShell`. The stand displays only the shared editable `HomeCanvas`, never gameplay.
+
+Event settings are ordered **Home → Game → Registration form → Questionnaire → Prizes → Raffle**. New events require explicit confirmation of all six panels; progress is server-persisted and unfinished events resume configuration on reload or Home entry. Existing events without the setup marker are exempt. Game includes a local playable preview using draft mechanics, without registration or real participant/prize writes.
+
+Configure the Home in event settings → Home: drag/resize non-overlapping components, add text, and save separate horizontal/vertical compositions. Event advanced customization also supports image or looping MP4/WebM backgrounds (videos up to 100 MB). Browsers may require **Activar sonido** before playing audio. New events start empty; existing events without a canvas receive an editable initial composition. See [`docs/operator-game-ui.md`](docs/operator-game-ui.md).
 
 | Game       | Description |
 |-----------|-------------|
@@ -121,15 +276,64 @@ STACK `/home` uses the shared event layout: stacked panels in narrow, portrait o
 
 STACK `/play` keeps the shared participant shell, safe areas, keyboard-aware viewport and vertical scrolling. Its player header can wrap, the canvas scales with the viewport, and ranking prize overlays remain scrollable from the top even on short screens. Resizing does not restart an attempt or recreate the scene.
 
-**Settings > Premios** supports an optional, independent PNG image for each validation, ranking and raffle prize (maximum 5 MB per image). The image control sits between the prize name and its numeric parameters, with preview, replacement and removal. File selection only edits the draft; **Guardar** uploads and publishes the catalog to the game backend, and failures keep the draft open with an error. Existing locally configured prize names and limits are published when saved; a server catalog takes precedence over that legacy cache.
+**Settings > Premios** assigns entries from the shared prize catalog to validation, ranking and raffle slots. Names and images are edited only in **Administración > Premios**; slot limits and ranking positions stay specific to each event. The shared catalog supports optional PNG images (maximum 5 MB); file selection remains a draft until the catalog is saved. Legacy prize entries are migrated to shared definitions on first catalog access.
 
 Prize images accompany their names on `/home` and participant results without replacing redemption QRs. The `/play` registration form advertises configured validation and ranking prizes before the fields, including both when present, but never advertises raffle prizes there. A raffle already won still appears with its image and QR in the participant's results. Prizes without images keep their text-only presentation, custom names are not translated, and images use `object-contain` rather than cropping.
 
-The prize catalog is stored per game using durable image keys, not base64 data or saved presigned URLs. Signed read URLs are regenerated by authenticated/public metadata reads; the participant page refreshes its prize metadata while mounted without restarting gameplay or clearing registration fields. Deploy the compatible backend routes and storage permissions before publishing this frontend. Local implementation does not deploy either project.
+The shared prize catalog is stored on the authenticated organizer account using durable image keys, not base64 data or saved presigned URLs. Game assignments retain optional event-specific caps and conditions, not independent physical inventory after general inventory activation; edits to shared names/images propagate to existing assignments. Signed read URLs are regenerated by authenticated/public metadata reads; the participant page refreshes its prize metadata while mounted without restarting gameplay or clearing registration fields. Deploy the compatible backend routes and storage permissions before publishing this frontend. Local implementation does not deploy either project.
+
+### General prize inventory
+
+**Administration > Prizes** combines the catalog and inventory in one flat
+list: each STAND row has name/image editing, removal, balance management and
+movements alongside its counters. Kivly rows keep their external identity and
+inventory actions without exposing STAND catalog editing. No duplicate catalog
+list or separate inventory heading is rendered. `GET /v1/prizes/inventory` reports STAND/Kivly
+origin, initialized physical availability (including a genuine zero), total
+assigned (`assigned + historicalAssigned`), explicit `canjeados`, historical
+breakdown, and active event names with their optional caps. Uninitialized stock
+is not shown as zero. Unknown Kivly redemptions (`canjeados: null`) remain unknown.
+
+Initialize sets **current physical available stock**, never the sum of previous
+event stocks. Replenish adds a positive integer; adjust applies a signed integer
+delta without allowing a negative balance. Every operation requires a reason.
+Writes send `requestId` and `expectedRevision`; uncertain retries keep the exact
+payload and request ID until the draft changes. Conflicts require reloading
+balances, not blindly resending a new operation.
+
+Legacy mode retains previous per-event stock until explicit activation. Opening
+the panel automatically imports every pending game in the response `imports`
+map, including archives and games with no current catalog, in either inventory
+mode. All pages are consumed sequentially without page-by-page clicks; already
+complete imports are skipped. A failed game does not prevent other games from
+importing. Errors and unmatched history remain visible, with retry controls and
+no automatic retry loop. Import cursors are opaque strings retained for retries
+while mounted. Reopening safely restarts pending imports using backend
+idempotency, without double-counting or debiting available stock.
+Activation remains explicit and is disabled until all imports finish, unresolved records are zero and
+all assigned prizes are initialized. Confirmation explains that every event will
+share the same units and new uninitialized prizes cannot be awarded.
+
+Movement details use cursor pagination. Event/kind/unit-state filters apply only
+to **loaded rows**, not the entire server history; loading more keeps earlier rows.
+STACK displays read-only `globalInventory` availability separately from the
+optional per-event cap (`stockTotal: null` means unlimited). Native settings read
+general inventory alongside the shared catalog. No event settings edit global
+stock; Kivly reward creation/editing and STAND shared selection are preserved.
+Zero caps, exhausted shared stock and uninitialized stock have explicit operator
+explanations; STACK allocation history also displays backend `inventoryReasons`.
+Native participant claims display compact `prizeUnavailable` reasons without
+inventing an award or blocking gameplay, and refresh them with existing polling.
+STACK prize results similarly display aggregated `stackPrizes.inventoryReasons`
+for omitted awards, including uninitialized stock, exhausted stock and event caps.
+Legacy EMPAREJA2 and STACK sessions also show STAND `nativePrizes` after inventory
+cutover without requiring lifecycle metadata; original award QR tokens are preserved.
+The frontend requires the matching inventory backend contract; these changes
+do not deploy either project.
 
 Operator `/home` has an **ES / EN** selector immediately to the left of the settings close button. It changes the home, catalog, game controls and settings interface without resetting gameplay, saving settings or losing form drafts. Spanish is the initial language; the choice lasts while the home remains mounted, including when closing and reopening settings. Event/player names, custom prizes, editable game content and unknown server messages are not translated. The operator's language is independent of each participant's `/play` selection.
 
-All games use mobile gameplay and Web participant access (`playMode: mobile`, `joinChannel: web`). Game configuration presents these fixed settings instead of offering master-screen or Instagram access choices. Game rules still save together through **Guardar y aplicar cambios**; participant limits are unchanged. Full name and verified email are required; game settings can show an optional phone field. Existing game records with older access settings are read as mobile/Web without requiring a data migration.
+All games use mobile gameplay and Web participant access (`playMode: mobile`, `joinChannel: web`). Home **Registro y acceso** presents these fixed settings instead of offering master-screen or Instagram access choices. **Guardar y aplicar cambios** saves registration/access only; mechanics save independently from administration. Participant limits are unchanged. Full name, verified email and phone are required in every game. Registration settings edit title, description and optional address/company/job title/birth date fields; its preview uses the same fixed form as Play. Existing game records with older access settings are read as mobile/Web without requiring a data migration.
 
 Participant access is always the Web registration form. Instagram is not collected as participant contact data and does not provide game access. Optional profile photos remain available.
 
@@ -154,16 +358,18 @@ The participant registration form shows the selected client logo centered at the
 
 Web registration always requires email verification, including legacy games with email disabled. **Enviar código / Send code** sends registration fields, consent and participant language (`es`/`en`) to `POST /v1/public/email/request`. The pending step retains the details and consent in memory, shows the masked email, and accepts a six-digit code including leading zeros, paste and one-time-code autofill. Codes expire after 10 minutes with at most 5 attempts; the server remains authoritative. Resend uses the captured registration details and current consent, waits for the server's `resendAvailableAt` (normally 60 seconds), and respects rate-limit retry delays. **Cambiar datos / Change details** discards the local challenge before editing.
 
-Registration asks for **Nombre completo / Full name** first, then mandatory email. Phone is optional and shown only when `phone.enabled` is true; legacy required-phone settings show it without making it mandatory. Blank phones are omitted. Names are trimmed, limited to 100 Unicode characters without control characters, and captured server-side with the email challenge; final verification cannot replace them. The name appears in public rankings. Names need not be unique, and verified recovery never renames an existing player.
+Registration starts with email, then asks for missing full name, mandatory phone, enabled optional profile fields and consent, followed by verification. Legacy disabled-contact settings resolve to mandatory contacts. Names are trimmed, limited to 100 Unicode characters without control characters, and captured server-side with the email challenge; final verification cannot replace them. The name appears in public rankings; optional profile values do not. Names need not be unique, and verified recovery never renames an existing player. Missing optional fields alone do not force a complete returning participant through details again.
 
 Final email registration sends only `{ gameId, challengeId, code }` to `/v1/public/join`; no player session is saved or gameplay opened before that succeeds. Challenges and raw verification codes are never stored in browser storage. Expired, exhausted, replaced or used challenges require a new code or editing details; verification and delivery errors are translated into Spanish/English. Deploy the compatible backend before publishing this frontend; local tests do not certify actual email delivery.
 
 ### Kivly: connection and player registration
 
-The STACK prize configurator starts with **Catálogo e inventario**, followed by
-consecutive rules without search filters or diagnostic delivery panels. Create
-STAND prizes locally; Kivly rewards are created on Kivly's website and selected
-from its existing catalog. Each rule contains alternative **OR groups**, with
+The home STACK prize configurator retains its searchable assignment catalog,
+optional event caps and Kivly reward flows. Physical inventory is shared after
+general inventory activation. STAND prizes are selected from
+the shared catalog; their names and images are managed in **Administración >
+Premios**. Rule editing has moved to the event settings overlay in administration.
+Each rule contains alternative **OR groups**, with
 **AND prizes** inside each group. Choose uniformly among groups with some
 available stock, then deliver the available units of the chosen group.
 Fully exhausted groups are excluded; quantities and shared stock remain
@@ -260,9 +466,10 @@ Start here for the full end-to-end checklist:
 - [`docs/new-game-playbook.md`](docs/new-game-playbook.md)
 
 1. **Add folder** `src/games/your-game/` with:
-   - `config.ts` — `GameDefinition` (id, name, colors, assets, `GameScreen`, optional `showRanking`, optional `GameConfigComponent`).
-   - `GameScreen.tsx` — React component with props `gameId`, `gameName` (see `GameScreenProps` in `src/core/types.ts`).
+   - `config.ts` — `GameDefinition` (id, name, colors, assets, optional `showRanking`, optional `GameConfigComponent`).
+   - `ParticipantPlay.tsx` — mobile experience using participant tokens through `publicApi`.
 2. **Register** in `src/games/index.ts`: import config and add it to the `games` array.
+   Connect the participant experience in `src/core/participant/ParticipantShell.tsx` and add a safe sample in `GamePlayPreview.tsx`; do not add a stand game screen.
 3. **Assets** (logos, etc.) go under `public/` or paths referenced in `assets` in config.
 
 ---

@@ -55,9 +55,11 @@ export function useAppThemeIsDark(): boolean {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY_THEME_MODE) update()
     }
+    window.addEventListener('app-theme-mode-changed', update)
     window.addEventListener('storage', handleStorageChange)
     return () => {
       clearInterval(interval)
+      window.removeEventListener('app-theme-mode-changed', update)
       window.removeEventListener('storage', handleStorageChange)
     }
   }, [])

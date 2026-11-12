@@ -1,110 +1,48 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api/api'
-import type { GamePrize } from '../prizes'
 import Players from './Players'
 import Ranking from './Ranking'
 import RaffleData from './RaffleData'
+import HomePrizes, { type HomePrize } from './HomePrizes'
 import { HOME_TITLE_TEXT, HOME_BODY_TEXT } from '../ui/homeTypography'
-import { prizeText } from '../../test/prizeText'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn() } }))
 vi.mock('../../auth/useCurrentUser', () => ({ useCurrentUser: () => ({ plan: 'event' }) }))
 
 beforeEach(() => {
   localStorage.clear()
+  vi.mocked(api.get).mockReset()
   vi.mocked(api.get).mockResolvedValue({
     ok: true, playerCount: 5, validatedCount: 2, raffleWinners: [],
     results: [{ rank: 1, username: 'Player', timer: 10 }],
-    settings: { empareja2: { maxValidations: 99 } },
   })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.useRealTimers() })
 
-const validation: GamePrize = { name: 'Entrada VIP', limit: 4, imageUrl: '/validation.png' }
-const ranking: GamePrize = { name: 'Copa', limit: 3, topX: 2, imageUrl: '/ranking.png' }
-const raffle: GamePrize = { name: 'Camiseta', limit: 8, imageUrl: '/raffle.png' }
+const prizes: HomePrize[] = [
+  { id: 'validation', slot: 'validation', heading: 'Premio', name: 'Entrada VIP', limit: 4, imageUrl: '/validation.png' },
+  { id: 'ranking', slot: 'ranking', heading: 'Premio top 2', name: 'Copa', limit: 3, topX: 2 },
+  { id: 'raffle', slot: 'raffle', heading: 'Sorteo', name: 'Camiseta', limit: null },
+]
 
-it.each([true, false])('shares title and body sizes across all home panels (compact=%s)', async (compact) => {
+it.each([true, false])('shares title and body sizes and never shows prize stickers (compact=%s)', async (compact) => {
   render(<>
-    <Players gameName="Event" gameType="EMPAREJA2" compact={compact} prize={validation} />
-    <Ranking gameId="GAME" compact={compact} prize={ranking} />
-    <RaffleData gameId="GAME" gameName="Event" compact={compact} prize={raffle} />
+    <Players gameName="Event" gameType="EMPAREJA2" compact={compact} />
+    <Ranking gameId="GAME" compact={compact} />
+    <RaffleData gameId="GAME" gameName="Event" compact={compact} />
   </>)
   const count = await screen.findByText('5')
-  const players = screen.getByText('Jugadores')
   const rankingTitle = await screen.findByRole('heading', { name: 'Ranking' })
   const raffleTitle = await screen.findByRole('heading', { name: 'Sorteo' })
-  for (const element of [count, players, rankingTitle, raffleTitle]) {
+  for (const element of [count, screen.getByText('Jugadores'), rankingTitle, raffleTitle]) {
     expect(element).toHaveClass(...HOME_TITLE_TEXT.split(' '))
   }
-  for (const text of ['PREMIO: Entrada VIP', 'PREMIO TOP 2: Copa', 'PREMIO: Camiseta',
-    '2/4', '1/3', '0/8', '10.000s', 'No hay ganadores aún']) {
-    expect(await screen.findByText(text.includes(': ') ? prizeText(text) : text)).toHaveClass(...HOME_BODY_TEXT.split(' '))
-  }
-  expect(screen.getByText('Player').parentElement).toHaveClass(...HOME_BODY_TEXT.split(' '))
-  expect(count).toHaveClass('text-[var(--color-primary)]')
-  expect(players).toHaveClass('text-textMain')
-  expect(screen.getByText('No hay ganadores aún')).toHaveClass('text-textSub')
+  expect(await screen.findByText('No hay ganadores aún')).toHaveClass(...HOME_BODY_TEXT.split(' '), 'text-textSub')
+  expect(screen.queryByTestId('prize-sticker')).not.toBeInTheDocument()
 })
 
-it('shows the correct slot image beside each single custom name and server limit', async () => {
-  render(<>
-    <Players gameName="Event" gameType="EMPAREJA2" prize={validation} prizeLabel="Old validation" maxPrizeValidationLimit={99} />
-    <Ranking gameId="GAME" prize={ranking} prizeLabel="Old ranking" topX={99} maxPrizeRanking={99} />
-    <RaffleData gameId="GAME" gameName="Event" prize={raffle} prizeLabel="Old raffle" maxPrizeRaffle={99} />
-  </>)
-  for (const prize of [validation, ranking, raffle]) {
-    const image = await screen.findByRole('img', { name: prize.name })
-    expect(image).toHaveAttribute('src', prize.imageUrl)
-    expect(image).toHaveClass('object-contain')
-    expect(screen.getAllByText(new RegExp(prize.name))).toHaveLength(1)
-  }
-  expect(screen.getByText('2/4')).toBeInTheDocument()
-  expect(screen.getByText('1/3')).toBeInTheDocument()
-  expect(screen.getByText('0/8')).toBeInTheDocument()
-  expect(screen.getByText(prizeText('PREMIO TOP 2: Copa'))).toBeInTheDocument()
-  expect(screen.queryByText(/Old/)).not.toBeInTheDocument()
-})
-
-it('preserves legacy text-only prizes without creating images', async () => {
-  render(<>
-    <Players gameName="Event" prizeLabel="Entrada" />
-    <Ranking gameId="GAME" prizeLabel="Trofeo" topX={3} />
-    <RaffleData gameId="GAME" gameName="Event" prizeLabel="Bolsa" />
-  </>)
-  expect(await screen.findByText(prizeText('PREMIO: Entrada'))).toBeInTheDocument()
-  expect(await screen.findByText(prizeText('PREMIO TOP 3: Trofeo'))).toBeInTheDocument()
-  expect(await screen.findByText(prizeText('PREMIO: Bolsa'))).toBeInTheDocument()
-  expect(screen.queryByRole('img')).not.toBeInTheDocument()
-})
-
-it.each([true, false])('keeps authoritative null limits unlimited despite legacy API and cached limits (countersOnly=%s)', async (countersOnly) => {
-  localStorage.setItem('EMPAREJA2_settings_GAME', JSON.stringify({ maxPrizeValidation: 77, maxValidations: 66 }))
-  render(<>
-    <Players gameName="Event" gameId="GAME" gameType="EMPAREJA2" countersOnly={countersOnly}
-      prize={{ ...validation, limit: null }} maxPrizeValidationLimit={88} />
-    <Ranking gameId="GAME" prize={{ ...ranking, limit: null }} maxPrizeRanking={88} />
-    <RaffleData gameId="GAME" gameName="Event" prize={{ ...raffle, limit: null }} maxPrizeRaffle={88} />
-  </>)
-  expect(await screen.findByText(prizeText('PREMIO: Entrada VIP'))).toBeInTheDocument()
-  expect(await screen.findByText(prizeText('PREMIO TOP 2: Copa'))).toBeInTheDocument()
-  expect(await screen.findByText(prizeText('PREMIO: Camiseta'))).toBeInTheDocument()
-  expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument()
-})
-
-it('removes an image immediately without resurrecting cached signed URLs', async () => {
-  localStorage.setItem('SEMAFORO_settings_GAME', JSON.stringify({ prizeCatalog: { validation } }))
-  const { rerender } = render(<Players gameName="Event" prize={validation} />)
-  expect(await screen.findByRole('img', { name: 'Entrada VIP' })).toHaveAttribute('src', '/validation.png')
-  rerender(<Players gameName="Event" prize={{ ...validation, imageKey: null, imageUrl: null }} />)
-  expect(screen.queryByRole('img')).not.toBeInTheDocument()
-  expect(screen.getByText(prizeText('PREMIO: Entrada VIP'))).toBeInTheDocument()
-  rerender(<Players gameName="Event" prize={{ name: '', limit: null }} />)
-  expect(screen.queryByText(/PREMIO:/)).not.toBeInTheDocument()
-})
-
-it.each([true, false])('overlaps the raffle card without hiding winner controls (compact=%s)', async (compact) => {
+it('shows raffle winners in a visible list with delivery controls', async () => {
   vi.mocked(api.get).mockResolvedValue({
     ok: true,
     game: { gameType: 'EMPAREJA2' },
@@ -114,23 +52,38 @@ it.each([true, false])('overlaps the raffle card without hiding winner controls 
     ],
   })
   vi.mocked(api.put).mockResolvedValue({ ok: true })
-  render(<RaffleData gameId="GAME" gameName="Event" compact={compact} prize={raffle} />)
-  const label = await screen.findByText(prizeText('PREMIO: Camiseta'))
-  expect(screen.getByRole('heading', { name: 'Sorteo' })).toHaveClass(
-    'text-xl', 'sm:text-2xl',
-  )
-  const sticker = label.parentElement?.parentElement
-  expect(sticker?.nextElementSibling).toHaveClass('card', compact ? 'p-2' : 'p-3')
-  expect(sticker?.nextElementSibling).not.toHaveClass('pt-10')
-  expect(screen.getByText('2/8')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: /Ganadores/ }))
-  expect(screen.getByRole('listbox')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: /Ganadores/ })).toHaveClass(...HOME_BODY_TEXT.split(' '))
-  expect(screen.getByText('Bob')).toHaveClass(...HOME_BODY_TEXT.split(' '))
+  render(<RaffleData gameId="GAME" gameName="Event" compact />)
+  expect(await screen.findByText('Ganadores (2)')).toBeInTheDocument()
+  expect(screen.getByRole('list', { name: 'Lista de ganadores' })).toBeVisible()
+  expect(screen.queryByRole('button', { name: /Ganadores/ })).not.toBeInTheDocument()
+  expect(screen.getByRole('checkbox', { name: 'Premio entregado para Alice' })).toBeChecked()
   fireEvent.click(screen.getByRole('checkbox', { name: 'Premio entregado para Bob' }))
   await waitFor(() => expect(api.put).toHaveBeenCalledWith('/v1/game', {
     gameId: 'GAME',
     settings: { prizeDelivered: { gameType: 'EMPAREJA2', playerId: 2, delivered: true } },
   }))
-  expect(screen.getByText('2/8')).toBeInTheDocument()
+})
+
+it('rotates through every prize with its counters', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  vi.mocked(api.get).mockImplementation(async (url: string) => url.startsWith('/v1/game/score')
+    ? { ok: true, results: [{}, {}, {}, {}] }
+    : { ok: true, validatedCount: 2, raffleWinners: [{}] })
+  render(<HomePrizes prizes={prizes} gameId="GAME" gameName="Event" />)
+  expect(await screen.findByText('Entrada VIP')).toBeInTheDocument()
+  expect(await screen.findByText('2/4')).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Entrada VIP' })).toHaveAttribute('src', '/validation.png')
+  await act(async () => { vi.advanceTimersByTime(4000) })
+  expect(screen.getByText('Copa')).toBeInTheDocument()
+  expect(screen.getByText('3/3')).toBeInTheDocument()
+  expect(api.get).toHaveBeenCalledWith('/v1/game/score?gameId=GAME&limit=3')
+  await act(async () => { vi.advanceTimersByTime(4000) })
+  expect(screen.getByText('Camiseta')).toBeInTheDocument()
+  expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument()
+})
+
+it('shows an empty state without polling when no prizes exist', () => {
+  render(<HomePrizes prizes={[]} gameId="GAME" gameName="Event" />)
+  expect(screen.getByText('Sin premios configurados')).toBeInTheDocument()
+  expect(api.get).not.toHaveBeenCalled()
 })

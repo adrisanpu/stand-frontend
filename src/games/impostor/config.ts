@@ -1,5 +1,4 @@
 import type { GameDefinition } from '../../core/types'
-import ImpostorGameScreen from './GameScreen'
 import ImpostorGameConfig from './GameConfig'
 
 export const impostorDefinition: GameDefinition = {
@@ -21,7 +20,6 @@ export const impostorDefinition: GameDefinition = {
     logo: '/images/impostor-logo.png',
     standLogo: '/images/logo-stand-footer.png',
   },
-  GameScreen: ImpostorGameScreen,
   showRanking: false,
   GameConfigComponent: ImpostorGameConfig,
 }

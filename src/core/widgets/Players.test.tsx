@@ -3,7 +3,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '../../api/api'
 import Players from './Players'
 import { OperatorLanguageProvider, OperatorLanguageSelector } from '../shell/operatorLanguage'
-import { prizeText } from '../../test/prizeText'
 
 const state = vi.hoisted(() => ({ plan: 'event' }))
 vi.mock('../../auth/useCurrentUser', () => ({
@@ -21,23 +20,23 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-it('translates the panel but preserves custom prize names', async () => {
+it('translates the panel without showing prizes', async () => {
   render(
     <OperatorLanguageProvider>
       <OperatorLanguageSelector />
-      <Players gameName="Event" gameType="EMPAREJA2" compact countersOnly prizeLabel="Premio por pareja" />
+      <Players gameName="Event" gameType="EMPAREJA2" compact countersOnly />
     </OperatorLanguageProvider>
   )
   await screen.findByText('25')
   fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
   expect(screen.getByText('Players')).toBeInTheDocument()
-  expect(screen.getByText(prizeText('PRIZE: Premio por pareja'))).toBeInTheDocument()
+  expect(screen.queryByTestId('prize-sticker')).not.toBeInTheDocument()
 })
 
 it.each([
   [true, true], [true, false], [false, true], [false, false],
 ])('places the count before the equally sized label (compact=%s, countersOnly=%s)', async (compact, countersOnly) => {
-  render(<Players gameName="Event" gameType="EMPAREJA2" compact={compact} countersOnly={countersOnly} prizeLabel="Entrada" />)
+  render(<Players gameName="Event" gameType="EMPAREJA2" compact={compact} countersOnly={countersOnly} />)
   const count = await screen.findByText('25')
   const label = screen.getByText('Jugadores')
   const row = label.parentElement
@@ -48,11 +47,8 @@ it.each([
   expect(label).toHaveClass('text-xl', 'sm:text-2xl')
   expect(count).toHaveClass('text-xl', 'sm:text-2xl', 'tabular-nums')
   expect(screen.getAllByText('Jugadores')).toHaveLength(1)
-  expect(screen.getByText(prizeText('PREMIO: Entrada'))).toBeInTheDocument()
-  const sticker = screen.getByText(prizeText('PREMIO: Entrada')).parentElement?.parentElement
-  expect(sticker?.nextElementSibling).toHaveClass('card', compact ? 'p-2' : 'p-3')
-  expect(sticker?.nextElementSibling).not.toHaveClass('pt-10')
-  expect(screen.getByText('3/10')).toBeInTheDocument()
+  expect(row?.closest('.card')).toHaveClass('card', compact ? 'p-2' : 'p-3')
+  expect(screen.queryByText('3/10')).not.toBeInTheDocument()
 })
 
 it.each([true, false])('preserves plan limits and warnings (countersOnly=%s)', async (countersOnly) => {

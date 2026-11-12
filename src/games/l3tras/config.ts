@@ -1,5 +1,4 @@
 import type { GameDefinition } from '../../core/types'
-import L3trasGameScreen from './GameScreen'
 import L3trasGameConfig from './GameConfig'
 
 export const l3trasDefinition: GameDefinition = {
@@ -21,8 +20,6 @@ export const l3trasDefinition: GameDefinition = {
     clientLogo: '/client-logo.png',
     standLogo: '/images/logo-stand-footer.png',
   },
-  GameScreen: L3trasGameScreen,
   showRanking: false,
   GameConfigComponent: L3trasGameConfig,
 }
-

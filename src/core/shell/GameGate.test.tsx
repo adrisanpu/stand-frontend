@@ -88,6 +88,13 @@ describe('GameGate – catalog view', () => {
     expect(screen.queryAllByRole('combobox')).toHaveLength(0)
   })
 
+  it('can omit catalog branding without removing the game icons', () => {
+    render(<GameGate showHeaderLogo={false} onGameCreated={vi.fn()} />)
+    expect(screen.queryByAltText('Stand')).not.toBeInTheDocument()
+    expect(screen.getByAltText('T1MER')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'T1MER' })).toBeInTheDocument()
+  })
+
   it('navigates to create/join view when a game is selected', () => {
     renderGate()
     fireEvent.click(screen.getByText('T1MER'))

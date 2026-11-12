@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../api/api'
 import Ranking from './Ranking'
 import { OperatorLanguageProvider, OperatorLanguageSelector } from '../shell/operatorLanguage'
-import { prizeText } from '../../test/prizeText'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn() } }))
 afterEach(cleanup)
@@ -28,42 +27,33 @@ describe('Ranking game score formatting', () => {
     expect(screen.getByText('Ana').parentElement?.parentElement?.querySelector('.rounded-full')).toHaveTextContent('A')
   })
 
-  it.each([true, false])('uses a centered prize sticker while retaining ranking rows and scrolling (compact=%s)', async (compact) => {
+  it.each([true, false])('highlights prize rows without a prize sticker while scrolling (compact=%s)', async (compact) => {
     vi.mocked(api.get).mockResolvedValue({
       ok: true,
       results: Array.from({ length: 12 }, (_, index) => ({ rank: index + 1, username: `Player ${index + 1}`, score: index })),
     })
     render(<Ranking gameId="GAME1234" gameType="STACK" compact={compact}
       prize={{ name: 'Copa', limit: 20, topX: 2, imageUrl: '/cup.png' }} />)
-    const label = await screen.findByText(prizeText('PREMIO TOP 2: Copa'))
-    const sticker = label.parentElement?.parentElement
-    expect(sticker).toHaveClass('self-end', compact ? 'h-16' : 'h-20', compact ? '-mb-8' : '-mb-10')
-    expect(sticker?.nextElementSibling).toHaveClass('card', 'flex-1', 'min-h-0', compact ? 'p-2' : 'p-3')
-    expect(sticker?.nextElementSibling).not.toHaveClass('h-full', 'pt-10')
-    expect(screen.getByRole('img', { name: 'Copa' })).toHaveClass('object-contain', 'h-full')
-    expect(sticker).toHaveTextContent('12/20')
+    await screen.findByText('Player 1')
+    expect(screen.queryByTestId('prize-sticker')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Copa/)).not.toBeInTheDocument()
     expect(screen.getAllByLabelText('Premio')).toHaveLength(2)
     expect(screen.getByText('+2 más').parentElement).toHaveClass('overflow-y-auto', 'flex-1', 'min-h-0')
     expect(api.get).toHaveBeenCalledWith('/v1/game/score?gameId=GAME1234&limit=20')
   })
 
-  it('translates Top X without translating the prize name and removes absent artwork', async () => {
+  it('translates the panel', async () => {
     vi.mocked(api.get).mockResolvedValue({ ok: true, results: [] })
-    const { rerender } = render(
+    render(
       <OperatorLanguageProvider>
         <OperatorLanguageSelector />
         <Ranking gameId="GAME1234" prize={{ name: 'Copa', limit: null, topX: 3 }} />
       </OperatorLanguageProvider>,
     )
-    await screen.findByText(prizeText('PREMIO TOP 3: Copa'))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
-    expect(screen.getByText(prizeText('TOP PRIZE 3: Copa'))).toBeInTheDocument()
-    expect(screen.getByText('No scores yet')).toBeInTheDocument()
-    expect(screen.queryByRole('img')).not.toBeInTheDocument()
-    expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument()
-    rerender(<Ranking gameId="GAME1234" prize={{ name: '', limit: null }} />)
     await screen.findByText('No hay puntuaciones aún')
-    expect(screen.queryByText(/PRIZE|PREMIO/)).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
+    expect(screen.getByText('No scores yet')).toBeInTheDocument()
+    expect(screen.queryByText(/PRIZE|PREMIO|Copa/)).not.toBeInTheDocument()
   })
 
   it('shows STACK score in bloques, including zero, without timer units', async () => {

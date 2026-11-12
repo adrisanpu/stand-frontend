@@ -1,5 +1,4 @@
 import type { GameDefinition } from '../../core/types'
-import Empareja2GameScreen from './GameScreen'
 import Empareja2GameConfig from './GameConfig'
 
 export const empareja2Definition: GameDefinition = {
@@ -20,8 +19,6 @@ export const empareja2Definition: GameDefinition = {
     logo: '/images/empareja2-logo.png',
     standLogo: '/images/logo-stand-footer.png',
   },
-  GameScreen: Empareja2GameScreen,
   showRanking: false,
   GameConfigComponent: Empareja2GameConfig,
 }
-

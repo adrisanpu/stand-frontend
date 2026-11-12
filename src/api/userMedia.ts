@@ -1,7 +1,7 @@
 import { api } from './api'
 import type { ParticipantAppearance } from '../core/theme/appearance'
 
-export type MediaKind = 'logo'
+export type MediaKind = 'logo' | 'home-background'
 
 export type UserMediaItem = {
   id: string
@@ -25,6 +25,7 @@ export type UserMediaResponse = {
     /** Presigned URLs for platform defaults (oscuro → dark, claro → light). */
     defaults?: Partial<Record<'dark' | 'light', UserMediaItem | null>>
   }
+  'home-background'?: { items: UserMediaItem[] }
 }
 
 type UploadRequest = {
@@ -97,7 +98,11 @@ export async function deleteUserMedia(kind: MediaKind, mediaId: string): Promise
   await api.delete('/v1/user/media', { kind, mediaId })
 }
 
-export async function uploadLogo(file: File, name?: string): Promise<void> {
+/** Register an image in the library without changing the account's selected logo. */
+export async function uploadLibraryImage(file: File, name?: string): Promise<UserMediaItem> {
+  if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml'].includes(file.type)) {
+    throw new Error('Selecciona una imagen PNG, JPEG, WebP, GIF o SVG.')
+  }
   const [entry] = await getUploadUrls([
     {
       kind: 'logo',
@@ -110,5 +115,23 @@ export async function uploadLogo(file: File, name?: string): Promise<void> {
   if (!entry) throw new Error('No upload URL received for logo')
   await uploadBinaryToPresignedUrl(entry.url, file)
   await api.post('/v1/user/media', { items: [entry.meta] })
+  return entry.meta
+}
+
+export async function uploadLogo(file: File, name?: string): Promise<void> {
+  const entry = await uploadLibraryImage(file, name)
   await selectLogo(entry.id)
+}
+
+export async function uploadHomeBackground(file: File): Promise<UserMediaItem> {
+  const image = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'].includes(file.type)
+  const video = ['video/mp4', 'video/webm'].includes(file.type)
+  if (!image && !video) throw new Error('Selecciona una imagen PNG, JPEG, WebP o SVG, o un vídeo MP4/WebM.')
+  const limit = (video ? 100 : 5) * 1024 * 1024
+  if (!file.size || file.size > limit) throw new Error(video ? 'El vídeo debe ocupar entre 1 byte y 100 MB.' : 'La imagen debe ocupar entre 1 byte y 5 MB.')
+  const [entry] = await getUploadUrls([{ kind: 'home-background', fileName: file.name, contentType: file.type, sizeBytes: file.size }])
+  if (!entry || entry.kind !== 'home-background') throw new Error('No upload URL received for home background')
+  await uploadBinaryToPresignedUrl(entry.url, file)
+  await api.post('/v1/user/media', { items: [entry.meta] })
+  return entry.meta
 }

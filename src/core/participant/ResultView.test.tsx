@@ -4,7 +4,12 @@ import { publicApi, type PlayerResponse } from '../../api/publicApi'
 import { savePlayerSession } from './playerSession'
 import ResultView from './ResultView'
 
-vi.mock('../../api/publicApi', () => ({ publicApi: { getPlayer: vi.fn() } }))
+vi.mock('../../api/publicApi', () => ({
+  publicApi: {
+    getPlayer: vi.fn(),
+    walletPassUrl: vi.fn((token: string, platform: string) => `/wallet/${platform}?token=${token}`),
+  },
+}))
 
 const player: PlayerResponse = {
   ok: true, gameId: 'GAME1', gameType: 'EMPAREJA2', playerToken: 'player-token',

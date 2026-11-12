@@ -5,8 +5,6 @@ import { usePolling } from '../../hooks/usePolling'
 import ProfileAvatar from './ProfileAvatar'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import type { GamePrize } from '../prizes'
-import PrizeSticker from './PrizeSticker'
-import type { StickerPrize } from './stackPrizePromotions'
 import { HOME_TITLE_TEXT, HOME_BODY_TEXT } from '../ui/homeTypography'
 
 export interface RankingEntry {
@@ -28,14 +26,12 @@ const T1MER_USERNAME_MAX_LEN = 20
 const DEFAULT_DISPLAY_COUNT = 10
 
 interface RankingProps {
-  stackPrizes?: StickerPrize[]
   gameId: string
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and show fewer items
-  prizeLabel?: string // Legacy prize name, shown in the prize sticker
   prize?: GamePrize
-  topX?: number // e.g. 3 — "Premio top 3: {prizeLabel}"
-  maxPrizeRanking?: number // límite mostrado como current/max junto al premio
+  topX?: number // highlights the top X rows as prize positions
+  maxPrizeRanking?: number // ensures enough rows are fetched for the prize limit
   gameType?: string // when "T1MER", show only position + username (truncated), no timer/score
 }
 
@@ -53,15 +49,12 @@ export default function Ranking({
   gameId,
   refreshInterval = 10000,
   compact = false,
-  prizeLabel: legacyPrizeLabel,
   prize,
   topX: legacyTopX,
   maxPrizeRanking: legacyMax,
   gameType,
-  stackPrizes,
 }: RankingProps) {
   const { t } = useOperatorLanguage()
-  const prizeLabel = prize ? prize.name : legacyPrizeLabel
   const topX = prize ? prize.topX : legacyTopX
   const maxPrizeRanking = prize ? prize.limit ?? undefined : legacyMax
   const isT1mer = normalizeGameType(gameType) === 'T1MER'
@@ -95,10 +88,8 @@ export default function Ranking({
     )
   }
 
-  const fullCount = ranking.length
   return (
     <div className="flex flex-col h-full min-h-0 min-w-0 flex-1">
-      <PrizeSticker items={stackPrizes} prize={prize} label={prizeLabel} topX={topX} current={fullCount} max={maxPrizeRanking} compact={compact} />
     <div
       className={`card rounded-xl sm:rounded-2xl shadow-neon flex flex-col min-h-0 flex-1 overflow-hidden ${compact ? 'p-2 sm:p-3 min-w-0' : 'p-3 sm:p-4 lg:p-6'}`}
     >

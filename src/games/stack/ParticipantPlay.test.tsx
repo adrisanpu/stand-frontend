@@ -17,7 +17,11 @@ const { createScene, controller } = vi.hoisted(() => ({
 vi.mock('./stackScene', () => ({ createStackScene: createScene }))
 vi.mock('../../api/publicApi', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/publicApi')>(),
-  publicApi: { startStackAttempt: vi.fn(), finishStackAttempt: vi.fn(), score: vi.fn(), getPlayer: vi.fn(), completionReward: vi.fn() },
+  publicApi: {
+    startStackAttempt: vi.fn(), finishStackAttempt: vi.fn(), score: vi.fn(),
+    getPlayer: vi.fn(), completionReward: vi.fn(),
+    walletPassUrl: vi.fn((token: string, platform: string) => `/wallet/${platform}?token=${token}`),
+  },
 }))
 
 const assignment: StackAssignment = {
