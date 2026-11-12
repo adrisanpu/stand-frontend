@@ -21,14 +21,17 @@ export default function AssignmentView({ gameId, gameMeta, onValidate, showPrize
 
   return (
     <div className="space-y-5 text-center">
-      <div className="play-character relative min-h-[16rem] overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-        <div className="absolute left-3 right-3 top-3 z-10 flex items-center justify-between gap-2">
-          <p className="shrink-0 rounded-lg bg-black/60 px-2 py-1 text-left text-sm text-white uppercase tracking-wide">{t('Te toca')}</p>
-          <div className="flex min-w-0 items-center gap-2 rounded-lg bg-black/60 px-2 py-1 text-white">
-            <ProfileAvatar profilePicUrl={assignment.profilePicUrl} username={assignment.participantName} size="md" />
-            <span className="truncate text-sm font-medium">{assignment.participantName || t('Jugador')}</span>
-          </div>
+      <div className="flex items-center justify-between gap-3 text-left">
+        <div className="min-w-0">
+          <p className="text-sm text-textSub uppercase tracking-wide">{t('Te toca')}</p>
+          <h2 className="break-words text-2xl font-bold text-textMain">{assignment.characterName}</h2>
         </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <ProfileAvatar profilePicUrl={assignment.profilePicUrl} username={assignment.participantName} size="md" />
+          <span className="truncate text-sm font-medium text-textMain">{assignment.participantName || t('Jugador')}</span>
+        </div>
+      </div>
+      <div className="play-character min-h-[16rem] overflow-hidden rounded-2xl border border-white/10 bg-white/5">
         {assignment.characterImageUrl && (
           <img
             src={assignment.characterImageUrl}
@@ -36,7 +39,6 @@ export default function AssignmentView({ gameId, gameMeta, onValidate, showPrize
             className="mx-auto h-64 w-64 max-w-full object-contain rounded-2xl"
           />
         )}
-        <h2 className="absolute bottom-3 right-3 z-10 max-w-[calc(100%-1.5rem)] rounded-lg bg-black/60 px-2 py-1 text-right text-2xl font-bold text-white break-words">{assignment.characterName}</h2>
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-4 text-left">

@@ -17,6 +17,8 @@ import GameGate from '../shell/GameGate'
 import GameFormSettings from './GameFormSettings'
 import { inputManager } from '../input/inputManager'
 import GamePlayPreview from './GamePlayPreview'
+import QRCode from '../widgets/QRCode'
+import { getRedeemUrl } from '../lib/joinUrl'
 
 export default function GameConfigurationDialog({ gameId: existingId, gameType, onClose, onCreated, requireSetup = false, initialSection = 'appearance' }: {
   gameId?: string; gameType?: string; onClose: (created?: boolean) => void
@@ -331,6 +333,8 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
           </nav>
           <section role="tabpanel" id="event-panel-configuration" aria-labelledby="event-tab-configuration"
             hidden={section !== 'configuration'} tabIndex={0} className="space-y-3 py-2">
+            <div className="grid items-start gap-6 lg:grid-cols-2">
+            <div className="min-w-0 space-y-3">
             {Component ? <>
               <fieldset disabled={readOnly || busy || saveUncertain || discard} onChangeCapture={() => { markMechanicsDirty(true); setMessage('') }}
                 onClickCapture={event => { if ((event.target as HTMLElement).closest('button')) { markMechanicsDirty(true); setMessage('') } }}>
@@ -347,14 +351,16 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
                 {t('Guardar configuración', 'Save configuration')}
               </SaveButton>
             </div>}
+            </div>
             {section === 'configuration' && <aside aria-label={t('Prueba del juego', 'Game trial')}
-              className="mx-auto max-w-lg space-y-3 rounded-xl border border-current/20 p-5">
+              className="min-w-0 w-full space-y-3 rounded-xl border border-current/20 p-5">
               <h3 className="font-semibold">{t('Vista previa jugable', 'Playable preview')}</h3>
               <p className="text-sm">{t('Simulación local: sin registro, resultados ni premios reales.', 'Local simulation: no registration, real results or prizes.')}</p>
               {!Component || mechanicsDraft
                 ? <GamePlayPreview gameType={data.game.gameType} settings={Component ? mechanicsDraft! : settings} gameId={gameId} />
                 : <p role="status">{t('Esperando una configuración del juego cargada correctamente.', 'Waiting for successfully loaded game settings.')}</p>}
             </aside>}
+            </div>
           </section>
           <section role="tabpanel"
             id={`event-panel-${formSection === 'registration' ? 'form' : formSection}`}
@@ -368,6 +374,13 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
           </section>
           <section role="tabpanel" id="event-panel-conditions" aria-labelledby="event-tab-conditions"
             hidden={section !== 'conditions'} tabIndex={0} className="space-y-3 py-2">
+            <div className="flex items-center gap-3 rounded-xl border border-current/15 p-3">
+              <QRCode data={getRedeemUrl(gameId)} size={80} margin={4}
+                alt={t('QR validador de premios', 'Prize validator QR code')} className="!bg-white !p-1" />
+              <a className="min-w-0 break-all text-sm underline" href={getRedeemUrl(gameId)} target="_blank" rel="noreferrer">
+                {t('Abrir validador de premios', 'Open prize validator')}
+              </a>
+            </div>
             <fieldset disabled={busy || discard}>
               <RewardConditions data={data} readOnly={readOnly} onBusyChange={conditionsBusy} onDirtyChange={markConditionsDirty} onReadyChange={conditionsReady} />
             </fieldset>

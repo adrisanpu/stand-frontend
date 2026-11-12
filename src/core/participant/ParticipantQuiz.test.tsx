@@ -40,6 +40,14 @@ function show(state = quiz, meta = game, token: string | null = 'token') {
 }
 
 describe('participant survey placement', () => {
+  it('renders the saved shared form logo above the questionnaire', async () => {
+    show(quiz, { ...game, formLogoUrl: '/event-logo.png',
+      formConfig: { ...game.formConfig!, logoKey: 'users/owner/logos/event.png' } })
+    const heading = await screen.findByRole('heading', { name: 'Tu opinión' })
+    expect(heading.previousElementSibling).toHaveAttribute('src', '/event-logo.png')
+    expect(publicApi.submitQuiz).not.toHaveBeenCalled()
+  })
+
   it('does not request participant data before registration or when disabled', () => {
     show(quiz, game, null)
     expect(screen.getByText('Jugar')).toBeInTheDocument()

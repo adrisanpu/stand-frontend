@@ -22,6 +22,7 @@ import { stackPrizePromotions } from '../widgets/stackPrizePromotions'
 import type { OperatorGame } from '../../api/operatorGames'
 import type { GameFormConfig } from '../formConfig'
 import HomeCanvas from '../home/HomeCanvas'
+import HomeAdminButton from '../home/HomeAdminButton'
 import { validateHomeCanvas, type HomeCanvasConfig, type HomeBackgroundUrls } from '../home/canvasModel'
 
 type AppShellProps = { initialGame?: OperatorGame; onReturnToAdmin?: () => void }
@@ -183,10 +184,7 @@ function AppContent({ initialGame, onReturnToAdmin }: AppShellProps) {
             }} /></div>
           </div>}
       </main>
-      {onReturnToAdmin && <button type="button" onClick={onReturnToAdmin}
-        className="stage-control absolute left-3 top-3 z-20 min-h-11 rounded-md border bg-black/60 px-3 py-2 text-sm opacity-60 backdrop-blur transition-opacity hover:opacity-100 focus-visible:opacity-100">
-        {t('Administración', 'Administration')}
-      </button>}
+      {onReturnToAdmin && <HomeAdminButton onClick={onReturnToAdmin} label={t('Administración', 'Administration')} />}
       {ready && error && <p role="alert" className="absolute bottom-3 right-3 z-20 rounded-md bg-black/70 px-3 py-2 text-sm">
         {error} <button type="button" className="underline" onClick={retry}>{t('Reintentar', 'Retry')}</button>
       </p>}

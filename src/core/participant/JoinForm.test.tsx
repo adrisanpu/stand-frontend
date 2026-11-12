@@ -55,7 +55,7 @@ const catalog: PrizeCatalog = {
 
 it('collects only enabled optional fields after the email step and binds them to verification', async () => {
   render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, participantFields: {
-    address: { enabled: true }, company: { enabled: true }, jobTitle: { enabled: true }, birthDate: { enabled: true },
+    address: { enabled: true }, company: { enabled: true }, sex: { enabled: true }, jobTitle: { enabled: true }, birthDate: { enabled: true },
   } }} onJoined={vi.fn()} />)
   expect(screen.queryByLabelText('Dirección (opcional)')).not.toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
@@ -64,21 +64,26 @@ it('collects only enabled optional fields after the email step and binds them to
   fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '+34 612345678' } })
   fireEvent.change(screen.getByLabelText('Dirección (opcional)'), { target: { value: ' Main street 1 ' } })
   fireEvent.change(screen.getByLabelText('Empresa (opcional)'), { target: { value: ' ACME ' } })
-  fireEvent.change(screen.getByLabelText('Cargo (opcional)'), { target: { value: ' Engineer ' } })
+  expect(screen.queryByLabelText('Cargo (opcional)')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Sexo (opcional)')).not.toBeRequired()
+  fireEvent.change(screen.getByLabelText('Sexo (opcional)'), { target: { value: 'female' } })
   fireEvent.change(screen.getByLabelText('Fecha de nacimiento (opcional)'), { target: { value: '1990-02-20' } })
   expect(screen.getByLabelText('Fecha de nacimiento (opcional)')).not.toBeRequired()
   fireEvent.click(screen.getByRole('checkbox'))
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Enviar código' })) })
   expect(publicApi.requestEmailCode).toHaveBeenCalledWith(expect.objectContaining({
-    address: 'Main street 1', company: 'ACME', jobTitle: 'Engineer', birthDate: '1990-02-20',
+    address: 'Main street 1', company: 'ACME', sex: 'female', birthDate: '1990-02-20',
     phone: '+34 612345678', username: 'Ana',
   }))
   expect(savePlayerSession).not.toHaveBeenCalled()
+  expect(publicApi.requestEmailCode).not.toHaveBeenCalledWith(expect.objectContaining({ jobTitle: expect.anything() }))
 })
 
 it('uses the real registration UI in preview without sending emails, joining or storing sessions', async () => {
   const onJoined = vi.fn()
   render(<JoinForm preview gameId="ABC123" gameMeta={meta} onJoined={onJoined} />)
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  expect(screen.queryByText(/Paso de registro/)).not.toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'preview@example.com' } })
   fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
   fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: 'Preview' } })
@@ -88,6 +93,7 @@ it('uses the real registration UI in preview without sending emails, joining or 
   fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '612345678' } })
   fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
   expect(screen.getByRole('status')).toHaveTextContent('Vista previa')
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Volver a empezar' }))
   expect(screen.getByLabelText('Email *')).toHaveValue('preview@example.com')
   expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
@@ -113,9 +119,10 @@ describe('same-game returning participant', () => {
     vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValue(challengeResponse())
     const onJoined = vi.fn()
     render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={onJoined} />)
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1')
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
     await submitEmail()
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '3')
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Paso de registro/)).not.toBeInTheDocument()
     expect(screen.getByLabelText('Código de verificación')).toBeInTheDocument()
     expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()

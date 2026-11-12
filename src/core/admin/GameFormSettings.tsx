@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { exportFormResults, generateFormQuestions, getGameForm, saveGameForm } from '../../api/gameForms'
+import { fetchUserMedia, uploadLibraryImage, type UserMediaItem } from '../../api/userMedia'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { formDraft, validateFormDraft, type GameFormConfig, type GameFormDraft, type GameFormResponse } from '../formConfig'
@@ -39,6 +40,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [generationText, setGenerationText] = useState('')
   const [generationCount, setGenerationCount] = useState(3)
+  const [logoLibrary, setLogoLibrary] = useState<UserMediaItem[]>([])
   const [canvasDirty, setCanvasDirty] = useState(false)
   const [canvasMounted, setCanvasMounted] = useState(section === 'appearance')
   useEffect(() => { if (section === 'appearance') setCanvasMounted(true) }, [section])
@@ -53,10 +55,12 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
     callbacks.current.onSectionDirtyChange?.('registration',
       draft.formConfig.registrationTitle !== saved.formConfig.registrationTitle
       || draft.formConfig.registrationDescription !== saved.formConfig.registrationDescription
+      || draft.formConfig.logoKey !== saved.formConfig.logoKey
       || JSON.stringify(draft.participantFields) !== JSON.stringify(saved.participantFields))
     callbacks.current.onSectionDirtyChange?.('questionnaire',
       draft.formConfig.quizTitle !== saved.formConfig.quizTitle
       || draft.formConfig.quizDescription !== saved.formConfig.quizDescription
+      || draft.formConfig.logoKey !== saved.formConfig.logoKey
       || draft.formConfig.quizMoment !== saved.formConfig.quizMoment
       || JSON.stringify(draft.questions) !== JSON.stringify(saved.questions))
   }, [draft, confirmed, canvasDirty])
@@ -140,7 +144,12 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
   </div>
 
   const config = draft.formConfig
-  const imageUrl = (kind: 'logo' | 'banner') => confirmed[`${kind}Url`]
+  const imageUrl = (kind: 'logo' | 'banner') => kind === 'logo'
+    ? config.logoKey
+      ? logoLibrary.find(item => item.key === config.logoKey)?.url
+        ?? (config.logoKey === confirmed.formConfig.logoKey ? confirmed.logoUrl : null)
+      : null
+    : confirmed.bannerUrl
   const dark = config.appearance?.themeMode === 'dark'
   const appearanceStyle = {
     backgroundColor: dark ? '#152F3A' : '#FFFFFF',
@@ -175,10 +184,50 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
           callbacks.current.onBusyChange?.(value || busyRef.current)
         }} />
     </div>}
-    {section !== 'appearance' && <div className="grid items-start gap-6 lg:grid-cols-2">
-      <div className="space-y-4">
+    {section !== 'appearance' && <div className="grid gap-6 lg:grid-cols-2">
+      <div className="min-w-0 space-y-4">
         <fieldset disabled={disabled} className="space-y-4">
           <legend className="mb-3 text-lg font-semibold">{t('Contenido', 'Content')}</legend>
+          <fieldset disabled={!features.advancedCustomization} className="space-y-2 rounded-xl border border-current/15 p-3">
+            <legend className="px-1 text-sm font-medium">{t('Logo del formulario y cuestionario', 'Registration and questionnaire logo')}</legend>
+            {!features.advancedCustomization && <p className="text-xs">{t('Disponible en el plan Event 24h.', 'Available on the Event 24h plan.')}</p>}
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="min-w-0 flex-1 text-sm">
+                <span className="sr-only">{t('Logo guardado', 'Saved logo')}</span>
+                <select className="w-full rounded-lg border border-current/20 bg-transparent p-2" value={config.logoKey ?? ''}
+                  onChange={event => changeConfig({ logoKey: event.target.value || null })}>
+                  <option value="">{t('Sin logo', 'No logo')}</option>
+                  {config.logoKey && !logoLibrary.some(item => item.key === config.logoKey) &&
+                    <option value={config.logoKey}>{t('Logo actual', 'Current logo')}</option>}
+                  {logoLibrary.map(item => <option key={item.id} value={item.key}>{item.name || item.fileName}</option>)}
+                </select>
+              </label>
+              <button type="button" className="min-h-[36px] text-sm underline"
+                onClick={() => void run(async () => { setLogoLibrary((await fetchUserMedia()).logo.items) })}>
+                {t('Abrir biblioteca de logos', 'Open logo library')}
+              </button>
+            </div>
+            <label className="block text-sm">{t('Subir logo', 'Upload logo')}
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" className="mt-1 block w-full text-xs"
+                onChange={event => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (!file) return
+                  void run(async () => {
+                    if (!file.size || file.size > 5 * 1024 * 1024) {
+                      throw new Error(t('El logo debe ocupar entre 1 byte y 5 MB.', 'The logo must be between 1 byte and 5 MB.'))
+                    }
+                    const uploaded = await uploadLibraryImage(file)
+                    const items = (await fetchUserMedia()).logo.items
+                    if (!items.some(item => item.key === uploaded.key && item.url)) {
+                      throw new Error(t('No se pudo cargar el logo subido. Reabre la biblioteca para seleccionarlo.', 'Could not load the uploaded logo. Reopen the library to select it.'))
+                    }
+                    setLogoLibrary(items)
+                    changeConfig({ logoKey: uploaded.key })
+                  })
+                }} />
+            </label>
+          </fieldset>
           {([
             ['registrationTitle', t('Título del registro', 'Registration title')],
             ['registrationDescription', t('Descripción del registro', 'Registration description')],
@@ -195,10 +244,16 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
                 maxLength={160}
                 value={config[key]} onChange={event => changeConfig({ [key]: event.target.value })} />}
           </label>)}
-          {(!section || section === 'registration') && <fieldset className="space-y-2 rounded-xl border border-current/15 p-3">
+          {(!section || section === 'registration') && <fieldset className="space-y-1 rounded-xl border border-current/15 p-3 text-sm">
             <legend className="px-1 font-medium">{t('Campos de registro', 'Registration fields')}</legend>
-            <p className="text-sm">{t('Primer paso: email. Segundo paso: nombre completo y teléfono obligatorios, campos opcionales y aceptación de condiciones. Se conserva la verificación por email.', 'First step: email. Second step: required full name and phone, optional fields and acceptance of terms. Email verification is retained.')}</p>
-            {OPTIONAL_REGISTRATION_FIELDS.map(field => <label key={field.key} className="flex min-h-11 items-center gap-2">
+            {[
+              t('Email', 'Email'), t('Nombre completo', 'Full name'), t('Teléfono', 'Phone'),
+            ].map(label => <label key={label} className="flex min-h-[28px] items-center gap-2">
+              <input type="checkbox" checked disabled />
+              {label} {t('(obligatorio)', '(required)')}
+            </label>)}
+            <div className="border-t border-current/15" />
+            {OPTIONAL_REGISTRATION_FIELDS.map(field => <label key={field.key} className="flex min-h-[28px] items-center gap-2">
               <input type="checkbox" checked={draft.participantFields[field.key]?.enabled === true}
                 onChange={event => setDraft({ ...draft, participantFields: {
                   ...resolveParticipantFields(draft.participantFields), [field.key]: { enabled: event.target.checked },
@@ -280,7 +335,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
           </fieldset>}
         </fieldset>
       </div>
-      <aside className="space-y-4 lg:sticky lg:top-0" aria-label={t('Vista previa del formulario', 'Form preview')}>
+      <aside className="flex min-w-0 flex-col gap-4" aria-label={t('Vista previa del formulario', 'Form preview')}>
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-semibold">{t('Vista previa', 'Preview')}</h3>
           {!section && <div role="tablist" aria-label={t('Vista previa', 'Preview')} className="flex gap-2 text-sm">
@@ -293,7 +348,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
         <article role={section ? 'region' : 'tabpanel'} id="form-preview-panel"
           aria-labelledby={!section ? `form-preview-tab-${preview}` : undefined}
           aria-label={section ? t('Vista previa', 'Preview') : undefined}
-          className="mx-auto max-w-sm space-y-5 rounded-2xl border border-current/20 p-5 shadow-sm" style={appearanceStyle}>
+          className="mx-auto w-full max-w-sm space-y-5 rounded-2xl border border-current/20 p-5 shadow-sm" style={appearanceStyle}>
           {preview === 'registration' ? <ParticipantLanguageProvider key={language} initialLanguage={language}>
             <JoinForm preview gameId={gameId} onJoined={() => undefined} gameMeta={{
               ok: true, gameId, gameType: confirmed.gameType, isActive: true,
@@ -310,11 +365,13 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
             <QuizFields questions={draft.questions} answers={answers} onChange={(id, value) => setAnswers(current => ({ ...current, [id]: value }))} namePrefix="form-preview" />
           </div>}
         </article>
+        <p className="text-xs">{t('La vista previa no registra participantes ni envía respuestas. El enlace muestra la versión guardada.', 'Preview does not register participants or submit answers. The link shows the saved version.')}</p>
+        <div className="mt-auto pt-12">
         <div className="flex items-center gap-3 rounded-xl border border-current/15 p-3">
           <QRCode data={confirmed.joinUrl} size={80} margin={4} alt={t('QR de participación', 'Participant QR code')} className="!bg-white !p-1" />
           <a className="min-w-0 break-all text-sm underline" href={confirmed.joinUrl} target="_blank" rel="noreferrer">{t('Abrir enlace de participación', 'Open participant link')}</a>
         </div>
-        <p className="text-xs">{t('La vista previa no registra participantes ni envía respuestas. El enlace muestra la versión guardada.', 'Preview does not register participants or submit answers. The link shows the saved version.')}</p>
+        </div>
       </aside>
     </div>}
     {section !== 'appearance' && <>

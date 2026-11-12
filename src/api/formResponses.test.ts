@@ -31,10 +31,12 @@ it('encodes game IDs and rejects malformed or mismatched responses', async () =>
 
 it('preserves authenticated profile fields and rejects malformed profile values', async () => {
   const player = { ...response.players[0], phone: '+34612345678', address: 'Street 1',
-    company: 'Company', jobTitle: 'Engineer', birthDate: '2000-01-02' }
+    company: 'Company', sex: 'male', jobTitle: 'Engineer', birthDate: '2000-01-02' }
   const result = { ...response, players: [player] }
   vi.mocked(api.get).mockResolvedValue(result)
   await expect(getFormResponses('ABC123')).resolves.toEqual(result)
   vi.mocked(api.get).mockResolvedValue({ ...response, players: [{ ...player, company: { unexpected: true } }] })
+  await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
+  vi.mocked(api.get).mockResolvedValue({ ...response, players: [{ ...player, sex: [] }] })
   await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
 })

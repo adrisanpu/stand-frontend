@@ -182,7 +182,7 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
                   value={numPairsValue}
                   onChange={(e) => setNumPairsInput(e.target.value)}
                   disabled={sliderDisabled}
-                  className="empareja2-difficulty-slider h-3 w-full rounded-full appearance-none bg-[rgba(255,255,255,0.1)] border border-white/10 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                  className="empareja2-difficulty-slider h-3 w-full rounded-full appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                   aria-label={t('Número de parejas (dificultad)', 'Number of pairs (difficulty)')}
                 />
               </div>

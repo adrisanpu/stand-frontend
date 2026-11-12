@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getOperatorGame, type OperatorGame } from '../../api/operatorGames'
 import AppShell from '../shell/AppShell'
 import { ThemeProvider } from '../theme'
 import GameConfigurationDialog from './GameConfigurationDialog'
 import { getGameById } from '../../games'
 import { OperatorLanguageProvider } from '../shell/operatorLanguage'
+import HomeAdminButton from '../home/HomeAdminButton'
 
 export default function GameHomeEntry() {
   const [params] = useSearchParams()
@@ -50,9 +51,7 @@ export default function GameHomeEntry() {
               : <p role="status">Cargando partida…</p>}
           </main>
         </ThemeProvider>}
-      {!ready && <Link to="/admin/games" className="fixed left-3 top-3 z-40 rounded-xl border border-current/20 bg-[var(--color-background)] px-3 py-2 text-sm text-textMain">
-        Administración
-      </Link>}
+      {!ready && <HomeAdminButton onClick={() => navigate('/admin/games')} label="Administración" />}
     </>
   )
 }

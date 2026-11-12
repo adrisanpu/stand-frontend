@@ -8,13 +8,14 @@ beforeEach(() => {
   sessionStorage.clear()
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
-it('keeps QR locally generated, square and opaque against arbitrary backgrounds', () => {
+it('keeps QR locally generated with a square black backing and no border', () => {
   const config = initialHomeCanvas(false, false)
   render(<HomeCanvas gameId="EVENT" gameName="Event" composition={config.landscape} orientation="landscape" />)
   const qr = screen.getByRole('img', { name: 'Escanea para unirte al juego' })
   expect(qr).toHaveAttribute('src', expect.stringContaining('data:image/svg+xml'))
   expect(qr).toHaveAttribute('data-qr-value', `${window.location.origin}/play/EVENT`)
-  expect(qr.parentElement).toHaveClass('!bg-black')
+  expect(qr.parentElement).toHaveClass('!bg-black', '!border-0', '!p-0')
+  expect(qr.parentElement?.parentElement?.parentElement).toHaveStyle({ aspectRatio: '1 / 1' })
   expect(qr.closest('.card')).toBeNull()
   expect(screen.queryByRole('heading', { name: 'Escanea para jugar' })).not.toBeInTheDocument()
 })
@@ -74,6 +75,15 @@ it('uses the centered players container in live and sample widgets without chang
   }} players={<div className="flex flex-col"><div className="card">24 Players</div></div>} />)
   expect(screen.getByText('24 Players').closest('.home-canvas-widget')).toHaveClass('home-widget-players')
   expect(screen.getByRole('img', { name: 'Escanea para unirte al juego' }).parentElement).toHaveClass('!bg-black')
+})
+it.each([[8, 12], [12, 8]])('fits the square black QR inside a %s by %s panel without filling its extra space', (w, h) => {
+  render(<HomeCanvas gameId="EVENT" gameName="Event" orientation="landscape" composition={{
+    background: null, items: [{ id: 'qr', type: 'qr', x: 0, y: 0, w, h, backgroundColor: '#ff0000' }],
+  }} />)
+  const qr = screen.getByRole('img', { name: 'Escanea para unirte al juego' })
+  const square = qr.parentElement?.parentElement?.parentElement
+  expect(square).toHaveStyle({ width: `${Math.min(w, h) * 60 - 20}px`, aspectRatio: '1 / 1' })
+  expect(qr.closest<HTMLElement>('.home-canvas-widget')?.style.backgroundColor).toBe('transparent')
 })
 it('inherits bold from the canvas and supports false overrides without changing legacy weights', () => {
   const item = { id: 'text', type: 'text' as const, x: 0, y: 0, w: 6, h: 2, text: 'Bold' }

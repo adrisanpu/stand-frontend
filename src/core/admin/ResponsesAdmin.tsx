@@ -5,7 +5,7 @@ import { listOperatorGames, type OperatorGame } from '../../api/operatorGames'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
-import { OPTIONAL_REGISTRATION_FIELDS } from '../lib/participantFields'
+import { PARTICIPANT_PROFILE_FIELDS, participantProfileValue } from '../lib/participantFields'
 
 const PAGE_SIZE = 25
 
@@ -24,7 +24,7 @@ export function buildResponsesCsv(
   const headers = [
     labels.player, labels.name, labels.email, labels.completed, labels.completedAt,
     language === 'en' ? 'Phone' : 'Teléfono',
-    ...OPTIONAL_REGISTRATION_FIELDS.map(field => language === 'en' ? field.en : field.es),
+    ...PARTICIPANT_PROFILE_FIELDS.map(field => language === 'en' ? field.en : field.es),
     ...questions.map(question => question.text),
   ]
   const rows = players.map(player => [
@@ -34,7 +34,7 @@ export function buildResponsesCsv(
     player.completed ? 'true' : 'false',
     player.completedAt,
     player.phone,
-    ...OPTIONAL_REGISTRATION_FIELDS.map(({ key }) => player[key]),
+    ...PARTICIPANT_PROFILE_FIELDS.map(({ key }) => participantProfileValue(key, player[key], language)),
     ...questions.map(question => {
       const payload = player.answers[question.id]
       return question.options.find(option => option.payload === payload)?.title ?? payload ?? ''
@@ -265,7 +265,7 @@ export default function ResponsesAdmin() {
                   <thead><tr>
                     {[t('Participante', 'Participant'), t('Email', 'Email'), t('Estado', 'Status'),
                       t('Fecha de finalización', 'Completion date'), t('Teléfono', 'Phone'),
-                      ...OPTIONAL_REGISTRATION_FIELDS.map(field => t(field.es, field.en)), ...responses.questions.map(question => question.text)]
+                      ...PARTICIPANT_PROFILE_FIELDS.map(field => t(field.es, field.en)), ...responses.questions.map(question => question.text)]
                       .map((label, index) => <th key={`${label}-${index}`} scope="col" className="whitespace-nowrap">{label}</th>)}
                   </tr></thead>
                   <tbody>{visiblePlayers.map(player => (
@@ -280,7 +280,7 @@ export default function ResponsesAdmin() {
                         {dateLabel(player.completedAt, language) ?? '—'}
                       </td>
                       <td className="p-2">{player.phone || '—'}</td>
-                      {OPTIONAL_REGISTRATION_FIELDS.map(({ key }) => <td key={key} className="p-2">{player[key] || '—'}</td>)}
+                      {PARTICIPANT_PROFILE_FIELDS.map(({ key }) => <td key={key} className="p-2">{participantProfileValue(key, player[key], language) || '—'}</td>)}
                       {responses.questions.map(question => <td key={question.id} className="min-w-40 p-2">
                         {formatAnswer(player, question)}
                       </td>)}

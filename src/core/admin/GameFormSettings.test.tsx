@@ -63,23 +63,111 @@ it('loads the selected event and saves keys and expected revision, not signed UR
   expect(screen.getByTestId('qr')).toHaveTextContent('/play/EVENT')
 })
 
+it('shares the selected logo across both tabs and saves only its media key', async () => {
+  const sectionDirty = vi.fn()
+  const { rerender } = render(<GameFormSettings gameId="EVENT" section="registration" onSectionDirtyChange={sectionDirty} />)
+  await screen.findByLabelText('Logo guardado')
+  fireEvent.click(screen.getByRole('button', { name: 'Abrir biblioteca de logos' }))
+  await screen.findByRole('option', { name: 'Saved image' })
+  fireEvent.change(screen.getByLabelText('Logo guardado'), { target: { value: 'users/owner/logos/image.png' } })
+  const preview = screen.getByRole('region', { name: 'Vista previa' })
+  expect(preview.querySelector('img')).toHaveAttribute('src', 'https://image.test/signed.png')
+  expect(sectionDirty).toHaveBeenCalledWith('registration', true)
+  expect(sectionDirty).toHaveBeenCalledWith('questionnaire', true)
+  expect(api.put).not.toHaveBeenCalled()
+  rerender(<GameFormSettings gameId="EVENT" section="questionnaire" onSectionDirtyChange={sectionDirty} />)
+  expect(screen.getByLabelText('Logo guardado')).toHaveValue('users/owner/logos/image.png')
+  expect(screen.getByRole('region', { name: 'Vista previa' }).querySelector('img')).toHaveAttribute('src', 'https://image.test/signed.png')
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cuestionario' }))
+  await screen.findByText('Cuestionario guardado y confirmado.')
+  expect(api.put).toHaveBeenCalledTimes(1)
+  expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
+    form: expect.objectContaining({ formConfig: expect.objectContaining({ logoKey: 'users/owner/logos/image.png' }) }),
+  }))
+  expect(JSON.stringify(vi.mocked(api.put).mock.calls)).not.toContain('signed.png')
+  fireEvent.change(screen.getByLabelText('Logo guardado'), { target: { value: '' } })
+  expect(screen.getByRole('region', { name: 'Vista previa' }).querySelector('img')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar cuestionario' }))
+  await waitFor(() => expect(snapshot.formConfig.logoKey).toBeNull())
+})
+
+it('uploads a form logo without selecting the account logo and previews it locally before saving', async () => {
+  const file = new File(['image'], 'logo.png', { type: 'image/png' })
+  const meta = { id: 'image', key: 'users/owner/logos/image.png', kind: 'logo' as const,
+    name: 'Logo', fileName: file.name, sizeBytes: file.size, contentType: file.type }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+  vi.mocked(api.post).mockImplementation(async path => path.includes('upload-url')
+    ? { ok: true, uploadUrls: [{ id: 'image', url: 'https://upload.test', meta }] } : { ok: true })
+  await mount()
+  fireEvent.change(screen.getByLabelText('Subir logo'), { target: { files: [file] } })
+  await waitFor(() => expect(screen.getByLabelText('Logo guardado')).toHaveValue(meta.key))
+  expect(screen.getByRole('tabpanel', { name: 'Registro' }).querySelector('img')).toHaveAttribute('src', 'https://image.test/signed.png')
+  expect(api.post).toHaveBeenCalledWith('/v1/user/media', { items: [meta] })
+  expect(api.put).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
+  await screen.findByText('Formulario guardado y confirmado.')
+  expect(snapshot.formConfig.logoKey).toBe(meta.key)
+  expect(api.put).toHaveBeenCalledTimes(1)
+  expect(vi.mocked(api.put).mock.calls[0][0]).toBe('/v1/game')
+})
+
+it('keeps the existing form logo on library or upload failures', async () => {
+  snapshot.formConfig.logoKey = 'users/owner/logos/old.png'
+  snapshot.logoUrl = 'https://image.test/old.png'
+  await mount()
+  const originalGet = vi.mocked(api.get).getMockImplementation()!
+  vi.mocked(api.get).mockImplementation(path => path === '/v1/user/media'
+    ? Promise.reject(new Error('Library unavailable')) : originalGet(path))
+  fireEvent.click(screen.getByRole('button', { name: 'Abrir biblioteca de logos' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Library unavailable')
+  expect(screen.getByLabelText('Logo guardado')).toHaveValue(snapshot.formConfig.logoKey)
+  expect(screen.getByRole('tabpanel', { name: 'Registro' }).querySelector('img')).toHaveAttribute('src', snapshot.logoUrl)
+  fireEvent.change(screen.getByLabelText('Subir logo'), {
+    target: { files: [new File([''], 'empty.png', { type: 'image/png' })] },
+  })
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('entre 1 byte y 5 MB'))
+  expect(api.put).not.toHaveBeenCalled()
+  expect(screen.getByLabelText('Logo guardado')).toHaveValue(snapshot.formConfig.logoKey)
+})
+
 it('previews the same two-step registration and optional fields that are saved for Play', async () => {
   await mount()
   const preview = within(screen.getByRole('tabpanel', { name: 'Registro' }))
   expect(preview.getByLabelText('Email *')).toBeRequired()
+  expect(preview.queryByRole('progressbar')).not.toBeInTheDocument()
   expect(preview.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('checkbox', { name: 'Empresa (opcional)' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Sexo (opcional)' }))
+  expect(screen.getByRole('checkbox', { name: 'Fecha de nacimiento (opcional)' })).toBeInTheDocument()
+  expect(screen.queryByRole('checkbox', { name: 'Cargo (opcional)' })).not.toBeInTheDocument()
   fireEvent.change(preview.getByLabelText('Email *'), { target: { value: 'a@example.com' } })
   fireEvent.click(preview.getByRole('button', { name: 'Continuar' }))
   expect(preview.getByLabelText('Nombre completo *')).toBeRequired()
   expect(preview.getByLabelText('Teléfono *')).toBeRequired()
   expect(preview.getByLabelText('Empresa (opcional)')).not.toBeRequired()
+  expect(preview.getByRole('combobox', { name: 'Sexo (opcional)' })).toHaveValue('')
+  expect(preview.getByRole('option', { name: 'Masculino' })).toHaveValue('male')
+  expect(preview.getByRole('option', { name: 'Femenino' })).toHaveValue('female')
   expect(preview.queryByLabelText('Cargo (opcional)')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
   await screen.findByText('Formulario guardado y confirmado.')
   expect(snapshot.participantFields).toMatchObject({
-    email: { required: true }, phone: { enabled: true, required: true }, company: { enabled: true },
+    email: { required: true }, phone: { enabled: true, required: true }, company: { enabled: true }, sex: { enabled: true },
   })
+})
+
+it.each(['registration', 'questionnaire'] as const)('places the %s QR below the preview at the bottom of its column', async section => {
+  render(<GameFormSettings gameId="EVENT" section={section} />)
+  const preview = await screen.findByRole('region', { name: 'Vista previa' })
+  const aside = screen.getByRole('complementary', { name: 'Vista previa del formulario' })
+  const grid = aside.parentElement!
+  expect(grid).toHaveClass('grid', 'lg:grid-cols-2')
+  expect(grid).not.toHaveClass('items-start')
+  expect(aside).toHaveClass('flex', 'flex-col')
+  const qr = screen.getByTestId('qr')
+  expect(aside).toContainElement(qr)
+  expect(qr.parentElement?.parentElement).toHaveClass('mt-auto', 'pt-12')
+  expect(preview.compareDocumentPosition(qr) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 
 it('keeps unsaved changes on failure and requires explicit reload before retry', async () => {
@@ -117,7 +205,12 @@ it('locks questions and timing after answers but allows presentation saves', asy
 it('enforces plan, read-only and mandatory phone constraints', async () => {
   snapshot.gameType = 'STACK'
   await mount()
-  expect(screen.getByText(/nombre completo y teléfono obligatorios/)).toBeInTheDocument()
+  for (const name of ['Email', 'Nombre completo', 'Teléfono']) {
+    const field = screen.getByRole('checkbox', { name: `${name} (obligatorio)` })
+    expect(field).toBeChecked()
+    expect(field).toBeDisabled()
+  }
+  expect(screen.queryByText(/Primer paso:/)).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Solicitar teléfono')).not.toBeInTheDocument()
   expect(screen.getByRole('checkbox', { name: 'Dirección (opcional)' })).not.toBeChecked()
   cleanup()
@@ -125,7 +218,7 @@ it('enforces plan, read-only and mandatory phone constraints', async () => {
   await mount()
   expect(screen.getByLabelText('Título del registro')).not.toBeDisabled()
   expect(screen.getByLabelText('Momento del cuestionario')).toBeDisabled()
-  expect(screen.queryByLabelText('Subir logo')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Subir logo')).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Exportar respuestas' })).toBeDisabled()
   cleanup()
   user.plan = 'event'
@@ -217,7 +310,7 @@ it('registers library uploads without selecting a global logo and preserves lega
 it('retains and saves both tab drafts with the same revision and shared appearance', async () => {
   snapshot.formConfig.appearance = { themeMode: 'light', colors: { primary: '#123456', accent: '#654321' } }
   const { rerender } = render(<GameFormSettings gameId="EVENT" section="appearance" />)
-  await screen.findByRole('button', { name: '+ QR' })
+  await screen.findByRole('combobox', { name: 'Añadir componente' })
   expect(screen.queryByLabelText('Vista previa del formulario')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Vista previa del home')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Título del registro')).not.toBeInTheDocument()

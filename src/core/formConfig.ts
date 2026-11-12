@@ -1,6 +1,6 @@
 import type { ParticipantFieldsConfig, PublicGameResponse } from '../api/publicApi'
 import type { ParticipantAppearance } from './theme/appearance'
-import { OPTIONAL_REGISTRATION_FIELDS, resolveParticipantFields } from './lib/participantFields'
+import { PARTICIPANT_PROFILE_FIELDS, resolveParticipantFields } from './lib/participantFields'
 
 export const QUIZ_MOMENTS = ['disabled', 'after_registration', 'after_game', 'prize', 'raffle'] as const
 export type QuizMoment = typeof QUIZ_MOMENTS[number]
@@ -93,6 +93,6 @@ export function isGameFormResponse(value: unknown): value is GameFormResponse {
         && /^#[\da-f]{6}$/i.test(config.appearance.colors.accent)))))
     && !!data.participantFields && typeof data.participantFields === 'object' && !Array.isArray(data.participantFields)
     && field(data.participantFields.email) && field(data.participantFields.phone)
-    && OPTIONAL_REGISTRATION_FIELDS.every(({ key }) => field(data.participantFields[key]))
+    && PARTICIPANT_PROFILE_FIELDS.every(({ key }) => field(data.participantFields[key]))
     && isFormQuestions(data.questions)
 }

@@ -59,6 +59,8 @@ registration, participant sessions, real scores, prize allocation or multiplayer
 rooms. All available games are supported; CUPIDO remains unavailable. SEMAFORO
 can read the saved questionnaire but never submits responses. EMPAREJA2 uses
 labeled sample characters. Switching away from Game stops its simulation.
+Every Game panel uses two columns on desktop: settings, inputs and saving on
+the left, the playable preview on the right. On mobile these stack in that order.
 
 Home uses the same `HomeCanvas` renderer as the live display, with
 sample counters, raffle and (when supported) ranking. Draft canvas content and media
@@ -70,11 +72,27 @@ canvas and never change the operator theme. Registration and Questionnaire
 keep their own previews. Registration and questionnaire retain a single draft
 across tab changes; saving either applies pending edits from both sections.
 Registration has a fixed layout: edit its title, description and requested
-optional fields (address, company, job title, birth date). Name, verified email,
-phone and legal consent cannot be disabled. Its preview renders the actual Play
+optional fields (address, company, sex, birth date). Email, full name and phone
+appear as checked, locked fields in the settings; legal consent cannot be
+disabled either. Sex is an optional male/female selector stored as `sex`
+(`male` / `female`), never relabeled or migrated from historical job titles.
+Historical job titles remain available in administrative responses and exports.
+Its preview renders the actual Play
 `JoinForm`, with a local email-to-details transition and no verification messages,
 participant creation, uploads or session writes. Appearance is inherited rather
 than independently edited in this panel. Questionnaire retains its existing controls.
+Both tabs offer the same shared registration/questionnaire logo: choose from the
+account's image library, upload an image up to 5 MB or select **No logo**.
+Selection updates both previews immediately; save either tab to persist the
+event's `logoKey`. Uploading adds a library image but never changes the account's
+selected logo. This customization retains the Event plan restriction. Changing
+the shared logo invalidates both panels during initial setup.
+Neither the preview nor the public registration form displays a step counter or
+progress bar; the email/details/verification flow itself is unchanged.
+Registration and Questionnaire keep their QR and participant link at the bottom
+of the right-hand preview column, with extra separation from the form.
+On the EMPAREJA2 Play screen, the assigned character name and participant name
+and avatar sit above and outside the character image panel, without overlays.
 Canvas background uploads do not change the account logo. Empty overrides retain the
 existing event/account appearance. STACK retains its additional club consent and
 Kivly identity checks; the new optional fields do not change Kivly customer data.
@@ -109,12 +127,21 @@ Creation does not navigate to the home screen or launch a raffle.
 Prizes loads existing shared prizes and, for STACK with a connected account,
 the existing Kivly rewards. All are available in the rule selector without first
 adding them to the event. Saving associates only the selected prizes, preserving
-existing associations and awards. Blank sub-stocks have no numeric reservation
+existing associations and awards. At the top of the Prizes panel, a QR and link
+open this event's prize validator at `/redeem/:gameId` in a new tab.
+Blank sub-stocks have no numeric reservation
 and cannot award prizes until a quantity is set. STACK saves associations before rules using the refreshed
-revision. Other games reuse their supported prize slots, with the ranking top
-editable alongside prize selection. No prize is created or awarded by loading.
-Selecting a STACK rule condition opens its prize details, including the Sub-stock
-textbox for raffle rules. Native raffle slots also expose their reserved sub-stock.
+revision. Every game uses the same STACK-style conditions table: add a rule,
+select its condition, and expand its prize and sub-stock details. Ranking rules
+expose their top parameter in the same row. Only conditions supported by the game
+and plan appear; native games retain validation, ranking and manual raffle slots,
+with at most one rule per condition, one prize per rule and quantity fixed at one.
+STACK keeps its additional score conditions, prize groups and quantities; the
+common interface does not extend native award behavior or migrate prize data.
+Empty new rules must be assigned a prize or removed before saving. Existing
+legacy prizes remain visible even when absent from the shared catalog, and
+conditions hidden by the plan are preserved on save. Inactive events show the
+same table read-only. No prize is created or awarded by loading.
 Administration > Prizes reloads inventory when its browser tab becomes visible
 or regains focus, reflecting saved event reservations without a manual refresh.
 Removing the last condition reference to a STACK prize releases its unassigned
@@ -135,15 +162,21 @@ The existing plan gate still applies.
 ### Editable Home canvas
 
 The QR scales to its panel's available width and height while preserving its
-square proportions. Position and panel size use dragging, corner resizing or
+square proportions. Its black backing is always square and fitted to the shorter
+available panel dimension, with no border or padding. Extra panel space stays
+transparent, including when a component background was previously configured.
+Position and panel size use dragging, corner resizing or
 arrow keys only; the editor has no coordinate or dimension textboxes.
-Only the selected component shows its resize handle. A single compact selection
-panel displays its background (default, transparent or custom color), accent,
-normal text color and text size. It edits the canvas background by default;
+Only the selected component shows its resize handle. A single compact toolbar
+above the canvas groups the **Add component** dropdown with contextual
+background (default, transparent or custom color), accent, normal text color,
+text size and bold controls. Its controls wrap on narrower screens. It edits
+the canvas background by default;
 clicking empty canvas space or **Select background** returns to those settings.
 Canvas and component controls are never displayed as separate simultaneous
-panels. Image/video background controls are available only with the canvas
-background selected, not for individual components.
+panels. An **Image / video background** dropdown next to the canvas colors
+provides the existing library, upload and removal controls. It is available
+only with the canvas background selected, not for individual components.
 **Bold** toggles the text weight for the current selection on every plan.
 Components inherit the canvas setting unless overridden; the reset arrow
 restores inheritance. Existing text weights stay unchanged until configured.

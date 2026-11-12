@@ -115,15 +115,17 @@ it('exports escaped CSV cells and neutralizes spreadsheet formulas', () => {
 
 it('shows and exports the protected registration profile with safe CSV cells', async () => {
   const player = { ...responses.players[0], phone: '+34612345678', address: 'Street 1',
-    company: '=Company', jobTitle: 'Engineer', birthDate: '2000-01-02' }
+    company: '=Company', sex: 'female', jobTitle: 'Engineer', birthDate: '2000-01-02' }
   vi.mocked(getFormResponses).mockResolvedValue({ ...responses, players: [player] })
   mount()
   expect(await screen.findByText('Street 1')).toBeInTheDocument()
   expect(screen.getByText('Engineer')).toBeInTheDocument()
+  expect(screen.getByText('Femenino')).toBeInTheDocument()
   expect(screen.getByText('2000-01-02')).toBeInTheDocument()
   const csv = buildResponsesCsv([player], [])
   expect(csv).toContain("\"'+34612345678\"")
   expect(csv).toContain('"Street 1"')
   expect(csv).toContain("\"'=Company\"")
-  expect(csv).toContain('"Engineer","2000-01-02"')
+  expect(csv).toContain('"Female","2000-01-02","Engineer"')
+  expect(buildResponsesCsv([player], [], undefined, 'es')).toContain('"Femenino","2000-01-02","Engineer"')
 })

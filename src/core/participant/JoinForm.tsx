@@ -58,7 +58,7 @@ const verificationErrors: Record<string, string> = {
   invalid_phone: 'Introduce un teléfono válido.',
   invalid_address: 'Revisa la dirección (máximo 300 caracteres).',
   invalid_company: 'Revisa la empresa (máximo 160 caracteres).',
-  invalid_jobTitle: 'Revisa el cargo (máximo 160 caracteres).',
+  invalid_sex: 'Selecciona masculino o femenino.',
   invalid_birthDate: 'Introduce una fecha de nacimiento válida, no futura.',
   player_limit_reached: 'El juego ha alcanzado el límite de participantes. Consulta al equipo del evento.',
 }
@@ -292,6 +292,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined, preview = false }
         if (!pf[field.key].enabled) continue
         const value = profile[field.key]?.trim() ?? ''
         if (value && (Array.from(value).length > field.maxLength || Array.from(value).some(isControlCharacter)
+          || (field.key === 'sex' && value !== 'male' && value !== 'female')
           || (field.key === 'birthDate' && (!/^\d{4}-\d{2}-\d{2}$/.test(value)
             || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value
             || value > new Date().toISOString().slice(0, 10))))) {
@@ -380,13 +381,6 @@ export default function JoinForm({ gameId, gameMeta, onJoined, preview = false }
       {gameMeta.formConfig && <FormHeader title={gameMeta.formConfig.registrationTitle}
         description={gameMeta.formConfig.registrationDescription}
         logoUrl={gameMeta.formLogoUrl} bannerUrl={gameMeta.formBannerUrl} />}
-      <div className="participant-step">
-        <p>{t('Paso de registro')} {step} / 3</p>
-        <div role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={step}
-          aria-valuetext={`${t('Paso de registro')} ${step} / 3`} className="participant-progress">
-          {[1, 2, 3].map(value => <span key={value} className={value <= step ? 'is-complete' : ''} />)}
-        </div>
-      </div>
       {step === 1 && <>
       <div>
         <label className="block text-sm mb-1" htmlFor="join-email">
@@ -489,10 +483,16 @@ export default function JoinForm({ gameId, gameMeta, onJoined, preview = false }
       {OPTIONAL_REGISTRATION_FIELDS.filter(({ key }) => pf[key].enabled
         && (!details?.existingPlayer || details.fields[key])).map(field => <label key={field.key} className="block space-y-1 text-sm">
         <span>{language === 'en' ? field.en : field.es}{t(' (opcional)')}</span>
-        <input type={field.type} autoComplete={field.autoComplete}
+        {field.key === 'sex' ? <select autoComplete={field.autoComplete}
+          value={profile.sex ?? ''} onChange={event => setProfile(current => ({ ...current, sex: event.target.value }))}
+          className="stack-prize-select w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3">
+          <option value="">{t('Sin seleccionar')}</option>
+          <option value="male">{t('Masculino')}</option>
+          <option value="female">{t('Femenino')}</option>
+        </select> : <input type={field.type} autoComplete={field.autoComplete}
           maxLength={field.maxLength} max={field.key === 'birthDate' ? new Date().toISOString().slice(0, 10) : undefined}
           value={profile[field.key] ?? ''} onChange={event => setProfile(current => ({ ...current, [field.key]: event.target.value }))}
-          className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3" />
+          className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3" />}
       </label>)}
 
       {(showConsent || showClubConsent) && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-[13px] leading-relaxed text-textSub items-start">

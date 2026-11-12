@@ -50,11 +50,14 @@ async function mount(options: {
   game?: GameDefinition
   plan?: 'free' | 'event'
   settings?: Record<string, unknown>
+  editConditions?: boolean
+  readOnly?: boolean
 } = {}) {
   const onPersist = vi.fn()
   render(<OperatorLanguageProvider>
     <OperatorPrizeSettings gameId="GAME 1" gameDefinition={options.game ?? definition}
-      plan={options.plan ?? 'event'} settings={options.settings ?? {}} onPersist={onPersist} />
+      plan={options.plan ?? 'event'} settings={options.settings ?? {}} onPersist={onPersist}
+      editConditions={options.editConditions} readOnly={options.readOnly} />
   </OperatorLanguageProvider>)
   await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toBeEnabled())
   return onPersist
@@ -153,4 +156,141 @@ it('reports missing inventory data instead of silently showing invented stock', 
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar los premios')
   expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
   expect(api.put).not.toHaveBeenCalled()
+})
+
+it.each([
+  ['EMPAREJA2', false, 'event', ['valide su participación', 'gane un sorteo']],
+  ['T1MER', true, 'event', ['esté en el top del ranking', 'gane un sorteo']],
+  ['L3TRAS', false, 'free', ['valide su participación']],
+  ['RULET4', false, 'event', ['gane un sorteo']],
+  ['INFOCARDS', false, 'event', ['gane un sorteo']],
+  ['IMPOSTOR', false, 'event', ['gane un sorteo']],
+] as const)('shows Stack-style native rules compatible with %s and %s on %s', async (id, showRanking, plan, conditions) => {
+  await mount({ game: { ...definition, id, showRanking }, plan, editConditions: true })
+  expect(screen.getByRole('table', { name: 'Condiciones' })).toBeInTheDocument()
+  expect(screen.getAllByLabelText(/^Condición \d/)).toHaveLength(conditions.length)
+  expect(within(screen.getByLabelText('Condición 1')).getAllByRole('option').map(option => option.textContent)).toEqual(conditions)
+  expect(screen.queryByRole('option', { name: 'consiga una puntuación' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'O añadir grupo' })).not.toBeInTheDocument()
+  expect(screen.queryByLabelText(/Cantidad de/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Añadir regla' })).toBeDisabled()
+  expect(api.put).not.toHaveBeenCalled()
+})
+
+it('adds and saves a native ranking rule with its prize, sub-stock and top, without STACK APIs', async () => {
+  serverResponse.prizeCatalog = {}
+  const onPersist = await mount({ game: { ...definition, id: 'T1MER' }, editConditions: true })
+  expect(screen.queryByRole('table', { name: 'Condiciones' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Añadir regla' }))
+  expect(screen.getByLabelText('Condición 1')).toHaveValue('ranking')
+  expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Premio de la regla 1'), { target: { value: 'welcome' } })
+  fireEvent.change(screen.getByLabelText('Puestos premiados (top)'), { target: { value: '7' } })
+  fireEvent.change(screen.getByLabelText('Substock de la regla 1'), { target: { value: '12' } })
+  await save()
+  expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
+    preserveRewardConditions: false, prizeCatalog: expect.objectContaining({
+      ranking: expect.objectContaining({ sharedPrizeId: 'welcome', topX: 7, limit: 12 }),
+    }),
+  }))
+  expect(onPersist).toHaveBeenCalledWith(expect.objectContaining({ topX: 7, maxPrizeRanking: 12 }))
+  expect(vi.mocked(api.get).mock.calls.some(([url]) => url.includes('/stack/'))).toBe(false)
+})
+
+it('removes a rule and clears only its assignment while preserving other and hidden conditions', async () => {
+  await mount({ plan: 'free', editConditions: true })
+  fireEvent.click(screen.getByRole('button', { name: 'Quitar regla 1' }))
+  expect(screen.getByLabelText('Condición 1')).toHaveValue('ranking')
+  await save()
+  expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
+    prizeCatalog: expect.objectContaining({
+      validation: expect.objectContaining({ name: '', limit: null }),
+      ranking: expect.objectContaining({ sharedPrizeId: 'podium', topX: 3 }),
+      raffle: expect.objectContaining({ sharedPrizeId: 'surprise', limit: 2 }),
+    }),
+  }))
+})
+
+it('switches an unused native condition without duplicating a prize rule', async () => {
+  serverResponse.prizeCatalog = { validation: initialCatalog.validation }
+  await mount({ editConditions: true })
+  fireEvent.change(screen.getByLabelText('Condición 1'), { target: { value: 'ranking' } })
+  expect(screen.getByLabelText('Premio de la regla 1')).toHaveValue('welcome')
+  fireEvent.change(screen.getByLabelText('Puestos premiados (top)'), { target: { value: '5' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Añadir regla' }))
+  expect(screen.getByLabelText('Condición 2')).toHaveValue('validation')
+  expect(within(screen.getByLabelText('Condición 2')).getByRole('option', { name: 'esté en el top del ranking' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Quitar regla 2' }))
+  await save()
+  expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
+    prizeCatalog: expect.objectContaining({
+      validation: expect.objectContaining({ name: '', limit: null }),
+      ranking: expect.objectContaining({ sharedPrizeId: 'welcome', topX: 5, limit: 4 }),
+    }),
+  }))
+})
+
+it('retains legacy prizes in the rule editor until explicitly replaced', async () => {
+  serverResponse.prizeCatalog = { validation: { name: 'Legacy cup', limit: 8, imageKey: 'old.png' } }
+  await mount({ editConditions: true })
+  expect(screen.getByRole('option', { name: 'Legacy cup' })).toHaveValue('legacy')
+  await save()
+  expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
+    prizeCatalog: expect.objectContaining({ validation: expect.objectContaining({ name: 'Legacy cup', limit: 8, imageKey: 'old.png' }) }),
+  }))
+})
+
+it('rejects invalid native rule parameters before writing and permits correction', async () => {
+  await mount({ editConditions: true })
+  fireEvent.click(screen.getByRole('radio', { name: 'Seleccionar regla 2' }))
+  fireEvent.change(screen.getByLabelText('Puestos premiados (top)'), { target: { value: '101' } })
+  fireEvent.change(screen.getByLabelText('Substock de la regla 2'), { target: { value: '-1' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('El substock debe ser un entero')
+  expect(api.put).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByLabelText('Puestos premiados (top)'), { target: { value: '5' } })
+  fireEvent.change(screen.getByLabelText('Substock de la regla 2'), { target: { value: '0' } })
+  await save()
+  expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
+    prizeCatalog: expect.objectContaining({ ranking: expect.objectContaining({ topX: 5, limit: 0 }) }),
+  }))
+})
+
+it('shows rule save failures explicitly without discarding the draft or reporting success', async () => {
+  await mount({ editConditions: true })
+  vi.mocked(api.put).mockRejectedValue(new Error('ReservationBelowAssigned'))
+  fireEvent.change(screen.getByLabelText('Substock de la regla 1'), { target: { value: '8' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('ReservationBelowAssigned')
+  expect(screen.getByLabelText('Substock de la regla 1')).toHaveValue('8')
+  expect(screen.queryByText('Guardado.')).not.toBeInTheDocument()
+})
+
+it('keeps the native rules read-only when the event is inactive', async () => {
+  render(<OperatorLanguageProvider><OperatorPrizeSettings gameId="GAME" gameDefinition={definition}
+    settings={{}} plan="event" onPersist={vi.fn()} editConditions readOnly /></OperatorLanguageProvider>)
+  expect(await screen.findByLabelText('Condición 1')).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Añadir regla' })).toBeDisabled()
+  expect(screen.getByLabelText('Premio de la regla 1')).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument()
+  expect(api.put).not.toHaveBeenCalled()
+})
+
+it('blocks setup readiness for unsaved and incomplete rules until they are saved or removed', async () => {
+  serverResponse.prizeCatalog = {}
+  const onReadyChange = vi.fn()
+  render(<OperatorLanguageProvider><OperatorPrizeSettings gameId="GAME" gameDefinition={definition}
+    settings={{}} plan="event" onPersist={vi.fn()} editConditions onReadyChange={onReadyChange} /></OperatorLanguageProvider>)
+  await waitFor(() => expect(onReadyChange).toHaveBeenLastCalledWith(true))
+  fireEvent.click(screen.getByRole('button', { name: 'Añadir regla' }))
+  await waitFor(() => expect(onReadyChange).toHaveBeenLastCalledWith(false))
+  expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
+  expect(screen.getByText('Selecciona un premio o elimina esta regla antes de guardar.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Quitar regla 1' }))
+  await waitFor(() => expect(onReadyChange).toHaveBeenLastCalledWith(true))
+  fireEvent.click(screen.getByRole('button', { name: 'Añadir regla' }))
+  fireEvent.change(screen.getByLabelText('Premio de la regla 1'), { target: { value: 'welcome' } })
+  expect(onReadyChange).toHaveBeenLastCalledWith(false)
+  await save()
+  await waitFor(() => expect(onReadyChange).toHaveBeenLastCalledWith(true))
 })

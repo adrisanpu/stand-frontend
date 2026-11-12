@@ -61,6 +61,24 @@ function mount() {
   render(<MemoryRouter><GameConfigurationDialog gameId="SELECTED" initialSection="configuration" onClose={onClose} /></MemoryRouter>)
   return onClose
 }
+it.each(['STACK', 'T1MER', 'EMPAREJA2', 'RULET4', 'L3TRAS', 'IMPOSTOR', 'SEMAFORO', 'INFOCARDS'])(
+  'uses shared responsive configuration and preview columns for %s', async gameType => {
+    snapshot.game.gameType = gameType
+    snapshot.game.type = {}
+    const originalGet = vi.mocked(api.get).getMockImplementation()!
+    vi.mocked(api.get).mockImplementation(path => path.startsWith('/v1/game/infocards?')
+      ? Promise.resolve({ ok: true, gameId: 'SELECTED', cards: [] })
+      : originalGet(path))
+    mount()
+    const preview = await screen.findByRole('complementary', { name: 'Prueba del juego' })
+    const grid = preview.parentElement!
+    expect(grid).toHaveClass('grid', 'lg:grid-cols-2')
+    expect(grid.children).toHaveLength(2)
+    expect(grid.lastElementChild).toBe(preview)
+    expect(grid.firstElementChild).not.toContainElement(preview)
+  },
+)
+
 it('keeps form drafts across sections and guards closing until discard is explicit', async () => {
   const form: GameFormResponse = {
     ok: true, gameId: 'SELECTED', gameType: 'STACK', revision: 'form-r1', locked: false, readOnly: false,
@@ -78,7 +96,7 @@ it('keeps form drafts across sections and guards closing until discard is explic
   await screen.findByText('Lienzo sin cambios pendientes')
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Home' })).toBeEnabled())
   fireEvent.click(screen.getByRole('tab', { name: 'Home' }))
-  await screen.findByRole('button', { name: '+ QR' })
+  await screen.findByRole('combobox', { name: 'Añadir componente' })
   expect(screen.getByRole('tabpanel', { name: 'Home' })).toHaveTextContent('Lienzo del Home')
   expect(screen.queryByText('Aspecto de la partida')).not.toBeInTheDocument()
   expect(screen.queryByText('Imágenes y colores de esta partida')).not.toBeInTheDocument()
@@ -123,15 +141,32 @@ async function ready() {
   fireEvent.click(screen.getByRole('tab', { name: 'Game' }))
 }
 
+it.each(['STACK', 'T1MER'])('shows the event validator QR and link above prize settings for %s', async gameType => {
+  snapshot.game.gameType = gameType
+  mount()
+  fireEvent.click(await screen.findByRole('tab', { name: 'Premios' }))
+  const link = screen.getByRole('link', { name: 'Abrir validador de premios' })
+  const url = `${window.location.origin}/redeem/SELECTED`
+  expect(link).toHaveAttribute('href', url)
+  expect(link).toHaveAttribute('target', '_blank')
+  expect(link).toHaveAttribute('rel', 'noreferrer')
+  const qr = screen.getByRole('img', { name: 'QR validador de premios' })
+  expect(qr).toHaveAttribute('data-qr-value', url)
+  const panel = screen.getByRole('tabpanel', { name: 'Premios' })
+  expect(panel.firstElementChild).toContainElement(link)
+  expect(panel.firstElementChild).toContainElement(qr)
+  expect(api.put).not.toHaveBeenCalled()
+})
+
 it('preserves canvas drafts across tabs and includes them in the discard guard', async () => {
   const close = mount()
   await screen.findByText('Lienzo sin cambios pendientes')
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Home' })).toBeEnabled())
   fireEvent.click(screen.getByRole('tab', { name: 'Home' }))
-  await screen.findByRole('button', { name: '+ Texto' })
+  await screen.findByRole('combobox', { name: 'Añadir componente' })
   fireEvent.click(screen.getByRole('button', { name: 'Mover Logo / nombre' }))
   fireEvent.click(screen.getByRole('button', { name: 'Eliminar componente' }))
-  fireEvent.click(screen.getByRole('button', { name: '+ Texto' }))
+  fireEvent.change(screen.getByRole('combobox', { name: 'Añadir componente' }), { target: { value: 'text' } })
   fireEvent.change(screen.getByLabelText('Texto', { selector: 'textarea' }), { target: { value: 'Canvas draft' } })
   fireEvent.click(screen.getByRole('tab', { name: 'Formulario de registro' }))
   fireEvent.click(screen.getByRole('tab', { name: 'Home' }))
@@ -309,11 +344,11 @@ it('assigns catalog prizes and ranking conditions together for a new T1MER event
   })
   mount()
   fireEvent.click(await screen.findByRole('tab', { name: 'Premios' }))
-  const top = await screen.findByLabelText('Puestos premiados (top)')
+  fireEvent.click(await screen.findByRole('button', { name: 'Añadir regla' }))
+  const top = screen.getByLabelText('Puestos premiados (top)')
   expect(screen.queryByRole('button', { name: 'Guardar configuración' })).not.toBeInTheDocument()
   expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument()
-  const ranking = screen.getByRole('region', { name: 'Ranking' })
-  fireEvent.change(ranking.querySelector('select')!, { target: { value: 'medal' } })
+  fireEvent.change(screen.getByLabelText('Premio de la regla 1'), { target: { value: 'medal' } })
   fireEvent.change(top, { target: { value: '7' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   await screen.findByText('Guardado.')
@@ -323,14 +358,15 @@ it('assigns catalog prizes and ranking conditions together for a new T1MER event
   }))
 })
 
-it('shows unsupported conditions honestly rather than inventing game rules', async () => {
+it('offers only native-compatible conditions and cannot add rules without catalog prizes', async () => {
   snapshot.game.gameType = 'SEMAFORO'
   snapshot.configuration = {}
   mount()
   fireEvent.click(await screen.findByRole('tab', { name: 'Premios' }))
   expect(await screen.findByText('Añade premios en Administración > Premios antes de asignarlos a esta partida.')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Guardar condiciones' })).not.toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Añadir regla' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Añadir regla' })).toBeDisabled()
+  expect(screen.queryByText('consiga una puntuación')).not.toBeInTheDocument()
 })
 
 it('retains L3TRAS drafts across parent renders and allows correcting validation errors', async () => {

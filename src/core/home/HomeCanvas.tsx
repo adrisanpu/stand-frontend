@@ -137,9 +137,16 @@ export default function HomeCanvas({
   const content = (item: HomeItem): ReactNode => {
     switch (item.type) {
       case 'qr':
-        return <QRCode data={getJoinUrl(gameId, 'web')} size={1000} themed
-          containerClassName="home-canvas-qr h-full w-full" className="!h-full !bg-black !border-0 !p-0 !rounded-none"
-          alt={t('Escanea para unirte al juego', 'Scan to join the game')} />
+        return <div className="flex h-full w-full items-center justify-center">
+          <div className="shrink-0" style={{
+            width: Math.max(0, Math.min(item.w * unitX - 20, item.h * unitY - 20)),
+            aspectRatio: '1 / 1',
+          }}>
+            <QRCode data={getJoinUrl(gameId, 'web')} size={1000} themed
+              containerClassName="home-canvas-qr h-full w-full" className="!h-full !w-full !bg-black !border-0 !p-0 !rounded-none"
+              alt={t('Escanea para unirte al juego', 'Scan to join the game')} />
+          </div>
+        </div>
       case 'logo':
         return <div className="card h-full flex items-center justify-center p-5">
           {logoSrc ? <img src={logoSrc} alt={t('Logo del evento', 'Event logo')} className="h-full w-full object-contain" />
@@ -171,6 +178,7 @@ export default function HomeCanvas({
         <div className={`home-canvas-widget home-widget-${item.type} ${(item.bold ?? composition.bold) !== undefined ? 'home-widget-font-weight' : ''} ${item.backgroundColor !== undefined ? 'home-widget-background' : ''} ${overlay ? 'pointer-events-none' : ''}`}
           style={{
             ...styleVariables(item),
+            ...(item.type === 'qr' ? { backgroundColor: 'transparent' } : {}),
             '--home-text-scale': Math.min(
               Math.max(1, item.w * unitX - 20) / 340,
               Math.max(1, item.h * unitY - 20) / (item.type === 'text' ? 100 : 220),

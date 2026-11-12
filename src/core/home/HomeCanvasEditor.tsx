@@ -255,35 +255,6 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
       </div>
     </header>
     {draft && composition && <fieldset disabled={disabled} className="min-w-0 w-full max-w-full space-y-3">
-      <div className="flex flex-wrap gap-2" role="group" aria-label={t('Añadir componente', 'Add component')}>
-        {HOME_ITEM_TYPES.filter(type => (type !== 'ranking' || definition?.showRanking)
-          && (type !== 'raffle' || confirmed?.showRaffleOnHome !== false)).map(type => <button
-          key={type} type="button" disabled={composition.items.length >= 40 || (type !== 'text' && composition.items.some(item => item.type === type))}
-          className="min-h-11 rounded-lg border border-current/20 px-3 py-2 text-sm disabled:opacity-40" onClick={() => add(type)}>
-          + {labels[type]}
-        </button>)}
-      </div>
-      <div className={`mx-auto min-w-0 w-full rounded-xl border border-current/20 overflow-hidden ${orientation === 'portrait' ? 'max-w-[420px]' : 'max-w-full'}`}
-        onClick={event => {
-          if (!disabled && event.target instanceof Element && !event.target.closest('[data-home-item]')) setSelectedId(null)
-        }}>
-        <div style={homePreviewTheme(definition, appearance)}>
-          <HomeCanvas composition={composition} orientation={orientation} gameId={gameId} gameName={gameName}
-            logoSrc={logoSrc || definition?.assets?.logo} backgroundUrl={backgroundUrl} preview {...samples}
-            overlay={item => <>
-              <button type="button" disabled={disabled} className="home-item-select" aria-pressed={item.id === selectedId}
-                aria-label={`${t('Mover', 'Move')} ${labels[item.type]}`} onClick={() => setSelectedId(item.id)}
-                onPointerDown={event => start(event, item, false)} onPointerMove={move}
-                onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}
-                onKeyDown={event => keyboard(event, item, false)} />
-              {item.id === selectedId && <button type="button" disabled={disabled} className="home-item-resize"
-                aria-label={`${t('Redimensionar', 'Resize')} ${labels[item.type]}`}
-                onPointerDown={event => start(event, item, true)} onPointerMove={move}
-                onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}
-                onKeyDown={event => keyboard(event, item, true)}>↘</button>}
-            </>} />
-        </div>
-      </div>
       <div className="space-y-2 rounded-lg border border-current/15 px-3 py-2" role="region" aria-label={t('Editar selección', 'Edit selection')}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-sm font-semibold">{selected ? labels[selected.type] : t('Fondo del lienzo', 'Canvas background')}</h4>
@@ -297,7 +268,54 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
           </button>
           </div>}
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="relative flex flex-wrap items-center gap-x-4 gap-y-2">
+        <select aria-label={t('Añadir componente', 'Add component')} value=""
+          disabled={composition.items.length >= 40}
+          className="min-h-11 max-w-full rounded-lg border border-current/20 bg-transparent px-3 py-2 text-sm"
+          onChange={event => {
+            const type = HOME_ITEM_TYPES.find(type => type === event.target.value)
+            if (type) add(type)
+          }}>
+          <option value="" disabled>{t('Añadir componente', 'Add component')}</option>
+          {HOME_ITEM_TYPES.filter(type => (type !== 'ranking' || definition?.showRanking)
+            && (type !== 'raffle' || confirmed?.showRaffleOnHome !== false)).map(type => <option
+            key={type} value={type} disabled={type !== 'text' && composition.items.some(item => item.type === type)}>
+            {labels[type]}
+          </option>)}
+        </select>
+        {!selected && <details>
+          <summary className="flex min-h-11 cursor-pointer items-center rounded-lg border border-current/20 px-3 py-2 text-xs">
+            {t('Imagen / vídeo de fondo', 'Background image / video')} {!advanced && '(Event)'}
+          </summary>
+          <fieldset disabled={!advanced} className="absolute left-0 top-full z-30 mt-2 w-72 max-w-[75vw] space-y-3 rounded-xl border border-current/20 bg-[var(--color-background,#0B0A12)] p-3 shadow-lg">
+            <button type="button" className="min-h-11 text-sm underline" onClick={() => void run(refreshMedia)}>{t('Abrir biblioteca de fondos', 'Open background library')}</button>
+            <label className="block text-sm">{t('Fondo guardado', 'Saved background')}
+              <select className="mt-1 w-full rounded border border-current/20 bg-transparent p-2" value={background?.key ?? ''}
+                onChange={event => {
+                  const item = media.find(item => item.key === event.target.value)
+                  change({ background: item ? { key: item.key, type: item.contentType.startsWith('video/') ? 'video' : 'image' } : null })
+                }}>
+                <option value="">{t('Sin fondo', 'No background')}</option>
+                {background && !media.some(item => item.key === background.key) && <option value={background.key}>{t('Fondo actual', 'Current background')}</option>}
+                {media.map(item => <option key={item.id} value={item.key}>{item.name || item.fileName}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm">{t('Subir imagen o vídeo', 'Upload image or video')}
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,video/mp4,video/webm" className="mt-2 block w-full"
+                onChange={event => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (!file) return
+                  void run(async () => {
+                    const item = await uploadHomeBackground(file)
+                    change({ background: { key: item.key, type: file.type.startsWith('video/') ? 'video' : 'image' } })
+                    await refreshMedia()
+                  })
+                }} />
+            </label>
+            <p className="text-xs">{t('Imágenes hasta 5 MB. MP4/WebM hasta 100 MB, en bucle y con sonido. La vista del editor permanece silenciada.', 'Images up to 5 MB. MP4/WebM up to 100 MB, looped with sound. The editor preview stays muted.')}</p>
+          </fieldset>
+        </details>}
         {selected && <div className="flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-xs">{t('Fondo', 'Background')}
             <select aria-label={t('Fondo del componente', 'Component background')} className="rounded border border-current/20 bg-transparent p-1"
@@ -337,37 +355,27 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
               </select></label>
           </div>
         </div>}
-      {!selected && <details className="border-t border-current/15 pt-2">
-        <summary className="cursor-pointer font-medium">{t('Fondo de este lienzo', 'Background for this canvas')} {!advanced && '(Event)'}</summary>
-        <fieldset disabled={!advanced} className="mt-3 space-y-3">
-          <button type="button" className="min-h-11 underline" onClick={() => void run(refreshMedia)}>{t('Abrir biblioteca de fondos', 'Open background library')}</button>
-          <label className="block text-sm">{t('Fondo guardado', 'Saved background')}
-            <select className="mt-1 w-full rounded border border-current/20 bg-transparent p-2" value={background?.key ?? ''}
-              onChange={event => {
-                const item = media.find(item => item.key === event.target.value)
-                change({ background: item ? { key: item.key, type: item.contentType.startsWith('video/') ? 'video' : 'image' } : null })
-              }}>
-              <option value="">{t('Sin fondo', 'No background')}</option>
-              {background && !media.some(item => item.key === background.key) && <option value={background.key}>{t('Fondo actual', 'Current background')}</option>}
-              {media.map(item => <option key={item.id} value={item.key}>{item.name || item.fileName}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm">{t('Subir imagen o vídeo', 'Upload image or video')}
-            <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,video/mp4,video/webm" className="mt-2 block w-full"
-              onChange={event => {
-                const file = event.target.files?.[0]
-                event.target.value = ''
-                if (!file) return
-                void run(async () => {
-                  const item = await uploadHomeBackground(file)
-                  change({ background: { key: item.key, type: file.type.startsWith('video/') ? 'video' : 'image' } })
-                  await refreshMedia()
-                })
-              }} />
-          </label>
-          <p className="text-xs">{t('Imágenes hasta 5 MB. MP4/WebM hasta 100 MB, en bucle y con sonido. La vista del editor permanece silenciada.', 'Images up to 5 MB. MP4/WebM up to 100 MB, looped with sound. The editor preview stays muted.')}</p>
-        </fieldset>
-      </details>}
+      </div>
+      <div className={`mx-auto min-w-0 w-full rounded-xl border border-current/20 overflow-hidden ${orientation === 'portrait' ? 'max-w-[420px]' : 'max-w-full'}`}
+        onClick={event => {
+          if (!disabled && event.target instanceof Element && !event.target.closest('[data-home-item]')) setSelectedId(null)
+        }}>
+        <div style={homePreviewTheme(definition, appearance)}>
+          <HomeCanvas composition={composition} orientation={orientation} gameId={gameId} gameName={gameName}
+            logoSrc={logoSrc || definition?.assets?.logo} backgroundUrl={backgroundUrl} preview {...samples}
+            overlay={item => <>
+              <button type="button" disabled={disabled} className="home-item-select" aria-pressed={item.id === selectedId}
+                aria-label={`${t('Mover', 'Move')} ${labels[item.type]}`} onClick={() => setSelectedId(item.id)}
+                onPointerDown={event => start(event, item, false)} onPointerMove={move}
+                onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}
+                onKeyDown={event => keyboard(event, item, false)} />
+              {item.id === selectedId && <button type="button" disabled={disabled} className="home-item-resize"
+                aria-label={`${t('Redimensionar', 'Resize')} ${labels[item.type]}`}
+                onPointerDown={event => start(event, item, true)} onPointerMove={move}
+                onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}
+                onKeyDown={event => keyboard(event, item, true)}>↘</button>}
+            </>} />
+        </div>
       </div>
     </fieldset>}
     {notice && <p role="status" className="text-sm">{notice}</p>}

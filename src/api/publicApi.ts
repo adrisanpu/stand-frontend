@@ -52,7 +52,7 @@ function isSafeWalletUrl(value: string | null | undefined): boolean {
   }
 }
 
-export type OptionalParticipantField = 'address' | 'company' | 'jobTitle' | 'birthDate'
+export type OptionalParticipantField = 'address' | 'company' | 'sex' | 'jobTitle' | 'birthDate'
 export type ParticipantProfile = Partial<Record<OptionalParticipantField, string>>
 export type ParticipantFieldsConfig = {
   email?: { required?: boolean }

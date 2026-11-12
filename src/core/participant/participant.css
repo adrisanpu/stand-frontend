@@ -28,31 +28,6 @@
   border-radius: 10px;
 }
 
-.participant-step {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  color: var(--color-text-sub);
-  font-size: 0.8rem;
-}
-
-.participant-progress {
-  display: flex;
-  width: min(8rem, 40%);
-  gap: 0.3rem;
-}
-
-.participant-progress span {
-  height: 0.25rem;
-  flex: 1;
-  background: rgba(var(--color-primary-rgb), 0.2);
-}
-
-.participant-progress span.is-complete {
-  background: var(--color-primary);
-}
-
 .play-shell .participant-form :is(input:not([type="checkbox"]), textarea, select) {
   border-color: rgba(var(--color-primary-rgb), 0.32);
   border-radius: 7px;

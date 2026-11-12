@@ -1,6 +1,6 @@
 import { api } from './api'
 import type { OptionalParticipantField } from './publicApi'
-import { OPTIONAL_REGISTRATION_FIELDS } from '../core/lib/participantFields'
+import { PARTICIPANT_PROFILE_FIELDS } from '../core/lib/participantFields'
 
 export type FormResponseQuestion = {
   id: string
@@ -43,7 +43,7 @@ function isResponse(value: unknown): value is FormResponses {
       && (typeof player.playerId === 'number' || typeof player.playerId === 'string')
       && (typeof player.name === 'string' || player.name === null)
       && (typeof player.email === 'string' || player.email === null)
-      && [player.phone, ...OPTIONAL_REGISTRATION_FIELDS.map(({ key }) => player[key])]
+      && [player.phone, ...PARTICIPANT_PROFILE_FIELDS.map(({ key }) => player[key])]
         .every(value => value === undefined || value === null || typeof value === 'string')
       && typeof player.completed === 'boolean'
       && (typeof player.completedAt === 'string' || player.completedAt === null)

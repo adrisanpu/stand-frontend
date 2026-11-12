@@ -15,6 +15,7 @@ import {
   getOperatorPrizeSlotVisibility, readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle,
 } from './operatorPrizeSlots'
 import StackPrizeSettings from './StackPrizeSettings'
+import NativePrizeRuleEditor, { type NativePrizeDraft } from './NativePrizeRuleEditor'
 
 type Props = {
   gameId: string
@@ -26,15 +27,9 @@ type Props = {
   onDirtyChange?: (dirty: boolean) => void
   onReadyChange?: (ready: boolean) => void
   editConditions?: boolean
+  readOnly?: boolean
 }
-type Draft = {
-  name: string
-  limit: string
-  topX: string
-  imageKey: string | null
-  imageUrl: string | null
-  sharedPrizeId: string
-}
+type Draft = NativePrizeDraft
 const slotNames = ['validation', 'ranking', 'raffle'] as const
 const nameKeys = { validation: 'prizeValidation', ranking: 'prizeTopX', raffle: 'prizeRaffle' } as const
 const limitKeys = { validation: 'maxPrizeValidation', ranking: 'maxPrizeRanking', raffle: 'maxPrizeRaffle' } as const
@@ -83,7 +78,7 @@ export default function OperatorPrizeSettings(props: Props) {
 }
 
 export function LegacyPrizeSettings({
-  gameId, gameDefinition, settings, plan, onPersist, onSavingChange, onDirtyChange, onReadyChange, editConditions = false,
+  gameId, gameDefinition, settings, plan, onPersist, onSavingChange, onDirtyChange, onReadyChange, editConditions = false, readOnly = false,
 }: Props) {
   const { t } = useOperatorLanguage()
   const slots = getOperatorPrizeSlotVisibility(gameDefinition, getFeaturesByPlan(plan))
@@ -100,16 +95,18 @@ export function LegacyPrizeSettings({
   const [saved, setSaved] = useState(false)
   const [refreshWarning, setRefreshWarning] = useState(false)
   const [cacheWarning, setCacheWarning] = useState(false)
+  const [nativeRulesValid, setNativeRulesValid] = useState(true)
   const savingRef = useRef(false)
   const latest = useRef({ settings, slots, onSavingChange })
   latest.current = { settings, slots, onSavingChange }
   const alive = useRef(true)
   const readyCallback = useRef(onReadyChange)
   readyCallback.current = onReadyChange
+  const dirty = JSON.stringify(drafts) !== JSON.stringify(draftsFrom(catalog))
   useEffect(() => {
     readyCallback.current?.(!loading && !loadError && !saving && !saveError && !refreshWarning
-      && !Object.values(numberErrors).some(Boolean))
-  }, [loading, loadError, saving, saveError, refreshWarning, numberErrors])
+      && !dirty && nativeRulesValid && !Object.values(numberErrors).some(Boolean))
+  }, [loading, loadError, saving, saveError, refreshWarning, numberErrors, dirty, nativeRulesValid])
 
   useEffect(() => {
     alive.current = true
@@ -156,7 +153,7 @@ export function LegacyPrizeSettings({
   }
 
   const handleSave = async () => {
-    if (savingRef.current || loading || loadError || refreshWarning) return
+    if (readOnly || savingRef.current || loading || loadError || refreshWarning || !nativeRulesValid) return
     const invalid: Partial<Record<PrizeSlot, boolean>> = {}
     for (const slot of slotNames) {
       if (!slots[slot]) continue
@@ -247,8 +244,16 @@ export function LegacyPrizeSettings({
         {t('Añade premios en Administración > Premios antes de asignarlos a esta partida.', 'Add prizes in Administration > Prizes before assigning them to this event.')}
         {' '}<Link className="underline" to="/admin/prizes">{t('Abrir catálogo', 'Open catalog')}</Link>
       </p>}
-      <fieldset disabled={loading || loadError || saving} className="space-y-2 min-w-0">
-        {slotNames.filter(slot => slots[slot]).map(slot => {
+      <fieldset disabled={readOnly || loading || loadError || saving || refreshWarning} className="space-y-2 min-w-0">
+        {editConditions ? !loading && !loadError && <NativePrizeRuleEditor slots={slots} drafts={drafts}
+          available={sharedCatalog} inventory={inventory} errors={numberErrors} onChange={changeDraft}
+          onValidityChange={setNativeRulesValid}
+          onMove={(from, to) => {
+            setDrafts(current => ({ ...current, [to]: { ...current[from] },
+              [from]: { name: '', limit: '', topX: '3', imageKey: null, imageUrl: null, sharedPrizeId: '' } }))
+            setSaved(false)
+            onDirtyChange?.(true)
+          }} /> : slotNames.filter(slot => slots[slot]).map(slot => {
           const draft = drafts[slot]
           const balance = inventory?.catalog.find(prize => prize.id === draft.sharedPrizeId)?.inventory
           const reservation = inventory?.catalog.find(prize => prize.id === draft.sharedPrizeId)?.reservation
@@ -313,10 +318,10 @@ export function LegacyPrizeSettings({
       {saved && <p role="status" className="text-green-300">{t('Guardado.', 'Saved.')}</p>}
       {refreshWarning && <p role="status">{t('Los premios se guardaron en el servidor, pero no se pudo actualizar la vista. Se conserva la vista previa; vuelve a abrir para refrescar antes de guardar de nuevo.', 'Prizes were saved on the server, but the display could not be refreshed. The preview is retained; reopen to refresh before saving again.')}</p>}
       {cacheWarning && <p role="status">{t('Los premios se guardaron en el servidor, pero no se pudo actualizar la caché local. Vuelve a abrir la partida para refrescar.', 'Prizes were saved on the server, but the local cache could not be updated. Reopen the game to refresh.')}</p>}
-      <SaveButton onClick={() => void handleSave()} disabled={loading || loadError || saving || refreshWarning || noSlots}
+      {!readOnly && <SaveButton onClick={() => void handleSave()} disabled={loading || loadError || saving || refreshWarning || noSlots || !nativeRulesValid}
         className="w-full">
         {saving ? t('Guardando...', 'Saving...') : t('Guardar', 'Save')}
-      </SaveButton>
+      </SaveButton>}
     </div>
   )
 }

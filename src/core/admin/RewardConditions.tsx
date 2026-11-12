@@ -218,8 +218,8 @@ function NativeConditions({ data, readOnly, onBusyChange, onDirtyChange, onReady
   const catalog = data.prizeCatalog ?? {}
   const { plan } = useCurrentUser()
   const definition = getGameById(data.game.gameType)
-  if (!readOnly && definition) return <LegacyPrizeSettings gameId={data.game.gameId} gameDefinition={definition}
-    settings={data.configuration} plan={plan} editConditions
+  if (definition) return <LegacyPrizeSettings gameId={data.game.gameId} gameDefinition={definition}
+    settings={data.configuration} plan={plan} editConditions readOnly={readOnly}
     onPersist={() => undefined} onSavingChange={onBusyChange} onDirtyChange={onDirtyChange} onReadyChange={onReadyChange} />
   return <div className="space-y-2">
     <p className="text-sm text-textSub">{t(

@@ -284,6 +284,11 @@ input[type="number"] {
 }
 
 /* Empareja2 difficulty range slider - track and thumb */
+.empareja2-difficulty-slider {
+  background: rgba(var(--color-primary-rgb, 176, 38, 255), 0.18);
+  border: 1px solid var(--color-text-sub, #9AA0A6);
+}
+
 .empareja2-difficulty-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
