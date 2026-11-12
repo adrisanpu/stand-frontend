@@ -3,8 +3,10 @@ import { useOperatorLanguage } from '../shell/operatorLanguage'
 export default function useHomeSamples() {
   const { t } = useOperatorLanguage()
   return {
-    players: <div className="card h-full flex items-center justify-center gap-5 p-4">
-      <strong className="text-6xl text-primary">24</strong><h2>{t('Jugadores', 'Players')}</h2>
+    players: <div className="card h-full flex items-center justify-center p-4">
+      <div className="flex flex-wrap items-center justify-center gap-5">
+        <strong className="text-6xl text-primary">24</strong><h2>{t('Jugadores', 'Players')}</h2>
+      </div>
     </div>,
     ranking: <div className="card h-full space-y-5 p-6">
       <h2>{t('Ranking', 'Leaderboard')}</h2>

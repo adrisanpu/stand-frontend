@@ -3,6 +3,22 @@ import { canPlaceHomeItem, findHomeSpace, initialHomeCanvas, validateHomeCanvas,
 
 const item: HomeItem = { id: 'a', type: 'text', x: 0, y: 0, w: 2, h: 1 }
 describe('home canvas grid', () => {
+  it('validates optional canvas and widget styles without changing legacy designs', () => {
+    const config = initialHomeCanvas(true, true)
+    const legacy = JSON.stringify(config)
+    expect(validateHomeCanvas(config)).toBe(true)
+    expect(JSON.stringify(config)).toBe(legacy)
+    const style = { backgroundColor: '#123456', accentColor: '#AbCdEf', color: '#ffffff', fontSize: 96, bold: true }
+    Object.assign(config.landscape, style)
+    config.landscape.items = config.landscape.items.map(element => ({ ...element, ...style }))
+    expect(validateHomeCanvas(config)).toBe(true)
+    expect(config.portrait.fontSize).toBeUndefined()
+    for (const patch of [{ accentColor: 'red' }, { color: '#fff' }, { fontSize: 15 }, { fontSize: 161 }, { fontSize: 24.5 }, { fontSize: '48' }, { color: null }, { bold: 1 }, { bold: 'true' }, { bold: null }]) {
+      expect(validateHomeCanvas({ ...config, landscape: { ...config.landscape, ...patch } })).toBe(false)
+      expect(validateHomeCanvas({ ...config, landscape: { ...config.landscape, items: [{ ...config.landscape.items[0], ...patch }] } })).toBe(false)
+    }
+    expect(validateHomeCanvas({ ...config, landscape: { ...config.landscape, backgroundColor: 'transparent' } })).toBe(false)
+  })
   it('accepts transparent or hex component backgrounds and rejects invalid colors', () => {
     const config = initialHomeCanvas(true, true)
     for (const backgroundColor of ['transparent', '#12Ab34']) {

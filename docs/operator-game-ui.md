@@ -137,10 +137,35 @@ The existing plan gate still applies.
 The QR scales to its panel's available width and height while preserving its
 square proportions. Position and panel size use dragging, corner resizing or
 arrow keys only; the editor has no coordinate or dimension textboxes.
-Only the selected component shows its resize handle and top-right paint icon,
-which opens background controls (default, transparent or custom color).
+Only the selected component shows its resize handle. A single compact selection
+panel displays its background (default, transparent or custom color), accent,
+normal text color and text size. It edits the canvas background by default;
+clicking empty canvas space or **Select background** returns to those settings.
+Canvas and component controls are never displayed as separate simultaneous
+panels. Image/video background controls are available only with the canvas
+background selected, not for individual components.
+**Bold** toggles the text weight for the current selection on every plan.
+Components inherit the canvas setting unless overridden; the reset arrow
+restores inheritance. Existing text weights stay unchanged until configured.
 Text sizes scale with both panel dimensions in the editor and live Home;
-text colors and font families are unchanged.
+the font family stays unchanged. Selecting **Canvas background** sets background,
+accent and normal text colors plus a proportional base size independently per
+orientation. Base size 48 preserves the existing scale; integer sizes 16-160
+scale title/body roles together. General colors inherit the event/account theme
+until overridden. Size can be cleared and typed freely; it is validated and
+applied on blur or Enter, restoring the previous size with a message if invalid.
+Accent applies to primary/accent decorations, and normal text
+applies to main/secondary copy; status/error colors and QR contrast stay intact.
+
+Selected non-QR components can override accent, normal text color and base size.
+**Inherit** removes an override; explicit saved text sizes/colors remain in use.
+The selection panel controls each component's background separately, including
+transparent backgrounds. A canvas background color sits behind any background
+image/video and does not replace component backgrounds.
+
+Players and text are centered vertically and horizontally by default in both
+the editor and live Home. Text keeps its individual left/center/right setting;
+explicit existing alignments are preserved. Long text remains scrollable.
 
 **Games > Event settings > Appearance > Home canvas** offers independent
 landscape (16:9) and portrait (9:16) compositions. The display selects the
@@ -159,8 +184,10 @@ keyboard editing. Position and size fields are grid units. Invalid moves,
 out-of-bounds sizes and collisions leave the last valid placement unchanged.
 There is no automatic pushing, layering, individual rotation or rich-text HTML.
 
-Layout, text, alignment and font size are available on every plan. Backgrounds
-and custom text colors require advanced customization (Event). Background
+Layout, text, alignment and general/individual font size are available on every
+plan, as are individual component backgrounds. Canvas background colors,
+accent/normal text color customization and background images/videos require
+advanced customization (Event). Background
 images support PNG/JPEG/WebP/SVG up to 5 MB; MP4/WebM video supports up to 100 MB.
 Backgrounds belong to each composition and never replace the registration
 banner or account logo. Video loops with sound; the editor/preview stays muted.
@@ -174,6 +201,15 @@ Moving a Home component does not invalidate an in-progress participant survey.
 Switching orientation or configuration tabs preserves the canvas draft.
 Reload/discard is explicit after a conflict or uncertain save. Stored canvas
 data contains media keys, not expiring signed URLs.
+
+The version-1 contract adds optional `backgroundColor`, `accentColor`, `color`
+and `fontSize` fields directly to each composition and component, plus an optional
+boolean `bold` (`true` for bold, `false` for regular; omitted inherits). Composition
+background colors and both text colors must be six-digit HEX; only component
+backgrounds also accept `transparent`. Omitting style fields inherits defaults
+without changing legacy stored data or its revision. Saving confirms all style
+fields as well as media and items. Deploy the compatible backend before the
+frontend that sends these fields; older strict validators reject them.
 
 ### Participant phone and photo
 

@@ -1,21 +1,26 @@
 export const HOME_ITEM_TYPES = ['qr', 'logo', 'players', 'ranking', 'raffle', 'prizes', 'text'] as const
 export type HomeItemType = typeof HOME_ITEM_TYPES[number]
 export type HomeOrientation = 'landscape' | 'portrait'
-export type HomeItem = {
+export const HOME_STYLE_FIELDS = ['backgroundColor', 'accentColor', 'color', 'fontSize', 'bold'] as const
+export type HomeStyle = {
+  backgroundColor?: string
+  accentColor?: string
+  color?: string
+  fontSize?: number
+  bold?: boolean
+}
+export type HomeItem = HomeStyle & {
   id: string
   type: HomeItemType
   x: number
   y: number
   w: number
   h: number
-  backgroundColor?: string
   text?: string
-  fontSize?: number
-  color?: string
   align?: 'left' | 'center' | 'right'
 }
 export type HomeBackground = { key: string; type: 'image' | 'video' }
-export type HomeComposition = { background: HomeBackground | null; items: HomeItem[] }
+export type HomeComposition = HomeStyle & { background: HomeBackground | null; items: HomeItem[] }
 export type HomeCanvasConfig = { version: 1; landscape: HomeComposition; portrait: HomeComposition }
 export type HomeBackgroundUrls = Record<HomeOrientation, string | null>
 export const HOME_UNIT = 60
@@ -23,6 +28,16 @@ export const HOME_GRID = { landscape: { cols: 32, rows: 18 }, portrait: { cols: 
 export const HOME_MIN_SIZE: Record<HomeItemType, { w: number; h: number }> = {
   qr: { w: 4, h: 5 }, logo: { w: 3, h: 2 }, players: { w: 4, h: 2 },
   ranking: { w: 4, h: 5 }, raffle: { w: 4, h: 4 }, prizes: { w: 4, h: 2 }, text: { w: 2, h: 1 },
+}
+
+function validHomeStyle(style: HomeStyle, transparent: boolean): boolean {
+  return (style.fontSize === undefined || (Number.isInteger(style.fontSize) && style.fontSize >= 16 && style.fontSize <= 160))
+    && (style.bold === undefined || typeof style.bold === 'boolean')
+    && (['backgroundColor', 'accentColor', 'color'] as const).every(key => {
+      const value = style[key]
+      return value === undefined || (typeof value === 'string'
+        && ((key === 'backgroundColor' && transparent && value === 'transparent') || /^#[\da-f]{6}$/i.test(value)))
+    })
 }
 
 export function homeItemsOverlap(a: HomeItem, b: HomeItem): boolean {
@@ -56,6 +71,7 @@ export function validateHomeCanvas(value: unknown): value is HomeCanvasConfig {
   for (const orientation of ['landscape', 'portrait'] as const) {
     const composition = config[orientation]
     if (!composition || !Array.isArray(composition.items) || composition.items.length > 40) return false
+    if (!validHomeStyle(composition, false)) return false
     const background = composition.background
     if (background !== null && (!background || typeof background.key !== 'string'
       || !background.key || !['image', 'video'].includes(background.type))) return false
@@ -66,10 +82,7 @@ export function validateHomeCanvas(value: unknown): value is HomeCanvasConfig {
         || (item.type !== 'text' && types.has(item.type))
         || !canPlaceHomeItem(item, composition.items, orientation)) return false
       if (item.text !== undefined && (typeof item.text !== 'string' || item.text.length > 1000)) return false
-      if (item.fontSize !== undefined && (!Number.isInteger(item.fontSize) || item.fontSize < 16 || item.fontSize > 160)) return false
-      if (item.color !== undefined && !/^#[\da-f]{6}$/i.test(item.color)) return false
-      if (item.backgroundColor !== undefined && item.backgroundColor !== 'transparent'
-        && !/^#[\da-f]{6}$/i.test(item.backgroundColor)) return false
+      if (!validHomeStyle(item, true)) return false
       if (item.align !== undefined && !['left', 'center', 'right'].includes(item.align)) return false
       ids.add(item.id)
       types.add(item.type)

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { getJoinUrl } from '../lib/joinUrl'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import QRCode from '../widgets/QRCode'
-import { HOME_GRID, HOME_UNIT, type HomeComposition, type HomeItem, type HomeOrientation } from './canvasModel'
+import { HOME_GRID, HOME_UNIT, type HomeComposition, type HomeItem, type HomeOrientation, type HomeStyle } from './canvasModel'
 import './homeCanvas.css'
 
 export type HomeCanvasProps = {
@@ -22,6 +22,28 @@ export type HomeCanvasProps = {
   /** Stretch the grid to the real container size (live Home); otherwise fit keeps the aspect ratio. */
   stretch?: boolean
   overlay?: (item: HomeItem) => ReactNode
+}
+
+function styleVariables(style: HomeStyle): CSSProperties {
+  const variables: Record<string, string> = {}
+  if (style.bold !== undefined) variables['--home-font-weight'] = style.bold ? '700' : '400'
+  if (style.backgroundColor !== undefined) variables.backgroundColor = style.backgroundColor
+  if (style.color) {
+    variables['--color-text-main'] = style.color
+    variables['--color-text-sub'] = style.color
+    variables.color = style.color
+  }
+  const accent = style.accentColor
+  if (accent) {
+    const rgb = [1, 3, 5].map(start => parseInt(accent.slice(start, start + 2), 16)).join(',')
+    for (const name of ['primary', 'accent']) {
+      variables[`--color-${name}`] = accent
+      variables[`--color-${name}-rgb`] = rgb
+    }
+    variables['--color-border-gradient-1'] = `rgba(${rgb},0.65)`
+    variables['--color-border-gradient-2'] = `rgba(${rgb},0.65)`
+  }
+  return variables
 }
 
 function VideoBackground({ src, preview, controls }: { src: string; preview: boolean; controls: HTMLDivElement | null }) {
@@ -128,9 +150,9 @@ export default function HomeCanvas({
       case 'raffle': return raffle
       case 'prizes': return prizes
       case 'text':
-        return <div className="h-full w-full whitespace-pre-wrap break-words overflow-auto"
-          style={{ fontSize: `calc(${item.fontSize ?? 48}px * var(--home-text-scale))`, color: item.color ?? 'var(--color-text-main)', textAlign: item.align ?? 'left' }}>
-          {item.text}
+        return <div className="home-canvas-text"
+          style={{ fontSize: 'calc(48px * var(--home-text-scale))', color: 'var(--color-text-main)', textAlign: item.align ?? 'center' }}>
+          <div className="w-full whitespace-pre-wrap break-words">{item.text}</div>
         </div>
     }
   }
@@ -139,20 +161,20 @@ export default function HomeCanvas({
     aria-label={t('Lienzo del Home', 'Home canvas')}>
     <div ref={container} className="home-canvas-viewport">
     <div className={`home-canvas-stage ${overlay ? 'home-canvas-editing' : ''}`} data-home-stage
-      style={(stretch ? { width: size.width, height: size.height } : { width, height, transform: `scale(${scale})` }) as CSSProperties}>
+      style={{ ...styleVariables(composition), ...(stretch ? { width: size.width, height: size.height } : { width, height, transform: `scale(${scale})` }) }}>
       {composition.background && backgroundUrl && (composition.background.type === 'video'
         ? <VideoBackground key={composition.background.key} src={backgroundUrl} preview={preview || !!overlay} controls={controls} />
         : <img src={backgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover" onError={() => setImageError(true)} />)}
       {imageError && <p role="alert" className="home-media-error">{t('No se puede cargar la imagen de fondo.', 'Background image could not be loaded.')}</p>}
       {composition.items.map(item => <div key={item.id} className="home-canvas-item"
         data-home-item={item.id} style={{ left: item.x * unitX, top: item.y * unitY, width: item.w * unitX, height: item.h * unitY }}>
-        <div className={`home-canvas-widget ${item.backgroundColor !== undefined ? 'home-widget-background' : ''} ${overlay ? 'pointer-events-none' : ''}`}
+        <div className={`home-canvas-widget home-widget-${item.type} ${(item.bold ?? composition.bold) !== undefined ? 'home-widget-font-weight' : ''} ${item.backgroundColor !== undefined ? 'home-widget-background' : ''} ${overlay ? 'pointer-events-none' : ''}`}
           style={{
-            backgroundColor: item.backgroundColor,
+            ...styleVariables(item),
             '--home-text-scale': Math.min(
               Math.max(1, item.w * unitX - 20) / 340,
               Math.max(1, item.h * unitY - 20) / (item.type === 'text' ? 100 : 220),
-            ),
+            ) * ((item.fontSize ?? composition.fontSize ?? 48) / 48),
           } as CSSProperties}>{content(item)}</div>
         {overlay?.(item)}
       </div>)}

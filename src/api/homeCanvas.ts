@@ -1,5 +1,5 @@
 import { api } from './api'
-import { validateHomeCanvas, type HomeCanvasConfig, type HomeBackgroundUrls } from '../core/home/canvasModel'
+import { HOME_STYLE_FIELDS, validateHomeCanvas, type HomeCanvasConfig, type HomeBackgroundUrls } from '../core/home/canvasModel'
 
 export type HomeCanvasResponse = {
   ok: true
@@ -29,6 +29,7 @@ export async function saveHomeCanvas(gameId: string, homeCanvas: HomeCanvasConfi
   if ((['landscape', 'portrait'] as const).some(orientation => {
     const saved = result.homeCanvas[orientation], requested = homeCanvas[orientation]
     return saved.background?.key !== requested.background?.key || saved.background?.type !== requested.background?.type
+      || HOME_STYLE_FIELDS.some(key => saved[key] !== requested[key])
       || saved.items.length !== requested.items.length
       || saved.items.some((item, index) => {
         const previous = requested.items[index]

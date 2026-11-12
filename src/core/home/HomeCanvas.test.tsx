@@ -39,6 +39,55 @@ it('adapts text scale to both panel dimensions', () => {
     composition={{ background: null, items: [{ ...item, w: 12, h: 1 }] }} />)
   expect(widget().style.getPropertyValue('--home-text-scale')).toBe('0.4')
 })
+it('scopes canvas colors and proportional size while honoring widget overrides and alignment', () => {
+  const item = { id: 'text', type: 'text' as const, x: 0, y: 0, w: 6, h: 2, text: 'Styled' }
+  const composition = { background: null, items: [item], backgroundColor: '#123456', accentColor: '#abcdef', color: '#ffffff', fontSize: 96 }
+  const { rerender } = render(<HomeCanvas gameId="EVENT" gameName="Event" orientation="landscape" composition={composition} />)
+  const stage = document.querySelector<HTMLElement>('[data-home-stage]')!
+  const widget = () => document.querySelector<HTMLElement>('.home-canvas-widget')!
+  expect(stage).toHaveStyle({ backgroundColor: '#123456' })
+  expect(stage.style.getPropertyValue('--color-primary')).toBe('#abcdef')
+  expect(stage.style.getPropertyValue('--color-accent')).toBe('#abcdef')
+  expect(stage.style.getPropertyValue('--color-primary-rgb')).toBe('171,205,239')
+  expect(stage.style.getPropertyValue('--color-text-main')).toBe('#ffffff')
+  expect(stage.style.getPropertyValue('--color-text-sub')).toBe('#ffffff')
+  expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('')
+  expect(widget().style.getPropertyValue('--home-text-scale')).toBe('2')
+  expect(document.querySelector('.home-canvas-text')).toHaveStyle({ textAlign: 'center' })
+  rerender(<HomeCanvas gameId="EVENT" gameName="Event" orientation="landscape" composition={{
+    ...composition, items: [{ ...item, fontSize: 24, accentColor: '#ff0000', color: '#000000', align: 'left', backgroundColor: 'transparent' }],
+  }} />)
+  expect(widget().style.getPropertyValue('--home-text-scale')).toBe('0.5')
+  expect(widget().style.getPropertyValue('--color-primary')).toBe('#ff0000')
+  expect(widget().style.getPropertyValue('--color-text-main')).toBe('#000000')
+  expect(widget().style.backgroundColor).toBe('transparent')
+  expect(document.querySelector('.home-canvas-text')).toHaveStyle({ textAlign: 'left' })
+  rerender(<HomeCanvas gameId="EVENT" gameName="Event" orientation="landscape" composition={{ background: null, items: [item] }} />)
+  expect(stage.style.getPropertyValue('--color-primary')).toBe('')
+  expect(widget().style.getPropertyValue('--color-primary')).toBe('')
+  expect(widget().style.getPropertyValue('--home-text-scale')).toBe('1')
+})
+it('uses the centered players container in live and sample widgets without changing the QR contrast', () => {
+  const composition = initialHomeCanvas(false, false).landscape
+  render(<HomeCanvas gameId="EVENT" gameName="Event" orientation="landscape" composition={{
+    ...composition, accentColor: '#ff0000', color: '#111111', backgroundColor: '#eeeeee',
+  }} players={<div className="flex flex-col"><div className="card">24 Players</div></div>} />)
+  expect(screen.getByText('24 Players').closest('.home-canvas-widget')).toHaveClass('home-widget-players')
+  expect(screen.getByRole('img', { name: 'Escanea para unirte al juego' }).parentElement).toHaveClass('!bg-black')
+})
+it('inherits bold from the canvas and supports false overrides without changing legacy weights', () => {
+  const item = { id: 'text', type: 'text' as const, x: 0, y: 0, w: 6, h: 2, text: 'Bold' }
+  const composition = { background: null, items: [item], bold: true }
+  const { rerender } = render(<HomeCanvas gameId="EVENT" gameName="Event" orientation="landscape" composition={composition} />)
+  const widget = () => document.querySelector<HTMLElement>('.home-canvas-widget')!
+  expect(document.querySelector<HTMLElement>('[data-home-stage]')!.style.getPropertyValue('--home-font-weight')).toBe('700')
+  expect(widget()).toHaveClass('home-widget-font-weight')
+  rerender(<HomeCanvas gameId="EVENT" gameName="Event" orientation="landscape" composition={{ ...composition, items: [{ ...item, bold: false }] }} />)
+  expect(widget().style.getPropertyValue('--home-font-weight')).toBe('400')
+  rerender(<HomeCanvas gameId="EVENT" gameName="Event" orientation="landscape" composition={{ background: null, items: [item] }} />)
+  expect(widget()).not.toHaveClass('home-widget-font-weight')
+  expect(widget().style.getPropertyValue('--home-font-weight')).toBe('')
+})
 it('falls back to muted autoplay and offers sound activation outside the editable stage', async () => {
   const play = vi.spyOn(HTMLMediaElement.prototype, 'play')
     .mockRejectedValueOnce(new DOMException('Gesture required', 'NotAllowedError'))
