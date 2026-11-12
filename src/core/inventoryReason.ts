@@ -1,5 +1,8 @@
 export function inventoryReasonText(reason: string, language: 'es' | 'en'): string {
   const normalized = reason.toLowerCase()
+  if (normalized.includes('eventreservationrequired')) {
+    return language === 'en' ? 'Set this event\'s prize sub-stock in Conditions.' : 'Define el substock del premio en Condiciones de esta partida.'
+  }
   if (normalized.includes('uninitialized') || normalized.includes('not_initialized') || normalized.includes('notinitialized')) {
     return language === 'en' ? 'Prize stock has not been initialized.' : 'El stock del premio no está inicializado.'
   }

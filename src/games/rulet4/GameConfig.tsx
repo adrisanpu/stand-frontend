@@ -5,21 +5,23 @@ import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import SaveButton from '../../core/ui/SaveButton'
 import { api } from '../../api/api'
 import { DEFAULT_RULET4_CONFIG, isRulet4Config, type Rulet4Settings, type Rulet4PanelConfig } from './rulet4Logic'
+import { useMechanicsDraft } from '../useMechanicsDraft'
 
 export type { Rulet4PanelConfig, Rulet4Settings } from './rulet4Logic'
 
-export default function Rulet4GameConfig({ gameId, settings, settingsLoaded, onChange, registerSave }: GameConfigProps) {
+export default function Rulet4GameConfig({ gameId, settings, settingsLoaded, onChange, onDraftChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   const translateRef = useRef(t)
   translateRef.current = t
   const [panels, setPanels] = useState<Rulet4PanelConfig[]>(
-    settingsLoaded && isRulet4Config(settings) ? settings.panels : DEFAULT_RULET4_CONFIG.panels
+    settingsLoaded ? (Array.isArray(settings?.panels) ? settings.panels : []) : DEFAULT_RULET4_CONFIG.panels
   )
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(settingsLoaded ? 'ready' : 'loading')
   const [message, setMessage] = useState('')
   const [saveFailed, setSaveFailed] = useState(false)
   const [reload, setReload] = useState(0)
   const [saving, setSaving] = useState(false)
+  useMechanicsDraft(status === 'ready' ? { panels } : null, onDraftChange)
 
   useEffect(() => {
     if (settingsLoaded) return

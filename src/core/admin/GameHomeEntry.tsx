@@ -3,10 +3,13 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getOperatorGame, type OperatorGame } from '../../api/operatorGames'
 import AppShell from '../shell/AppShell'
 import { ThemeProvider } from '../theme'
+import GameConfigurationDialog from './GameConfigurationDialog'
+import { getGameById } from '../../games'
+import { OperatorLanguageProvider } from '../shell/operatorLanguage'
 
 export default function GameHomeEntry() {
   const [params] = useSearchParams()
-  const gameId = params.get('gameId')
+  const gameId = params.get('gameId') ?? localStorage.getItem('gameId')
   const navigate = useNavigate()
   const [loaded, setLoaded] = useState<{ requestedId: string; game: OperatorGame } | null>(null)
   const [errorId, setErrorId] = useState<string | null>(null)
@@ -29,7 +32,13 @@ export default function GameHomeEntry() {
   const ready = gameId === null || game !== undefined
   return (
     <>
-      {ready
+      {game?.setupReview && !game.setupReview.completed
+        ? <ThemeProvider game={getGameById(game.gameType) ?? null}>
+          <OperatorLanguageProvider>
+            <GameConfigurationDialog gameId={game.gameId} requireSetup onClose={() => setVersion(value => value + 1)} />
+          </OperatorLanguageProvider>
+        </ThemeProvider>
+        : ready
         ? <AppShell key={gameId ?? 'legacy'} initialGame={game} onReturnToAdmin={() => navigate('/admin/games')} />
         : <ThemeProvider game={null}>
           <main className="min-h-dvh bg-[var(--color-background)] p-8 text-textMain">

@@ -65,7 +65,7 @@ export async function uploadPrizeImage(gameId: string, slot: PrizeSlot, file: Fi
   return result.key
 }
 
-export async function savePrizeCatalog(gameId: string, catalog: PrizeCatalog): Promise<void> {
+export async function savePrizeCatalog(gameId: string, catalog: PrizeCatalog, preserveRewardConditions = true): Promise<void> {
   const prizeCatalog: PrizeCatalog = {}
   for (const slot of ['validation', 'ranking', 'raffle'] as const) {
     const prize = catalog[slot]
@@ -76,6 +76,6 @@ export async function savePrizeCatalog(gameId: string, catalog: PrizeCatalog): P
     if (prize.imageKey !== undefined) durable.imageKey = prize.imageKey
     prizeCatalog[slot] = durable
   }
-  const result = await api.put<{ ok?: boolean }>('/v1/game', { gameId, prizeCatalog, preserveRewardConditions: true })
+  const result = await api.put<{ ok?: boolean }>('/v1/game', { gameId, prizeCatalog, preserveRewardConditions })
   if (result?.ok === false) throw new Error('Server rejected prize settings')
 }

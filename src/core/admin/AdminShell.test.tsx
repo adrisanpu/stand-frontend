@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { api } from '../../api/api'
 import { kivlyApi } from '../../api/kivlyApi'
+import { STORAGE_KEY_THEME_MODE } from '../storageKeys'
 import AdminShell from './AdminShell'
 
 vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn(), delete: vi.fn() } }))
@@ -15,6 +16,7 @@ vi.mock('../../auth/useCurrentUser', () => ({
 vi.mock('../../api/kivlyApi', () => ({
   kivlyApi: { getAccountConnection: vi.fn() },
 }))
+vi.mock('../../games/stack/BlockPreview', () => ({ default: () => <div /> }))
 vi.mock('../shell/GameGate', () => ({
   default: ({ onGameCreated }: { onGameCreated: (name: string, id: string, type: string) => void }) =>
     <button onClick={() => onGameCreated('NEW_EVENT', 'NEW', 'STACK')}>Crear partida de prueba</button>,
@@ -45,6 +47,14 @@ afterEach(cleanup)
 it('opens account settings from the sidebar identity block', async () => {
   mount()
   await screen.findByText('NEW_EVENT')
+  const gameToolbar = screen.getByRole('searchbox', { name: 'Buscar partidas' }).closest('.card')! as HTMLElement
+  expect(within(gameToolbar).getByRole('button', { name: 'Ver partidas archivadas' })).toBeInTheDocument()
+  expect(within(gameToolbar).getByRole('button', { name: 'Crear partida' })).toBeInTheDocument()
+  expect(within(gameToolbar).getByRole('group', { name: 'Acciones de la partida seleccionada' })).toBeInTheDocument()
+  expect(screen.queryByText('Seleccionada: NEW_EVENT')).not.toBeInTheDocument()
+  const pageTitle = screen.getByRole('heading', { level: 1, name: 'Juegos' })
+  expect(pageTitle.closest('header')).toContainElement(screen.getByText('Gestiona tus partidas o elige un juego para crear una nueva.'))
+  expect(pageTitle.closest('header')).toContainElement(screen.getByRole('combobox', { name: 'Idioma' }))
   expect(screen.getByText('Ana')).toBeInTheDocument()
   expect(screen.getByText('ana@example.com')).toBeInTheDocument()
   for (const name of ['Configurar cuenta', 'Cerrar sesión']) {
@@ -75,14 +85,31 @@ it('opens the selected event independently of a stale browser selection', async 
   expect(localStorage.getItem('gameId')).toBe('OLD')
 })
 
-it('shows a real empty state and catalog access', async () => {
-  vi.mocked(api.get).mockResolvedValue({ ok: true, games: [] })
-  mount()
+it.each(['plus', 'coverflow'])('opens the same creation and configuration modal from %s', async entry => {
+  vi.mocked(api.get).mockImplementation(async url => {
+    if (url.includes('configuration=true')) return {
+      ok: true, game: { ...game, lifecycleState: 'active',
+        setupReview: { version: 1, revision: 'r1', confirmedSections: [], completed: false },
+      }, configuration: {}, rewardConditionsRevision: 'revision',
+    }
+    if (url.startsWith('/v1/game/stack/prizes')) return {
+      ok: true, state: 'open', programRevision: 'revision', program: { version: 3, catalog: [], rules: [] },
+    }
+    return { ok: true, games: [] }
+  })
+  mount('/admin/games?game=STACK')
   expect(await screen.findByText('Todavía no tienes partidas')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Crear partida' }))
-  expect(screen.getByRole('dialog')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: entry === 'plus'
+    ? 'Crear partida' : 'Ver explicación y crear partida de STACK' }))
+  const dialog = screen.getByRole('dialog')
+  expect(dialog).toHaveAccessibleName('Crear partida · STACK')
   fireEvent.click(screen.getByRole('button', { name: 'Crear partida de prueba' }))
-  expect(screen.getByText('/home?gameId=NEW')).toBeInTheDocument()
+  expect(await screen.findByRole('tab', { name: 'Home' })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.queryByText('/home?gameId=NEW')).not.toBeInTheDocument()
+  expect(screen.getByRole('tab', { name: 'Premios' })).toBeInTheDocument()
+  expect(screen.getByRole('tab', { name: 'Sorteo' })).toBeInTheDocument()
+  expect(screen.getByRole('dialog')).toBe(dialog)
+  expect(screen.getByRole('button', { name: 'Finalizar configuración' })).toBeDisabled()
 })
 
 it('does not present a failed lookup as an empty list and supports retry', async () => {
@@ -94,6 +121,35 @@ it('does not present a failed lookup as an empty list and supports retry', async
   expect(await screen.findByText('NEW_EVENT')).toBeInTheDocument()
 })
 
+it('refreshes the event list when finishing setup after creation', async () => {
+  let created = false
+  const setupReview = { version: 1, revision: 'r1', completed: false,
+    confirmedSections: ['appearance', 'configuration', 'form', 'questionnaire', 'conditions', 'prizes'] }
+  vi.mocked(api.put).mockResolvedValue({ ok: true, gameId: 'NEW',
+    setupReview: { ...setupReview, revision: 'r2', completed: true } })
+  vi.mocked(api.get).mockImplementation(async url => {
+    if (url.includes('configuration=true')) {
+      created = true
+      return { ok: true, game: { ...game, lifecycleState: 'active', setupReview }, configuration: {}, rewardConditionsRevision: 'revision' }
+    }
+    if (url.startsWith('/v1/game/stack/prizes')) return {
+      ok: true, state: 'open', programRevision: 'revision', program: { version: 3, catalog: [], rules: [] },
+    }
+    return { ok: true, games: created ? [game] : [] }
+  })
+  mount('/admin/games?game=STACK')
+  await screen.findByText('Todavía no tienes partidas')
+  fireEvent.click(screen.getByRole('button', { name: 'Crear partida' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Crear partida de prueba' }))
+  await screen.findByRole('dialog', { name: 'NEW_EVENT' })
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Finalizar configuración' })).toBeEnabled())
+  fireEvent.click(screen.getByRole('button', { name: 'Finalizar configuración' }))
+  expect(await screen.findByRole('link', { name: 'Entrar en la partida NEW_EVENT' })).toBeInTheDocument()
+  expect(vi.mocked(api.get).mock.calls.filter(([url]) => url === '/v1/game')).toHaveLength(2)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(api.delete).not.toHaveBeenCalled()
+})
+
 it('retains the list while changing language and exposes only functional sections', async () => {
   mount()
   await screen.findByText('NEW_EVENT')
@@ -102,6 +158,24 @@ it('retains the list while changing language and exposes only functional section
   expect(screen.getByRole('link', { name: 'Open event NEW_EVENT' })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Prizes' })).toBeInTheDocument()
   expect(api.get).toHaveBeenCalledTimes(1)
+})
+
+it('toggles the color mode beside the language selector', async () => {
+  mount()
+  await screen.findByText('NEW_EVENT')
+
+  const themeToggle = screen.getByRole('switch', { name: 'Modo oscuro' })
+  expect(themeToggle.closest('header')).toContainElement(screen.getByRole('combobox', { name: 'Idioma' }))
+  expect(themeToggle).toHaveAttribute('aria-checked', 'true')
+  expect(document.documentElement.style.getPropertyValue('--color-background')).toBe('#0B0A12')
+  fireEvent.click(themeToggle)
+  expect(localStorage.getItem(STORAGE_KEY_THEME_MODE)).toBe('light')
+  expect(document.documentElement).toHaveClass('light-mode')
+  expect(document.documentElement.style.getPropertyValue('--color-background')).toBe('#F5F5F7')
+  expect(themeToggle).toHaveAttribute('aria-checked', 'false')
+
+  fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
+  expect(screen.getByRole('switch', { name: 'Dark mode' })).toBeInTheDocument()
 })
 
 it('offers a collapsible mobile navigation with state and active location', async () => {
@@ -238,7 +312,7 @@ it('opens the catalog over the list and closes with Escape, restoring focus and 
   expect(screen.getByText('NEW_EVENT')).toBeInTheDocument()
   expect(window.document.body.style.overflow).toBe('hidden')
   fireEvent.keyDown(dialog, { key: 'Tab' })
-  expect(within(dialog).getByRole('button', { name: 'Cerrar catálogo' })).toHaveFocus()
+  expect(within(dialog).getByRole('button', { name: 'Cerrar configuración' })).toHaveFocus()
   fireEvent.keyDown(dialog, { key: 'Escape' })
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(trigger).toHaveFocus()
@@ -250,7 +324,7 @@ it('redirects the old catalog URL to the overlay on the event list', async () =>
   mount('/admin/games/catalog')
   expect(await screen.findByRole('dialog')).toBeInTheDocument()
   expect(await screen.findByText('NEW_EVENT')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Cerrar catálogo' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar configuración' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 

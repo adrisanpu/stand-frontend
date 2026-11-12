@@ -23,12 +23,6 @@ type Mode =
   | 'confirmForgotPassword'
   | 'newPassword'
 
-const inputClass =
-  'w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-textMain placeholder:text-textSub focus:outline-none focus:border-white/25'
-const btnClass =
-  'w-full p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-all duration-200 hover:border-white/20 font-medium text-textMain disabled:opacity-50'
-const linkClass = 'text-sm text-textSub hover:text-textMain underline-offset-2 hover:underline'
-
 export default function Login() {
   const [searchParams] = useSearchParams()
   const returnUrl = searchParams.get('returnUrl') || '/admin/games'
@@ -165,22 +159,27 @@ export default function Login() {
 
   return (
     <ThemeProvider game={null}>
-      <div className="min-h-screen flex items-center justify-center bg-club text-textMain px-6">
-        <div className="card w-full max-w-md p-8">
+      <main className="auth-shell">
+        <section className="auth-story" aria-label="STAND">
+          <img
+            src={standLogo}
+            alt="STAND"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              if (target.src !== `${window.location.origin}/images/logo_stand_letters_white.png`) {
+                target.src = '/images/logo_stand_letters_white.png'
+              }
+            }}
+          />
+          <div>
+            <p className="auth-kicker mb-4 text-sm font-semibold tracking-wide">Experiencias en vivo</p>
+            <h2>Tu juego. Tu gente. En directo.</h2>
+            <p className="mt-6">Prepara la experiencia, activa el juego y comparte el momento con todo el mundo.</p>
+          </div>
+        </section>
+        <section className="auth-card" aria-labelledby="login-title">
           <div className="flex flex-col items-center space-y-6">
-            <img
-              src={standLogo}
-              alt="Stand"
-              className="h-28 w-auto object-contain"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                if (target.src !== `${window.location.origin}/images/logo_stand_letters_white.png`) {
-                  target.src = '/images/logo_stand_letters_white.png'
-                }
-              }}
-            />
-
-            <h1 className="text-xl font-semibold w-full text-center">{title}</h1>
+            <h1 id="login-title" className="w-full">{title}</h1>
 
             <form onSubmit={onSubmit} className="w-full space-y-3">
               {(mode === 'signIn' ||
@@ -194,9 +193,10 @@ export default function Login() {
                   autoComplete="username"
                   required
                   placeholder="Email"
+                  aria-label="Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className={inputClass}
+                  className="auth-input p-3"
                   disabled={mode === 'newPassword'}
                 />
               )}
@@ -207,9 +207,10 @@ export default function Login() {
                   autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
                   required
                   placeholder="Contraseña"
+                  aria-label="Contraseña"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={inputClass}
+                  className="auth-input p-3"
                 />
               )}
 
@@ -219,9 +220,10 @@ export default function Login() {
                   autoComplete="new-password"
                   required
                   placeholder="Repetir contraseña"
+                  aria-label="Repetir contraseña"
                   value={password2}
                   onChange={(e) => setPassword2(e.target.value)}
-                  className={inputClass}
+                  className="auth-input p-3"
                 />
               )}
 
@@ -232,9 +234,10 @@ export default function Login() {
                   autoComplete="one-time-code"
                   required
                   placeholder="Código"
+                  aria-label="Código"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  className={inputClass}
+                  className="auth-input p-3"
                 />
               )}
 
@@ -245,26 +248,28 @@ export default function Login() {
                     autoComplete="new-password"
                     required
                     placeholder="Nueva contraseña"
+                    aria-label="Nueva contraseña"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={inputClass}
+                    className="auth-input p-3"
                   />
                   <input
                     type="password"
                     autoComplete="new-password"
                     required
                     placeholder="Repetir contraseña"
+                    aria-label="Repetir contraseña"
                     value={password2}
                     onChange={(e) => setPassword2(e.target.value)}
-                    className={inputClass}
+                    className="auth-input p-3"
                   />
                 </>
               )}
 
-              {error && <p className="text-sm text-red-300">{error}</p>}
-              {info && <p className="text-sm text-textSub">{info}</p>}
+              {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+              {info && <p role="status" className="text-sm text-textSub">{info}</p>}
 
-              <button type="submit" className={btnClass} disabled={busy}>
+              <button type="submit" className="auth-submit w-full p-4 font-semibold" disabled={busy}>
                 {busy ? 'Espera…' : title}
               </button>
             </form>
@@ -272,23 +277,23 @@ export default function Login() {
             <div className="w-full flex flex-col items-center gap-2">
               {mode === 'signIn' && (
                 <>
-                  <button type="button" className={linkClass} onClick={() => { setMode('signUp'); setError(null); setInfo(null) }}>
+                  <button type="button" className="auth-link text-sm" onClick={() => { setMode('signUp'); setError(null); setInfo(null) }}>
                     Crear cuenta
                   </button>
-                  <button type="button" className={linkClass} onClick={() => { setMode('forgotPassword'); setError(null); setInfo(null) }}>
+                  <button type="button" className="auth-link text-sm" onClick={() => { setMode('forgotPassword'); setError(null); setInfo(null) }}>
                     Olvidé mi contraseña
                   </button>
                 </>
               )}
               {mode !== 'signIn' && mode !== 'newPassword' && (
-                <button type="button" className={linkClass} onClick={() => { setMode('signIn'); setError(null); setInfo(null); setCode(''); setPassword2('') }}>
+                <button type="button" className="auth-link text-sm" onClick={() => { setMode('signIn'); setError(null); setInfo(null); setCode(''); setPassword2('') }}>
                   Volver a iniciar sesión
                 </button>
               )}
             </div>
           </div>
-        </div>
-      </div>
+        </section>
+      </main>
     </ThemeProvider>
   )
 }

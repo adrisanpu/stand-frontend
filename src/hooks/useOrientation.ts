@@ -24,10 +24,10 @@ function readForcedPortraitPreference(): boolean | null {
 function readOrientation(automatic: boolean): boolean {
   const forced = readForcedPortraitPreference()
   if (forced !== null) return forced
-  return !automatic || window.innerWidth < 1024 || window.innerHeight < 600 || window.innerWidth <= window.innerHeight
+  return !automatic || window.innerWidth <= window.innerHeight
 }
 
-/** Presentation screens default to portrait; automatic layouts opt in without overriding explicit preferences. */
+/** Canvas orientation follows the screen aspect ratio unless explicitly overridden. */
 export function useOrientation(automatic = false): boolean {
   const [isPortrait, setIsPortrait] = useState(() => {
     if (typeof window === 'undefined') return true

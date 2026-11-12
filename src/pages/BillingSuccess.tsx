@@ -51,8 +51,8 @@ export default function BillingSuccess() {
 
   return (
     <ThemeProvider game={null}>
-      <div className="min-h-screen flex items-center justify-center bg-club text-textMain px-6">
-        <div className="card w-full max-w-md p-8 text-center">
+      <main className="auth-shell billing-shell">
+        <div className="auth-card auth-status-card text-center" aria-live="polite">
         {refreshing || initialLoading ? (
           <>
             <div className="mb-4">
@@ -74,7 +74,7 @@ export default function BillingSuccess() {
             <p className="text-textSub mb-6">{error.message}</p>
             <button
               onClick={() => navigate('/home')}
-              className="w-full p-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 hover:bg-[rgba(255,255,255,0.1)] transition-colors"
+              className="auth-submit w-full p-3 font-semibold"
             >
               Volver a la aplicación
             </button>
@@ -92,15 +92,14 @@ export default function BillingSuccess() {
             </p>
             <button
               onClick={() => navigate('/home')}
-              className="w-full p-3 rounded-xl bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors font-medium"
+              className="auth-submit w-full p-3 font-semibold"
             >
               Continuar
             </button>
           </>
         )}
         </div>
-      </div>
+      </main>
     </ThemeProvider>
   )
 }
-

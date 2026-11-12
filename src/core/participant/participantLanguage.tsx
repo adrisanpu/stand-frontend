@@ -2,6 +2,61 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 
 type Language = 'es' | 'en'
 const translations: Record<string, string> = {
+  'Vista previa: no se envían emails ni se registran participantes.': 'Preview: no emails are sent and no participants are registered.',
+  'Revisa la dirección (máximo 300 caracteres).': 'Check the address (up to 300 characters).',
+  'Revisa la empresa (máximo 160 caracteres).': 'Check the company (up to 160 characters).',
+  'Revisa el cargo (máximo 160 caracteres).': 'Check the job title (up to 160 characters).',
+  'Introduce una fecha de nacimiento válida, no futura.': 'Enter a valid date of birth, not in the future.',
+  'Tu letra': 'Your letter',
+  'Letras reunidas': 'Collected letters',
+  'Reúne los códigos de tu grupo en este móvil para formar la palabra. Incluye tu código.': 'Collect your group’s codes on this phone to form the word. Include your code.',
+  '¡Palabra completada!': 'Word completed!',
+  'Se acabó el tiempo. Volved a reunir las letras.': 'Time is up. Collect the letters again.',
+  'Código de participante': 'Participant code',
+  'Comprobando…': 'Checking…',
+  'Reintentar acción': 'Retry action',
+  'Añadir letra': 'Add letter',
+  'Volver a empezar': 'Start over',
+  'En desarrollo': 'Under development',
+  'Fallos': 'Mistakes',
+  '¡Correcto!': 'Correct!',
+  'Respuesta incorrecta o fuera de tiempo.': 'Wrong answer or time expired.',
+  'Adivina la respuesta de': 'Guess the answer of',
+  'Estoy listo: empezar turno': 'I’m ready: start turn',
+  'Habéis llegado a tres fallos. Quiz terminado.': 'Three mistakes. Quiz finished.',
+  '¡Pareja validada!': 'Pair validated!',
+  'Introduce el código de tu pareja. Jugaréis por turnos en este móvil.': 'Enter your partner’s code. Take turns on this phone.',
+  'Tarjetas informativas': 'Information cards',
+  'Cargando tarjetas…': 'Loading cards…',
+  'Todavía no hay tarjetas disponibles.': 'No cards are available yet.',
+  'Tarjeta': 'Card',
+  'Navegar tarjetas': 'Navigate cards',
+  'Actualizar tarjetas': 'Refresh cards',
+  'No se pudo cargar el contenido multimedia. Puedes seguir leyendo las tarjetas.': 'Could not load the media. You can still read the cards.',
+  'Ese código no existe en esta partida.': 'That code does not exist in this game.',
+  'Ya has añadido ese código.': 'You have already added that code.',
+  'Esa letra no tiene un hueco libre en la palabra.': 'That letter has no empty slot in the word.',
+  'Introduce el código de otra persona.': 'Enter a different participant’s code.',
+  'Un participante ya está validado. Comprueba el estado recuperado.': 'A participant has already been validated. Check the recovered state.',
+  'La partida ha cambiado. Comprueba el estado recuperado y reintenta.': 'Your game has changed. Check the recovered state and retry.',
+  'Tu pareja debe completar el cuestionario primero.': 'Your partner must complete the questionnaire first.',
+  'Incluye tu código para completar la palabra.': 'Include your own code to complete the word.',
+  'El código debe tener cuatro dígitos.': 'The code must contain four digits.',
+  'Completa el cuestionario antes de jugar.': 'Complete the questionnaire before playing.',
+  'Las tarjetas no están disponibles. Reintenta más tarde.': 'Cards are unavailable. Try again later.',
+  'El turno sigue activo. Elige una respuesta.': 'The turn is still active. Choose an answer.',
+  'La partida ya ha terminado.': 'The game has already finished.',
+  'No se pudo recuperar el juego.': 'Could not recover the game.',
+  'No se pudo confirmar la acción.': 'Could not confirm the action.',
+  'No se pudo confirmar el cuestionario. Tus respuestas no se han descartado.': 'Could not confirm the questionnaire. Your answers have not been discarded.',
+  'Recargar cuestionario': 'Reload questionnaire',
+  'Cargando cuestionario…': 'Loading questionnaire…',
+  'Cuéntanos tu opinión': 'Tell us what you think',
+  'Enviar respuestas': 'Submit answers',
+  'Volver al juego': 'Back to game',
+  'Completa el cuestionario para participar en el sorteo.': 'Complete the questionnaire to enter the raffle.',
+  'Tu premio está reservado. Completa el cuestionario para recibirlo.': 'Your prize is reserved. Complete the questionnaire to receive it.',
+  'Responder cuestionario': 'Answer questionnaire',
   'Se está confirmando tu alta en el club. Espera el plazo indicado y reintenta con el mismo código verificado.': 'Your club registration is being confirmed. Wait for the indicated delay and retry with the same verified code.',
   'Tu email y teléfono corresponden a perfiles diferentes del club. Consulta al equipo del evento.': 'Your email and phone belong to different club profiles. Ask the event team.',
   'Tu teléfono coincide con una ficha del club con otro email o sin email. El organizador debe comprobar tu identidad antes de vincularla.': 'Your phone matches a club profile with a different or missing email. The organizer must verify your identity before linking it.',
@@ -269,8 +324,8 @@ const ParticipantLanguageContext = createContext<{
   setLanguage: () => {},
 })
 
-export function ParticipantLanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>('es')
+export function ParticipantLanguageProvider({ children, initialLanguage = 'es' }: { children: ReactNode; initialLanguage?: Language }) {
+  const [language, setLanguage] = useState<Language>(initialLanguage)
   const t = (text: string) => language === 'en' ? translations[text] ?? text : text
   return (
     <ParticipantLanguageContext.Provider value={{ language, t, setLanguage }}>

@@ -2,13 +2,14 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { fetchSharedPrizeCatalog, saveSharedPrizeCatalog, uploadSharedPrizeImage, type SharedPrize } from '../../api/sharedPrizeCatalog'
 import { validatePrizeImage } from '../../api/prizeMedia'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
-import SaveButton from '../ui/SaveButton'
+import { AdminIcon, AdminIconButton } from './AdminIcon'
 
 const fieldClass = 'h-9 min-w-0 rounded-lg border border-current/20 bg-surface px-3 text-sm'
 
 type CatalogControls = {
   catalog: SharedPrize[]
   actions: (id: string) => ReactNode
+  add: ReactNode
   editor?: { prizeId: string; content: ReactNode }
   busy: boolean
 }
@@ -124,10 +125,10 @@ export default function SharedPrizeCatalog({ onSaved, children, disabled = false
   const actions = (id: string) => {
     const prize = catalog.find(item => item.id === id)
     return <>
-      <button type="button" className="rounded-md px-2 py-1 text-sm underline" disabled={!prize || disabled || busy || !!draft}
-        onClick={() => { if (prize) edit(prize) }}>{t('Editar', 'Edit')}</button>
-      <button type="button" className="rounded-md px-2 py-1 text-sm text-red-400 underline" disabled={!prize || disabled || busy || !!draft}
-        onClick={() => { if (prize) void remove(prize.id) }}>{t('Eliminar', 'Remove')}</button>
+      <AdminIconButton icon="edit" label={t('Editar', 'Edit')} disabled={!prize || disabled || busy || !!draft}
+        onClick={() => { if (prize) edit(prize) }} />
+      <AdminIconButton icon="delete" tone="danger" label={t('Eliminar', 'Remove')} disabled={!prize || disabled || busy || !!draft}
+        onClick={() => { if (prize) void remove(prize.id) }} />
     </>
   }
 
@@ -141,8 +142,9 @@ export default function SharedPrizeCatalog({ onSaved, children, disabled = false
         onChange={event => setDraft(value => value ? { ...value, name: event.target.value } : value)} />
     </label>
     {draft.imageUrl && <img src={draft.imageUrl} alt="" className="h-9 w-9 object-contain" />}
-    <label className={`relative inline-flex cursor-pointer items-center justify-center px-3 ${fieldClass} ${busy ? 'opacity-50' : ''}`}>
-      <span>{draft.imageUrl ? t('Cambiar imagen', 'Change image') : t('Añadir imagen PNG', 'Add PNG image')}</span>
+    <label title={draft.imageUrl ? t('Cambiar imagen', 'Change image') : t('Añadir imagen PNG', 'Add PNG image')}
+      className={`relative inline-flex cursor-pointer items-center justify-center rounded-xl border border-current/20 p-2 ${busy ? 'opacity-50' : ''}`}>
+      <AdminIcon name="image" className="h-5 w-5" />
       <input className="absolute inset-0 w-full cursor-pointer opacity-0" type="file" accept=".png,image/png"
         aria-label={t('Imagen PNG', 'PNG image')} disabled={busy}
         onChange={async event => {
@@ -162,36 +164,26 @@ export default function SharedPrizeCatalog({ onSaved, children, disabled = false
           }
         }} />
     </label>
-    <SaveButton type="submit" disabled={busy}>{t('Guardar', 'Save')}</SaveButton>
-    <button type="button" className="rounded-lg border border-current/20 px-3 py-2 text-sm"
-      disabled={busy} onClick={() => setDraft(null)}>{t('Cancelar', 'Cancel')}</button>
+    <AdminIconButton type="submit" icon="confirm" tone="primary" small label={t('Guardar', 'Save')} disabled={busy} />
+    <AdminIconButton icon="cancel" small label={t('Cancelar', 'Cancel')} disabled={busy} onClick={() => setDraft(null)} />
   </form>
 
   return <section aria-label={t('Catálogo e inventario de premios', 'Prize catalog and inventory')} className="mt-6">
     {loading && <p role="status">{t('Cargando catálogo…', 'Loading catalog…')}</p>}
     {error && <div role="alert" className="mb-3 flex flex-wrap items-center gap-3">
       <p>{error}</p>
-      {!loading && !draft && <button type="button" className="underline" onClick={() => setReload(value => value + 1)}>
-        {t('Recargar', 'Reload')}
-      </button>}
+      {!loading && !draft && <AdminIconButton icon="reload" small label={t('Recargar', 'Reload')}
+        onClick={() => setReload(value => value + 1)} />}
     </div>}
     {message && <p role="status" className="mb-3 text-sm text-textSub">{message}</p>}
     {!loading && <>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-current/10 pb-3">
-        <p className="text-sm text-textSub">{t(
-          'Premios y stock compartidos por todas las partidas. Gestiona cada ficha, su saldo y su historial desde la misma lista.',
-          'Prizes and stock shared across events. Manage each prize, its balance and history from the same list.',
-        )}</p>
-        <button type="button" className="rounded-lg border border-current/20 px-3 py-2 text-sm"
-          disabled={disabled || busy || !!draft} onClick={() => edit()}>
-          {t('Añadir premio', 'Add prize')}
-        </button>
-      </div>
       {creating && editor}
       {catalog.length === 0 && !draft && <p className="py-4 text-sm text-textSub">
         {t('Aún no hay premios. Añade una ficha para poder asignarla a las partidas.', 'No prizes yet. Add a prize detail to assign it to events.')}
       </p>}
       {children({ catalog, actions, busy: busy || !!draft,
+        add: <AdminIconButton icon="create" tone="primary" label={t('Añadir premio', 'Add prize')}
+          disabled={disabled || busy || !!draft} onClick={() => edit()} />,
         editor: draft && !creating ? { prizeId: draft.id, content: editor } : undefined })}
     </>}
   </section>

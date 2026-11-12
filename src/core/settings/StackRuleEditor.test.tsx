@@ -70,6 +70,17 @@ it('offers existing ranking conditions and validates inclusive score bounds', ()
   expect(screen.getByRole('button', { name: 'Guardar condiciones' })).toBeDisabled()
 })
 
+it('shows conditions as a table and toggles the selected rule prize sub-table', () => {
+  render(<Harness />)
+  expect(screen.getByRole('table', { name: 'Condiciones' })).toBeInTheDocument()
+  expect(screen.getByRole('radio', { name: 'Seleccionar regla 1' })).toBeChecked()
+  expect(screen.getByRole('region', { name: 'Premios de la regla 1' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('radio', { name: 'Seleccionar regla 1' }))
+  expect(screen.queryByRole('region', { name: 'Premios de la regla 1' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Añadir regla' }))
+  expect(screen.getByRole('region', { name: 'Premios de la regla 2' })).toBeInTheDocument()
+})
+
 it('does not offer manual raffles on a plan without raffles', () => {
   render(<Harness raffles={false} />)
   expect(screen.queryByRole('option', { name: 'gane un sorteo' })).not.toBeInTheDocument()

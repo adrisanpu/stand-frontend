@@ -1,5 +1,4 @@
 import type { GameDefinition } from '../../core/types'
-import Rulet4GameScreen from './GameScreen'
 import Rulet4GameConfig from './GameConfig'
 
 export const rulet4Definition: GameDefinition = {
@@ -21,9 +20,7 @@ export const rulet4Definition: GameDefinition = {
     clientLogo: '/client-logo.png', // can reuse an existing one if needed
     standLogo: '/images/logo-stand-footer.png',
   },
-  GameScreen: Rulet4GameScreen,
   showRanking: false,
   // NEW (see section 2): per-game configuration component
   GameConfigComponent: Rulet4GameConfig,
 }
-

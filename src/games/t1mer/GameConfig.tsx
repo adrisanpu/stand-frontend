@@ -5,6 +5,7 @@ import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/sett
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
+import { useMechanicsDraft } from '../useMechanicsDraft'
 
 interface GameDataResponse {
   ok: boolean
@@ -16,16 +17,17 @@ interface GameDataResponse {
   }
 }
 
-export default function T1merGameConfig({ gameId, gameName: _gameName, onChange, registerSave }: GameConfigProps) {
+export default function T1merGameConfig({ gameId, gameName: _gameName, settingsLoaded, onChange, onDraftChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   const [emailRequired, setEmailRequired] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState('')
-  const [loaded, setLoaded] = useState(!gameId)
+  const [loaded, setLoaded] = useState(settingsLoaded || !gameId)
   const [loadError, setLoadError] = useState('')
+  useMechanicsDraft(loaded ? { emailRequired } : null, onDraftChange)
 
   useEffect(() => {
-    if (!gameId) return
+    if (!gameId || settingsLoaded) return
     let cancelled = false
     setLoaded(false)
     setLoadError('')
@@ -44,7 +46,7 @@ export default function T1merGameConfig({ gameId, gameName: _gameName, onChange,
     return () => {
       cancelled = true
     }
-  }, [gameId])
+  }, [gameId, settingsLoaded])
 
   const validate = () => (loaded ? null : loadError || t('La configuración del juego aún se está cargando.', 'The game configuration is still loading.'))
 

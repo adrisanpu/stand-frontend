@@ -3,6 +3,7 @@ import { publicApi } from '../../api/publicApi'
 import { loadAssignment, savePlayerSession } from '../../core/participant/playerSession'
 import { useParticipantLanguage } from '../../core/participant/participantLanguage'
 import ProfileAvatar from '../../core/widgets/ProfileAvatar'
+import { formatTimer, timerDifference } from './timerLogic'
 
 type GameState = 'preparing' | 'playing' | 'hidden' | 'finished'
 
@@ -10,13 +11,6 @@ type Props = {
   gameId: string
   playerToken: string
   onFinished: (result: { time: number; difference: number; rank: number | null }) => void
-}
-
-function formatTimer(seconds: number): string {
-  const totalSeconds = Math.floor(seconds)
-  const centiseconds = Math.floor((seconds % 1) * 100)
-  const milliseconds = Math.floor(((seconds % 1) * 1000) % 10)
-  return `${String(totalSeconds).padStart(2, '0')}:${String(centiseconds).padStart(2, '0')}.${String(milliseconds)}`
 }
 
 export default function T1merParticipantPlay({ gameId, playerToken, onFinished }: Props) {
@@ -63,7 +57,7 @@ export default function T1merParticipantPlay({ gameId, playerToken, onFinished }
   const handleStop = async () => {
     if (gameState !== 'playing' && gameState !== 'hidden') return
     const finalTime = (Date.now() - startTimeRef.current) / 1000
-    const difference = Math.abs(finalTime - 10.0)
+    const difference = timerDifference(finalTime)
     setGameState('finished')
     setSubmitting(true)
     setError(null)

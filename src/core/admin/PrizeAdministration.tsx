@@ -4,10 +4,8 @@ import { useState } from 'react'
 
 export default function PrizeAdministration() {
   const [inventoryVersion, setInventoryVersion] = useState(0)
-  const [inventoryBlocked, setInventoryBlocked] = useState(false)
-  return <SharedPrizeCatalog disabled={inventoryBlocked} onSaved={() => setInventoryVersion(value => value + 1)}>
-    {({ catalog, actions, editor, busy }) => <PrizeInventory catalogVersion={inventoryVersion}
-      catalog={catalog} catalogActions={actions} catalogEditor={editor} catalogBusy={busy}
-      onBlockedChange={setInventoryBlocked} />}
+  return <SharedPrizeCatalog onSaved={() => setInventoryVersion(value => value + 1)}>
+    {({ catalog, actions, add, editor, busy }) => <PrizeInventory catalogVersion={inventoryVersion}
+      catalog={catalog} catalogActions={actions} catalogAdd={add} catalogEditor={editor} catalogBusy={busy} />}
   </SharedPrizeCatalog>
 }

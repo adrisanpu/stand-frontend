@@ -5,6 +5,7 @@ import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/sett
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
+import { useMechanicsDraft } from '../useMechanicsDraft'
 
 export type Empareja2Settings = {
   numPairs?: number
@@ -23,7 +24,7 @@ interface GameDataResponse {
   empareja2CatalogPairCount?: number
 }
 
-export default function Empareja2GameConfig({ gameId, gameName: _gameName, settings, settingsLoaded, onChange, registerSave }: GameConfigProps) {
+export default function Empareja2GameConfig({ gameId, gameName: _gameName, settings, settingsLoaded, onChange, onDraftChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   const [numPairsInput, setNumPairsInput] = useState<string>(
     (settings as Empareja2Settings | null)?.numPairs != null
@@ -37,6 +38,10 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
   const [loaded, setLoaded] = useState(settingsLoaded || !gameId)
   const [loadError, setLoadError] = useState('')
   const storedNumPairs = (settings as Empareja2Settings | null)?.numPairs
+  useMechanicsDraft(loaded ? {
+    numPairs: numPairsInput.trim() === '' ? catalogPairCount ?? 50 : Number(numPairsInput),
+    catalogPairCount,
+  } : null, onDraftChange)
 
   useEffect(() => {
     if (storedNumPairs != null) setNumPairsInput(String(storedNumPairs))

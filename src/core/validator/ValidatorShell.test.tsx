@@ -76,3 +76,10 @@ it('does not show a prize when redemption fails', async () => {
   expect(await screen.findByText('Este premio ya se había entregado.')).toBeInTheDocument()
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
 })
+
+it('does not mistake a required survey for an already collected prize', async () => {
+  vi.mocked(publicApi.redeem).mockRejectedValue(Object.assign(new Error('QuizRequired'), { status: 409 }))
+  renderValidator()
+  expect(await screen.findByText('El participante debe completar el cuestionario antes de recibir el premio.')).toBeInTheDocument()
+  expect(screen.queryByText('Este premio ya se había entregado.')).not.toBeInTheDocument()
+})

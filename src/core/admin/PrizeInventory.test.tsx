@@ -3,33 +3,28 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { StrictMode } from 'react'
 import { prizeInventoryApi, type PrizeInventory as Inventory } from '../../api/prizeInventory'
 import { OperatorLanguageProvider } from '../shell/operatorLanguage'
+import { saveGamePrizeCap } from '../../api/prizeGameCaps'
 import PrizeInventory from './PrizeInventory'
 
+vi.mock('../../api/prizeGameCaps', () => ({ saveGamePrizeCap: vi.fn() }))
 vi.mock('../../api/prizeInventory', () => ({
-  prizeInventoryApi: { get: vi.fn(), change: vi.fn(), movements: vi.fn(), importHistory: vi.fn(), activate: vi.fn() },
+  prizeInventoryApi: { get: vi.fn(), movements: vi.fn(), importHistory: vi.fn(), removeKivlyPrize: vi.fn() },
 }))
 let data: Inventory
 beforeEach(() => {
   vi.resetAllMocks()
   data = {
-    ok: true, mode: 'legacy', unresolved: 0, imports: { event: true },
+    ok: true, mode: 'reservations', unresolved: 0, imports: { event: true },
     catalog: [
       { id: 'gift', name: 'Gift', source: 'stand', games: [{ gameId: 'event', name: 'Event One', active: true, limit: 5 }],
         inventory: { initialized: true, available: 0, assigned: 3, historicalAssigned: 7, redeemed: 1, historicalRedeemed: 2, revision: 4 },
-        canjeados: 3 },
+        canjeados: 3, reservation: { total: 10, available: 0, assigned: 10, redeemed: 3, error: null } },
       { id: 'coffee', name: 'Coffee', source: 'kivly', games: [],
         inventory: { initialized: false, available: 0, assigned: 0, historicalAssigned: 0, redeemed: 0, historicalRedeemed: 0, revision: 0 },
-        canjeados: null },
+        canjeados: null, reservation: { total: 0, available: 0, assigned: 0, redeemed: null, error: null } },
     ],
   }
   vi.mocked(prizeInventoryApi.get).mockImplementation(async () => structuredClone(data))
-  vi.mocked(prizeInventoryApi.change).mockImplementation(async payload => {
-    const prize = data.catalog.find(item => item.id === payload.prizeId)!
-    prize.inventory = { ...prize.inventory, initialized: true, revision: payload.expectedRevision + 1,
-      available: payload.action === 'initialize' ? payload.quantity : prize.inventory.available + payload.quantity }
-    return structuredClone(prize.inventory)
-  })
-  vi.mocked(prizeInventoryApi.activate).mockImplementation(async () => { data.mode = 'active' })
   vi.mocked(prizeInventoryApi.movements).mockResolvedValue({ ok: true, items: [], cursor: null })
 })
 afterEach(cleanup)
@@ -38,205 +33,149 @@ async function row(name: string) {
   return within((await screen.findByRole('rowheader', { name })).closest('tr')!)
 }
 async function selectPrize(name: string) {
-  fireEvent.click(await screen.findByRole('radio', { name: `Seleccionar ${name}` }))
+  const radio = await screen.findByRole('radio', { name: `Seleccionar ${name}` })
+  fireEvent.click(radio.closest('tr')!)
 }
-async function openStock(name = 'Gift') {
+it('deletes an uninitialized unused Kivly prize from both catalogs after confirmation', async () => {
+  vi.mocked(prizeInventoryApi.removeKivlyPrize).mockImplementation(async id => {
+    data.catalog = data.catalog.filter(item => item.id !== id)
+  })
   mount()
-  await selectPrize(name)
-  fireEvent.click(screen.getByRole('button', { name: 'Gestionar saldo' }))
-}
-function draft(quantity = '2', reason = 'Physical count') {
-  fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: quantity } })
-  fireEvent.change(screen.getByLabelText('Motivo obligatorio'), { target: { value: reason } })
-}
-const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }))
+  await selectPrize('Coffee')
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar de STAND y Kivly' }))
+  expect(prizeInventoryApi.removeKivlyPrize).not.toHaveBeenCalled()
+  expect(screen.getByRole('alertdialog')).toHaveTextContent('catálogo de Kivly')
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar eliminación' }))
+  await waitFor(() => expect(screen.queryByRole('rowheader', { name: 'Coffee' })).not.toBeInTheDocument())
+  expect(prizeInventoryApi.removeKivlyPrize).toHaveBeenCalledTimes(1)
+  expect(prizeInventoryApi.removeKivlyPrize).toHaveBeenCalledWith('coffee')
+})
 
-it('distinguishes initialized zero, unknown Kivly, explicit redemptions, historical totals and active caps', async () => {
+it.each(['linked', 'initialized', 'history'] as const)('protects Kivly prizes with %s', async state => {
+  const coffee = data.catalog[1]
+  if (state === 'linked') coffee.games = [{ gameId: 'old', name: 'Old', active: false, limit: null }]
+  if (state === 'initialized') coffee.inventory.initialized = true
+  if (state === 'history') coffee.inventory.historicalAssigned = 1
+  mount()
+  await selectPrize('Coffee')
+  expect(screen.getByRole('button', { name: 'Eliminar de STAND y Kivly' })).toBeDisabled()
+  expect(prizeInventoryApi.removeKivlyPrize).not.toHaveBeenCalled()
+})
+
+it('requires a manual inventory refresh before retrying an uncertain deletion', async () => {
+  vi.mocked(prizeInventoryApi.removeKivlyPrize).mockRejectedValue(new Error('Network failed'))
+  mount()
+  await selectPrize('Coffee')
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar de STAND y Kivly' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar eliminación' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Actualiza el inventario antes de reintentar')
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+  expect(screen.getByRole('button', { name: 'Eliminar de STAND y Kivly' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Actualizar inventario' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Eliminar de STAND y Kivly' })).toBeEnabled())
+})
+it('shows read-only stock, a distribution bar and linked event counts', async () => {
   mount()
   const gift = await row('Gift')
   expect(screen.getAllByRole('columnheader').map(cell => cell.textContent)).toEqual([
-    'Selección', 'Foto', 'Nombre', 'Origen', 'Stock', 'Disponibles', 'Canjeados', 'Repartidos', 'Partidas',
+    'Selección', 'Foto', 'Nombre', 'Origen', 'Stock', 'Distribución', 'Partidas',
   ])
-  expect(gift.getAllByRole('cell')[3]).toHaveTextContent(/^7$/)
-  expect(gift.getAllByRole('cell')[4]).toHaveTextContent(/^0$/)
-  expect(gift.getAllByRole('cell')[5]).toHaveTextContent(/^3$/)
-  expect(gift.getAllByRole('cell')[6]).toHaveTextContent(/^10$/)
-  fireEvent.click(gift.getByText('Ver partidas (1)'))
-  expect(gift.getByText('Event One · 5')).toBeInTheDocument()
-  expect(gift.queryByText(/Canjeados históricos/)).not.toBeInTheDocument()
+  expect(gift.getAllByRole('cell')[3]).toHaveTextContent(/^10$/)
+  expect(gift.getByRole('img', { name: 'Disponible: 0 (0%) · Repartido: 7 (70%) · Canjeado: 3 (30%)' })).toBeInTheDocument()
+  expect(gift.getAllByRole('cell')[5]).toHaveTextContent(/^1$/)
+  const coffee = await row('Coffee')
+  expect(coffee.getAllByRole('cell')[3]).toHaveTextContent(/^0$/)
+  expect(coffee.getAllByRole('cell')[4]).toHaveTextContent('0')
+  expect(coffee.getAllByRole('cell')[5]).toHaveTextContent('Ninguna')
+  expect(screen.queryByText(/Modo anterior: cada partida conserva/)).not.toBeInTheDocument()
   await selectPrize('Gift')
+  expect(gift.queryByRole('textbox')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Ver movimientos' }))
   expect(screen.getByText(/Canjeados históricos/)).toHaveTextContent('Repartidos históricos: 7')
-  const coffee = await row('Coffee')
-  expect(coffee.getAllByRole('cell')[3]).toHaveTextContent('Desconocido')
-  expect(coffee.getAllByRole('cell')[4]).toHaveTextContent('Sin inicializar')
-  expect(coffee.getAllByRole('cell')[5]).toHaveTextContent('Desconocido')
-  expect(screen.getByText(/Modo anterior: cada partida conserva/)).toBeInTheDocument()
 })
 
-it('opens one compact detail immediately below its prize and switches between prizes', async () => {
+it.each(['focus', 'visibilitychange'])('refreshes event sub-stocks automatically on %s', async event => {
+  data.catalog[0].reservation = { total: 5, available: 5, assigned: 0, redeemed: 0, error: null }
   mount()
   await selectPrize('Gift')
-  fireEvent.click(screen.getByRole('button', { name: 'Gestionar saldo' }))
+  data.catalog[0].games[0].limit = 12
+  data.catalog[0].games[0].remaining = 12
+  data.catalog[0].games[0].assigned = 0
+  data.catalog[0].reservation = { total: 12, available: 12, assigned: 0, redeemed: 0, error: null }
+  if (event === 'focus') fireEvent.focus(window)
+  else fireEvent(document, new Event('visibilitychange'))
+  await waitFor(() => expect(within(screen.getByRole('rowheader', { name: 'Gift' }).closest('tr')!)
+    .getAllByRole('cell')[3]).toHaveTextContent(/^12$/))
+  const allocation = within(screen.getByRole('table', { name: 'Reparto por partida' }))
+  expect(within(allocation.getByRole('rowheader', { name: 'Event One' }).closest('tr')!)
+    .getAllByRole('cell')[1]).toHaveTextContent(/^12$/)
+})
+
+it('keeps the latest reservations when automatic refresh responses arrive out of order', async () => {
+  mount()
+  await row('Gift')
+  let resolveOlder!: (value: Inventory) => void
+  vi.mocked(prizeInventoryApi.get).mockImplementationOnce(() => new Promise(resolve => { resolveOlder = resolve }))
+  const older = structuredClone(data)
+  fireEvent.focus(window)
+  data.catalog[0].reservation = { total: 12, available: 12, assigned: 0, redeemed: 0, error: null }
+  fireEvent.focus(window)
+  const stockCell = () => within(screen.getByRole('rowheader', { name: 'Gift' }).closest('tr')!).getAllByRole('cell')[3]
+  await waitFor(() => expect(stockCell()).toHaveTextContent(/^12$/))
+  await act(async () => { resolveOlder(older) })
+  expect(stockCell()).toHaveTextContent(/^12$/)
+})
+
+it('reports an automatic refresh failure and removes listeners on unmount', async () => {
+  const { unmount } = mount()
+  await row('Gift')
+  vi.mocked(prizeInventoryApi.get).mockRejectedValueOnce(new Error('Refresh failed'))
+  fireEvent.focus(window)
+  expect(await screen.findByRole('alert')).toHaveTextContent('Refresh failed')
+  const calls = vi.mocked(prizeInventoryApi.get).mock.calls.length
+  unmount()
+  fireEvent.focus(window)
+  expect(prizeInventoryApi.get).toHaveBeenCalledTimes(calls)
+})
+
+it('shows read-only sub-stocks with a per-event chart below the selected row; a second click closes it', async () => {
+  Object.assign(data.catalog[0].games[0], { assigned: 3, remaining: 2, redeemed: 1 })
+  data.catalog[0].games.push({ gameId: 'old', name: 'Old event', active: false, limit: 15, remaining: 15, assigned: 0, redeemed: 0 })
+  vi.mocked(prizeInventoryApi.movements).mockResolvedValue({ ok: true, cursor: null, items: [
+    { key: 'a', prizeId: 'gift', kind: 'assignment', quantity: 3, historical: false, createdAt: '2026-01-01', gameId: 'event',
+      units: { u1: { state: 'delivered', condition: 'ranking' }, u2: { state: 'available', condition: 'ranking' } } },
+  ] })
+  mount()
+  await selectPrize('Gift')
   const giftRow = screen.getByRole('rowheader', { name: 'Gift' }).closest('tr')!
-  expect(giftRow.nextElementSibling).toContainElement(screen.getByRole('region', { name: 'Detalle: Gift' }))
-  expect(screen.getByRole('button', { name: 'Gestionar saldo' })).toHaveAttribute('aria-expanded', 'true')
+  const detail = screen.getByRole('region', { name: 'Detalle: Gift' })
+  expect(giftRow.nextElementSibling).toContainElement(detail)
+  expect(await within(detail).findByRole('img', { name: 'Disponible: 2 (40%) · Repartido: 2 (40%) · Canjeado: 1 (20%)' })).toBeInTheDocument()
+  expect(within(detail).getByRole('img', { name: 'Disponible: 15 (100%) · Repartido: 0 (0%) · Canjeado: 0 (0%)' })).toBeInTheDocument()
+  expect(within(detail).getByText('Inactiva')).toBeInTheDocument()
+  const event = within(within(detail).getByRole('rowheader', { name: 'Event One' }).closest('tr')!)
+  expect(event.getAllByRole('cell')[1]).toHaveTextContent(/^5$/)
+  expect(within(detail).queryByRole('textbox')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Guardar reparto' })).not.toBeInTheDocument()
+  expect(saveGamePrizeCap).not.toHaveBeenCalled()
+  expect(prizeInventoryApi.movements).not.toHaveBeenCalled()
   await selectPrize('Coffee')
-  fireEvent.click(screen.getByRole('button', { name: 'Ver movimientos' }))
   expect(screen.queryByRole('region', { name: 'Detalle: Gift' })).not.toBeInTheDocument()
-  expect(screen.getByRole('region', { name: 'Detalle: Coffee' })).toBeInTheDocument()
-  expect(screen.queryByLabelText('Cantidad')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle' }))
+  expect(screen.getByRole('region', { name: 'Detalle: Coffee' })).toHaveTextContent('no está asignado a ninguna partida')
+  await selectPrize('Coffee')
   expect(screen.queryByRole('region', { name: 'Detalle: Coffee' })).not.toBeInTheDocument()
 })
 
-it('keeps all linked games informational, including inactive games and unlimited caps', async () => {
-  data.catalog[0].games.push({ gameId: 'old', name: 'Old event', active: false, limit: null })
-  mount()
-  const gift = await row('Gift')
-  const summary = gift.getByText('Ver partidas (2)')
-  expect(summary.closest('details')).not.toHaveAttribute('open')
-  fireEvent.click(summary)
-  expect(summary.closest('details')).toHaveAttribute('open')
-  expect(gift.getByText('Activa')).toBeInTheDocument()
-  expect(gift.getByText('Inactiva')).toBeInTheDocument()
-  expect(gift.getByText('Old event · Sin límite')).toBeInTheDocument()
-  expect(gift.queryByRole('combobox')).not.toBeInTheDocument()
-})
-
 it.each(['uninitialized', 'pending-history', 'invalid-counters'] as const)(
-  'does not invent physical stock for %s', async state => {
+  'uses event reservations independently of legacy %s', async state => {
     if (state === 'uninitialized') data.catalog[0].inventory.initialized = false
     if (state === 'pending-history') data.unresolved = 1
     if (state === 'invalid-counters') data.catalog[0].canjeados = 11
     mount()
     const gift = await row('Gift')
-    expect(gift.getAllByRole('cell')[3]).toHaveTextContent(state === 'uninitialized' ? 'Sin inicializar' : 'Desconocido')
-    if (state === 'invalid-counters') {
-      await selectPrize('Gift')
-      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Ver movimientos' })) })
-      expect(screen.getByRole('alert')).toHaveTextContent('Los canjes superan los repartos registrados')
-    }
+    expect(gift.getAllByRole('cell')[3]).toHaveTextContent(/^10$/)
   },
 )
-
-it('keeps an uncertain stock request mounted until it is retried or edited', async () => {
-  vi.mocked(prizeInventoryApi.change).mockRejectedValueOnce(new Error('Response lost'))
-  await openStock()
-  draft(); submit()
-  await screen.findByRole('alert')
-  expect(screen.getByRole('button', { name: 'Cerrar detalle' })).toBeDisabled()
-  expect(screen.getByRole('radio', { name: 'Seleccionar Coffee' })).toBeDisabled()
-  expect(screen.getByRole('button', { name: 'Ver movimientos' })).toBeDisabled()
-  draft('3')
-  expect(screen.getByRole('button', { name: 'Cerrar detalle' })).toBeEnabled()
-})
-
-it('keeps the identical payload and requestId after uncertain failure even when summary refreshes', async () => {
-  vi.mocked(prizeInventoryApi.change).mockRejectedValueOnce(new Error('Network interrupted'))
-  await openStock()
-  draft()
-  submit()
-  expect(await screen.findByRole('alert')).toHaveTextContent('Resultado no confirmado')
-  const first = vi.mocked(prizeInventoryApi.change).mock.calls[0][0]
-  expect(first).toMatchObject({ action: 'replenish', quantity: 2, reason: 'Physical count', expectedRevision: 4 })
-  data.catalog[0].inventory.revision = 8
-  fireEvent.click(screen.getByRole('button', { name: 'Actualizar inventario' }))
-  await waitFor(() => expect(prizeInventoryApi.get).toHaveBeenCalledTimes(2))
-  fireEvent.click(screen.getByRole('button', { name: 'Reintentar operación' }))
-  await screen.findByText('Operación confirmada.')
-  expect(vi.mocked(prizeInventoryApi.change).mock.calls[1][0]).toEqual(first)
-  expect(first.requestId).toBeTruthy()
-})
-
-it('creates a new request only after the user edits the draft', async () => {
-  vi.mocked(prizeInventoryApi.change).mockRejectedValueOnce(new Error('Network interrupted'))
-  await openStock()
-  draft()
-  submit()
-  await screen.findByRole('alert')
-  const first = vi.mocked(prizeInventoryApi.change).mock.calls[0][0]
-  draft('3')
-  submit()
-  await screen.findByText('Operación confirmada.')
-  const second = vi.mocked(prizeInventoryApi.change).mock.calls[1][0]
-  expect(second.quantity).toBe(3)
-  expect(second.requestId).not.toBe(first.requestId)
-})
-
-it('retries an uncertain signed adjustment unchanged even if refreshed stock is already reduced', async () => {
-  data.catalog[0].inventory.available = 5
-  vi.mocked(prizeInventoryApi.change).mockRejectedValueOnce(new Error('Response lost'))
-  await openStock()
-  fireEvent.change(screen.getByLabelText('Operación'), { target: { value: 'adjust' } })
-  draft('-5'); submit()
-  await screen.findByRole('alert')
-  const first = vi.mocked(prizeInventoryApi.change).mock.calls[0][0]
-  data.catalog[0].inventory.available = 0
-  data.catalog[0].inventory.revision = 5
-  vi.mocked(prizeInventoryApi.change).mockResolvedValueOnce(data.catalog[0].inventory)
-  fireEvent.click(screen.getByRole('button', { name: 'Actualizar inventario' }))
-  await waitFor(() => expect(prizeInventoryApi.get).toHaveBeenCalledTimes(2))
-  fireEvent.click(screen.getByRole('button', { name: 'Reintentar operación' }))
-  await screen.findByText('Operación confirmada.')
-  expect(vi.mocked(prizeInventoryApi.change).mock.calls[1][0]).toEqual(first)
-})
-
-it('requires a reload after a revision conflict and uses the refreshed revision', async () => {
-  vi.mocked(prizeInventoryApi.change).mockRejectedValueOnce(Object.assign(new Error('Revision conflict'), { status: 409 }))
-  await openStock()
-  draft(); submit()
-  await screen.findByRole('alert')
-  expect(screen.getByLabelText('Cantidad')).toBeDisabled()
-  expect(screen.getByRole('button', { name: 'Reintentar operación' })).toBeDisabled()
-  data.catalog[0].inventory.revision = 9
-  fireEvent.click(screen.getByRole('button', { name: 'Recargar saldos' }))
-  await waitFor(() => expect(screen.getByLabelText('Cantidad')).toBeEnabled())
-  draft(); submit()
-  await screen.findByText('Operación confirmada.')
-  expect(vi.mocked(prizeInventoryApi.change).mock.calls[1][0].expectedRevision).toBe(9)
-})
-
-it('initializes current physical stock with zero even with no active games', async () => {
-  await openStock('Coffee')
-  draft('0')
-  submit()
-  await screen.findByText('Operación confirmada.')
-  expect(prizeInventoryApi.change).toHaveBeenCalledWith(expect.objectContaining({ action: 'initialize', prizeId: 'coffee', quantity: 0 }))
-  expect(screen.getByLabelText('Operación')).toHaveValue('replenish')
-})
-
-it('rejects missing reasons, zero replenish and adjustments below zero; accepts signed adjustments', async () => {
-  data.catalog[0].inventory.available = 5
-  await openStock()
-  draft('2', ' ')
-  submit()
-  await screen.findByRole('alert')
-  draft('0')
-  submit()
-  expect(prizeInventoryApi.change).not.toHaveBeenCalled()
-  fireEvent.change(screen.getByLabelText('Operación'), { target: { value: 'adjust' } })
-  for (const invalid of ['-6', '-1.5', 'NaN', 'Infinity', '9007199254740992']) {
-    draft(invalid)
-    submit()
-    expect(prizeInventoryApi.change).not.toHaveBeenCalled()
-  }
-  draft('-5')
-  submit()
-  await screen.findByText('Operación confirmada.')
-  expect(prizeInventoryApi.change).toHaveBeenCalledWith(expect.objectContaining({ action: 'adjust', quantity: -5 }))
-})
-
-it('does not send another stock write when a confirmed write cannot refresh', async () => {
-  await openStock()
-  vi.mocked(prizeInventoryApi.get).mockRejectedValueOnce(new Error('Refresh failed'))
-  draft(); submit()
-  await screen.findByRole('alert')
-  expect(screen.getByRole('button', { name: 'Reintentar operación' })).toBeDisabled()
-  fireEvent.click(screen.getByRole('button', { name: 'Recargar saldos' }))
-  await waitFor(() => expect(screen.getByLabelText('Cantidad')).toBeEnabled())
-  expect(prizeInventoryApi.change).toHaveBeenCalledTimes(1)
-})
 
 it('paginates movements with retry and client filters that explicitly apply to loaded rows', async () => {
   vi.mocked(prizeInventoryApi.movements)
@@ -268,7 +207,7 @@ it('paginates movements with retry and client filters that explicitly apply to l
   expect(screen.queryByText('New shipment')).not.toBeInTheDocument()
 })
 
-it('automatically imports every page, retains failed cursors and keeps activation explicit', async () => {
+it('automatically imports every page and retains failed cursors without an activation step', async () => {
   data.imports.event = false
   vi.mocked(prizeInventoryApi.importHistory)
     .mockResolvedValueOnce({ ok: true, cursor: 'players:page-two+/=', unresolved: 0 })
@@ -279,19 +218,11 @@ it('automatically imports every page, retains failed cursors and keeps activatio
     })
 
   mount()
-  const activate = await screen.findByRole('button', { name: 'Activar inventario compartido' })
-  expect(activate).toBeDisabled()
   await screen.findByRole('alert')
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar importación' }))
-  await waitFor(() => expect(activate).toBeEnabled())
+  await waitFor(() => expect(screen.queryByLabelText('Histórico de premios')).not.toBeInTheDocument())
   expect(vi.mocked(prizeInventoryApi.importHistory).mock.calls).toEqual([['event', undefined], ['event', 'players:page-two+/='], ['event', 'players:page-two+/=']])
-  fireEvent.click(activate)
-  const dialog = screen.getByRole('dialog', { name: 'Confirmar activación' })
-  expect(dialog).toHaveTextContent('Los nuevos premios sin inicializar no se repartirán')
-  expect(prizeInventoryApi.activate).not.toHaveBeenCalled()
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar activación' }))
-  await screen.findByText(/Inventario compartido activo/)
-  expect(prizeInventoryApi.activate).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole('button', { name: 'Activar inventario compartido' })).not.toBeInTheDocument()
 })
 
 it('imports all response games including archived and empty catalogs, preserving a 140-character opaque cursor', async () => {
@@ -306,17 +237,15 @@ it('imports all response games including archived and empty catalogs, preserving
       return { ok: true, cursor: null, unresolved: 0 }
     })
   mount()
-  const activate = await screen.findByRole('button', { name: 'Activar inventario compartido' })
-  expect(screen.getByText('empty-catalog: Importación completa')).toBeInTheDocument()
-  expect(within(screen.getByLabelText('Histórico de premios')).queryByText(/Not an import target/)).not.toBeInTheDocument()
-  await waitFor(() => expect(activate).toBeEnabled())
+  await waitFor(() => expect(prizeInventoryApi.importHistory).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(screen.queryByLabelText('Histórico de premios')).not.toBeInTheDocument())
+  expect(screen.queryByLabelText('Histórico de premios')).not.toBeInTheDocument()
   expect(vi.mocked(prizeInventoryApi.importHistory).mock.calls).toEqual([
     ['archived-no-catalog', undefined], ['archived-no-catalog', cursor],
   ])
 })
 
 it('continues importing other games after one fails, including in active mode', async () => {
-  data.mode = 'active'
   data.imports = { event: false, archive: false, empty: false }
   vi.mocked(prizeInventoryApi.importHistory).mockImplementation(async (id, cursor) => {
     if (id === 'event') throw new Error('Unlinked historical prize')
@@ -332,7 +261,6 @@ it('continues importing other games after one fails, including in active mode', 
   expect(screen.getByText('archive: Importación completa')).toBeInTheDocument()
   expect(screen.getByText('empty: Importación completa')).toBeInTheDocument()
   expect(screen.queryByText('Históricos actualizados automáticamente.')).not.toBeInTheDocument()
-  expect(prizeInventoryApi.activate).not.toHaveBeenCalled()
 })
 
 it('stops at unresolved history without an automatic retry loop', async () => {
@@ -344,13 +272,13 @@ it('stops at unresolved history without an automatic retry loop', async () => {
   mount()
   await screen.findByRole('button', { name: 'Reintentar importación' })
   expect(prizeInventoryApi.importHistory).toHaveBeenCalledTimes(1)
-  expect(screen.getByRole('button', { name: 'Activar inventario compartido' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Activar inventario compartido' })).not.toBeInTheDocument()
   vi.mocked(prizeInventoryApi.importHistory).mockImplementationOnce(async () => {
     data.unresolved = 0; data.imports.event = true
     return { ok: true, cursor: null, unresolved: 0 }
   })
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar importación' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Activar inventario compartido' })).toBeEnabled())
+  await waitFor(() => expect(screen.queryByLabelText('Histórico de premios')).not.toBeInTheDocument())
   expect(vi.mocked(prizeInventoryApi.importHistory).mock.calls).toEqual([['event', undefined], ['event', undefined]])
 })
 
@@ -362,10 +290,50 @@ it('does not duplicate imports under StrictMode', async () => {
     return { ok: true, cursor: null, unresolved: 0 }
   })
   render(<StrictMode><OperatorLanguageProvider><PrizeInventory /></OperatorLanguageProvider></StrictMode>)
-  await screen.findByText('Event One: Importación completa')
+  await waitFor(() => expect(prizeInventoryApi.importHistory).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(screen.queryByLabelText('Histórico de premios')).not.toBeInTheDocument())
+  expect(screen.queryByLabelText('Histórico de premios')).not.toBeInTheDocument()
   expect(vi.mocked(prizeInventoryApi.importHistory).mock.calls).toEqual([
     ['event', undefined], ['event', 'players:'],
   ])
+})
+
+it('hides successful migration details and initialization instructions', async () => {
+  mount()
+  await row('Gift')
+  expect(screen.queryByText('Históricos actualizados automáticamente.')).not.toBeInTheDocument()
+  expect(screen.queryByText(/Estado por partida/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/Sin resolver: 0/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/inicializa todos los premios/)).not.toBeInTheDocument()
+})
+
+it('shows stock as summed exclusive reservations even without manual initialization', async () => {
+  data.catalog[0].inventory.initialized = false
+  data.catalog[0].games = [
+    { gameId: 'event', name: 'Event One', active: true, limit: 10, assigned: 3, redeemed: 1, remaining: 7 },
+    { gameId: 'old', name: 'Old event', active: false, limit: 20, assigned: 2, redeemed: 1, remaining: 18 },
+  ]
+  data.catalog[0].reservation = { total: 30, available: 25, assigned: 5, redeemed: 2, error: null }
+  mount()
+  const gift = await row('Gift')
+  expect(gift.getAllByRole('cell')[3]).toHaveTextContent(/^30$/)
+  expect(gift.getByRole('img', { name: 'Disponible: 25 (83%) · Repartido: 3 (10%) · Canjeado: 2 (7%)' })).toBeInTheDocument()
+  await selectPrize('Gift')
+  const detail = screen.getByRole('region', { name: 'Detalle: Gift' })
+  expect(within(detail).getByRole('img', { name: 'Disponible: 7 (70%) · Repartido: 2 (20%) · Canjeado: 1 (10%)' })).toBeInTheDocument()
+  expect(within(detail).getByRole('img', { name: 'Disponible: 18 (90%) · Repartido: 1 (5%) · Canjeado: 1 (5%)' })).toBeInTheDocument()
+  expect(prizeInventoryApi.movements).not.toHaveBeenCalled()
+})
+
+it('reports missing reservation quantities instead of guessing a total', async () => {
+  data.catalog[0].reservation = { total: null, available: null, assigned: 0, redeemed: 0, error: 'EventReservationRequired' }
+  data.catalog[0].games[0].limit = null
+  mount()
+  const gift = await row('Gift')
+  expect(gift.getAllByRole('cell')[3]).toHaveTextContent('Define los substocks')
+  await selectPrize('Gift')
+  expect(screen.getByRole('alert')).toHaveTextContent('Define un substock numérico')
+  expect(screen.queryByText('Sin inicializar')).not.toBeInTheDocument()
 })
 
 it('imports games discovered during another import without automatically retrying failures', async () => {
@@ -422,24 +390,23 @@ it('does not start another page after leaving the panel', async () => {
   expect(prizeInventoryApi.importHistory).toHaveBeenCalledTimes(1)
 })
 
-it.each(['uninitialized', 'unresolved'] as const)('blocks activation for %s prerequisites', async condition => {
+it.each(['uninitialized', 'unresolved'] as const)('has no legacy activation for %s', async condition => {
   if (condition === 'uninitialized') data.catalog[0].inventory.initialized = false
   else data.unresolved = 1
   mount()
-  expect(await screen.findByRole('button', { name: 'Activar inventario compartido' })).toBeDisabled()
+  await row('Gift')
+  expect(screen.queryByRole('button', { name: 'Activar inventario compartido' })).not.toBeInTheDocument()
   if (condition === 'unresolved') {
     expect(screen.queryByText('Históricos actualizados automáticamente.')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Histórico de premios')).toHaveTextContent('Sin resolver: 1')
   }
 })
 
-it('reports load failures and supports reload without hiding an activation failure', async () => {
+it('reports load failures and supports reload', async () => {
   vi.mocked(prizeInventoryApi.get).mockRejectedValueOnce(new Error('Load failed'))
   mount()
   expect(await screen.findByRole('alert')).toHaveTextContent('Load failed')
   fireEvent.click(screen.getByRole('button', { name: 'Actualizar inventario' }))
-  fireEvent.click(await screen.findByRole('button', { name: 'Activar inventario compartido' }))
-  vi.mocked(prizeInventoryApi.activate).mockRejectedValueOnce(new Error('Activation failed'))
-  fireEvent.click(screen.getByRole('button', { name: 'Confirmar activación' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('Activation failed')
+  await row('Gift')
+  await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
 })

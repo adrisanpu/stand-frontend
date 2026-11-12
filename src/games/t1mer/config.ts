@@ -1,5 +1,4 @@
 import type { GameDefinition } from '../../core/types'
-import T1merGameScreen from './GameScreen'
 import T1merGameConfig from './GameConfig'
 
 export const t1merDefinition: GameDefinition = {
@@ -21,8 +20,6 @@ export const t1merDefinition: GameDefinition = {
     clientLogo: '/client-logo.png',
     standLogo: '/images/logo-stand-footer.png',
   },
-  GameScreen: T1merGameScreen,
   GameConfigComponent: T1merGameConfig,
   showRanking: true,
 }
-

@@ -1,15 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { PublicApiError, publicApi, type EmailChallengeResponse, type EmailRegistration, type EmailDetailsResponse, type ResumeEmailRequest, type PlayerAssignment, type PublicGameResponse } from '../../api/publicApi'
+import { PublicApiError, publicApi, type EmailChallengeResponse, type EmailRegistration, type EmailDetailsResponse, type ResumeEmailRequest, type PlayerAssignment, type PublicGameResponse, type ParticipantProfile } from '../../api/publicApi'
 import { savePlayerSession } from './playerSession'
 import { PARTICIPANT_PRIVACY_NOTICE, PRIVACY_POLICY_URL } from '../ui/gameLegalCopy'
 import { useParticipantLanguage } from './participantLanguage'
-import { resolveParticipantFields } from '../lib/participantFields'
+import { OPTIONAL_REGISTRATION_FIELDS, resolveParticipantFields } from '../lib/participantFields'
 import { PHONE_COUNTRIES, internationalPhone, splitInternationalPhone, type PhoneCountryCode } from './phoneCountries'
+import { FormHeader } from './FormPresentation'
 
 type Props = {
   gameId: string
   gameMeta: PublicGameResponse
   onJoined: (playerToken: string, photoUploadFailed?: boolean) => void
+  preview?: boolean
+}
+
+function isControlCharacter(character: string): boolean {
+  const codePoint = character.charCodeAt(0)
+  return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)
 }
 
 const verificationErrors: Record<string, string> = {
@@ -49,11 +56,15 @@ const verificationErrors: Record<string, string> = {
   missing_username: 'El nombre completo es obligatorio.',
   missing_phone: 'El teléfono es obligatorio.',
   invalid_phone: 'Introduce un teléfono válido.',
+  invalid_address: 'Revisa la dirección (máximo 300 caracteres).',
+  invalid_company: 'Revisa la empresa (máximo 160 caracteres).',
+  invalid_jobTitle: 'Revisa el cargo (máximo 160 caracteres).',
+  invalid_birthDate: 'Introduce una fecha de nacimiento válida, no futura.',
   player_limit_reached: 'El juego ha alcanzado el límite de participantes. Consulta al equipo del evento.',
 }
 const invalidChallenges = new Set(['VerificationRequired', 'VerificationExpired', 'VerificationAttemptsExceeded', 'VerificationSuperseded', 'VerificationUsed'])
 
-export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
+export default function JoinForm({ gameId, gameMeta, onJoined, preview = false }: Props) {
   const { language, t } = useParticipantLanguage()
   const pf = resolveParticipantFields(gameMeta.participantFields, gameMeta.gameType)
   const phoneEnabled = pf.phone.enabled
@@ -61,6 +72,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [phone, setPhone] = useState('')
+  const [profile, setProfile] = useState<ParticipantProfile>({})
   const [phoneCountry, setPhoneCountry] = useState<PhoneCountryCode>('ES')
   const [consent, setConsent] = useState(false)
   const [clubConsent, setClubConsent] = useState(false)
@@ -207,6 +219,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         return
       }
       setEmail(trimmedEmail)
+      if (preview) { setStep(2); return }
       if (cooldown > 0) return
       busy.current = true
       setLoading(true)
@@ -253,10 +266,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         return
       }
       const usernameCharacters = Array.from(trimmedUsername)
-      const hasControlCharacter = usernameCharacters.some((character) => {
-        const codePoint = character.codePointAt(0)!
-        return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)
-      })
+      const hasControlCharacter = usernameCharacters.some(isControlCharacter)
       if (showName && (usernameCharacters.length > 100 || hasControlCharacter)) {
         setError(verificationErrors.invalid_username)
         return
@@ -278,6 +288,18 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         setError(verificationErrors.KivlyConsentRequired)
         return
       }
+      for (const field of OPTIONAL_REGISTRATION_FIELDS) {
+        if (!pf[field.key].enabled) continue
+        const value = profile[field.key]?.trim() ?? ''
+        if (value && (Array.from(value).length > field.maxLength || Array.from(value).some(isControlCharacter)
+          || (field.key === 'birthDate' && (!/^\d{4}-\d{2}-\d{2}$/.test(value)
+            || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value
+            || value > new Date().toISOString().slice(0, 10))))) {
+          setError(verificationErrors[`invalid_${field.key}`])
+          return
+        }
+      }
+      if (preview) { setStep(3); return }
       if (cooldown > 0) return
     }
     if (step === 3 && (!challenge || expired || invalidChallenge || verificationCooldown > 0)) return
@@ -296,12 +318,16 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
         ...(showPhone ? { phone: fullPhone } : {}),
         ...(showConsent ? { consent } : {}),
         ...(showClubConsent && gameMeta.loyalty ? { loyaltyConsentVersion: gameMeta.loyalty.consentVersion } : {}),
+        ...Object.fromEntries(OPTIONAL_REGISTRATION_FIELDS.filter(({ key }) =>
+          pf[key].enabled && details.fields[key] && profile[key]?.trim()).map(({ key }) => [key, profile[key]!.trim()])),
       } : {
         gameId,
         email: email.trim(),
         username: trimmedUsername,
         ...(phoneEnabled && fullPhone ? { phone: fullPhone } : {}),
         consent,
+        ...Object.fromEntries(OPTIONAL_REGISTRATION_FIELDS.filter(({ key }) =>
+          pf[key].enabled && profile[key]?.trim()).map(({ key }) => [key, profile[key]!.trim()])),
         ...(gameMeta.loyalty ? { loyaltyConsentVersion: gameMeta.loyalty.consentVersion } : {}),
       }
       if (step === 2) {
@@ -350,7 +376,17 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
   const nameColumn = details?.existingPlayer ? 'col-start-1' : 'col-start-2'
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-4">
+    <form onSubmit={handleSubmit} noValidate className="participant-form space-y-4">
+      {gameMeta.formConfig && <FormHeader title={gameMeta.formConfig.registrationTitle}
+        description={gameMeta.formConfig.registrationDescription}
+        logoUrl={gameMeta.formLogoUrl} bannerUrl={gameMeta.formBannerUrl} />}
+      <div className="participant-step">
+        <p>{t('Paso de registro')} {step} / 3</p>
+        <div role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={step}
+          aria-valuetext={`${t('Paso de registro')} ${step} / 3`} className="participant-progress">
+          {[1, 2, 3].map(value => <span key={value} className={value <= step ? 'is-complete' : ''} />)}
+        </div>
+      </div>
       {step === 1 && <>
       <div>
         <label className="block text-sm mb-1" htmlFor="join-email">
@@ -450,6 +486,14 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
           maxLength={64} required={pf.phone.required} />
         </div>
       </div>}
+      {OPTIONAL_REGISTRATION_FIELDS.filter(({ key }) => pf[key].enabled
+        && (!details?.existingPlayer || details.fields[key])).map(field => <label key={field.key} className="block space-y-1 text-sm">
+        <span>{language === 'en' ? field.en : field.es}{t(' (opcional)')}</span>
+        <input type={field.type} autoComplete={field.autoComplete}
+          maxLength={field.maxLength} max={field.key === 'birthDate' ? new Date().toISOString().slice(0, 10) : undefined}
+          value={profile[field.key] ?? ''} onChange={event => setProfile(current => ({ ...current, [field.key]: event.target.value }))}
+          className="w-full rounded-2xl border border-white/20 bg-white/5 px-4 py-3" />
+      </label>)}
 
       {(showConsent || showClubConsent) && <label className="flex gap-3 rounded-xl border border-white/10 p-3 text-[13px] leading-relaxed text-textSub items-start">
         <input
@@ -486,6 +530,10 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
       </fieldset>
       </>}
 
+      {preview && step === 3 && <div className="space-y-3">
+        <p role="status">{t('Vista previa: no se envían emails ni se registran participantes.')}</p>
+        <button type="button" className="underline" onClick={() => { setStep(1); setError(null) }}>{t('Volver a empezar')}</button>
+      </div>}
       {step === 3 && challenge && <div className="space-y-3">
         <p role="status">{t('Código enviado a')}: {challenge.emailMasked}</p>
         <p className="text-sm text-textSub">{t('El código caduca en 10 minutos. Tienes 5 intentos.')}</p>
@@ -522,14 +570,14 @@ export default function JoinForm({ gameId, gameMeta, onJoined }: Props) {
 
       {step === 2 && <button type="button" disabled={loading} onClick={() => setStep(1)}
         className="w-full rounded-xl py-3 text-accent disabled:opacity-50">{t('Volver')}</button>}
-      <button
+      {(!preview || step !== 3) && <button
         type="submit"
         disabled={loading || (step !== 3 && cooldown > 0) || (step === 3 && (expired || invalidChallenge || verificationCooldown > 0))}
-        className="w-full rounded-2xl py-3.5 font-semibold text-primary bg-[rgba(var(--color-primary-rgb),0.25)] border border-[rgba(var(--color-primary-rgb),0.4)] disabled:opacity-50"
+        className="participant-primary-action w-full py-3.5 font-semibold text-primary bg-[rgba(var(--color-primary-rgb),0.25)] border border-[rgba(var(--color-primary-rgb),0.4)] disabled:opacity-50"
       >
         {t(loading ? (step !== 3 ? 'Enviando código...' : 'Registrando...')
           : step === 1 ? 'Continuar' : step === 2 ? 'Enviar código' : 'Verificar y empezar')}
-      </button>
+      </button>}
     </form>
   )
 }

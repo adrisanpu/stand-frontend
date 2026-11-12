@@ -8,6 +8,7 @@ import { GAME_ACCESS_CAPABILITIES, resolveGameAccess, type GameAccess } from './
 import { saveErrorMessage } from './gameConfigSave'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import KivlySettings, { useKivlyDraft } from './KivlySettings'
+import GameFormSettings from '../admin/GameFormSettings'
 
 export type GameConfigSavedPatch = Record<string, unknown> & GameAccess
 
@@ -35,12 +36,17 @@ export const GAME_CONFIG_SAVE_LABEL = 'Guardar y aplicar cambios'
  * footer button that persists everything together.
  */
 export default function GameConfigPanel({ gameId, gameDefinition, settings, onSettingsChange, onSaved, onSavingChange, registrationOnly = false }: Props) {
+  if (registrationOnly) return <GameFormSettings gameId={gameId} section="registration" onBusyChange={onSavingChange} />
+  return <GameMechanicsPanel gameId={gameId} gameDefinition={gameDefinition} settings={settings}
+    onSettingsChange={onSettingsChange} onSaved={onSaved} onSavingChange={onSavingChange} />
+}
+
+function GameMechanicsPanel({ gameId, gameDefinition, settings, onSettingsChange, onSaved, onSavingChange }: Props) {
   const { t } = useOperatorLanguage()
   const accessDraft = useGameAccessDraft(gameId, gameDefinition.id)
   const isStack = gameDefinition.id.toUpperCase() === 'STACK'
   const kivly = useKivlyDraft(gameId, isStack)
-  const participantFields = accessDraft.participantFields
-  const GameConfigComponent = registrationOnly ? undefined : gameDefinition.GameConfigComponent
+  const GameConfigComponent = gameDefinition.GameConfigComponent
   const rulesSaveRef = useRef<GameConfigSaveRegistration | null>(null)
   const savingRef = useRef(false)
   const pendingPatchRef = useRef<Record<string, unknown>>({})
@@ -126,7 +132,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
     let accessSaved = false
     try {
       try {
-        access = await accessDraft.persist(supportsMobile)
+        access = await accessDraft.persist()
         accessSaved = true
       } catch (cause) {
         throw new Error(`No se pudo guardar el modo y acceso: ${saveErrorMessage(cause, 'error desconocido.')}`)
@@ -146,7 +152,6 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
     }
     const patch: GameConfigSavedPatch = {
       ...pendingPatchRef.current, ...access,
-      ...(supportsMobile ? { participantFields } : {}),
     }
     pendingPatchRef.current = {}
     setSaving(false)
@@ -179,18 +184,7 @@ export default function GameConfigPanel({ gameId, gameDefinition, settings, onSe
                   {t('Validador de premios', 'Prize validator')}
                 </a>
               </div>
-              <fieldset disabled={accessDraft.status !== 'ready'} className="min-w-0 space-y-2">
-                <legend className="mb-2 font-medium">{t('Datos del participante', 'Participant information')}</legend>
-                <p>{isStack ? t('Nombre completo, email y teléfono obligatorios', 'Full name, email and phone required')
-                  : t('Nombre completo y email obligatorios', 'Full name and email required')}</p>
-                {!isStack && <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={participantFields.phone.enabled}
-                    onChange={(event) => accessDraft.setParticipantFields({
-                      ...participantFields, phone: { required: false, enabled: event.target.checked },
-                    })} />
-                  {t('Mostrar teléfono (opcional)', 'Show phone (optional)')}
-                </label>}
-              </fieldset>
+              <p>{t('Edita los campos de registro en Formulario de registro.', 'Edit registration fields in Registration form.')}</p>
             </section>
           )}
         </fieldset>

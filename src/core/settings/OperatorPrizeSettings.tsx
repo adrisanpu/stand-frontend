@@ -24,6 +24,8 @@ type Props = {
   onPersist: (patch: Record<string, unknown>) => void
   onSavingChange?: (saving: boolean) => void
   onDirtyChange?: (dirty: boolean) => void
+  onReadyChange?: (ready: boolean) => void
+  editConditions?: boolean
 }
 type Draft = {
   name: string
@@ -80,8 +82,8 @@ export default function OperatorPrizeSettings(props: Props) {
     : <LegacyPrizeSettings {...props} />
 }
 
-function LegacyPrizeSettings({
-  gameId, gameDefinition, settings, plan, onPersist, onSavingChange, onDirtyChange,
+export function LegacyPrizeSettings({
+  gameId, gameDefinition, settings, plan, onPersist, onSavingChange, onDirtyChange, onReadyChange, editConditions = false,
 }: Props) {
   const { t } = useOperatorLanguage()
   const slots = getOperatorPrizeSlotVisibility(gameDefinition, getFeaturesByPlan(plan))
@@ -102,6 +104,12 @@ function LegacyPrizeSettings({
   const latest = useRef({ settings, slots, onSavingChange })
   latest.current = { settings, slots, onSavingChange }
   const alive = useRef(true)
+  const readyCallback = useRef(onReadyChange)
+  readyCallback.current = onReadyChange
+  useEffect(() => {
+    readyCallback.current?.(!loading && !loadError && !saving && !saveError && !refreshWarning
+      && !Object.values(numberErrors).some(Boolean))
+  }, [loading, loadError, saving, saveError, refreshWarning, numberErrors])
 
   useEffect(() => {
     alive.current = true
@@ -179,7 +187,7 @@ function LegacyPrizeSettings({
         }
         next[slot] = prize
       }
-      await savePrizeCatalog(gameId, next)
+      await savePrizeCatalog(gameId, next, !editConditions)
       persisted = next
     } catch (error) {
       setSaveError(error instanceof Error && error.message ? error.message : 'unknown')
@@ -243,6 +251,7 @@ function LegacyPrizeSettings({
         {slotNames.filter(slot => slots[slot]).map(slot => {
           const draft = drafts[slot]
           const balance = inventory?.catalog.find(prize => prize.id === draft.sharedPrizeId)?.inventory
+          const reservation = inventory?.catalog.find(prize => prize.id === draft.sharedPrizeId)?.reservation
           const title = slot === 'validation' ? t('Validación / participación', 'Validation / participation')
             : slot === 'ranking' ? t('Ranking', 'Ranking') : t('Sorteo', 'Raffle')
           const id = `op-prize-${slot}`
@@ -268,29 +277,33 @@ function LegacyPrizeSettings({
                   </div>
                 </div>
                 <div className="min-w-0">
-                  <label className={labelClass} htmlFor={`${id}-limit`}>{t('Límite por evento', 'Event cap')}</label>
-                  <input id={`${id}-limit`} className={inputClass} inputMode="numeric" placeholder="∞" value={draft.limit}
+                  <label className={labelClass} htmlFor={`${id}-limit`}>{t('Substock reservado', 'Reserved sub-stock')}</label>
+                  <input id={`${id}-limit`} className={inputClass} inputMode="numeric" placeholder={t('Sin reserva', 'No reservation')} value={draft.limit}
                     aria-invalid={!!numberErrors[slot]} aria-describedby={numberErrors[slot] ? `${id}-number-error` : undefined}
                     onChange={event => changeDraft(slot, { limit: event.target.value })} />
                 </div>
-                <p className="text-[11px] text-textSub">{t('Límite opcional de esta partida; vacío significa sin límite. El stock físico se gestiona en Administración > Premios.',
-                  'Optional cap for this event; blank means unlimited. Manage physical stock in Administration > Prizes.')}</p>
-                {draft.sharedPrizeId && <p className="text-xs text-textSub">{t('Disponible compartido', 'Shared available')}: {
-                  balance?.initialized ? balance.available : t('Sin inicializar', 'Uninitialized')
+                <p className="text-[11px] text-textSub">{t('Reserva exclusiva de esta partida. El stock general es la suma de todos los substocks. Vacío no reserva unidades.',
+                  'Exclusive reservation for this event. General stock is the sum of all sub-stocks. Blank reserves no units.')}</p>
+                {draft.sharedPrizeId && <p className="text-xs text-textSub">{t('Disponible general', 'General available')}: {
+                  reservation ? reservation.available ?? t('Define los substocks', 'Set sub-stocks')
+                    : balance?.initialized ? balance.available : t('Sin reserva', 'No reservation')
                 }</p>}
-                {inventory?.mode === 'legacy' && <p className="text-xs text-textSub">{t('Modo anterior: se mantiene el stock previo hasta la activación general.',
-                  'Legacy mode: previous stock remains until general activation.')}</p>}
                 {draft.limit.trim() === '0' && <p className="text-xs text-amber-300">{t('Límite por evento: 0. Esta partida no repartirá este premio.',
                   'Event cap: 0. This event will not award this prize.')}</p>}
-                {balance?.initialized && balance.available === 0 && <p className="text-xs text-amber-300">{t('Se ha agotado el stock compartido del premio.',
-                  'Shared prize stock is exhausted.')}</p>}
+                {draft.sharedPrizeId && draft.limit.trim() === '' && <p className="text-xs text-amber-300">{t('Define el substock para repartir este premio.',
+                  'Set the sub-stock to award this prize.')}</p>}
               </div>
-              {slot === 'ranking' && <p className="text-[11px] text-textSub">{t(
+              {slot === 'ranking' && editConditions && <label className="block text-sm">
+                {t('Puestos premiados (top)', 'Rewarded positions (top)')}
+                <input type="number" min={1} max={100} className={inputClass} value={draft.topX}
+                  onChange={event => changeDraft(slot, { topX: event.target.value })} />
+              </label>}
+              {slot === 'ranking' && !editConditions && <p className="text-[11px] text-textSub">{t(
                 'La condición top se edita en Configurar partida > Condiciones.',
                 'Edit the top condition under Event settings > Conditions.',
               )}</p>}
               {numberErrors[slot] && <p id={`${id}-number-error`} role="alert" className="text-sm text-red-300">
-                {t('El límite debe ser un entero ≥ 0 o vacío (sin límite). Top X debe ser un entero entre 1 y 100.', 'Limit must be a whole number ≥ 0 or empty (unlimited). Top X must be a whole number from 1 to 100.')}
+                {t('El límite debe ser un entero ≥ 0 o vacío (sin reserva). Top X debe ser un entero entre 1 y 100.', 'Limit must be a whole number ≥ 0 or empty (no reservation). Top X must be a whole number from 1 to 100.')}
               </p>}
             </section>
           )

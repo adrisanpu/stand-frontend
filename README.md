@@ -233,7 +233,7 @@ stand-frontend/
 │   ├── auth/         # Cognito IdP (in-app login), tokens, protected routes, user hook
 │   ├── api/          # API client (base URL, auth headers)
 │   ├── core/         # App shell, game gate, settings, ranking, quiz, raffle, theme, types
-│   ├── games/        # One folder per game (config + GameScreen)
+│   ├── games/        # One folder per game (config + ParticipantPlay)
 │   ├── pages/        # Login, BillingSuccess, BillingCancel
 │   ├── styles/       # Global styles (e.g. glow.css)
 │   ├── App.tsx       # Routes and auth provider
@@ -248,7 +248,11 @@ stand-frontend/
 
 ## Games (in this frontend)
 
-Each game is a **module**: `src/games/<game-id>/` with `config.ts` (game definition + theme + assets) and `GameScreen.tsx` (UI and logic). They are registered in `src/games/index.ts`.
+Each game is a **module**: `src/games/<game-id>/` with `config.ts` (game definition + theme + assets) and `ParticipantPlay.tsx` (mobile gameplay). Definitions are registered in `src/games/index.ts`; mobile experiences are connected through `ParticipantShell`. The stand displays only the shared editable `HomeCanvas`, never gameplay.
+
+Event settings are ordered **Home → Game → Registration form → Questionnaire → Prizes → Raffle**. New events require explicit confirmation of all six panels; progress is server-persisted and unfinished events resume configuration on reload or Home entry. Existing events without the setup marker are exempt. Game includes a local playable preview using draft mechanics, without registration or real participant/prize writes.
+
+Configure the Home in event settings → Home: drag/resize non-overlapping components, add text, and save separate horizontal/vertical compositions. Event advanced customization also supports image or looping MP4/WebM backgrounds (videos up to 100 MB). Browsers may require **Activar sonido** before playing audio. New events start empty; existing events without a canvas receive an editable initial composition. See [`docs/operator-game-ui.md`](docs/operator-game-ui.md).
 
 | Game       | Description |
 |-----------|-------------|
@@ -329,7 +333,7 @@ do not deploy either project.
 
 Operator `/home` has an **ES / EN** selector immediately to the left of the settings close button. It changes the home, catalog, game controls and settings interface without resetting gameplay, saving settings or losing form drafts. Spanish is the initial language; the choice lasts while the home remains mounted, including when closing and reopening settings. Event/player names, custom prizes, editable game content and unknown server messages are not translated. The operator's language is independent of each participant's `/play` selection.
 
-All games use mobile gameplay and Web participant access (`playMode: mobile`, `joinChannel: web`). Home **Registro y acceso** presents these fixed settings instead of offering master-screen or Instagram access choices. **Guardar y aplicar cambios** saves registration/access only; mechanics save independently from administration. Participant limits are unchanged. Full name and verified email are required; registration settings can show an optional phone field. Existing game records with older access settings are read as mobile/Web without requiring a data migration.
+All games use mobile gameplay and Web participant access (`playMode: mobile`, `joinChannel: web`). Home **Registro y acceso** presents these fixed settings instead of offering master-screen or Instagram access choices. **Guardar y aplicar cambios** saves registration/access only; mechanics save independently from administration. Participant limits are unchanged. Full name, verified email and phone are required in every game. Registration settings edit title, description and optional address/company/job title/birth date fields; its preview uses the same fixed form as Play. Existing game records with older access settings are read as mobile/Web without requiring a data migration.
 
 Participant access is always the Web registration form. Instagram is not collected as participant contact data and does not provide game access. Optional profile photos remain available.
 
@@ -354,7 +358,7 @@ The participant registration form shows the selected client logo centered at the
 
 Web registration always requires email verification, including legacy games with email disabled. **Enviar código / Send code** sends registration fields, consent and participant language (`es`/`en`) to `POST /v1/public/email/request`. The pending step retains the details and consent in memory, shows the masked email, and accepts a six-digit code including leading zeros, paste and one-time-code autofill. Codes expire after 10 minutes with at most 5 attempts; the server remains authoritative. Resend uses the captured registration details and current consent, waits for the server's `resendAvailableAt` (normally 60 seconds), and respects rate-limit retry delays. **Cambiar datos / Change details** discards the local challenge before editing.
 
-Registration asks for **Nombre completo / Full name** first, then mandatory email. Phone is optional and shown only when `phone.enabled` is true; legacy required-phone settings show it without making it mandatory. Blank phones are omitted. Names are trimmed, limited to 100 Unicode characters without control characters, and captured server-side with the email challenge; final verification cannot replace them. The name appears in public rankings. Names need not be unique, and verified recovery never renames an existing player.
+Registration starts with email, then asks for missing full name, mandatory phone, enabled optional profile fields and consent, followed by verification. Legacy disabled-contact settings resolve to mandatory contacts. Names are trimmed, limited to 100 Unicode characters without control characters, and captured server-side with the email challenge; final verification cannot replace them. The name appears in public rankings; optional profile values do not. Names need not be unique, and verified recovery never renames an existing player. Missing optional fields alone do not force a complete returning participant through details again.
 
 Final email registration sends only `{ gameId, challengeId, code }` to `/v1/public/join`; no player session is saved or gameplay opened before that succeeds. Challenges and raw verification codes are never stored in browser storage. Expired, exhausted, replaced or used challenges require a new code or editing details; verification and delivery errors are translated into Spanish/English. Deploy the compatible backend before publishing this frontend; local tests do not certify actual email delivery.
 
@@ -462,9 +466,10 @@ Start here for the full end-to-end checklist:
 - [`docs/new-game-playbook.md`](docs/new-game-playbook.md)
 
 1. **Add folder** `src/games/your-game/` with:
-   - `config.ts` — `GameDefinition` (id, name, colors, assets, `GameScreen`, optional `showRanking`, optional `GameConfigComponent`).
-   - `GameScreen.tsx` — React component with props `gameId`, `gameName` (see `GameScreenProps` in `src/core/types.ts`).
+   - `config.ts` — `GameDefinition` (id, name, colors, assets, optional `showRanking`, optional `GameConfigComponent`).
+   - `ParticipantPlay.tsx` — mobile experience using participant tokens through `publicApi`.
 2. **Register** in `src/games/index.ts`: import config and add it to the `games` array.
+   Connect the participant experience in `src/core/participant/ParticipantShell.tsx` and add a safe sample in `GamePlayPreview.tsx`; do not add a stand game screen.
 3. **Assets** (logos, etc.) go under `public/` or paths referenced in `assets` in config.
 
 ---

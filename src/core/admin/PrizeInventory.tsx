@@ -1,107 +1,81 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  prizeInventoryApi, type InventoryChange, type InventoryPrize, type PrizeInventory as Inventory,
+  prizeInventoryApi, type InventoryPrize, type PrizeInventory as Inventory,
   type PrizeMovement,
 } from '../../api/prizeInventory'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import type { SharedPrize } from '../../api/sharedPrizeCatalog'
+import { AdminIconButton } from './AdminIcon'
 
-const button = 'rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-sm hover:bg-primary/20 disabled:opacity-40'
 const field = 'h-9 rounded-md border border-current/20 bg-surface px-2 text-sm min-w-0'
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
-const isConflict = (error: unknown) => typeof error === 'object' && error !== null
-  && 'status' in error && error.status === 409
+const barColors = { available: 'bg-emerald-500', assigned: 'bg-red-500', redeemed: 'bg-[#9c6b6b]' }
 
-function StockAction({ prize, reload, onBlockedChange }: {
-  prize: InventoryPrize; reload: () => Promise<Inventory>; onBlockedChange: (blocked: boolean) => void
-}) {
+function GameShares({ prize }: { prize: InventoryPrize }) {
   const { t } = useOperatorLanguage()
-  const [action, setAction] = useState<InventoryChange['action']>(prize.inventory.initialized ? 'replenish' : 'initialize')
-  const [quantity, setQuantity] = useState('')
-  const [reason, setReason] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [conflict, setConflict] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const pending = useRef<InventoryChange | null>(null)
-  const lock = useRef(false)
-  useEffect(() => {
-    onBlockedChange(busy || conflict || pending.current !== null)
-  }, [busy, conflict, error, onBlockedChange])
-  useEffect(() => () => onBlockedChange(false), [onBlockedChange])
-  useEffect(() => {
-    if (!pending.current) {
-      setAction(prize.inventory.initialized ? 'replenish' : 'initialize')
-      setQuantity(''); setReason('')
-    }
-  }, [prize.inventory.initialized])
-  const changed = () => { pending.current = null; setError(''); setSuccess(false) }
-  const submit = async () => {
-    if (lock.current || conflict) return
-    const amount = Number(quantity)
-    if (!pending.current && (!/^[+-]?\d+$/.test(quantity.trim()) || !Number.isSafeInteger(amount)
-      || (action === 'initialize' && amount < 0) || (action === 'replenish' && amount <= 0)
-      || (action !== 'initialize' && (!Number.isSafeInteger(prize.inventory.available + amount)
-        || prize.inventory.available + amount < 0)) || !reason.trim())) {
-      setError(t('Introduce una cantidad entera válida y un motivo. El saldo no puede ser negativo.',
-        'Enter a valid whole quantity and a reason. The balance cannot be negative.'))
-      return
-    }
-    pending.current ??= {
-      action, prizeId: prize.id, quantity: amount, reason: reason.trim(),
-      requestId: crypto.randomUUID(), expectedRevision: prize.inventory.revision,
-    }
-    lock.current = true
-    setBusy(true); setError(''); setSuccess(false)
-    let confirmed = false
-    try {
-      await prizeInventoryApi.change(pending.current)
-      confirmed = true
-      pending.current = null
-      setQuantity(''); setReason(''); setSuccess(true)
-      const refreshed = await reload()
-      setAction(refreshed.catalog.find(item => item.id === prize.id)?.inventory.initialized ? 'replenish' : 'initialize')
-    } catch (cause) {
-      if (confirmed || isConflict(cause)) setConflict(true)
-      setError(`${message(cause)} ${confirmed || isConflict(cause)
-        ? t('Recarga los saldos antes de continuar.', 'Reload balances before continuing.')
-        : t('Resultado no confirmado. Reintentar conserva la misma solicitud; editar crea una nueva.',
-          'Result unconfirmed. Retry keeps the same request; editing creates a new one.')}`)
-    } finally { lock.current = false; setBusy(false) }
+  if (!prize.games.length) return <p className="py-2 text-sm text-textSub">{t(
+    'Este premio aún no está asignado a ninguna partida.', 'This prize is not assigned to any event yet.')}</p>
+  const gameBar = (gameId: string) => {
+    const game = prize.games.find(item => item.gameId === gameId)
+    if (prize.reservation && game?.limit === null) return <span className="text-xs text-textSub">{t(
+      'Define el substock de esta partida.', 'Set this event\'s sub-stock.',
+    )}</span>
+    if (prize.reservation && game?.assigned != null) return <DistributionBar parts={[
+      { key: 'available', label: t('Disponible', 'Available'), value: game.remaining ?? 0 },
+      { key: 'assigned', label: t('Repartido', 'Assigned'), value: Math.max(game.assigned - (prize.source === 'kivly' ? 0 : game.redeemed ?? 0), 0) },
+      ...(prize.source === 'kivly' ? [] : [{ key: 'redeemed' as const, label: t('Canjeado', 'Redeemed'), value: game.redeemed ?? 0 }]),
+    ]} />
+    return <span className="text-xs text-textSub">{t('No disponible', 'Unavailable')}</span>
   }
-  return <form className="space-y-2 py-2" onSubmit={event => { event.preventDefault(); void submit() }}>
-    <p className="text-sm text-textSub">{t(
-      'Introduce unidades libres para nuevos premios, no el recuento físico total ni la suma de partidas. Los históricos no se descuentan de nuevo.',
-      'Enter free units for new awards, not the total physical count or the sum of events. History is never deducted again.',
-    )}</p>
-    <fieldset disabled={busy || conflict} className="flex flex-wrap items-end gap-2">
-      <label className="flex flex-col gap-1">{t('Operación', 'Action')} <select className={field} value={action} onChange={event => {
-        changed(); setAction(event.target.value as InventoryChange['action'])
-      }}>
-        {!prize.inventory.initialized && <option value="initialize">{t('Inicializar', 'Initialize')}</option>}
-        {prize.inventory.initialized && <>
-          <option value="replenish">{t('Reponer', 'Replenish')}</option>
-          <option value="adjust">{t('Ajustar (variación con signo)', 'Adjust (signed delta)')}</option>
-        </>}
-      </select></label>
-      <label className="flex flex-col gap-1">{t('Cantidad', 'Quantity')} <input className={`${field} w-28`} inputMode="numeric" value={quantity}
-        onChange={event => { changed(); setQuantity(event.target.value) }} /></label>
-      <label className="flex min-w-[12rem] flex-1 flex-col gap-1">{t('Motivo obligatorio', 'Required reason')} <input className={field} value={reason} maxLength={300}
-        onChange={event => { changed(); setReason(event.target.value) }} /></label>
-      <button className={button} type="submit">{busy ? t('Enviando…', 'Sending…') : error ? t('Reintentar operación', 'Retry operation') : t('Aplicar', 'Apply')}</button>
-    </fieldset>
-    {error && <p role="alert">{error}</p>}
-    {success && <p role="status">{t('Operación confirmada.', 'Operation confirmed.')}</p>}
-    {conflict && <button className={button} type="button" disabled={busy} onClick={() => {
-      if (lock.current) return
-      lock.current = true; setBusy(true)
-      void reload().then(refreshed => {
-        pending.current = null; setConflict(false); setError(''); setQuantity(''); setReason('')
-        setAction(refreshed.catalog.find(item => item.id === prize.id)?.inventory.initialized ? 'replenish' : 'initialize')
-      })
-        .catch(cause => setError(message(cause))).finally(() => { lock.current = false; setBusy(false) })
-    }}>{t('Recargar saldos', 'Reload balances')}</button>}
-  </form>
+  return <div className="space-y-2 py-2">
+    <table className="admin-table w-full text-left text-sm" aria-label={t('Reparto por partida', 'Allocation by event')}>
+      <thead><tr>{[t('Partida', 'Event'), t('Estado', 'Status'), t('Substock', 'Sub-stock'), t('Distribución', 'Distribution')]
+        .map(label => <th key={label} scope="col" className="p-2 whitespace-nowrap">{label}</th>)}</tr></thead>
+      <tbody>{prize.games.map(game => <tr key={game.gameId} className="border-t border-current/10">
+        <th scope="row" className="p-2 font-medium">{game.name}</th>
+        <td className="p-2">{game.active ? t('Activa', 'Active') : t('Inactiva', 'Inactive')}</td>
+        <td className="p-2 tabular-nums">{game.limit ?? <span className="text-textSub">{t('Sin reserva', 'No reservation')}</span>}</td>
+        <td className="p-2">{gameBar(game.gameId)}</td>
+      </tr>)}</tbody>
+    </table>
+    <p className="text-xs text-textSub">{t('Cada substock es una reserva exclusiva. El stock general es su suma. Se edita en Condiciones de cada partida.',
+      'Each sub-stock is an exclusive reservation. General stock is their sum. Edit it in each event\'s Conditions.')}</p>
+  </div>
+}
+
+type BarPart = { key: keyof typeof barColors; label: string; value: number }
+
+function DistributionBar({ parts }: { parts: BarPart[] }) {
+  const total = parts.reduce((sum, part) => sum + part.value, 0)
+  const percent = (value: number) => total ? Math.round(value / total * 100) : 0
+  const summary = parts.map(part => `${part.label}: ${part.value} (${percent(part.value)}%)`).join(' · ')
+  return <div className="min-w-[11rem] space-y-1" role="img" aria-label={summary} title={summary}>
+    <div className="flex h-2.5 overflow-hidden rounded-full bg-current/10">
+      {parts.map(part => part.value > 0 && <span key={part.key} className={barColors[part.key]}
+        style={{ width: `${part.value / total * 100}%` }} />)}
+    </div>
+    <div aria-hidden="true" className="flex gap-3 whitespace-nowrap text-[11px] tabular-nums text-textSub">
+      {parts.map(part => <span key={part.key} className="inline-flex items-center gap-1">
+        <span className={`h-2 w-2 rounded-full ${barColors[part.key]}`} />{part.value} · {percent(part.value)}%
+      </span>)}
+    </div>
+  </div>
+}
+
+function StockBar({ prize }: { prize: InventoryPrize }) {
+  const { t } = useOperatorLanguage()
+  if (prize.reservation) {
+    if (prize.reservation.error || prize.reservation.available === null) return <span className="text-textSub">{t(
+      prize.reservation.error === 'ReservationBelowAssigned' ? 'Revisar reservas' : 'Define los substocks',
+      prize.reservation.error === 'ReservationBelowAssigned' ? 'Review reservations' : 'Set sub-stocks',
+    )}</span>
+    return <DistributionBar parts={[
+      { key: 'available', label: t('Disponible', 'Available'), value: prize.reservation.available },
+      { key: 'assigned', label: t('Repartido', 'Assigned'), value: Math.max(prize.reservation.assigned - (prize.reservation.redeemed ?? 0), 0) },
+      ...(prize.reservation.redeemed === null ? [] : [{ key: 'redeemed' as const, label: t('Canjeado', 'Redeemed'), value: prize.reservation.redeemed }]),
+    ]} />
+  }
+  return <span className="text-textSub">{t('Reserva pendiente de cargar', 'Reservation not loaded')}</span>
 }
 
 function Movements({ prizeId }: { prizeId: string }) {
@@ -159,16 +133,15 @@ function Movements({ prizeId }: { prizeId: string }) {
     </li>)}</ul>
     {!busy && !filtered.length && <p>{t('Sin movimientos cargados para estos filtros.', 'No loaded movements match these filters.')}</p>}
     {error && <p role="alert">{error}</p>}
-    {cursor !== null && <button className={button} disabled={busy} onClick={() => void load(cursor)}>
-      {busy ? t('Cargando…', 'Loading…') : error ? t('Reintentar página', 'Retry page') : t('Cargar más movimientos', 'Load more movements')}
-    </button>}
+    {cursor !== null && <AdminIconButton icon={error ? 'reload' : 'more'} small disabled={busy} onClick={() => void load(cursor)}
+      label={error ? t('Reintentar página', 'Retry page') : t('Cargar más movimientos', 'Load more movements')} />}
   </div>
 }
 
-function ImportHistory({ games, imports, unresolved, refresh, onBusyChange }: {
+function ImportHistory({ games, imports, unresolved, refresh }: {
   games: Map<string, string>; imports: Record<string, boolean>
   unresolved: number
-  refresh: () => Promise<Inventory>; onBusyChange: (busy: boolean) => void
+  refresh: () => Promise<Inventory>
 }) {
   const { t } = useOperatorLanguage()
   const [busy, setBusy] = useState(false)
@@ -181,7 +154,7 @@ function ImportHistory({ games, imports, unresolved, refresh, onBusyChange }: {
   const gameIds = [...games.keys()].sort().join(',')
   const run = async () => {
     if (lock.current || [...games.keys()].every(id => imports[id])) return
-    lock.current = true; setBusy(true); onBusyChange(true)
+    lock.current = true; setBusy(true)
     const failures: Record<string, string> = { ...errors }
     delete failures.refresh
     try {
@@ -206,7 +179,7 @@ function ImportHistory({ games, imports, unresolved, refresh, onBusyChange }: {
     } finally {
       lock.current = false
       if (alive.current) {
-        setErrors(failures); setBusy(false); setProgress(''); onBusyChange(false)
+        setErrors(failures); setBusy(false); setProgress('')
       }
     }
   }
@@ -219,6 +192,7 @@ function ImportHistory({ games, imports, unresolved, refresh, onBusyChange }: {
   }, [gameIds, busy])
   const failed = Object.values(errors)
   const pending = [...games.keys()].some(id => !imports[id])
+  if (!busy && !failed.length && !pending && !unresolved) return null
   return <div className="space-y-2 text-sm" aria-label={t('Histórico de premios', 'Prize history')}>
     <p role="status">{busy
       ? `${t('Importando históricos automáticamente', 'Importing history automatically')}… ${progress}`
@@ -235,7 +209,8 @@ function ImportHistory({ games, imports, unresolved, refresh, onBusyChange }: {
       )}</p>}
     </details>
     {failed.length > 0 && <p role="alert">{failed.join(' · ')} — {t('Se conserva la página para reintentar.', 'The page is retained for retry.')}</p>}
-    {!busy && (failed.length > 0 || pending) && <button className={button} onClick={() => {
+    {!busy && (failed.length > 0 || pending) && <AdminIconButton icon="reload" small
+      label={t('Reintentar importación', 'Retry import')} onClick={() => {
       for (const id of games.keys()) {
         if (!imports[id]) {
           attempted.current.delete(id)
@@ -243,15 +218,15 @@ function ImportHistory({ games, imports, unresolved, refresh, onBusyChange }: {
         }
       }
       void run()
-    }}>{t('Reintentar importación', 'Retry import')}</button>}
+    }} />}
   </div>
 }
 
-export default function PrizeInventory({ catalogVersion = 0, catalog = [], catalogActions, catalogEditor,
-  catalogBusy = false, onBlockedChange }: {
+export default function PrizeInventory({ catalogVersion = 0, catalog = [], catalogActions, catalogAdd, catalogEditor,
+  catalogBusy = false }: {
   catalogVersion?: number; catalog?: SharedPrize[]; catalogActions?: (id: string) => ReactNode
+  catalogAdd?: ReactNode
   catalogEditor?: { prizeId: string; content: ReactNode }; catalogBusy?: boolean
-  onBlockedChange?: (blocked: boolean) => void
 }) {
   const { t } = useOperatorLanguage()
   const [data, setData] = useState<Inventory | null>(null)
@@ -259,71 +234,128 @@ export default function PrizeInventory({ catalogVersion = 0, catalog = [], catal
   const [selected, setSelected] = useState('')
   const [chosen, setChosen] = useState('')
   const [view, setView] = useState<'stock' | 'movements'>('stock')
-  const [confirmation, setConfirmation] = useState(false)
-  const [activating, setActivating] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const [detailBlocked, setDetailBlocked] = useState(false)
   const [historyVersion, setHistoryVersion] = useState(0)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState(false)
+  const [deleteUncertain, setDeleteUncertain] = useState(false)
   const lock = useRef(false)
+  const refreshVersion = useRef(0)
   useEffect(() => { if (catalogBusy) setSelected('') }, [catalogBusy])
-  useEffect(() => { onBlockedChange?.(detailBlocked) }, [detailBlocked, onBlockedChange])
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
+    const version = ++refreshVersion.current
     const next = await prizeInventoryApi.get()
-    setData(next); setError('')
+    if (version === refreshVersion.current) { setData(next); setError('') }
     return next
-  }
-  const refreshHistory = async () => {
+  }, [])
+  const refreshHistory = useCallback(async () => {
     const next = await refresh()
     setHistoryVersion(value => value + 1)
     return next
-  }
-  useEffect(() => { void refresh().catch(cause => setError(message(cause))) }, [catalogVersion])
+  }, [refresh])
+  useEffect(() => {
+    const reload = () => {
+      void refreshHistory().catch(cause => setError(message(cause)))
+    }
+    const visible = () => { if (document.visibilityState === 'visible') reload() }
+    reload()
+    window.addEventListener('focus', reload)
+    document.addEventListener('visibilitychange', visible)
+    return () => {
+      refreshVersion.current += 1
+      window.removeEventListener('focus', reload)
+      document.removeEventListener('visibilitychange', visible)
+    }
+  }, [catalogVersion, refreshHistory])
   const games = new Map<string, string>(Object.keys(data?.imports ?? {}).map(id => [id, id]))
   data?.catalog.forEach(prize => prize.games.forEach(game => {
     if (games.has(game.gameId)) games.set(game.gameId, game.name)
   }))
-  const ready = !importing && data && data.unresolved === 0 && [...games.keys()].every(id => data.imports[id] === true)
-    && data.catalog.filter(prize => prize.games.length > 0).every(prize => prize.inventory.initialized)
   const entries = new Map((data?.catalog ?? []).map(item => [item.id, item]))
   const shared = new Map(catalog.map(item => [item.id, item]))
   const ids = [...new Set([...shared.keys(), ...entries.keys()])]
   const chosenId = ids.includes(chosen) ? chosen : ''
   const chosenPrize = entries.get(chosenId)
+  const canDeleteKivly = chosenPrize?.source === 'kivly' && chosenPrize.games.length === 0
+    && !chosenPrize.inventory.initialized && !chosenPrize.inventory.available
+    && !chosenPrize.inventory.assigned && !chosenPrize.inventory.historicalAssigned
+    && !chosenPrize.inventory.redeemed && !chosenPrize.inventory.historicalRedeemed
+  const open = (id: string) => { setChosen(id); setSelected(id); setView('stock') }
+  const toggle = (id: string) => {
+    if (catalogBusy || deleting || deleteConfirmation) return
+    if (chosenId === id && selected === id) setSelected('')
+    else open(id)
+  }
+  const movementsOpen = !!chosenId && selected === chosenId && view === 'movements'
   return <div className="space-y-4 pt-3">
-    <div className="flex items-center justify-between gap-2">
-      <button className={button} onClick={() => void refreshHistory().catch(cause => setError(message(cause)))}>{t('Actualizar inventario', 'Refresh inventory')}</button>
-    </div>
     {error && <p role="alert">{error}</p>}
     {!data && !error && <p>{t('Cargando inventario…', 'Loading inventory…')}</p>}
-      {data && (data.mode === 'legacy' ? <p className="rounded-lg border border-amber-400/40 p-3">{t(
-        'Modo anterior: cada partida conserva su stock previo hasta la activación explícita. Inicializa las unidades libres para nuevos premios, nunca sumando partidas.',
-        'Legacy mode: each event keeps its previous stock until explicit activation. Initialize free units for new awards, never by summing events.',
-      )}</p> : <p>{t('Inventario compartido activo. Todas las partidas consumen las mismas unidades.', 'Shared inventory active. All events consume the same units.')}</p>)}
-      <p className="text-xs text-textSub">{t(
-        'Stock = disponibles + pendientes de canjear registrados. Repartidos y canjeados incluyen históricos. Stock desconocido si falta histórico; Kivly no confirma stock físico ni canjes externos.',
-        'Stock = available + recorded unredeemed awards. Assigned and redeemed include history. Stock is unknown while history is pending; Kivly does not confirm physical stock or external redemptions.',
-      )}</p>
-      <div role="group" aria-label={t('Acciones del premio seleccionado', 'Selected prize actions')}
-        className="flex flex-wrap items-center justify-end gap-2">
-        <span className="mr-auto text-sm text-textSub">{chosenId
-          ? shared.get(chosenId)?.name ?? chosenPrize?.name
-          : t('Selecciona un premio para gestionar sus acciones.', 'Select a prize to manage its actions.')}</span>
-        <fieldset disabled={detailBlocked} className="flex flex-wrap items-center justify-end gap-1">
-          {chosenPrize?.source !== 'kivly' && catalogActions?.(chosenId)}
-          <button className={button} disabled={!chosenPrize || catalogBusy}
-            aria-expanded={selected === chosenId && !!selected && view === 'stock'}
-            onClick={() => { setSelected(chosenId); setView('stock') }}>{t('Gestionar saldo', 'Manage balance')}</button>
-          <button className={button} disabled={!chosenPrize || catalogBusy}
-            aria-expanded={selected === chosenId && !!selected && view === 'movements'}
-            onClick={() => { setSelected(chosenId); setView('movements') }}>{t('Ver movimientos', 'View movements')}</button>
-        </fieldset>
+    <div className="card space-y-3 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {catalogAdd}
+        <div aria-hidden="true" title={t(
+          'Stock = suma de las reservas exclusivas de todas las partidas. Kivly no confirma canjes externos.',
+          'Stock = sum of exclusive reservations across all events. Kivly does not confirm external redemptions.',
+        )} className="flex flex-wrap items-center gap-3 text-xs text-textSub">
+          {([['available', t('Disponible', 'Available')], ['assigned', t('Repartido', 'Assigned')], ['redeemed', t('Canjeado', 'Redeemed')]] as const)
+            .map(([key, label]) => <span key={key} className="inline-flex items-center gap-1">
+              <span className={`h-2.5 w-2.5 rounded-full ${barColors[key]}`} />{label}
+            </span>)}
+        </div>
+        <div role="group" aria-label={t('Acciones del premio seleccionado', 'Selected prize actions')}
+          className="ml-auto flex flex-wrap items-center gap-2">
+          <fieldset className="flex flex-wrap items-center gap-2">
+            {chosenPrize?.source !== 'kivly' && catalogActions?.(chosenId)}
+            {chosenPrize?.source === 'kivly' && <AdminIconButton icon="delete" tone="danger"
+              label={t('Eliminar de STAND y Kivly', 'Delete from STAND and Kivly')}
+              disabled={!canDeleteKivly || catalogBusy || deleting || deleteUncertain}
+              onClick={() => setDeleteConfirmation(true)} />}
+            <AdminIconButton icon="history" label={t('Ver movimientos', 'View movements')}
+              disabled={!chosenPrize || catalogBusy} aria-pressed={movementsOpen}
+              onClick={() => { if (movementsOpen) setView('stock'); else { setSelected(chosenId); setView('movements') } }} />
+          </fieldset>
+          <AdminIconButton icon="reload" label={t('Actualizar inventario', 'Refresh inventory')}
+            disabled={deleting}
+            onClick={() => void refreshHistory().then(() => setDeleteUncertain(false)).catch(cause => setError(message(cause)))} />
+        </div>
+        {deleteConfirmation && <div role="alertdialog" aria-label={t('Eliminar premio Kivly', 'Delete Kivly prize')}
+          className="space-y-2 rounded-lg border border-red-500/30 p-3 text-sm">
+          <p>{t('Se eliminará este premio de STAND y del catálogo de Kivly. Esta acción no se puede deshacer.',
+            'This prize will be deleted from STAND and the Kivly catalog. This cannot be undone.')} {chosenPrize?.name}</p>
+          <div className="flex gap-2">
+            <AdminIconButton icon="confirm" tone="danger" label={t('Confirmar eliminación', 'Confirm deletion')}
+              disabled={deleting} onClick={() => {
+                if (lock.current || !canDeleteKivly) return
+                lock.current = true
+                setDeleting(true); setError('')
+                void (async () => {
+                  try {
+                    await prizeInventoryApi.removeKivlyPrize(chosenId)
+                  } catch (cause) {
+                    setDeleteUncertain(true)
+                    setError(`${message(cause)} — ${t(
+                      'No se pudo confirmar la eliminación. Actualiza el inventario antes de reintentar.',
+                      'Deletion could not be confirmed. Refresh inventory before retrying.',
+                    )}`)
+                    return
+                  }
+                  setSelected(''); setChosen('')
+                  await refreshHistory()
+                })().catch(cause => setError(message(cause))).finally(() => {
+                  lock.current = false; setDeleting(false); setDeleteConfirmation(false)
+                })
+              }} />
+            <AdminIconButton icon="cancel" label={t('Cancelar', 'Cancel')} disabled={deleting}
+              onClick={() => setDeleteConfirmation(false)} />
+          </div>
+        </div>}
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="admin-table w-full text-left text-sm">
           <caption className="sr-only">{t('Catálogo e inventario de premios', 'Prize catalog and inventory')}</caption>
-          <thead><tr>{[t('Selección', 'Selection'), t('Foto', 'Photo'), t('Nombre', 'Name'), t('Origen', 'Origin'), t('Stock', 'Stock'),
-            t('Disponibles', 'Available'), t('Canjeados', 'Redeemed'), t('Repartidos', 'Assigned'),
-            t('Partidas', 'Events')]
+          <thead><tr>
+            <th scope="col" className="p-2"><span className="sr-only">{t('Selección', 'Selection')}</span></th>
+            {[t('Foto', 'Photo'), t('Nombre', 'Name'), t('Origen', 'Origin'),
+            t('Stock', 'Stock'), t('Distribución', 'Distribution'), t('Partidas', 'Events')]
             .map(label => <th key={label} scope="col" className="p-2 whitespace-nowrap">{label}</th>)}</tr></thead>
           <tbody>{ids.map(id => {
             const item = entries.get(id)
@@ -332,60 +364,51 @@ export default function PrizeInventory({ catalogVersion = 0, catalog = [], catal
             const imageUrl = definition?.imageUrl ?? item?.imageUrl
             const editing = catalogEditor?.prizeId === id
             const expanded = editing || (!catalogBusy && selected === id)
+            const isChosen = chosenId === id
             const assigned = item ? item.inventory.assigned + item.inventory.historicalAssigned : 0
             const pending = item?.canjeados === null || !item ? null : assigned - item.canjeados
-            const historyPending = !data || data.unresolved > 0 || Object.values(data.imports).some(complete => !complete)
-            const stock = !item || item.source === 'kivly' || pending === null || pending < 0
-              || !Number.isSafeInteger(item.inventory.available + pending) || historyPending
-              ? null : item.inventory.available + pending
             return <Fragment key={id}>
-              <tr className={`border-t border-current/10 ${expanded ? 'bg-primary/5' : ''}`}>
+              <tr onClick={() => toggle(id)} aria-expanded={expanded}
+                className={`cursor-pointer border-t border-current/10 ${isChosen ? 'bg-primary/5' : ''}`}>
                 <td className="w-10 p-2">
                   <input type="radio" name="prize-selection" checked={chosenId === id}
-                    aria-label={`${t('Seleccionar', 'Select')} ${name}`} disabled={detailBlocked || catalogBusy}
-                    className="h-4 w-4 accent-primary"
-                    onChange={() => { setChosen(id); setSelected('') }} />
+                    aria-label={`${t('Seleccionar', 'Select')} ${name}`} disabled={catalogBusy || deleting || deleteConfirmation}
+                    className="h-4 w-4 accent-primary" onClick={event => event.stopPropagation()}
+                    onChange={() => open(id)} />
                 </td>
                 <td className="w-12 p-2">{imageUrl
                   ? <img src={imageUrl} alt="" className="h-9 w-9 object-contain" />
                   : <span aria-hidden="true" className="block h-9 w-9 rounded-md bg-current/5" />}</td>
                 <th scope="row" className="p-2 font-medium">{name}</th>
                 <td className="p-2">{item?.source === 'kivly' ? 'Kivly' : 'STAND'}</td>
-                {!item ? <td colSpan={5} className="p-2 text-textSub">{t('Saldo pendiente de cargar. Actualiza el inventario.', 'Balance not loaded. Refresh inventory.')}</td>
+                {!item ? <td colSpan={3} className="p-2 text-textSub">{t('Saldo pendiente de cargar. Actualiza el inventario.', 'Balance not loaded. Refresh inventory.')}</td>
                   : <>
-                    <td className="p-2 tabular-nums" title={t('Disponibles + pendientes de canjear registrados', 'Available + recorded unredeemed awards')}>
-                      {item.source === 'kivly' ? t('Desconocido', 'Unknown') : !item.inventory.initialized
-                        ? t('Sin inicializar', 'Uninitialized') : stock === null ? t('Desconocido', 'Unknown') : stock}
+                    <td className="p-2 tabular-nums" title={t('Suma de substocks reservados', 'Sum of reserved sub-stocks')}>
+                      {item.reservation ? item.reservation.total ?? t('Define los substocks', 'Set sub-stocks')
+                        : t('Reserva pendiente de cargar', 'Reservation not loaded')}
                     </td>
-                    <td className="p-2 tabular-nums">{item.inventory.initialized ? item.inventory.available : t('Sin inicializar', 'Uninitialized')}</td>
-                    <td className="p-2 tabular-nums">{item.canjeados === null ? t('Desconocido', 'Unknown') : item.canjeados}</td>
-                    <td className="p-2 tabular-nums">{assigned}</td>
-                    <td className="p-2">
-                      {item.games.length ? <details>
-                        <summary className="cursor-pointer whitespace-nowrap">{t('Ver partidas', 'View events')} ({item.games.length})</summary>
-                        <ul className="max-h-40 min-w-[12rem] space-y-1 overflow-y-auto pt-2">{item.games.map(game => <li key={game.gameId}>
-                          <span>{game.name} · {game.limit === null ? t('Sin límite', 'Unlimited') : game.limit}</span>
-                          <span className="block text-xs text-textSub">{game.active ? t('Activa', 'Active') : t('Inactiva', 'Inactive')}</span>
-                        </li>)}</ul>
-                      </details> : <span className="text-textSub">{t('Ninguna', 'None')}</span>}
-                    </td>
+                    <td className="p-2"><StockBar prize={item} /></td>
+                    <td className="p-2 tabular-nums">{item.games.length
+                      ? item.games.length : <span className="text-textSub">{t('Ninguna', 'None')}</span>}</td>
                   </>}
               </tr>
-              {expanded && <tr className="bg-primary/5"><td colSpan={9} className="px-3 pb-3">
+              {expanded && <tr className="bg-primary/5"><td colSpan={7} className="px-3 pb-3">
                 <section id={`prize-detail-${id}`} aria-label={`${t('Detalle', 'Detail')}: ${name}`}
                   className="rounded-lg border border-current/10 px-3 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold">{name} · {editing ? t('Editar ficha', 'Edit details')
-                      : view === 'stock' ? t('Gestionar saldo', 'Manage balance') : t('Histórico', 'History')}</h3>
-                    {!editing && <button className={button} disabled={detailBlocked} onClick={() => setSelected('')}>
-                      {t('Cerrar detalle', 'Close detail')}</button>}
-                  </div>
+                  {item?.reservation?.error && <p role="alert" className="pt-2 text-sm">{t(
+                    item.reservation.error === 'ReservationBelowAssigned'
+                      ? 'Hay reservas menores que los premios ya repartidos. Revisa los substocks en Condiciones.'
+                      : 'Define un substock numérico en cada partida para calcular el stock general y repartir premios.',
+                    item.reservation.error === 'ReservationBelowAssigned'
+                      ? 'Some reservations are below already assigned prizes. Review sub-stocks in Conditions.'
+                      : 'Set a numeric sub-stock in each event to calculate general stock and award prizes.',
+                  )}</p>}
                   {item && pending !== null && pending < 0 && <p role="alert" className="pt-2 text-sm">{t(
                     'Los canjes superan los repartos registrados. Revisa el histórico antes de interpretar el stock.',
                     'Redemptions exceed recorded assignments. Review history before interpreting stock.',
                   )}</p>}
                   {editing ? catalogEditor.content : item && (view === 'stock'
-                    ? <StockAction key={id} prize={item} reload={refresh} onBlockedChange={setDetailBlocked} />
+                    ? !(pending !== null && pending < 0) && <GameShares key={id} prize={item} />
                     : <>
                       <p className="pt-2 text-sm text-textSub">{t('Repartidos históricos', 'Historical assigned')}: {item.inventory.historicalAssigned}
                         {' · '}{t('Canjeados históricos', 'Historical redeemed')}: {item.canjeados === null ? t('Desconocido', 'Unknown') : item.inventory.historicalRedeemed}
@@ -399,32 +422,10 @@ export default function PrizeInventory({ catalogVersion = 0, catalog = [], catal
           })}</tbody>
         </table>
       </div>
-      {data && <>
+    </div>
+    {data && <>
       <ImportHistory games={games} imports={data.imports} unresolved={data.unresolved}
-        refresh={refreshHistory} onBusyChange={setImporting} />
-      {data.mode === 'legacy' && <>
-        <p>{t('Sin resolver', 'Unresolved')}: {data.unresolved}. {t(
-          'El histórico se importa automáticamente. Para activar, resuelve los registros pendientes e inicializa todos los premios asignados.',
-          'History imports automatically. To activate, reconcile pending records and initialize all assigned prizes.',
-        )}</p>
-        <button className={button} disabled={!ready || activating} onClick={() => setConfirmation(true)}>{t('Activar inventario compartido', 'Activate shared inventory')}</button>
-        {confirmation && <div role="dialog" aria-label={t('Confirmar activación', 'Confirm activation')} className="border border-amber-400/40 rounded-lg p-3 space-y-3">
-          <p>{t('Todas las partidas compartirán las mismas unidades. Los nuevos premios sin inicializar no se repartirán. Esta acción sustituye el stock anterior por partida.',
-            'All events will share the same units. New uninitialized prizes will not be awarded. This replaces previous per-event stock.')}</p>
-          <button className={button} disabled={!ready || activating} onClick={() => {
-            if (lock.current) return
-            lock.current = true; setActivating(true); setError('')
-            void prizeInventoryApi.activate().then(async () => { setConfirmation(false); await refresh() })
-              .catch(async cause => {
-                setConfirmation(false)
-                try { await refresh() } catch { /* Keep the activation error visible even if refresh fails. */ }
-                setError(message(cause))
-              })
-              .finally(() => { lock.current = false; setActivating(false) })
-          }}>{t('Confirmar activación', 'Confirm activation')}</button>
-          <button className={button} disabled={activating} onClick={() => setConfirmation(false)}>{t('Cancelar', 'Cancel')}</button>
-        </div>}
-      </>}
+        refresh={refreshHistory} />
     </>}
   </div>
 }

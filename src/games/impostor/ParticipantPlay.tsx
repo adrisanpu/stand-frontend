@@ -58,7 +58,7 @@ export default function ImpostorParticipantPlay({ gameId, playerToken, initialAs
   )
 }
 
-function ImpostorRound({ state }: { state?: ImpostorParticipantState }) {
+export function ImpostorRound({ state }: { state?: ImpostorParticipantState }) {
   const { t } = useParticipantLanguage()
   if (!state || state.phase === 'lobby') {
     return <p className="font-semibold">{t('Estás en la lista. Espera a que empiece la partida.')}</p>

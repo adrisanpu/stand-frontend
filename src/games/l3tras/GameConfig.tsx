@@ -5,6 +5,7 @@ import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/sett
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
+import { useMechanicsDraft } from '../useMechanicsDraft'
 
 interface GameDataResponse {
   ok: boolean
@@ -40,43 +41,48 @@ const DEFAULT_SETTINGS: L3trasSettings = {
   validationTimeLimitSeconds: DEFAULT_VALIDATION_TIME_LIMIT_SECONDS,
 }
 
-export default function L3trasGameConfig({ gameId, settings, settingsLoaded, onChange, registerSave }: GameConfigProps) {
+export default function L3trasGameConfig({ gameId, settings, settingsLoaded, onChange, onDraftChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   const [objectiveWord, setObjectiveWord] = useState<string>(
-    (settings as L3trasSettings | null)?.objectiveWord || DEFAULT_SETTINGS.objectiveWord
+    (settings as L3trasSettings | null)?.objectiveWord ?? DEFAULT_SETTINGS.objectiveWord
   )
   const [validationTimeLimitSeconds, setValidationTimeLimitSeconds] = useState<number>(() =>
-    normalizeValidationTimeLimitSeconds(
-      (settings as L3trasSettings | null)?.validationTimeLimitSeconds,
-    ),
+    settings?.validationTimeLimitSeconds === undefined ? DEFAULT_VALIDATION_TIME_LIMIT_SECONDS : Number(settings.validationTimeLimitSeconds),
   )
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string>('')
+  const [loaded, setLoaded] = useState(settingsLoaded || !gameId)
+  const [loadError, setLoadError] = useState('')
+  useMechanicsDraft(loaded ? { objectiveWord, validationTimeLimitSeconds } : null, onDraftChange)
 
   useEffect(() => {
     if (settings) {
       const s = settings as L3trasSettings
-      setObjectiveWord((s.objectiveWord || DEFAULT_SETTINGS.objectiveWord).toUpperCase())
-      setValidationTimeLimitSeconds(normalizeValidationTimeLimitSeconds(s.validationTimeLimitSeconds))
+      setObjectiveWord((s.objectiveWord ?? DEFAULT_SETTINGS.objectiveWord).toUpperCase())
+      setValidationTimeLimitSeconds(s.validationTimeLimitSeconds === undefined ? DEFAULT_VALIDATION_TIME_LIMIT_SECONDS : Number(s.validationTimeLimitSeconds))
     }
   }, [settings])
 
   useEffect(() => {
     if (!gameId || settingsLoaded) return
     let cancelled = false
+    setLoaded(false)
+    setLoadError('')
     ;(async () => {
       try {
         const data = await api.get<GameDataResponse>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
-        if (cancelled || !data.ok) return
+        if (cancelled) return
+        if (!data.ok) throw new Error('No se pudo cargar la configuración.')
         const backend = data.settings?.l3tras
         if (backend?.objectiveWord) {
           setObjectiveWord(backend.objectiveWord.toUpperCase())
         }
         if (backend?.validationTimeLimitSeconds != null) {
-          setValidationTimeLimitSeconds(normalizeValidationTimeLimitSeconds(backend.validationTimeLimitSeconds))
+          setValidationTimeLimitSeconds(Number(backend.validationTimeLimitSeconds))
         }
-      } catch {
-        // ignore
+        setLoaded(true)
+      } catch (cause) {
+        if (!cancelled) setLoadError(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración.')
       }
     })()
     return () => { cancelled = true }
@@ -87,8 +93,11 @@ export default function L3trasGameConfig({ gameId, settings, settingsLoaded, onC
     setObjectiveWord(cleaned)
   }
 
-  const validate = () =>
-    !objectiveWord || objectiveWord.length === 0 ? t('La palabra objetivo no puede estar vacía', 'The target word cannot be empty') : null
+  const validate = () => {
+    if (!loaded) return loadError || t('Cargando configuración...', 'Loading configuration...')
+    if (!objectiveWord) return t('La palabra objetivo no puede estar vacía', 'The target word cannot be empty')
+    return null
+  }
 
   const persist = async () => {
     const invalid = validate()
@@ -150,6 +159,7 @@ export default function L3trasGameConfig({ gameId, settings, settingsLoaded, onC
 
   return (
     <div className="space-y-6">
+      {loadError && <p role="alert">{loadError}</p>}
       <div className="grid grid-cols-2 gap-4">
         <div className="min-w-0 flex flex-col">
           <div className="mb-2 flex items-center gap-2">
@@ -203,12 +213,8 @@ export default function L3trasGameConfig({ gameId, settings, settingsLoaded, onC
             min={MIN_VALIDATION_TIME_LIMIT_SECONDS}
             max={MAX_VALIDATION_TIME_LIMIT_SECONDS}
             step={1}
-            value={validationTimeLimitSeconds}
-            onChange={(e) =>
-              setValidationTimeLimitSeconds(
-                normalizeValidationTimeLimitSeconds(e.target.value === '' ? NaN : Number(e.target.value)),
-              )
-            }
+            value={Number.isFinite(validationTimeLimitSeconds) ? validationTimeLimitSeconds : ''}
+            onChange={(e) => setValidationTimeLimitSeconds(e.target.value === '' ? NaN : Number(e.target.value))}
             className="mt-auto w-full min-w-0 h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
           />
         </div>

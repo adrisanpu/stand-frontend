@@ -4,31 +4,9 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { archiveOperatorGame, deleteOperatorGamePermanently, listOperatorGames, operatorGameHomeUrl, setOperatorGameActive, unarchiveOperatorGame, type OperatorGame } from '../../api/operatorGames'
 import { games as catalog, getGameById } from '../../games'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
-import CreateGameDialog from './CreateGameDialog'
 import GameConfigurationDialog from './GameConfigurationDialog'
 import GameShowcase from './GameShowcase'
-
-const actionPaths = {
-  create: 'M12 5v14M5 12h14',
-  open: 'M14 3h7v7M21 3 10 14M10 3H3v18h18v-7',
-  activate: 'm8 5 11 7-11 7Z',
-  deactivate: 'M7 5h3v14H7zM14 5h3v14h-3z',
-  closing: 'M5 3h14M5 21h14M7 3v4l10 10v4M17 3v4L7 17v4',
-  archive: 'M4 8h16v13H4zM3 3h18v5H3zM9 12h6',
-  restore: 'M4 10v11h16V10M3 3h18v5H3zM12 17V10m-3 3 3-3 3 3',
-  delete: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
-  reload: 'M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 14 6M18 18a8 8 0 0 1-14-6',
-  confirm: 'm5 12 4 4L19 6',
-  cancel: 'm6 6 12 12M6 18 18 6',
-  configure: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1Z',
-}
-
-function ActionIcon({ name }: { name: keyof typeof actionPaths }) {
-  return <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-    <path d={actionPaths[name]} />
-  </svg>
-}
+import { AdminIcon as ActionIcon } from './AdminIcon'
 
 export default function AdminGames() {
   const { language, t } = useOperatorLanguage()
@@ -239,44 +217,15 @@ export default function AdminGames() {
   }
   return (
     <div className="mt-6 space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="w-full sm:max-w-md">
-          <label htmlFor="event-search" className="sr-only">{t('Buscar partidas', 'Search events')}</label>
-          <input id="event-search" type="search" value={search} onChange={event => setSearch(event.target.value)}
-            placeholder={t('Buscar por partida, fecha o jugadores…', 'Search by event, date or players…')}
-            className="w-full rounded-xl border border-current/20 bg-surface px-4 py-3 text-sm text-textMain" />
-        </div>
-        {actionError && <div role="alert" className="card space-y-2 p-4">
-          <p>{actionError}</p>
-          <button type="button" disabled={busyId !== null} className="rounded-xl border border-current/20 p-3 disabled:opacity-50"
-            aria-label={t('Recargar partidas', 'Reload events')} title={t('Recargar partidas', 'Reload events')} onClick={() => {
-            setActionError('')
-            setConfirm(null)
-            setVersion(version + 1)
-          }}><ActionIcon name="reload" /></button>
-        </div>}
-        <div className="flex items-center justify-end gap-2">
-        <button type="button" disabled={busyId !== null} aria-pressed={archived}
-          aria-label={archived ? t('Volver a partidas', 'Back to events') : t('Ver partidas archivadas', 'View archived events')}
-          title={archived ? t('Volver a partidas', 'Back to events') : t('Ver partidas archivadas', 'View archived events')}
-          onClick={() => {
-            const next = new URLSearchParams(params)
-            if (archived) next.delete('archived')
-            else next.set('archived', '1')
-            setParams(next)
-          }}
-          className="rounded-xl border border-current/20 p-3 disabled:opacity-50">
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-6 w-6">
-            {archived ? <path d="m14 6-6 6 6 6M8 12h13" /> : <><path d="M4 8h16v13H4zM3 3h18v5H3zM9 12h6" /></>}
-          </svg>
-        </button>
-        <button type="button" disabled={busyId !== null} onClick={() => setCatalogOpen(true)}
-          aria-label={t('Crear partida', 'Create event')} title={t('Crear partida', 'Create event')}
-          className="shrink-0 rounded-xl border border-current/20 bg-primary/20 p-3 disabled:opacity-50">
-          <ActionIcon name="create" />
-        </button>
-        </div>
-      </div>
+      {actionError && <div role="alert" className="card space-y-2 p-4">
+        <p>{actionError}</p>
+        <button type="button" disabled={busyId !== null} className="rounded-xl border border-current/20 p-3 disabled:opacity-50"
+          aria-label={t('Recargar partidas', 'Reload events')} title={t('Recargar partidas', 'Reload events')} onClick={() => {
+          setActionError('')
+          setConfirm(null)
+          setVersion(version + 1)
+        }}><ActionIcon name="reload" /></button>
+      </div>}
       {archived && <h2 className="text-xl font-semibold">{t('Partidas archivadas', 'Archived events')}</h2>}
       {(status === 'loading' || (status === 'ready' && !ready)) && <p role="status">{t('Cargando partidas…', 'Loading events…')}</p>}
       {status === 'error' && <div className="card space-y-3 p-6">
@@ -286,31 +235,48 @@ export default function AdminGames() {
           <ActionIcon name="reload" />
         </button>
       </div>}
-      {ready && <GameShowcase games={catalog} counts={counts} selectedId={selectedType} onSelect={selectGameType} />}
-      {ready && games.length === 0 && <div className="card space-y-3 p-6">
-        <h2 className="text-xl font-semibold">{archived ? t('No tienes partidas archivadas', 'No archived events') : t('Todavía no tienes partidas', 'No events yet')}</h2>
-        <p className="text-textSub">{archived
-          ? t('Aquí aparecerán las partidas que archives. Desarchivarlas no las activa.', 'Archived events appear here. Restoring them does not activate them.')
-          : t('Pulsa Crear partida para elegir un juego del catálogo.', 'Select Create event to choose a game from the catalog.')}</p>
-      </div>}
-      {ready && games.length > 0 && typeGames.length === 0 && <p role="status" className="text-center text-textSub">
-        {archived ? t('Este juego no tiene partidas archivadas.', 'This game has no archived events.') : t('Este juego no tiene partidas.', 'This game has no events.')}
-      </p>}
-      {ready && typeGames.length > 0 && filtered.length === 0 && <p role="status">
-        {t('No hay partidas que coincidan con tu búsqueda.', 'No events match your search.')}
-      </p>}
-      {ready && filtered.length > 0 && <div className="card space-y-3 p-4">
-        <div role="group" aria-label={t('Acciones de la partida seleccionada', 'Selected event actions')}
-          className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <span className="text-sm text-textSub sm:pt-3">{chosenGame
-            ? `${t('Seleccionada', 'Selected')}: ${chosenGame.gameName}`
-            : t('Selecciona una partida para gestionar sus acciones.', 'Select an event to manage its actions.')}</span>
-          <div className="space-y-2 sm:max-w-sm">{renderActions(chosenGame)}</div>
+      {ready && <GameShowcase games={catalog} counts={counts} selectedId={selectedType} onSelect={selectGameType}
+        onOpen={archived ? undefined : () => setCatalogOpen(true)} />}
+      <div className="card space-y-3 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="w-full sm:min-w-72 sm:max-w-xl sm:flex-1">
+            <label htmlFor="event-search" className="sr-only">{t('Buscar partidas', 'Search events')}</label>
+            <input id="event-search" type="search" value={search} onChange={event => setSearch(event.target.value)}
+              placeholder={t('Buscar por partida, fecha o jugadores…', 'Search by event, date or players…')}
+              className="w-full rounded-xl border border-current/20 bg-surface px-4 py-3 text-base text-textMain" />
+          </div>
+          <div className="flex shrink-0 items-center gap-2 sm:order-first">
+            <button type="button" disabled={busyId !== null} aria-pressed={archived}
+              aria-label={archived ? t('Volver a partidas', 'Back to events') : t('Ver partidas archivadas', 'View archived events')}
+              title={archived ? t('Volver a partidas', 'Back to events') : t('Ver partidas archivadas', 'View archived events')}
+              onClick={() => {
+                const next = new URLSearchParams(params)
+                if (archived) next.delete('archived')
+                else next.set('archived', '1')
+                setParams(next)
+              }}
+              className="rounded-xl border border-current/20 p-3 disabled:opacity-50">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-6 w-6">
+                {archived ? <path d="m14 6-6 6 6 6M8 12h13" /> : <><path d="M4 8h16v13H4zM3 3h18v5H3zM9 12h6" /></>}
+              </svg>
+            </button>
+            <button type="button" disabled={busyId !== null} onClick={() => setCatalogOpen(true)}
+              aria-label={t('Crear partida', 'Create event')} title={t('Crear partida', 'Create event')}
+              className="shrink-0 rounded-xl border border-current/20 bg-primary/20 p-3 disabled:opacity-50">
+              <ActionIcon name="create" />
+            </button>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm" aria-label={archived ? t('Partidas archivadas', 'Archived events') : t('Mis partidas', 'My events')}>
+        <div role="group" aria-label={t('Acciones de la partida seleccionada', 'Selected event actions')}
+          className="space-y-2 lg:max-w-sm">{renderActions(chosenGame)}</div>
+      </div>
+      {ready && filtered.length > 0 && <div className="overflow-x-auto">
+          <table className="admin-table w-full text-left text-sm" aria-label={archived ? t('Partidas archivadas', 'Archived events') : t('Mis partidas', 'My events')}>
             <caption className="sr-only">{archived ? t('Partidas archivadas', 'Archived events') : t('Mis partidas', 'My events')}</caption>
-            <thead><tr>{[t('Selección', 'Selection'), t('Nombre', 'Name'), t('Estado', 'Status'), t('Creada', 'Created'), t('Jugadores', 'Players')]
+            <thead><tr>
+              <th scope="col" className="p-2"><span className="sr-only">{t('Selección', 'Selection')}</span></th>
+              {[t('Nombre', 'Name'), t('Estado', 'Status'), t('Creada', 'Created'), t('Jugadores', 'Players')]
               .map(label => <th key={label} scope="col" className="p-2 whitespace-nowrap">{label}</th>)}</tr></thead>
             <tbody>{filtered.map(game => {
               const selected = chosenGame?.gameId === game.gameId
@@ -328,13 +294,25 @@ export default function AdminGames() {
               </tr>
             })}</tbody>
           </table>
-        </div>
       </div>}
+      </div>
+      {ready && games.length === 0 && <div className="card space-y-3 p-6">
+        <h2 className="text-xl font-semibold">{archived ? t('No tienes partidas archivadas', 'No archived events') : t('Todavía no tienes partidas', 'No events yet')}</h2>
+        <p className="text-textSub">{archived
+          ? t('Aquí aparecerán las partidas que archives. Desarchivarlas no las activa.', 'Archived events appear here. Restoring them does not activate them.')
+          : t('Pulsa Crear partida para elegir un juego del catálogo.', 'Select Create event to choose a game from the catalog.')}</p>
+      </div>}
+      {ready && games.length > 0 && typeGames.length === 0 && <p role="status" className="text-center text-textSub">
+        {archived ? t('Este juego no tiene partidas archivadas.', 'This game has no archived events.') : t('Este juego no tiene partidas.', 'This game has no events.')}
+      </p>}
+      {ready && typeGames.length > 0 && filtered.length === 0 && <p role="status">
+        {t('No hay partidas que coincidan con tu búsqueda.', 'No events match your search.')}
+      </p>}
       {confirm && confirmingGame && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-6"
           onClick={event => { if (event.target === event.currentTarget) setConfirm(null) }}>
           <div ref={actionDialog} lang={language} role="dialog" aria-modal="true" aria-labelledby="game-action-title" tabIndex={-1}
-            className="w-full max-w-lg rounded-2xl border border-current/20 bg-[var(--color-background)] p-5 text-textMain shadow-xl"
+            className="admin-dialog w-full max-w-lg rounded-lg border p-5 shadow-xl"
             onKeyDown={event => {
               if (event.key === 'Escape') {
                 event.stopPropagation()
@@ -384,9 +362,27 @@ export default function AdminGames() {
         </div>,
         document.body,
       )}
-      {params.get('create') === '1' && <CreateGameDialog onClose={() => setCatalogOpen(false)} />}
-      {configureId && <GameConfigurationDialog key={configureId} gameId={configureId} onClose={() => {
+      {(params.get('create') === '1' || params.get('setup') || params.get('form') || configureId) && <GameConfigurationDialog
+        key={params.get('create') === '1' || params.get('setup') ? 'setup' : params.get('form') || configureId!}
+        gameType={params.get('create') === '1' ? selectedType : undefined}
+        gameId={params.get('setup') || params.get('form') || configureId || undefined}
+        requireSetup={params.has('setup')}
+        initialSection={params.get('form') ? 'form' : 'appearance'}
+        onCreated={id => setParams(current => {
+          const next = new URLSearchParams(current)
+          next.delete('create')
+          next.set('setup', id)
+          return next
+        }, { replace: true })}
+        onClose={() => {
         setConfigureId(null)
+        setParams(current => {
+          const next = new URLSearchParams(current)
+          next.delete('create')
+          next.delete('form')
+          next.delete('setup')
+          return next
+        }, { replace: true })
         setVersion(value => value + 1)
       }} />}
     </div>

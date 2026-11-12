@@ -6,6 +6,7 @@ import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/sett
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
+import { useMechanicsDraft } from '../useMechanicsDraft'
 
 type InfoCard = {
   id: string
@@ -60,7 +61,7 @@ const LAYOUT_OPTIONS: { value: CardLayoutPosition; label: string }[] = [
   { value: 'bottom', label: 'Abajo' },
 ]
 
-export default function InfocardsGameConfig({ gameId, settings = {}, onChange, registerSave, readOnly = false, onBusyChange, onDirtyChange }: GameConfigProps) {
+export default function InfocardsGameConfig({ gameId, settings = {}, onChange, onDraftChange, registerSave, readOnly = false, onBusyChange, onDirtyChange }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   // Section A — current cards
   const [cards, setCards] = useState<InfoCard[]>([])
@@ -89,6 +90,14 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
   // Participation / sorteo (no validación, mensaje al completar quiz)
   const [requiresValidation, setRequiresValidation] = useState(false)
   const [quizCompletedMessage, setQuizCompletedMessage] = useState('')
+  useMechanicsDraft(loadingCards || cardsLoadError ? null : {
+    cards: cards.map(card => ({
+      ...card,
+      imageUrl: card._localImagePreview ?? card.imageUrl,
+      videoUrl: card._localVideoPreview ?? card.videoUrl,
+    })),
+    cardLayouts, requiresValidation, quizCompletedMessage,
+  }, onDraftChange)
 
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
@@ -227,7 +236,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
       await fetchCards()
     }
     setLayoutsDirty(false)
-    onChange({ ...settings, cardLayouts, refreshGameScreen: true })
+    onChange({ ...settings, cardLayouts })
   }
 
   const embedded = useGameConfigSaveRegistration(registerSave, { validate, save: persist })
@@ -312,7 +321,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
       setCards(newCards)
       setCardsDirty(false)
       setAiStatus('done')
-      setAiMessage(t(`Listo. Se generaron ${newCards.length} tarjetas.${processRes.quizGenerated ? ' Quiz generado.' : ''}`, `Done. ${newCards.length} cards generated.${processRes.quizGenerated ? ' Quiz generated.' : ''}`))
+      setAiMessage(t(`Listo. Se generaron ${newCards.length} tarjetas.${processRes.quizGenerated ? ' Cuestionario generado.' : ''}`, `Done. ${newCards.length} cards generated.${processRes.quizGenerated ? ' Questionnaire generated.' : ''}`))
       setAiExpanded(false)
       onChange({ ...settings, processed: true, cardsCount: newCards.length, close: true })
     } catch (err) {
@@ -487,7 +496,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
                   disabled={isAiLoading}
                   className="rounded border-white/20 bg-[rgba(255,255,255,0.05)] text-indigo-500 focus:ring-white/20 disabled:opacity-50"
                 />
-                <span className="text-sm text-gray-300 whitespace-nowrap">{t('Generar Quiz', 'Generate quiz')}</span>
+                <span className="text-sm text-gray-300 whitespace-nowrap">{t('Generar cuestionario', 'Generate questionnaire')}</span>
               </label>
               {generateQuiz && (
                 <>
@@ -647,13 +656,13 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, r
               }}
               className="rounded border-white/20 bg-[rgba(255,255,255,0.05)] text-indigo-500 focus:ring-white/20"
             />
-            <span className="text-sm text-gray-300">{t('No requiere validación (solo quiz para participar)', 'No validation required (quiz only to participate)')}</span>
+            <span className="text-sm text-gray-300">{t('No requiere validación (solo cuestionario para participar)', 'No validation required (questionnaire only to participate)')}</span>
           </label>
           <p className="text-xs text-gray-500">
-            {t('Si está activado, los jugadores no reciben código de validación; al completar el quiz se les envía el mensaje de abajo.', 'When enabled, players do not receive a validation code; when they complete the quiz, they receive the message below.')}
+            {t('Si está activado, los jugadores no reciben código de validación; al completar el cuestionario se les envía el mensaje de abajo.', 'When enabled, players do not receive a validation code; when they complete the questionnaire, they receive the message below.')}
           </p>
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">{t('Mensaje al completar el quiz', 'Message after completing the quiz')}</label>
+            <label className="block text-xs font-medium text-gray-400 mb-1">{t('Mensaje al completar el cuestionario', 'Message after completing the questionnaire')}</label>
             <textarea
               value={quizCompletedMessage}
               onChange={e => {

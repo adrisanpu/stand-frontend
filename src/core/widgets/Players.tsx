@@ -5,9 +5,6 @@ import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { normalizeGameType } from '../gameTypeMap'
 import { usePolling } from '../../hooks/usePolling'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
-import type { GamePrize } from '../prizes'
-import PrizeSticker from './PrizeSticker'
-import type { StickerPrize } from './stackPrizePromotions'
 import { HOME_TITLE_TEXT, HOME_BODY_TEXT } from '../ui/homeTypography'
 
 interface GameDataResponse {
@@ -21,60 +18,28 @@ interface GameDataResponse {
 }
 
 interface PlayersProps {
-  stackPrizes?: StickerPrize[]
   gameName: string
   gameId?: string
   gameType?: string
   refreshInterval?: number // in milliseconds, 0 to disable
   compact?: boolean // when true (e.g. landscape sidebar), reduce padding and avoid scroll
   countersOnly?: boolean // when true (e.g. empareja2 landscape), compact card without main "Jugadores" heading
-  prizeLabel?: string // Legacy prize name, shown in the prize sticker
-  prize?: GamePrize
-  /** Límite premio validación (localStorage; empareja2 también API) */
-  maxPrizeValidationLimit?: number
 }
 
-const EMPAREJA2_SETTINGS_KEY = 'EMPAREJA2_settings_'
-
-function getEmpareja2MaxValidations(gameId: string | undefined): number | undefined {
-  if (!gameId) return undefined
-  try {
-    const raw = localStorage.getItem(`${EMPAREJA2_SETTINGS_KEY}${gameId}`)
-    if (!raw) return undefined
-    const parsed = JSON.parse(raw)
-    const n = parsed?.maxPrizeValidation ?? parsed?.maxValidations
-    if (typeof n !== 'number' || n < 0) return undefined
-    return n
-  } catch {
-    return undefined
-  }
-}
-
-export default function Players({ gameName, gameId, gameType, refreshInterval = 10000, compact = false, countersOnly = false, prizeLabel: legacyPrizeLabel, prize, maxPrizeValidationLimit, stackPrizes }: PlayersProps) {
+export default function Players({ gameName, gameType, refreshInterval = 10000, compact = false, countersOnly = false }: PlayersProps) {
   const { t } = useOperatorLanguage()
   const { plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const [playerCount, setPlayerCount] = useState<number | null>(null)
-  const [validatedCount, setValidatedCount] = useState<number>(0)
-  const [maxValidationsFromApi, setMaxValidationsFromApi] = useState<number | undefined>(undefined)
 
   const maxPlayers = features.maxPlayers === Infinity ? null : features.maxPlayers
   const isEmpareja2 = normalizeGameType(gameType) === 'EMPAREJA2'
-  const prizeLabel = prize ? prize.name : legacyPrizeLabel
-  const effectiveMax = prize ? prize.limit ?? undefined : isEmpareja2
-    ? (maxValidationsFromApi ?? maxPrizeValidationLimit ?? getEmpareja2MaxValidations(gameId))
-    : maxPrizeValidationLimit
 
   const fetchCount = async () => {
     if (!gameName) return
     const data = await api.get<GameDataResponse>(`/v1/game?gameName=${encodeURIComponent(gameName)}`)
     if (!data.ok) throw new Error('API response not ok')
     setPlayerCount(data.playerCount ?? 0)
-    setValidatedCount(data.validatedCount ?? 0)
-    const fromApi = data.settings?.empareja2?.maxValidations
-    setMaxValidationsFromApi(
-      typeof fromApi === 'number' && fromApi >= 0 ? fromApi : undefined
-    )
   }
 
   const { isStale } = usePolling(fetchCount, [gameName], { interval: refreshInterval })
@@ -96,7 +61,6 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
   if (countersOnly && isEmpareja2) {
     return (
       <div className="flex flex-col shrink-0 min-w-0">
-        <PrizeSticker items={stackPrizes} label={prizeLabel} prize={prize} current={validatedCount} max={effectiveMax} compact={compact} />
         <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
           {isStale && <span className={`${HOME_BODY_TEXT} font-normal text-yellow-500 mb-1 block`}>● {t('sin señal', 'offline')}</span>}
           <div className="space-y-2">
@@ -127,7 +91,6 @@ export default function Players({ gameName, gameId, gameType, refreshInterval = 
 
   return (
     <div className="flex flex-col shrink-0 min-w-0">
-      <PrizeSticker items={stackPrizes} label={prizeLabel} prize={prize} current={validatedCount} max={effectiveMax} compact={compact} />
       <div className={`card rounded-xl sm:rounded-2xl shadow-neon flex-shrink-0 ${compact ? 'p-2 sm:p-3 min-w-0 overflow-hidden' : 'p-3 sm:p-4 lg:p-6'}`}>
         {isStale && <span className={`${HOME_BODY_TEXT} font-normal text-yellow-500 mb-1 block`}>● {t('sin señal', 'offline')}</span>}
         <div className="flex flex-wrap items-center gap-3">

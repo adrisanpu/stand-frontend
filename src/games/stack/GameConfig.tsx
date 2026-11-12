@@ -7,6 +7,7 @@ import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
 import { DEFAULT_STACK_CONFIG, isStackConfig, STACK_SKINS, type StackConfig, type StackSkin } from './stackLogic'
 import BlockPreview from './BlockPreview'
+import { useMechanicsDraft } from '../useMechanicsDraft'
 
 const FIELDS = [
   { key: 'initialSpeed', label: 'Velocidad inicial', min: 0.1, step: 0.1 },
@@ -21,11 +22,12 @@ const SKIN_LABELS: Record<StackSkin, string> = {
   baklava: 'Baklava de pistacho',
 }
 
-export default function StackGameConfig({ gameId, settings, settingsLoaded, onChange, registerSave }: GameConfigProps) {
+export default function StackGameConfig({ gameId, settings, settingsLoaded, onChange, onDraftChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
-  const [config, setConfig] = useState<StackConfig>(settingsLoaded && isStackConfig(settings) ? settings : DEFAULT_STACK_CONFIG)
+  const [config, setConfig] = useState<StackConfig>(settingsLoaded ? settings ?? {} : DEFAULT_STACK_CONFIG)
   const [status, setStatus] = useState<'loading' | 'ready' | 'saving' | 'saved' | 'error'>(settingsLoaded ? 'ready' : 'loading')
   const [message, setMessage] = useState('')
+  useMechanicsDraft(status === 'loading' || status === 'error' ? null : config, onDraftChange)
 
   useEffect(() => {
     if (settingsLoaded) return

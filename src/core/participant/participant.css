@@ -24,6 +24,58 @@
   margin-top: clamp(8px, calc(var(--play-viewport-height) * 0.018), 20px);
 }
 
+.play-shell .play-card {
+  border-radius: 10px;
+}
+
+.participant-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--color-text-sub);
+  font-size: 0.8rem;
+}
+
+.participant-progress {
+  display: flex;
+  width: min(8rem, 40%);
+  gap: 0.3rem;
+}
+
+.participant-progress span {
+  height: 0.25rem;
+  flex: 1;
+  background: rgba(var(--color-primary-rgb), 0.2);
+}
+
+.participant-progress span.is-complete {
+  background: var(--color-primary);
+}
+
+.play-shell .participant-form :is(input:not([type="checkbox"]), textarea, select) {
+  border-color: rgba(var(--color-primary-rgb), 0.32);
+  border-radius: 7px;
+  background-color: rgba(255,255,255,0.05);
+  color: var(--color-text-main);
+}
+
+.play-shell .participant-form :is(input, textarea, select):focus-visible {
+  border-color: var(--color-primary);
+  outline-color: var(--color-primary);
+}
+
+.play-shell .participant-primary-action {
+  min-height: 44px;
+  border-radius: 7px;
+}
+
+html.light-mode .play-shell .participant-form :is(input:not([type="checkbox"]), textarea, select) {
+  border-color: rgba(21,47,58,0.24);
+  background-color: rgba(21,47,58,0.035);
+  color: var(--color-text-main);
+}
+
 .play-shell .play-logo {
   height: clamp(48px, calc(var(--play-viewport-height) * 0.14), 112px);
 }

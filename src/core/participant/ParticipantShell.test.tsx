@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PublicApiError, publicApi, type StackAssignment, type PublicGameResponse, type PlayerResponse, type PlayerAssignment } from '../../api/publicApi'
+import { PublicApiError, publicApi, type MobileAssignment, type StackAssignment, type PublicGameResponse, type PlayerResponse, type PlayerAssignment } from '../../api/publicApi'
 import { DEFAULT_STACK_CONFIG } from '../../games/stack/stackLogic'
 import { DEFAULT_RULET4_CONFIG } from '../../games/rulet4/rulet4Logic'
 import { StrictMode } from 'react'
@@ -54,6 +54,25 @@ async function advanceToParticipantDetails(email = 'player@example.test') {
 }
 
 describe('ParticipantShell STACK integration', () => {
+  it.each(['L3TRAS', 'SEMAFORO', 'CUPIDO', 'INFOCARDS'] as const)('restores %s into its real mobile experience', async gameType => {
+    const restored: MobileAssignment = {
+      gameType, playerId: 1, displayName: 'Alex', validationCode: 1234, validated: false,
+      letter: 'S', play: { revision: 0, phase: 'idle', word: 'STAND', slots: [null, null, null, null, null] },
+      cards: [{ id: 'welcome', title: 'Evento móvil', body: 'Información del evento' }],
+    }
+    vi.mocked(publicApi.getGame).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType, isActive: true, playMode: 'mobile',
+      playerCount: 1, validatedCount: 0, recentPairs: [], joinUrl: '',
+    })
+    vi.mocked(publicApi.getPlayer).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType, playerToken: 'token', assignment: restored, prizes: [],
+    })
+    savePlayerSession('GAME1234', 'token', restored)
+    renderParticipant()
+    if (gameType === 'INFOCARDS') expect(await screen.findByRole('heading', { name: 'Evento móvil' })).toBeInTheDocument()
+    else expect(await screen.findByRole('heading', { name: gameType })).toBeInTheDocument()
+    expect(screen.queryByText('Sigue las instrucciones del evento para jugar.')).not.toBeInTheDocument()
+  })
   it.each(['EMPAREJA2', 'STACK'] as const)('renders cutover native awards for legacy %s without lifecycle metadata or legacy prizes', async gameType => {
     vi.mocked(publicApi.getGame).mockResolvedValue({
       ok: true, gameId: 'GAME1234', gameType, isActive: true,
@@ -842,6 +861,7 @@ describe('ParticipantShell STACK integration', () => {
           appearance: { colors: custom ? { primary: '#ff0000', accent: '#00ff00' } : null, themeMode: 'light' },
           playerCount: 1, validatedCount: 0, recentPairs: [], joinUrl: '/play/GAME1234',
         })
+
         savePlayerSession('GAME1234', 'token', pairAssignment)
         vi.mocked(publicApi.getPlayer).mockResolvedValue(playerResponse('EMPAREJA2', pairAssignment))
         renderParticipant()
@@ -862,6 +882,28 @@ describe('ParticipantShell STACK integration', () => {
         if (previousMode === null) localStorage.removeItem(STORAGE_KEY_THEME_MODE)
         else localStorage.setItem(STORAGE_KEY_THEME_MODE, previousMode)
       }
+  })
+
+  it('keeps the event appearance, logo and banner during gameplay and validation', async () => {
+    vi.mocked(publicApi.getGame).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'EMPAREJA2', isActive: true,
+      playMode: 'mobile', joinChannel: 'web', clientLogoUrl: '/account-logo.png',
+      appearance: { colors: null, themeMode: 'dark' },
+      formConfig: { registrationTitle: '', registrationDescription: '', quizTitle: '', quizDescription: '',
+        logoKey: 'logo', bannerKey: 'banner', quizMoment: 'disabled',
+        appearance: { colors: { primary: '#123456', accent: '#654321' }, themeMode: 'light' } },
+      formLogoUrl: '/event-logo.png', formBannerUrl: '/event-banner.png',
+      playerCount: 1, validatedCount: 0, recentPairs: [], joinUrl: '/play/GAME1234',
+    })
+    savePlayerSession('GAME1234', 'token', pairAssignment)
+    vi.mocked(publicApi.getPlayer).mockResolvedValue(playerResponse('EMPAREJA2', pairAssignment))
+    renderParticipant()
+    fireEvent.click(await screen.findByRole('button', { name: 'Validar pareja' }))
+    expect(screen.getByRole('img', { name: 'Logo del cliente' })).toHaveAttribute('src', '/event-logo.png')
+    expect(document.querySelector('img[src="/event-banner.png"]')).toBeInTheDocument()
+    expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('#123456')
+    expect(document.documentElement).toHaveClass('light-mode')
+    expect(screen.getByRole('button', { name: 'Validar' })).toBeInTheDocument()
   })
 
   it('validates the immutable own code together with the entered partner code and preserves errors', async () => {

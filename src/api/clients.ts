@@ -25,6 +25,7 @@ export type ClientAward = {
 
 export type ClientParticipation = {
   gameId: string
+  playerId?: number
   gameName: string | null
   gameType: string | null
   joinedAt: string | null
@@ -71,6 +72,7 @@ function isClientAward(value: unknown): value is ClientAward {
 function isClientParticipation(value: unknown): value is ClientParticipation {
   return typeof value === 'object' && value !== null
     && 'gameId' in value && typeof value.gameId === 'string'
+    && (!('playerId' in value) || Number.isSafeInteger(value.playerId))
     && 'gameName' in value && isTextOrNull(value.gameName)
     && 'gameType' in value && isTextOrNull(value.gameType)
     && 'joinedAt' in value && isTextOrNull(value.joinedAt)
@@ -123,4 +125,9 @@ export async function getClientHistory(clientId: string): Promise<ClientHistory>
     throw new Error('Invalid client history response')
   }
   return { client: data.client, participations: data.participations }
+}
+
+export async function removeClientFromGame(gameId: string, playerId: number): Promise<void> {
+  const result = await api.delete<{ ok: boolean }>('/v1/game/players', { gameId, playerId })
+  if (result?.ok !== true) throw new Error('Could not remove player')
 }

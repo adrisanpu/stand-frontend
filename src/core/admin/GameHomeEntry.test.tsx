@@ -10,6 +10,10 @@ vi.mock('../shell/AppShell', () => ({
   default: ({ initialGame, onReturnToAdmin }: { initialGame?: OperatorGame; onReturnToAdmin: () => void }) =>
     <div><p>Home: {initialGame?.gameId ?? 'legacy'}</p><button onClick={onReturnToAdmin}>Volver</button></div>,
 }))
+vi.mock('./GameConfigurationDialog', () => ({
+  default: ({ gameId, onClose }: { gameId: string; onClose: () => void }) =>
+    <div role="dialog">Setup: {gameId}<button onClick={onClose}>Complete review</button></div>,
+}))
 const game = { gameId: 'NEW', gameName: 'NEW_EVENT', gameType: 'STACK' }
 function mount(path = '/home?gameId=NEW') {
   render(<MemoryRouter initialEntries={[path]}>
@@ -58,4 +62,18 @@ it('preserves direct legacy home links without an extra game lookup', () => {
   mount('/home')
   expect(screen.getByText('Home: legacy')).toBeInTheDocument()
   expect(api.get).not.toHaveBeenCalled()
+})
+
+it.each(['/home?gameId=NEW', '/home'])('resumes mandatory setup before mounting Home via %s', async path => {
+  localStorage.setItem('gameId', 'NEW')
+  const pending = { version: 1, revision: 'r1', confirmedSections: [], completed: false }
+  vi.mocked(api.get).mockResolvedValue({ ok: true, game: { ...game, setupReview: pending } })
+  mount(path)
+  expect(await screen.findByRole('dialog')).toHaveTextContent('Setup: NEW')
+  expect(screen.queryByText('Home: NEW')).not.toBeInTheDocument()
+  vi.mocked(api.get).mockResolvedValue({ ok: true, game: { ...game, setupReview: {
+    ...pending, completed: true, confirmedSections: ['appearance', 'configuration', 'form', 'questionnaire', 'conditions', 'prizes'],
+  } } })
+  fireEvent.click(screen.getByRole('button', { name: 'Complete review' }))
+  expect(await screen.findByText('Home: NEW')).toBeInTheDocument()
 })

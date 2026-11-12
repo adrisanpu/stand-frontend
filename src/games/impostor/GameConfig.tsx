@@ -5,6 +5,7 @@ import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/sett
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
+import { useMechanicsDraft } from '../useMechanicsDraft'
 
 type ImpostorSettings = {
   maxPlayers?: number
@@ -19,12 +20,13 @@ type GameDataResponse = {
 
 const DEFAULT_WORDS = ['playa', 'montana', 'pizza', 'cine', 'futbol', 'musica']
 
-export default function ImpostorGameConfig({ gameId, settings, settingsLoaded, onChange, registerSave }: GameConfigProps) {
+export default function ImpostorGameConfig({ gameId, settings, settingsLoaded, onChange, onDraftChange, registerSave }: GameConfigProps) {
   const { t } = useOperatorLanguage()
   const s = (settings || {}) as ImpostorSettings
   const [maxPlayers, setMaxPlayers] = useState<number>(s.maxPlayers ?? 8)
-  const [wordsText, setWordsText] = useState<string>((s.words && s.words.length ? s.words : DEFAULT_WORDS).join('\n'))
+  const [wordsText, setWordsText] = useState<string>((s.words ?? DEFAULT_WORDS).join('\n'))
   const [status, setStatus] = useState<string>('')
+  const [loaded, setLoaded] = useState(settingsLoaded || !gameId)
   const normalizedWords = useMemo(
     () =>
       wordsText
@@ -33,20 +35,24 @@ export default function ImpostorGameConfig({ gameId, settings, settingsLoaded, o
         .filter(Boolean),
     [wordsText],
   )
+  useMechanicsDraft(loaded ? { maxPlayers, words: normalizedWords } : null, onDraftChange)
 
   useEffect(() => {
     if (!gameId || settingsLoaded) return
     let cancelled = false
+    setLoaded(false)
     ;(async () => {
       try {
         const data = await api.get<GameDataResponse>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
-        if (cancelled || !data.ok) return
+        if (cancelled) return
+        if (!data.ok) throw new Error('No se pudo cargar la configuración.')
         const max = data.settings?.impostor?.maxPlayers ?? data.game?.maxPlayers
         const words = data.settings?.impostor?.words
-        if (typeof max === 'number') setMaxPlayers(Math.max(3, Math.min(25, Math.floor(max))))
-        if (words?.length) setWordsText(words.join('\n'))
-      } catch {
-        // keep local defaults
+        if (typeof max === 'number') setMaxPlayers(max)
+        if (words) setWordsText(words.join('\n'))
+        setLoaded(true)
+      } catch (cause) {
+        if (!cancelled) setStatus(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración.')
       }
     })()
     return () => {
@@ -54,7 +60,11 @@ export default function ImpostorGameConfig({ gameId, settings, settingsLoaded, o
     }
   }, [gameId, settingsLoaded])
 
+  const validate = () => !loaded ? t('La configuración no está disponible.', 'Settings are unavailable.') : null
+
   const persist = async () => {
+    const invalid = validate()
+    if (invalid) throw new Error(invalid)
     const payload: ImpostorSettings = {
       maxPlayers: Math.max(3, Math.min(25, Math.floor(maxPlayers))),
       words: normalizedWords.length ? normalizedWords : DEFAULT_WORDS,
@@ -63,7 +73,7 @@ export default function ImpostorGameConfig({ gameId, settings, settingsLoaded, o
     onChange(payload)
   }
 
-  const embedded = useGameConfigSaveRegistration(registerSave, { save: persist })
+  const embedded = useGameConfigSaveRegistration(registerSave, { validate, save: persist })
 
   const save = async () => {
     if (gameId) setStatus(t('Guardando...', 'Saving...'))

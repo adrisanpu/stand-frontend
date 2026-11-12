@@ -3,6 +3,25 @@ import { normalizeGameType } from '../core/gameTypeMap'
 import { getGameById } from '../games'
 import type { PrizeCatalog } from '../core/prizes'
 
+export const SETUP_REVIEW_SECTIONS = ['appearance', 'configuration', 'form', 'questionnaire', 'conditions', 'prizes'] as const
+export type SetupReviewSection = typeof SETUP_REVIEW_SECTIONS[number]
+export type SetupReviewProgress = {
+  version: 1
+  revision: string
+  confirmedSections: SetupReviewSection[]
+  completed: boolean
+}
+
+function isSetupReviewProgress(value: unknown): value is SetupReviewProgress {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const progress = value as Partial<SetupReviewProgress>
+  return progress.version === 1 && typeof progress.revision === 'string' && !!progress.revision.trim()
+    && typeof progress.completed === 'boolean' && Array.isArray(progress.confirmedSections)
+    && progress.confirmedSections.every(section => SETUP_REVIEW_SECTIONS.includes(section))
+    && new Set(progress.confirmedSections).size === progress.confirmedSections.length
+    && (!progress.completed || progress.confirmedSections.length === SETUP_REVIEW_SECTIONS.length)
+}
+
 export type OperatorGame = {
   gameId: string
   gameName: string
@@ -14,6 +33,8 @@ export type OperatorGame = {
   lifecycleState?: 'active' | 'closing' | 'inactive'
   archivedAt?: string
   deletionStartedAt?: string
+  /** Absent on legacy events, which are exempt from initial review. */
+  setupReview?: SetupReviewProgress
 }
 
 function isOperatorGame(value: unknown): value is OperatorGame {
@@ -31,6 +52,35 @@ function isOperatorGame(value: unknown): value is OperatorGame {
     && (!('deletionStartedAt' in value) || (typeof value.deletionStartedAt === 'string' && Number.isFinite(Date.parse(value.deletionStartedAt))))
     && (!('archivedAt' in value) || ('isActive' in value && value.isActive === false))
     && (!('deletionStartedAt' in value) || 'archivedAt' in value)
+    && (!('setupReview' in value) || isSetupReviewProgress(value.setupReview))
+}
+
+type SetupReviewUpdate =
+  | { section: SetupReviewSection; confirmed: boolean; expectedRevision: string }
+  | { finish: true; expectedRevision: string }
+
+async function saveSetupReview(gameId: string, update: SetupReviewUpdate): Promise<SetupReviewProgress> {
+  const data = await api.put<{ ok?: boolean; gameId?: string; setupReview?: unknown }>('/v1/game', {
+    gameId, setupReview: update,
+  })
+  if (data?.ok !== true || data.gameId !== gameId || !isSetupReviewProgress(data.setupReview)
+    || data.setupReview.revision === update.expectedRevision
+    || ('finish' in update ? !data.setupReview.completed
+      : data.setupReview.confirmedSections.includes(update.section) !== update.confirmed
+        || (!update.confirmed && data.setupReview.completed))) {
+    throw new Error('Setup review update not confirmed')
+  }
+  return data.setupReview
+}
+
+export async function updateSetupReview(
+  gameId: string, section: SetupReviewSection, confirmed: boolean, expectedRevision: string,
+): Promise<SetupReviewProgress> {
+  return saveSetupReview(gameId, { section, confirmed, expectedRevision })
+}
+
+export async function finishSetupReview(gameId: string, expectedRevision: string): Promise<SetupReviewProgress> {
+  return saveSetupReview(gameId, { finish: true, expectedRevision })
 }
 
 export async function listOperatorGames(archived = false): Promise<OperatorGame[]> {

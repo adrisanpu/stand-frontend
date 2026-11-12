@@ -1,6 +1,8 @@
 # Operator game UI (design guidelines)
 
-Conventions for `GameScreen` layouts, spacing to the viewport, code validation, and validate actions. **Reference game: t1mer.**
+Conventions for the operator canvas, participant gameplay and event configuration.
+All gameplay runs on participant phones at `/play/:gameId`; the stand displays
+only the configurable Home, not an interactive game engine.
 
 ## RULET4: 3D prize wheel
 
@@ -15,9 +17,8 @@ errors disable new spins and display a visible status or retry action. Context
 loss and page visibility changes suspend an active animation without choosing
 another prize. Retrying the scene preserves the selected prize in the current
 screen; it does not persist an unfinished spin across a page reload.
-The result is announced and sent through the existing score endpoint only after
-the final frame renders, once per spin. Returning to code entry cancels pending
-animation callbacks. Verify legibility and GPU performance on the event device,
+The participant spin endpoint assigns the result server-side; the animation
+reveals that result without awarding again. Verify legibility and GPU performance on the event device,
 especially for many segments or long prize names.
 
 ## Catalog: detalle al elegir un juego (`GameGate`)
@@ -26,15 +27,153 @@ Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas d
 
 ## Configurar juego
 
+### Initial setup after creating an event
+
+Both the + action and the coverflow guide open the existing configuration modal.
+For a new event it first shows the game explanation, name and Create action.
+After creation, the same modal opens Home and requires explicit confirmation of
+all six panels: **Home, Game, Registration form, Questionnaire, Prizes, Raffle**.
+Defaults may be confirmed without edits; changes must be saved first. Editing a
+confirmed panel clears its confirmation until it is reviewed again. Progress and
+its revision are stored on the server; the creation URL becomes `?setup=<gameId>`
+so reloads reopen the same event rather than creating another. Closing is blocked
+until all panels are confirmed and **Finish setup** succeeds. Opening an unfinished
+event's Home also resumes this review. A plan-locked raffle panel can be reviewed
+without upgrading or launching a raffle.
+
+Existing events without a setup marker are exempt. This is an operator review,
+not a new publication state or a change to public participant access.
+
+### Event registration and survey
+
+**Juegos > Configurar partida > Formulario de registro / Cuestionario** provides
+two separate settings tabs and their corresponding live previews. Registration
+fields belong to the registration tab; questions and timing belong to the
+questionnaire tab. **Home**, the first tab, contains only the Home canvas editor, without
+a separate preview; the old event appearance controls and separate appearance save
+button have been removed. Existing saved logo/banner/theme overrides remain
+in use; empty overrides inherit the account appearance.
+**Game** contains mechanics and an isolated playable preview. It uses loaded,
+unsaved mechanic drafts and local simulated opponents where appropriate, without
+registration, participant sessions, real scores, prize allocation or multiplayer
+rooms. All available games are supported; CUPIDO remains unavailable. SEMAFORO
+can read the saved questionnaire but never submits responses. EMPAREJA2 uses
+labeled sample characters. Switching away from Game stops its simulation.
+
+Home uses the same `HomeCanvas` renderer as the live display, with
+sample counters, raffle and (when supported) ranking. Draft canvas content and media
+update locally; no polling, game actions, iframe or additional dependencies are
+used. The editor itself shows the design; there is no duplicate Home or mobile
+preview in Home. It never mounts participant sessions, 3D engines or timers.
+The QR is generated locally. Preview CSS variables are scoped to its
+canvas and never change the operator theme. Registration and Questionnaire
+keep their own previews. Registration and questionnaire retain a single draft
+across tab changes; saving either applies pending edits from both sections.
+Registration has a fixed layout: edit its title, description and requested
+optional fields (address, company, job title, birth date). Name, verified email,
+phone and legal consent cannot be disabled. Its preview renders the actual Play
+`JoinForm`, with a local email-to-details transition and no verification messages,
+participant creation, uploads or session writes. Appearance is inherited rather
+than independently edited in this panel. Questionnaire retains its existing controls.
+Canvas background uploads do not change the account logo. Empty overrides retain the
+existing event/account appearance. STACK retains its additional club consent and
+Kivly identity checks; the new optional fields do not change Kivly customer data.
+
+The survey has at most five single-choice questions and three options each,
+without scoring. Select one placement: disabled, after registration, after the
+game, to receive a prize, or to enter a raffle. After-game placement is unavailable
+for INFOCARDS and IMPOSTOR, which lack a final participant event for this flow.
+After-registration placement blocks gameplay until submission; prize and raffle
+placement do not. Submission is durable and requested only once per participant.
+Raffle entry is automatic after completing the raffle survey.
+
+Questions and placement become read-only after the first submitted response
+(including existing historical answers). Presentation remains editable while
+the event is active. Create a different event to use a different questionnaire;
+there is no questionnaire versioning or participant-answer reset.
+AI generation fills a local draft; it does not save or replace existing answers.
+Legacy registration/quiz settings open the same editor.
+
+**Administracion > Respuestas** provides event selection, registered/completed
+counts, answer distributions, participant search/status filtering and CSV export.
+Results are not combined across different questionnaires. Completion rates use
+registered participants, not visitors or an inferred abandonment funnel.
+Archived events remain available for consultation. Configuration and exports
+respect their existing plan/lifecycle restrictions; the panel does not add AI
+insights.
+
+For completed or exempt events, closing keeps confirmed saves, refreshes the event
+list, and asks before discarding drafts. Creation and writes block closing until complete.
+Creation does not navigate to the home screen or launch a raffle.
+
+Prizes loads existing shared prizes and, for STACK with a connected account,
+the existing Kivly rewards. All are available in the rule selector without first
+adding them to the event. Saving associates only the selected prizes, preserving
+existing associations and awards. Blank sub-stocks have no numeric reservation
+and cannot award prizes until a quantity is set. STACK saves associations before rules using the refreshed
+revision. Other games reuse their supported prize slots, with the ranking top
+editable alongside prize selection. No prize is created or awarded by loading.
+Selecting a STACK rule condition opens its prize details, including the Sub-stock
+textbox for raffle rules. Native raffle slots also expose their reserved sub-stock.
+Administration > Prizes reloads inventory when its browser tab becomes visible
+or regains focus, reflecting saved event reservations without a manual refresh.
+Removing the last condition reference to a STACK prize releases its unassigned
+reservation on save. The catalog entry retains only consumed units; existing
+awards and durable movements remain unchanged for both STAND and Kivly.
+
 ### Home raffle visibility
 
 **Settings > Sorteo > Mostrar sorteo en el home** has an ON/OFF toggle button,
 styled like the light/dark switch,
 that saves immediately per game and refreshes the home after a successful save.
 It defaults to enabled, including existing games without `showRaffleOnHome`.
-Disabling it removes the raffle card and its space in both orientations; it
+Disabling it hides the raffle widget in both orientations without moving the
+other canvas elements; its saved position remains available when enabled again. It
 does not disable running the raffle from settings or change prize eligibility.
 The existing plan gate still applies.
+
+### Editable Home canvas
+
+The QR scales to its panel's available width and height while preserving its
+square proportions. Position and panel size use dragging, corner resizing or
+arrow keys only; the editor has no coordinate or dimension textboxes.
+Only the selected component shows its resize handle and top-right paint icon,
+which opens background controls (default, transparent or custom color).
+Text sizes scale with both panel dimensions in the editor and live Home;
+text colors and font families are unchanged.
+
+**Games > Event settings > Appearance > Home canvas** offers independent
+landscape (16:9) and portrait (9:16) compositions. The display selects the
+composition matching its screen orientation, respecting explicit orientation
+overrides. It fits the complete design without stretching or cropping.
+
+New events start with both canvases empty. Existing events without canvas data
+receive an editable initial composition. Saving an intentionally empty canvas
+does not restore the initial widgets.
+
+Add QR, event logo/name, player count, supported leaderboard, enabled raffle,
+or plain text. Each built-in widget can appear once; text can repeat, up to 40
+elements per composition. Drag elements to move them, or use the selected
+element's corner handle to resize. Focus either control and use arrow keys for
+keyboard editing. Position and size fields are grid units. Invalid moves,
+out-of-bounds sizes and collisions leave the last valid placement unchanged.
+There is no automatic pushing, layering, individual rotation or rich-text HTML.
+
+Layout, text, alignment and font size are available on every plan. Backgrounds
+and custom text colors require advanced customization (Event). Background
+images support PNG/JPEG/WebP/SVG up to 5 MB; MP4/WebM video supports up to 100 MB.
+Backgrounds belong to each composition and never replace the registration
+banner or account logo. Video loops with sound; the editor/preview stays muted.
+Browsers can require a gesture for audio: **Enable sound** appears outside the
+design when needed. Audio preference lasts for the browser session. Playback
+or codec failures are reported explicitly.
+
+**Save canvas** persists both compositions with an independent revision.
+Registration/questionnaire drafts are saved separately in their respective tabs.
+Moving a Home component does not invalidate an in-progress participant survey.
+Switching orientation or configuration tabs preserves the canvas draft.
+Reload/discard is explicit after a conflict or uncertain save. Stored canvas
+data contains media keys, not expiring signed URLs.
 
 ### Participant phone and photo
 
@@ -47,8 +186,8 @@ The participant form offers European country calling codes, with Spain (+34)
 selected initially. Options show flags and calling codes, with the prize-settings
 dropdown style and accessible country names. The avatar picker sits alongside
 the full-name input. Both consent rows use the same 13px text and 20px checkboxes.
-The API receives a single international number; leaving an
-optional phone empty does not send its prefix. Pasted international numbers
+Phone is mandatory for every game. The API receives a single international number;
+pasted international numbers
 do not receive a second prefix. The optional profile photo is selected through
 a keyboard-accessible circular avatar with a generic silhouette and local
 preview. JPG, PNG and WebP files up to 5 MB remain supported.
@@ -87,17 +226,18 @@ automatically replayed. Installed-wallet propagation has not been live-verified.
 scroll-snap gallery with four cards on desktop, two on smaller screens and
 one on mobile. Arrow controls and native touch scrolling reveal more prizes.
 Cards put the image first, followed by name, source logo, read-only event
-allowance and **shared available stock**. The editable value is an **optional
-event cap**, not physical stock; blank saves `null` (unlimited), zero prevents
-awards in that event. Shared availability comes from backend `globalInventory`;
-exhausted/uninitialized stock and zero caps have explicit explanations. A null
-global response displays the legacy-mode notice, never a guessed shared balance.
+reservation and **reservation availability**. Sub-stock is an **exclusive event
+reservation**. Blank saves `null` (no numeric reservation), zero reserves no units;
+neither can award prizes. General stock is the sum of configured sub-stocks.
+Availability comes from backend `globalInventory`, scoped to this event, so
+another event cannot consume its units. Missing quantities and exhausted
+reservations have explicit explanations.
 Hover, image click and keyboard focus reveal Kivly upload/remove actions, without
 exposing native file-input text. Uploaded PNGs (up to 5 MB) remain game-local for
 Kivly and do not edit the external catalog. STAND names/images are read-only,
 selected from the general catalog in **Administration > Prizes**.
 Both creation forms share a compact row for source, shared-prize selection or
-Kivly name, optional event cap (blank by default), and image preview.
+Kivly name, reserved sub-stock (blank by default), and image preview.
 Kivly-only fields and advanced options use the same compact controls and grid.
 Prize artwork has a transparent background; source badges use the footer logos.
 Rules follow the gallery; the exclusive **Wallet / Email** Kivly delivery
@@ -112,9 +252,8 @@ STAND prize QRs retain their usual behavior. The prize panel also shows email
 states and lets the organizer retry definitive failures without awarding again,
 including after closure; uncertain sends require investigation instead.
 
-STACK registration always requires name, verified email and phone in both
-channels. Its shared game configuration has no optional-phone toggle. Other
-games keep their existing optional-phone configuration. The QR uses the phone
+Registration always requires name, verified email and phone in every game and
+both STACK channels. There is no optional-phone toggle. The QR uses the phone
 in Kivly, not a conflicting value entered in STAND; a missing Kivly phone shows
 an actionable error and never silently falls back.
 Each rule uses "Cuando [condition], entregar [OR groups of AND prizes]".
@@ -131,54 +270,64 @@ attempt. A STAND selection references a shared prize. New Kivly selections use
 local IDs independent of the external reward ID. Edits stay drafts until the
 save succeeds.
 
-### General physical inventory
+### Event-reserved prize inventory
 
 **Administration > Prizes** shows one combined catalog/inventory table, ordered
-as **Selection, Photo, Name, Origin, Stock, Available, Redeemed, Assigned, Events**.
+as **Selection, Photo, Name, Origin, Stock, Distribution, Events**.
 The first column selects a single prize using radio controls. Edit, remove,
-balance and history actions sit above the table, aligned right, and target
+and history actions sit above the table, aligned right, and target
 only that selection; they are disabled until a prize is selected. Selection
-cannot change during catalog editing or an unresolved stock request.
+cannot change during catalog editing or deletion.
 There is no second catalog list or repeated inventory title. Compact actions
 open a single detail row immediately below the selected prize: STAND name/image
-editing, balance management or movement history. Creation remains above the
+editing, event reservation breakdown or movement history. Creation remains above the
 table. Kivly retains its external catalog identity and inventory actions.
 Event associations use a read-only disclosure with name, active/inactive state
 and cap, including inactive events; it does not edit assignments.
 
-For STAND, Stock is available units plus recorded unredeemed awards; Assigned
-and Redeemed include current and historical counts. Stock stays unknown while
-history is incomplete or counts are inconsistent. Zero availability differs
-from uninitialized stock. Kivly physical stock and external redemptions remain
-unknown, even when its STAND-managed available balance is initialized.
+For assigned prizes, Stock is the sum of every configured event reservation,
+including inactive events and prizes whose rules are currently unused.
+Availability is each reservation minus that event's recorded assignments;
+redemption moves units from Assigned to Redeemed without restoring availability.
+The general total includes redeemed units and does not decrease on redemption.
+Reservations are derived on every read, not initialized from a guessed manual
+balance, and repeated refreshes cannot accumulate stock. A missing numeric
+sub-stock displays an actionable notice instead of an invented quantity.
+Kivly totals describe STAND-managed reservations, not confirmed external physical
+stock; external redemptions remain unknown.
+Unused, uninitialized STAND prizes can be deleted without creating a game.
+Unused, uninitialized Kivly prizes have a separate Delete from STAND and Kivly
+action with an irreversible-deletion confirmation. Event associations (including
+inactive events), initialized balances and assignment/movement history block
+Kivly deletion. Uncertain deletions require a manual inventory refresh before
+retrying; they are never automatically repeated.
 The historical/current breakdown lives inside movement details, not a table
 column. Movements load by cursor and state clearly that event/kind/state filters
 affect only loaded rows. Refreshing inventory or completing an import reloads
 open movements so their rows match the updated summary.
 
-Initialize with **free units for new awards**, not total physical units including
-outstanding awards, and never summed event stock. Historical imports do not
-deduct those units again. Initialize/replenish/adjust require an integer quantity
-and explicit reason; adjustments use signed deltas. Uncertain retries keep the
-request ID and payload; revision conflicts require reloading. While a request
-is pending, uncertain or requires reconciliation, prevent closing/switching
-the stock panel or starting catalog edits. Editing an uncertain draft explicitly
-creates a new request. General inventory stays editable when events are inactive.
+Set quantities in each event's Conditions. Existing finite sub-stocks are used
+automatically; no manual initialization is required. Durable movement history
+provides consumed quantities, including imported history and deleted award rows,
+without counting the same units twice. Event reservations are the only live stock
+source: there is no activation step, manual initialization, replenishment or
+adjustment. Old manual movements remain visible as audit history; retired manual
+balances cannot authorize new awards. Unassociated prizes have zero reserved stock.
 
-Legacy stock stays in effect until explicit activation. On opening the panel,
-automatically import all pending games from `imports`, including archives and
-games without current prizes. Consume all pages sequentially, also in active
-mode, without manual page advancement. Skip complete imports and continue with
+On opening the panel, automatically import all pending games from `imports`, including archives and
+games without current prizes. Consume all pages sequentially,
+without manual page advancement. Skip complete imports and continue with
 other games after a failure. Show errors/unresolved history and a retry action;
 do not retry indefinitely. Preserve opaque cursors for uncertain retries.
-Keep per-event import status inside a disclosure rather than permanently
+Hide successful history/import status entirely. Keep per-event status inside a disclosure only when there are pending imports or incidents rather than permanently
 listing every event. Newly discovered games are imported after the current
 batch without automatically retrying failed games or losing their errors.
 Unlinked history requires reviewing the shared catalog selection in event
 settings and retrying; ambiguous names are never automatically merged.
-Activation requires complete imports, zero unresolved records and initialized
-assigned prizes. Its confirmation explains shared units across all games and
-that new uninitialized prizes cannot award.
+Missing numeric reservations block new awards explicitly. Public prize/QR reads
+only resolve existing awards; legacy player flags are imported explicitly, never
+used to mint awards during a read. Charts use server-side reservation summaries,
+not a client-side reconstruction of paginated movement history.
 
 Each alternative group contains one or more prizes and quantities. Each
 rule keeps its condition and remove action in a compact header; alternative
@@ -357,116 +506,45 @@ The shared panel shows the participant
 `/play/:gameId` link and prize validator link with its QR immediately below the
 fixed mobile/Web access summary, before game-specific rules. Use three compact columns:
 participant QR with its link below, validator QR with its link below (both 80px),
-and **Datos del participante** with required full name/email and one checkbox
-to show an optional phone. Save phone visibility with the shared footer, not in
-individual game configs. Email is always verified, including legacy disabled-email
-settings. Legacy required-phone settings make phone visible but not mandatory;
-an explicit `phone.enabled` takes precedence. Hidden/blank phones are omitted.
-Individual game configs must not duplicate these settings. Web registration
-asks for full name first, then email, and also offers an optional
+and access details. Participant fields are configured only in the Registration
+form tab, not in individual game configs. Name, phone and verified email are
+mandatory, including legacy disabled-contact settings. Web registration asks for
+email first, then missing identity/details and consent, followed by email verification.
+Enabled optional fields are collected when supplied but do not force otherwise
+complete returning participants back through details. Administrative responses
+and CSV include profile values; public rankings and assignment responses do not.
+Registration also offers an optional
 profile photo for every participant, independent of the configured contact fields;
 uploaded photos appear in rankings and participant `/play`. Instagram is neither
 contact data nor an access channel.
 
-## Screen edge → content (AppShell)
+## Display shell and participant gameplay
 
-Do not reimplement outer page padding inside `GameScreen`; the shell already insets content.
-The event home is the operator dashboard for all games; participant gameplay
-and validation run on mobile at `/play`.
+`AppShell` reserves separate header/footer space for operator controls and Stand
+branding. The remaining viewport fits `HomeCanvas`; controls do not cover the
+editable design. There are no per-game landscape columns or portrait wrappers.
 
-| Mode | Where | Classes / behavior |
-|------|--------|-------------------|
-| Portrait | Main column | `px-4 sm:px-6` on the scroll column; vertical insets via `paddingTop` / `paddingBottom` in `dvh` (see `AppShell.tsx`). |
-| Portrait | Header join (above card) | `GamePortraitHeaderJoin` in `AppShell.tsx` — logo left, QR + “Escanea para jugar” + game code right; instructions modal via `getJoinInstructions()`. |
-| Portrait | Game card wrapper | `p-4 sm:p-5` on the `.card` that wraps `GameScreen` (game UI only; no logo/QR inside). |
-| Landscape | Full-bleed stage | `py-[10dvh] pl-[3dvw] pr-[1.5dvw]` on the landscape container (tighter right gutter). |
+Load appearance before choosing the logo. Priority is event override, selected
+client logo, then the game's logo; the platform Stand logo is not a substitute.
+QR links always target Web participant registration.
 
-Settings control is `fixed top-4 left-4` (not part of game panels).
+Game mechanics belong in `src/games/<gameId>/ParticipantPlay.tsx` or existing
+shared participant views, connected through `ParticipantShell`. Participant
+requests use `publicApi` with the participant token, not operator credentials.
+Do not register stand `GameScreen` components or reintroduce layout injection.
 
-## Mobile-client event home
+Each component has a **Component background** selector: default, transparent
+(no color), or a solid color. These controls are available on every plan and
+saved separately for each orientation. Explicit backgrounds replace widget
+card surfaces; the QR code itself retains its contrast for scanning.
 
-On `/home`, check the saved Appearance media before displaying game content.
-Prefer the user-selected client logo; only use the game's default logo when no
-client logo is selected. Do not briefly show the game logo while this initial
-lookup is pending, or substitute the platform Stand logo for the game's logo.
-Apply the same logo priority in portrait and landscape.
+## Legal notice
 
-`AppShell` uses the shared `MobileGameHome` for all games instead of an
-operator gameplay panel.
-Landscape uses three columns: large logo with players and an expanded raffle
-below on the left, a large QR in the center, and the ranking filling the right
-column. The large QR panel displays **NO ESCANEAR, POR FAVOR.** in Spanish or
-**DO NOT SCAN THIS.** in English, centered above the QR in oversized bold white
-text with **NO** / **NOT** in red, following the selected interface language.
-Reserve vertical space for this heading when sizing the QR so both fit.
-Distribute remaining vertical space evenly above the heading, between the heading
-and QR, and below the QR. Keep base padding and gap equal (1rem, or 1.5rem from
-`sm`) so all three spaces remain equal as the panel height changes.
-Games without a ranking use two columns; raffle plan restrictions and
-prize settings remain unchanged. The logo card contains only the logo, without
-the manual icon or legal footer. No mobile participation explanation, participant
-link buttons or event-name/code text appears on this home. The QR always links to Web participant registration. The mobile landscape stage
-uses `4dvw` horizontal margins and a `7dvh` top inset, and reserves at least
-`max(7dvh, 4rem)` below the panels for the fixed Stand footer logo.
-
-Portrait stacks the logo, QR, players, raffle and ranking in that order in a
-scrollable page with `px-6 sm:px-8` horizontal margins and an `8dvh` top inset.
-This presentation does not change the participant registration/consent screens.
-
-## Landscape game grid (three columns)
-
-Use the shared token so column weights and gutters match t1mer:
-
-- Import `GAME_LANDSCAPE_THREE_COL_GRID` from [`src/core/ui/gameScreenLayout.ts`](../src/core/ui/gameScreenLayout.ts).
-- Equivalent classes: `grid grid-cols-[25%_40%_25%] gap-4 items-stretch h-full min-h-0`.
-
-Left: `GameLandscapeLeftColumn` — info panel (`GameLandscapeInfoColumn`: logo, QR, manual/legal footer) + `playersElement` below. Pass instructions as `children` for the modal. Center: main game. Right: `sidebarElement` only (Ranking `flex-1` if `showRanking`, RaffleData) — **no Players**.
-
-`AppShell` passes `playersElement` and `sidebarElement` separately. Infocards (two-col): `playersElement` stays on the right sidebar above `sidebarElement`.
-
-## Landscape center panel (main column)
-
-- Import `GAME_LANDSCAPE_CENTER_CARD` from the same module.
-- Equivalent: `card flex flex-col p-6 sm:p-8 overflow-hidden min-h-0 min-w-0 space-y-6`.
-- Append game-specific utilities when needed (e.g. `items-center`, `justify-center`).
-- **l3tras** uses vertical `gap-6` between sections: combine as  
-  `` `${GAME_LANDSCAPE_CENTER_CARD} flex-1 gap-6 space-y-0` ``.
-
-Do not use the older `minmax(0,0.85fr)_minmax(0,1.5fr)_minmax(180px,260px)` + `gap-3 sm:gap-4 lg:gap-6` pattern for new work.
-
-## Landscape two columns (e.g. infocards)
-
-- `GAME_LANDSCAPE_TWO_COL_GRID`: `grid-cols-[minmax(0,1fr)_minmax(180px,260px)] gap-4` (same gutter as three-col).
-- Main area: prefer `p-6 sm:p-8` on the outer `card` for parity with the center column of other games.
-- Right sidebar: `playersElement` on top, then `sidebarElement` (ranking, raffle) — no left info column.
-
-## Portrait: header join + game card
-
-Portrait join UI lives in **AppShell**, not inside each `GameScreen`:
-
-- [`GamePortraitHeaderJoin`](../src/core/widgets/GamePortraitHeaderJoin.tsx) — row: logo (`max-h-20`–`max-h-24`) | QR (~128px) + “Escanea para jugar” + [`GameIdHint`](../src/core/widgets/GameJoinHints.tsx).
-- Layout token: `GAME_PORTRAIT_HEADER_JOIN` in [`gameScreenLayout.ts`](../src/core/ui/gameScreenLayout.ts).
-- Instructions: [`getJoinInstructions(gameId)`](../src/core/ui/gameJoinInstructions.tsx) passed as `footerChildren` (same modal/footer as landscape via `GamePanelFooter`).
-- Inside `.card`, `GameScreen` renders **only** game interaction/animations — mirror landscape center column (`GAME_LANDSCAPE_CENTER_CARD` utilities where applicable). Do **not** import `GamePortraitJoinPanel` in new work (`GamePortraitJoinPanel` is deprecated).
-
-## Join panel footer, instructions modal, and legal notice
-
-Shared widgets:
-
-| Widget | Path | Role |
-|--------|------|------|
-| `GamePanelFooter` | `src/core/widgets/GamePanelFooter.tsx` | Manual icon + one-line data notice + opens modal |
-| `GameInstructionsModal` | `src/core/widgets/GameInstructionsModal.tsx` | Scrollable instructions + expanded legal text |
-| `gameLegalCopy` | `src/core/ui/gameLegalCopy.ts` | `PRIVACY_POLICY_URL`, `GAME_DATA_NOTICE_PANEL`, `GAME_DATA_NOTICE_MODAL` |
+Registration and consent belong to the participant flow, not a fixed Home panel.
+Shared legal copy remains in `src/core/ui/gameLegalCopy.ts`. Keep mandatory Stand
+branding and operator controls outside the editable canvas.
 
 Privacy policy (Spanish UI): `/pages/privacy-es.html`. English: `/pages/privacy.html`.
-
-## Internal spacers
-
-- Pair code inputs: prefer `grid grid-cols-2 gap-4` (not `gap-5`).
-- Keep inner `space-y-*` / list spacing consistent with the reference game unless the layout truly needs more air.
-
----
 
 ## Code validation (copy & controls)
 
@@ -474,12 +552,8 @@ Colors always come from each game’s theme.
 
 ### Shared copy
 
-Import from [`src/core/ui/gameValidationCopy.ts`](../src/core/ui/gameValidationCopy.ts):
-
-| Export | Use |
-|--------|-----|
-| `CODE_INPUT_PLACEHOLDER` | Every validation code `<input>`. Literal: `introduce código`. |
-| `VALIDATE_LABEL` | All validate submit buttons. Literal: `Validar`. |
+Use the participant language provider for validation labels and loading/error copy.
+Follow the existing mobile experiences instead of adding stand validation controls.
 
 ### Input styling
 
@@ -491,7 +565,7 @@ Typical: `rounded-xl`, `bg-[rgba(255,255,255,0.05)]`, `border border-white/10`, 
 
 ### Validate button — inline (beside input)
 
-`h-14`, `rounded-xl`, `font-semibold`, `shrink-0`, `inline-flex items-center justify-center gap-2`, `px-8` (typical), same disabled pattern, `VALIDATE_LABEL` / spinner + `Validando…`.
+`h-14`, `rounded-xl`, `font-semibold`, `shrink-0`, `inline-flex items-center justify-center gap-2`, `px-8` (typical), same disabled pattern, translated `Validar` / spinner + `Validando…`.
 
 ### Pair games with fixed avatar slots (empareja2)
 
@@ -499,8 +573,7 @@ Two fixed-size cells above the code inputs; on success, same cells show `charact
 
 ### Files that often change
 
-- `src/games/<gameId>/GameScreen.tsx`
-- `src/core/ui/gameScreenLayout.ts`, `gameValidationCopy.ts`, `gameLegalCopy.ts`
-- `src/core/widgets/GameLandscapeLeftColumn.tsx`, `GameLandscapeInfoColumn.tsx`, `GamePortraitHeaderJoin.tsx`, `GameJoinHints.tsx`, `GamePanelFooter.tsx`
-- `src/core/ui/gameJoinInstructions.tsx`
-- `src/core/shell/AppShell.tsx` (only if global insets change)
+- `src/core/home/` for the model, editor and shared display renderer
+- `src/games/<gameId>/ParticipantPlay.tsx` for mobile mechanics
+- `src/core/participant/ParticipantShell.tsx` for participant navigation
+- `src/core/shell/AppShell.tsx` for the display shell

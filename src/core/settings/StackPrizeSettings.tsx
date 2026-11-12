@@ -614,8 +614,8 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
                   placeholder={t('Nombre del nuevo premio', 'New prize name')} />
                 </label>}
               <label className="space-y-1 text-xs text-textSub">
-                <span>{t('Límite opcional por evento', 'Optional event cap')}</span>
-                <input type="number" min={0} step={1} className={`${field} w-full`} placeholder={t('Sin límite', 'Unlimited')}
+                <span>{t('Substock reservado', 'Reserved sub-stock')}</span>
+                <input type="number" min={0} step={1} className={`${field} w-full`} placeholder={t('Sin reserva', 'No reservation')}
                   value={initialStock[createSource] ?? ''}
                   onChange={(event) => setInitialStock({ ...initialStock, [createSource]: event.target.value === '' ? null : event.target.valueAsNumber })} />
               </label>
@@ -653,7 +653,7 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
                   }}>{t('Quitar imagen', 'Remove image')}</button>}
                 </div>}
             </div>
-          {!validInitialStock && <p role="alert" className="text-xs text-red-300">{t('El límite debe ser un entero ≥ 0 o vacío (sin límite).', 'Cap must be a whole number ≥ 0 or empty (unlimited).')}</p>}
+          {!validInitialStock && <p role="alert" className="text-xs text-red-300">{t('El límite debe ser un entero ≥ 0 o vacío (sin reserva).', 'Cap must be a whole number ≥ 0 or empty (no reservation).')}</p>}
           {createSource === 'stand' ? <>
             <SaveButton disabled={!sharedPrizeId || !validInitialStock || (!editingPrize && program.catalog.length >= 32)}
               onClick={() => void createStandPrize()}>{editingPrize
@@ -810,7 +810,7 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
                   </button>
                 </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <span className="rounded-lg bg-black/15 p-2 text-textSub">{t('Margen del evento', 'Event allowance')}: <strong className="text-textMain">{prize.stockTotal === null ? t('Sin límite', 'Unlimited') : stock?.remaining ?? '—'}</strong></span>
+                    <span className="rounded-lg bg-black/15 p-2 text-textSub">{t('Reserva disponible', 'Available reservation')}: <strong className="text-textMain">{prize.stockTotal === null ? t('Sin reserva', 'No reservation') : stock?.remaining ?? '—'}</strong></span>
                     <span className="rounded-lg bg-black/15 p-2 text-textSub">{t('Disponible compartido', 'Shared available')}: <strong className="text-textMain">{shared ? shared.reason ? t('No disponible', 'Unavailable') : shared.remaining : '—'}</strong></span>
                   </div>
                   {shared?.reason && <p className="text-xs text-textSub">{inventoryReasonText(shared.reason, language)} ({shared.reason})</p>}
@@ -819,8 +819,12 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
                   {shared && !shared.reason && shared.remaining === 0 && <p className="text-xs text-amber-300">
                     {inventoryReasonText('out_of_stock', language)}
                   </p>}
-                  <label className="block text-xs text-textSub">{t('Límite opcional por evento', 'Optional event cap')}
-                    <input type="number" min={0} value={prize.stockTotal ?? ''} placeholder={t('Sin límite', 'Unlimited')}
+                  {prize.stockTotal === null && <p className="text-xs text-amber-300">{t(
+                    'Define el substock para repartir este premio. El stock general es la suma de las reservas exclusivas.',
+                    'Set the sub-stock to award this prize. General stock is the sum of exclusive reservations.',
+                  )}</p>}
+                  <label className="block text-xs text-textSub">{t('Substock reservado', 'Reserved sub-stock')}
+                    <input type="number" min={0} value={prize.stockTotal ?? ''} placeholder={t('Sin reserva', 'No reservation')}
                       disabled={!configured && program.catalog.length >= 32}
                       className={`${field} mt-1 w-full text-textMain`}
                       aria-label={`${t('Límite por evento de', 'Event cap for')} ${prize.name}`}
@@ -839,11 +843,11 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
         {filteredPrizes.length === 0 && <p className="py-6 text-center text-sm text-textSub">
           {t('No hay premios que coincidan con la búsqueda.', 'No prizes match your search.')}
         </p>}
-        <p className="text-xs text-textSub">{t('El límite es opcional y solo restringe esta partida; vacío significa sin límite. El stock físico se gestiona en Administración > Premios.',
-          'The optional cap only restricts this event; blank means unlimited. Manage physical stock in Administration > Prizes.')}{' '}
+        <p className="text-xs text-textSub">{t('El substock reserva unidades exclusivas para esta partida. El stock general es la suma de todos los substocks; vacío no reserva unidades.',
+          'Sub-stock reserves exclusive units for this event. General stock is the sum of all sub-stocks; blank reserves no units.')}{' '}
           <a href="/admin/prizes" className="underline">{t('Abrir inventario general', 'Open general inventory')}</a></p>
-        {data.globalInventory == null && <p className="text-xs text-amber-300">{t('Modo anterior: la partida mantiene su stock previo hasta activar el inventario general.',
-          'Legacy mode: this event keeps its previous stock until general inventory activation.')}</p>}
+        {data.globalInventory == null && <p className="text-xs text-amber-300">{t('No se pudo consultar la disponibilidad de las reservas.',
+          'Reservation availability could not be checked.')}</p>}
         <p className="text-xs text-textSub">{t('El nombre y la imagen se administran en el catálogo general de Premios.',
           'Names and images are managed in the shared Prizes catalog.')}</p>
       </section>

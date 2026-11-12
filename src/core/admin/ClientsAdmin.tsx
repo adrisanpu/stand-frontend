@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react'
-import { getClientHistory, searchClients, type ClientAward, type ClientHistory, type ClientSummary } from '../../api/clients'
+import { Fragment, useEffect, useState } from 'react'
+import { getClientHistory, removeClientFromGame, searchClients, type ClientAward, type ClientHistory, type ClientSummary } from '../../api/clients'
 import { getGameById } from '../../games'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
-import IconButton from '../ui/IconButton'
 
 function dateLabel(value: string | null, language: string) {
   if (!value || !Number.isFinite(Date.parse(value))) return null
@@ -67,6 +66,10 @@ export default function ClientsAdmin() {
   const [history, setHistory] = useState<ClientHistory | null>(null)
   const [listStatus, setListStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [historyStatus, setHistoryStatus] = useState<'loading' | 'ready' | 'error'>('ready')
+  const [historyReload, setHistoryReload] = useState(0)
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState('')
   useEffect(() => {
     if (search.trim() === query) return
     const timer = window.setTimeout(() => {
@@ -101,6 +104,8 @@ export default function ClientsAdmin() {
     }
     let cancelled = false
     setHistoryStatus('loading')
+    setConfirmRemove(null)
+    setRemoveError('')
     void getClientHistory(selectedId).then(result => {
       if (!cancelled) {
         setHistory(result)
@@ -113,58 +118,106 @@ export default function ClientsAdmin() {
       }
     })
     return () => { cancelled = true }
-  }, [selectedId])
+  }, [selectedId, historyReload])
 
   const clientLabel = (client: ClientSummary) => client.name?.trim() || client.email
-  const renderAward = (award: ClientAward) => (
-    <article key={award.id} className="rounded-lg border border-current/10 px-3 py-2">
-      <div className="flex items-center gap-2">
-        {award.imageUrl && <img src={award.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded object-contain" />}
-        <p className="font-medium">{award.name || t('Premio sin nombre', 'Unnamed prize')}</p>
-      </div>
-      <p className="text-xs text-textSub">{award.source === 'kivly' ? 'Kivly' : award.source === 'stand' ? 'STAND' : t('Origen no disponible', 'Source unavailable')}</p>
-      <ul className="mt-1 space-y-0.5 text-sm text-textSub">
-        {awardStatus(award, language, t).map(status => <li key={status}>{status}</li>)}
-      </ul>
-    </article>
-  )
+  const sourceLabel = (award: ClientAward) => award.source === 'kivly' ? 'Kivly'
+    : award.source === 'stand' ? 'STAND' : t('Origen no disponible', 'Source unavailable')
+
+  const removeParticipation = async (gameId: string, playerId: number) => {
+    if (removing || !selectedId) return
+    setRemoving(true)
+    setRemoveError('')
+    try {
+      await removeClientFromGame(gameId, playerId)
+      setConfirmRemove(null)
+      setClients(current => current.map(client => client.id === selectedId
+        ? { ...client, participationCount: Math.max(0, client.participationCount - 1) } : client))
+      setHistoryReload(value => value + 1)
+    } catch {
+      setRemoveError(t('No se pudo eliminar al jugador de la partida.', 'Could not remove the player from the event.'))
+    } finally {
+      setRemoving(false)
+    }
+  }
 
   const historyPanel = selectedId && (
-    <section id={`client-history-${selectedId}`} aria-label={t('Historial del cliente', 'Client history')} className="border-t border-current/10 p-3 sm:p-4">
-      <div className="mb-2 flex justify-end">
-        <IconButton icon="remove" label={t('Cerrar', 'Close')} onClick={() => setSelectedId(null)} />
-      </div>
+    <section id={`client-history-${selectedId}`} aria-label={t('Historial del cliente', 'Client history')} className="py-2">
       {historyStatus === 'loading' && <p role="status">{t('Cargando historial…', 'Loading history…')}</p>}
       {historyStatus === 'error' && <p role="alert">{t('No se pudo cargar el historial.', 'Could not load history.')}</p>}
+      {removeError && <p role="alert" className="text-sm text-red-400">{removeError}</p>}
       {historyStatus === 'ready' && history && history.client.id === selectedId && (
-        <>
-          <div className="space-y-3">
-            {history.participations.map((participation, index) => {
-              const definition = participation.gameType ? getGameById(participation.gameType) : undefined
-              return (
-              <article key={`${participation.gameId}-${index}`} className="rounded-lg bg-surface/50 p-3">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                  <div className="flex items-center gap-2">
-                    {definition?.assets?.logo && <img src={definition.assets.logo} alt={definition.name} className="h-8 w-8 shrink-0 object-contain" />}
-                    <h3 className="font-medium">{participation.gameName || participation.gameId}</h3>
-                  </div>
-                  {dateLabel(participation.joinedAt, language) && (
-                    <time dateTime={participation.joinedAt ?? undefined} className="text-xs text-textSub">
-                      {dateLabel(participation.joinedAt, language)}
-                    </time>
-                  )}
-                </div>
-                {participation.awards.length > 0
-                  ? <div className="mt-2 grid gap-2 sm:grid-cols-2">{participation.awards.map(renderAward)}</div>
-                  : <p className="mt-2 text-sm text-textSub">{t('Sin premios registrados.', 'No recorded prizes.')}</p>}
-              </article>
-              )
-            })}
-            {history.participations.length === 0 && (
-              <p className="text-sm text-textSub">{t('No hay participaciones disponibles.', 'No participation records are available.')}</p>
-            )}
-          </div>
-        </>
+        history.participations.length === 0
+          ? <p className="text-sm text-textSub">{t('No hay participaciones disponibles.', 'No participation records are available.')}</p>
+          : <table className="admin-table w-full text-left text-sm" aria-label={t('Participaciones', 'Participations')}>
+            <thead>
+              <tr>
+                {[t('Partida', 'Event'), t('Fecha', 'Date'), t('Premio', 'Prize'), t('Origen', 'Source'), t('Estado', 'Status'), t('Acciones', 'Actions')]
+                  .map(label => <th key={label} scope="col" className="whitespace-nowrap p-2">{label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {history.participations.map((participation, index) => {
+                const definition = participation.gameType ? getGameById(participation.gameType) : undefined
+                const span = Math.max(participation.awards.length, 1)
+                const date = dateLabel(participation.joinedAt, language)
+                const lead = <>
+                  <th scope="row" rowSpan={span} className="p-2 align-top font-medium">
+                    <span className="flex items-center gap-2">
+                      {definition?.assets?.logo && <img src={definition.assets.logo} alt="" title={definition.name} className="h-8 w-8 shrink-0 object-contain" />}
+                      {participation.gameName || participation.gameId}
+                    </span>
+                  </th>
+                  <td rowSpan={span} className="whitespace-nowrap p-2 align-top text-textSub">
+                    {date ? <time dateTime={participation.joinedAt ?? undefined}>{date}</time> : '—'}
+                  </td>
+                </>
+                const key = `:`
+                const playerId = participation.playerId
+                const action = <td rowSpan={span} className="p-2 align-top">
+                  {playerId === undefined ? '—' : confirmRemove === key
+                    ? <span className="flex flex-wrap gap-2">
+                      <button type="button" disabled={removing} className="min-h-9 rounded-md bg-red-700 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                        onClick={() => void removeParticipation(participation.gameId, playerId)}>
+                        {removing ? t('Eliminando…', 'Removing…') : t('Confirmar eliminación', 'Confirm removal')}
+                      </button>
+                      <button type="button" disabled={removing} className="min-h-9 rounded-md border border-current/20 px-3 text-xs"
+                        onClick={() => setConfirmRemove(null)}>{t('Cancelar', 'Cancel')}</button>
+                    </span>
+                    : <button type="button" disabled={removing} className="min-h-9 whitespace-nowrap rounded-md border border-red-400/60 px-3 text-xs text-red-300 disabled:opacity-50"
+                      aria-label={t(`Eliminar de la partida `, `Remove from event `)}
+                      onClick={() => { setRemoveError(''); setConfirmRemove(key) }}>
+                      {t('Eliminar de la partida', 'Remove from event')}
+                    </button>}
+                </td>
+                if (!participation.awards.length) return (
+                  <tr key={`${participation.gameId}-${index}`} className="border-t border-current/10">
+                    {lead}
+                    <td colSpan={3} className="p-2 text-textSub">{t('Sin premios registrados.', 'No recorded prizes.')}</td>
+                    {action}
+                  </tr>
+                )
+                return participation.awards.map((award, awardIndex) => (
+                  <tr key={`${participation.gameId}-${index}-${award.id}`} className={awardIndex ? '' : 'border-t border-current/10'}>
+                    {awardIndex === 0 && lead}
+                    <td className="p-2 align-top">
+                      <span className="flex items-center gap-2">
+                        {award.imageUrl && <img src={award.imageUrl} alt="" className="h-8 w-8 shrink-0 rounded object-contain" />}
+                        <span className="font-medium">{award.name || t('Premio sin nombre', 'Unnamed prize')}</span>
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap p-2 align-top text-textSub">{sourceLabel(award)}</td>
+                    <td className="p-2 align-top">
+                      <ul className="space-y-0.5 text-xs text-textSub">
+                        {awardStatus(award, language, t).map(status => <li key={status}>{status}</li>)}
+                      </ul>
+                    </td>
+                    {awardIndex === 0 && action}
+                  </tr>
+                ))
+              })}
+            </tbody>
+          </table>
       )}
     </section>
   )
@@ -207,24 +260,45 @@ export default function ClientsAdmin() {
           : t('Todavía no hay clientes con email verificado.', 'There are no clients with a verified email yet.')}</p>
       )}
       {listStatus === 'ready' && clients.length > 0 && (
-        <ul aria-label={t('Listado de clientes', 'Client list')} className="divide-y divide-current/10 rounded-xl border border-current/10">
-          {clients.map(client => (
-            <li key={client.id}>
-              <button type="button" onClick={() => setSelectedId(current => current === client.id ? null : client.id)}
-                aria-expanded={selectedId === client.id}
-                aria-controls={selectedId === client.id ? `client-history-${client.id}` : undefined}
-                aria-label={t(`Ver historial de ${clientLabel(client)}`, `View history for ${clientLabel(client)}`)}
-                className={`grid w-full gap-1 px-3 py-3 text-left sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] sm:items-center ${selectedId === client.id ? 'bg-primary/10' : 'hover:bg-surface'}`}>
-                <span className="truncate font-medium">{clientLabel(client)}</span>
-                <span className="truncate text-sm text-textSub">{client.email}</span>
-                <span className="text-xs text-textSub sm:text-right">
-                  {[client.phone, `${client.participationCount} ${t('participaciones', 'participations')}`].filter(Boolean).join(' · ')}
-                </span>
-              </button>
-              {selectedId === client.id && historyPanel}
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto rounded-lg border border-current/10">
+          <table className="admin-table w-full text-left text-sm" aria-label={t('Listado de clientes', 'Client list')}>
+            <caption className="sr-only">{t('Listado de clientes', 'Client list')}</caption>
+            <thead>
+              <tr>
+                <th scope="col"><span className="sr-only">{t('Selección', 'Selection')}</span></th>
+                {[t('Cliente', 'Client'), t('Email', 'Email'), t('Teléfono', 'Phone'), t('Participaciones', 'Participations')]
+                  .map(label => <th key={label} scope="col" className="whitespace-nowrap">{label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map(client => {
+                const isSelected = selectedId === client.id
+                return (
+                  <Fragment key={client.id}>
+                    <tr onClick={() => setSelectedId(current => current === client.id ? null : client.id)}
+                      className={`cursor-pointer border-t border-current/10 ${isSelected ? 'bg-primary/5' : ''}`}>
+                      <td className="w-10">
+                        <input type="radio" name="client-selection" checked={isSelected}
+                          aria-label={t(`Ver historial de ${clientLabel(client)}`, `View history for ${clientLabel(client)}`)}
+                          aria-controls={isSelected ? `client-history-${client.id}` : undefined}
+                          className="h-4 w-4 accent-primary"
+                          onClick={event => event.stopPropagation()}
+                          onChange={() => setSelectedId(current => current === client.id ? null : client.id)} />
+                      </td>
+                      <th scope="row" className="break-words font-medium">{clientLabel(client)}</th>
+                      <td className="whitespace-nowrap">{client.email}</td>
+                      <td className="whitespace-nowrap">{client.phone || <span className="text-textSub">—</span>}</td>
+                      <td className="tabular-nums">{client.participationCount}</td>
+                    </tr>
+                    {isSelected && <tr className="bg-primary/5">
+                      <td colSpan={5} className="px-3 pb-3">{historyPanel}</td>
+                    </tr>}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   )

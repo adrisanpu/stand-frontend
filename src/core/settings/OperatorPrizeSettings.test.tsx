@@ -11,7 +11,7 @@ vi.mock('../../api/api', () => ({ api: { get: vi.fn(), put: vi.fn(), post: vi.fn
 
 const colors = { primary: '#000', accent: '#000', background: '#000', surface: '#000', textMain: '#fff', textSub: '#fff' }
 const definition: GameDefinition = {
-  id: 'EMPAREJA2', name: 'EMPAREJA2', colors, GameScreen: () => null, showRanking: true,
+  id: 'EMPAREJA2', name: 'EMPAREJA2', colors, showRanking: true,
 }
 const shared = [
   { id: 'welcome', name: 'Mi premio', imageKey: 'prizes/owner/welcome.png', imageUrl: 'https://images/welcome.png' },
@@ -29,7 +29,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   serverResponse = { ok: true, prizeCatalog: structuredClone(initialCatalog) }
   vi.mocked(api.get).mockImplementation(async url => url === '/v1/prizes/inventory'
-    ? { ok: true, mode: 'active', imports: {}, unresolved: 0, catalog: [
+    ? { ok: true, mode: 'reservations', imports: {}, unresolved: 0, catalog: [
       { id: 'welcome', inventory: { initialized: true, available: 9 } },
       { id: 'podium', inventory: { initialized: true, available: 0 } },
     ] }
@@ -76,7 +76,7 @@ it('assigns a shared prize while keeping limits and ranking conditions per event
   const onPersist = await mount()
   const ranking = region('Ranking')
   fireEvent.change(ranking.getByLabelText('Premio compartido'), { target: { value: 'welcome' } })
-  fireEvent.change(ranking.getByLabelText('Límite por evento'), { target: { value: '7' } })
+  fireEvent.change(ranking.getByLabelText('Substock reservado'), { target: { value: '7' } })
   await save()
   expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
     gameId: 'GAME 1', preserveRewardConditions: true,
@@ -87,6 +87,18 @@ it('assigns a shared prize while keeping limits and ranking conditions per event
   expect(onPersist).toHaveBeenCalledWith(expect.objectContaining({
     prizeCatalog: expect.any(Object), prizeTopX: 'Mi premio', maxPrizeRanking: 7, topX: 3,
   }))
+})
+
+it.each(['EMPAREJA2', 'T1MER', 'CUPIDO'])('saves the raffle sub-stock for %s', async id => {
+  await mount({ game: { ...definition, id } })
+  fireEvent.change(region('Sorteo').getByRole('textbox', { name: 'Substock reservado' }), { target: { value: '12' } })
+  await save()
+  expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
+    prizeCatalog: expect.objectContaining({
+      raffle: expect.objectContaining({ sharedPrizeId: 'surprise', limit: 12 }),
+    }),
+  }))
+  expect(region('Sorteo').getByLabelText('Substock reservado')).toHaveValue('12')
 })
 
 it('uses the master name and image as read-only details in an event assignment', async () => {
@@ -102,11 +114,11 @@ it('uses the master name and image as read-only details in an event assignment',
 it('keeps an unassigned slot empty and accepts only valid integer limits', async () => {
   await mount()
   fireEvent.change(region().getByLabelText('Premio compartido'), { target: { value: '' } })
-  fireEvent.change(region().getByLabelText('Límite por evento'), { target: { value: '-1' } })
+  fireEvent.change(region().getByLabelText('Substock reservado'), { target: { value: '-1' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('El límite debe ser un entero')
   expect(api.put).not.toHaveBeenCalled()
-  fireEvent.change(region().getByLabelText('Límite por evento'), { target: { value: '0' } })
+  fireEvent.change(region().getByLabelText('Substock reservado'), { target: { value: '0' } })
   fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
   await screen.findByText('Guardado.')
   expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
@@ -121,14 +133,14 @@ async function save() {
 
 it('shows shared availability separately from optional event caps, including genuine zero', async () => {
   await mount()
-  expect(region().getByText(/Disponible compartido/)).toHaveTextContent('9')
-  expect(region('Ranking').getByText(/Disponible compartido/)).toHaveTextContent('0')
-  fireEvent.change(region().getByLabelText('Límite por evento'), { target: { value: '' } })
+  expect(region().getByText(/Disponible general/)).toHaveTextContent('9')
+  expect(region('Ranking').getByText(/Disponible general/)).toHaveTextContent('0')
+  fireEvent.change(region().getByLabelText('Substock reservado'), { target: { value: '' } })
   await save()
   expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
     prizeCatalog: expect.objectContaining({ validation: expect.objectContaining({ limit: null }) }),
   }))
-  expect(region().getByText(/Disponible compartido/)).toHaveTextContent('9')
+  expect(region().getByText(/Disponible general/)).toHaveTextContent('9')
 })
 
 it('reports missing inventory data instead of silently showing invented stock', async () => {

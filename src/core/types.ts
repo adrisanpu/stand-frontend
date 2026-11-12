@@ -1,28 +1,5 @@
 import React from 'react'
-import type { GameAccess, PlayMode } from './settings/gameAccess'
-import type { PrizeCatalog } from './prizes'
-
-export interface GameScreenProps {
-  gameId: string
-  /** When 'landscape', the game may render a 3-column layout (logo+code+QR | validation | sidebar) */
-  orientation?: 'portrait' | 'landscape'
-  /** For landscape: node to place in column 1 (e.g. logo) */
-  logoElement?: React.ReactNode
-  /** For landscape: node to place in column 1 below the info panel (e.g. Players) */
-  playersElement?: React.ReactNode
-  /** For landscape: node to place in column 3 (ranking and raffle data) */
-  sidebarElement?: React.ReactNode
-  /** Optional: top X positions that get a prize (e.g. 3); used to show "Premio por top X" in result screen */
-  topX?: number
-  /** Optional: label for the prize (e.g. "Merchandising"); shown when player ranks in top X */
-  prizeLabel?: string
-  prizeCatalog?: PrizeCatalog
-  /** When the in-game counter/timer is running, call with true to pause API polling (score, ranking, game) and avoid lag */
-  onCounterActiveChange?: (active: boolean) => void
-  /** Participant registration channel, independent of where gameplay runs. */
-  joinChannel?: string | null
-  playMode?: PlayMode
-}
+import type { GameAccess } from './settings/gameAccess'
 
 export interface ThemeColors {
   primary: string
@@ -61,6 +38,8 @@ export type GameConfigProps = {
   onBusyChange?: (busy: boolean) => void
   onDirtyChange?: (dirty: boolean) => void
   onChange: (newSettings: any) => void
+  /** Unsaved mechanics, emitted after load and on edits. Null means loading or unavailable. */
+  onDraftChange?: (draft: Record<string, unknown> | null) => void
   /** Saved access, or the unsaved access draft when embedded in the shared config modal. */
   access?: GameAccess
   /**
@@ -106,7 +85,6 @@ export interface GameDefinition {
   underDevelopment?: boolean
   colors: ThemeColors
   assets?: GameAssets
-  GameScreen: React.ComponentType<GameScreenProps>
   showRanking?: boolean // Whether this game should display the ranking component
   // NEW: optional per-game config component
   GameConfigComponent?: React.ComponentType<GameConfigProps>
