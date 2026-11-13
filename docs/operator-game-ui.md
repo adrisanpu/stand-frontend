@@ -107,8 +107,11 @@ placement do not. Submission is durable and requested only once per participant.
 Raffle entry is automatic after completing the raffle survey.
 
 Questions and placement become read-only after the first submitted response
-(including existing historical answers). Presentation remains editable while
-the event is active. Create a different event to use a different questionnaire;
+(including existing historical answers). While the event is active, operators can
+disable the questionnaire and reactivate it at its original placement without
+deleting responses. Disabling is also available on the free plan, but reactivation
+requires an eligible plan. Presentation remains editable while the event is active.
+Create a different event to use a different questionnaire;
 there is no questionnaire versioning or participant-answer reset.
 AI generation fills a local draft; it does not save or replace existing answers.
 Legacy registration/quiz settings open the same editor.

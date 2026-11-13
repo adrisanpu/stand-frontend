@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { publicApi, type ParticipantQuizState, type PlayerResponse, type PublicGameResponse } from '../../api/publicApi'
 import ParticipantQuiz from './ParticipantQuiz'
@@ -117,6 +117,26 @@ describe('participant survey placement', () => {
     expect(await screen.findByText('Tu opinión')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Volver al juego'))
     expect(screen.getByText('Jugar')).toBeInTheDocument()
+  })
+
+  it.each(['after_registration', 'raffle'] as const)('closes an open %s questionnaire when disabled and restores it when reactivated', async moment => {
+    vi.useFakeTimers()
+    try {
+      const state = { ...quiz, moment }
+      const meta = { ...game, formConfig: { ...game.formConfig!, quizMoment: moment } }
+      await act(async () => { show(state, meta) })
+      if (moment === 'raffle') fireEvent.click(screen.getByRole('button', { name: 'Responder cuestionario' }))
+      expect(screen.getByText('Tu opinión')).toBeInTheDocument()
+      vi.mocked(publicApi.getPlayer).mockResolvedValue(response({ ...state, moment: 'disabled' }))
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+      expect(screen.queryByText('Tu opinión')).not.toBeInTheDocument()
+      expect(screen.getByText('Jugar')).toBeInTheDocument()
+      vi.mocked(publicApi.getPlayer).mockResolvedValue(response(state))
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+      expect(screen.getByText('Tu opinión')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps entered answers on failed save and retries submission', async () => {

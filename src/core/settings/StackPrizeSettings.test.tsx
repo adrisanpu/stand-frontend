@@ -88,7 +88,7 @@ it('does not expose a delivery-channel selector and saves Wallet as the legacy d
   await screen.findByText('Entrega de premios')
   expect(screen.queryByLabelText('Entrega de premios Kivly')).not.toBeInTheDocument()
   expect(screen.queryByRole('combobox', { name: /entrega/i })).not.toBeInTheDocument()
-  expect(screen.getByText(/tarjeta Wallet/)).toBeInTheDocument()
+  expect(screen.getByText(/QR para canjearlos/)).toBeInTheDocument()
   fireEvent.change(await screen.findByLabelText('Límite por evento de Pizza'), { target: { value: '99' } })
   save()
   await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalledWith('ABC123',

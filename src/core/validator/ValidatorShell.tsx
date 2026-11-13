@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import jsQR from 'jsqr'
 import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
-import { publicApi } from '../../api/publicApi'
+import { publicApi, type PublicGameResponse } from '../../api/publicApi'
 import type { GamePrize } from '../prizes'
 import PrizePresentation from '../widgets/PrizePresentation'
 
@@ -18,7 +18,6 @@ const PRIZE_LABEL: Record<string, string> = {
 
 export default function ValidatorShell() {
   const { gameId = '' } = useParams()
-  const game = getGameById('EMPAREJA2')
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -27,6 +26,25 @@ export default function ValidatorShell() {
   const [message, setMessage] = useState<string | null>(null)
   const [prize, setPrize] = useState<GamePrize | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [gameMeta, setGameMeta] = useState<PublicGameResponse | null>(null)
+  const currentGameMeta = gameMeta?.gameId === gameId ? gameMeta : null
+  const game = currentGameMeta ? getGameById(currentGameMeta.gameType) : undefined
+  const logo = currentGameMeta
+    ? currentGameMeta.formLogoUrl || currentGameMeta.clientLogoUrl || game?.assets?.logo
+    : undefined
+
+  useEffect(() => {
+    let cancelled = false
+    setGameMeta(null)
+    if (gameId) {
+      void publicApi.getGame(gameId).then((meta) => {
+        if (!cancelled && meta.ok && meta.gameId === gameId) setGameMeta(meta)
+      }).catch(() => {
+        if (!cancelled) setGameMeta(null)
+      })
+    }
+    return () => { cancelled = true }
+  }, [gameId])
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -123,15 +141,17 @@ export default function ValidatorShell() {
     return () => cancelAnimationFrame(raf)
   }, [status, redeemToken, stopCamera])
 
-  const colors = game?.colors
-
   return (
-    <ThemeProvider game={game ?? null}>
-      <div
-        className="validator-shell text-textMain font-sans"
-        style={{ background: colors?.background ?? '#0B0A12', color: colors?.textMain ?? '#EAEAF2' }}
-      >
-        <div className="validator-content mx-auto max-w-md w-full space-y-4">
+    <ThemeProvider game={game ?? null} appearance={currentGameMeta?.formConfig?.appearance ?? currentGameMeta?.appearance}>
+      <div className="validator-shell play-shell bg-club text-textMain font-sans">
+        <div className="validator-content play-card card mx-auto max-w-md w-full space-y-4">
+          {logo && (
+            <img
+              src={logo}
+              alt={currentGameMeta?.formLogoUrl || currentGameMeta?.clientLogoUrl ? 'Logo del cliente' : game?.name}
+              className="play-logo mx-auto w-auto max-w-full object-contain"
+            />
+          )}
           <h1 className="text-xl font-bold text-center">Validador de premios</h1>
 
           <div className="validator-frame relative overflow-hidden rounded-xl aspect-[3/4]">

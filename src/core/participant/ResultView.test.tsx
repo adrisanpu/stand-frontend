@@ -37,6 +37,8 @@ it('shows the correct images alongside awarded prize QRs, including a won raffle
   expect(screen.getByRole('img', { name: 'Bicicleta' })).toHaveAttribute('src', '/bike.png')
   expect(screen.getByRole('img', { name: 'QR Premio por pareja' })).toHaveAttribute('src', expect.stringContaining('data=validation-token'))
   expect(screen.getByRole('img', { name: 'QR Premio del sorteo' })).toHaveAttribute('src', expect.stringContaining('data=raffle-token'))
+  expect(screen.queryByRole('link', { name: /Wallet/ })).not.toBeInTheDocument()
+  expect(screen.queryByText('Muestra este QR en el punto de recogida para canjear tu premio.')).not.toBeInTheDocument()
   expect(screen.queryByRole('button')).not.toBeInTheDocument()
 })
 
@@ -60,7 +62,7 @@ it('retains delivered prize images without displaying a redemption QR', async ()
     ...player, prizes: player.prizes.map((prize) => ({ ...prize, delivered: true })),
   })
   render(<ResultView gameId="GAME1" />)
-  expect(await screen.findByText('Premio(s) ya recogido(s). ¡Disfrutad!')).toBeInTheDocument()
+  expect(await screen.findByText('Mirad la pantalla del evento para ver el resultado en vivo.')).toBeInTheDocument()
   expect(screen.getByRole('img', { name: 'Mochila' })).toBeInTheDocument()
   expect(screen.queryByRole('img', { name: 'QR Premio por pareja' })).not.toBeInTheDocument()
 })

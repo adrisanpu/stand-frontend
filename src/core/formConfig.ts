@@ -28,6 +28,7 @@ export type GameFormResponse = GameFormDraft & {
   logoUrl: string | null
   bannerUrl: string | null
   locked: boolean
+  quizPreviousMoment?: Exclude<QuizMoment, 'disabled'> | null
   revision: string
   joinUrl: string
   readOnly: boolean
@@ -77,6 +78,8 @@ export function isGameFormResponse(value: unknown): value is GameFormResponse {
   return data.ok === true && typeof data.gameId === 'string' && typeof data.gameType === 'string'
     && typeof data.revision === 'string' && !!data.revision
     && typeof data.locked === 'boolean' && typeof data.readOnly === 'boolean'
+    && (data.quizPreviousMoment === undefined || data.quizPreviousMoment === null
+      || QUIZ_MOMENTS.slice(1).some(moment => moment === data.quizPreviousMoment))
     && typeof data.joinUrl === 'string' && !!data.joinUrl
     && (data.loyalty === undefined || (!!data.loyalty
       && ['clubName', 'privacyUrl', 'termsUrl', 'consentVersion'].every(key =>

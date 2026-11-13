@@ -3,7 +3,6 @@ import { publicApi, type NativePrizeAward, type PlayerResponse } from '../../api
 import { inventoryReasonText } from '../inventoryReason'
 import QRCode from '../widgets/QRCode'
 import { useParticipantLanguage } from './participantLanguage'
-import WalletPassLinks from './WalletPassLinks'
 
 export default function NativePrizeClaims({ gameId, playerToken, initialAwards, initialUnavailable = [] }: {
   gameId: string; playerToken: string; initialAwards: NativePrizeAward[]
@@ -13,33 +12,6 @@ export default function NativePrizeClaims({ gameId, playerToken, initialAwards, 
   const [awards, setAwards] = useState<NativePrizeAward[]>(initialAwards)
   const [unavailable, setUnavailable] = useState(initialUnavailable)
   const [error, setError] = useState(false)
-  const [emailError, setEmailError] = useState(false)
-  const [retrying, setRetrying] = useState<string | null>(null)
-  const refreshAwards = async () => {
-    const result = await publicApi.getPlayer(playerToken, gameId)
-    if (!result.ok || result.gameId !== gameId) throw new Error('Invalid prize response')
-    setAwards(result.nativePrizes ?? [])
-    setUnavailable(result.prizeUnavailable ?? [])
-  }
-  const retryEmail = async (awardId: string) => {
-    setRetrying(awardId)
-    setEmailError(false)
-    try {
-      await publicApi.retryRewardEmail(gameId, playerToken, awardId)
-      await refreshAwards()
-    } catch {
-      setEmailError(true)
-    } finally {
-      setRetrying(null)
-    }
-  }
-  const emailStates = {
-    pending: t('Preparando el email de tu premio.'),
-    sending: t('Enviando el email de tu premio.'),
-    accepted: t('Email aceptado para envío. Revisa tu bandeja y spam.'),
-    failed: t('No se pudo enviar el email del premio.'),
-    reconciliation_required: t('El envío del email requiere comprobación del equipo.'),
-  }
   useEffect(() => {
     let cancelled = false
     const refresh = async () => {
@@ -67,17 +39,11 @@ export default function NativePrizeClaims({ gameId, playerToken, initialAwards, 
       <h3 className="font-semibold">{award.name}</h3>
       {award.imageUrl && <img src={award.imageUrl} alt="" className="mx-auto h-16 w-16 object-contain" />}
       {award.state === 'available' && award.token && !error
-        ? <>
-          <QRCode data={award.token} size={220} alt={`QR ${award.name}`} className="!bg-white !p-3" />
-          <WalletPassLinks token={award.token} />
-        </>
-        : <p>{t(award.state === 'delivered' ? 'Premio(s) ya recogido(s). ¡Disfrutad!' : 'No se pudieron actualizar los premios.')}</p>}
-      {award.emailState && <p role="status" className="text-sm text-textSub">{emailStates[award.emailState]}</p>}
-      {award.emailState === 'failed' && <button type="button" className="underline text-sm"
-        disabled={retrying !== null} onClick={() => void retryEmail(award.id)}>
-        {retrying === award.id ? t('Reintentando…') : t('Reintentar email')}
-      </button>}
+        ? <QRCode data={award.token} size={220} alt={`QR ${award.name}`} className="!bg-white !p-3" />
+        : award.state !== 'delivered' && <p>{t('No se pudieron actualizar los premios.')}</p>}
     </article>)}
-    {emailError && <p role="alert">{t('No se pudo reintentar el email.')}</p>}
+    {awards.length > 0 && awards.every(award => award.state === 'delivered') && (
+      <p className="text-sm text-textSub">{t('Mirad la pantalla del evento para ver el resultado en vivo.')}</p>
+    )}
   </section>
 }

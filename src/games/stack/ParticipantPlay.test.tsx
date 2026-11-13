@@ -409,7 +409,7 @@ describe('STACK participant gameplay', () => {
     expect(viewport).toContainElement(name)
     expect(image.nextElementSibling).toBe(name)
     expect(name.parentElement?.parentElement).toBe(qr.parentElement?.parentElement)
-    expect(viewport).not.toContainElement(screen.getByText('Muestra este QR en el punto de recogida para canjear tu premio.'))
+    expect(screen.queryByText('Muestra este QR en el punto de recogida para canjear tu premio.')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Premio del ranking' })).not.toBeInTheDocument()
     expect(screen.queryByText('Fin de la partida')).not.toBeInTheDocument()
   })

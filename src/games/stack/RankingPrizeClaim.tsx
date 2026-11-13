@@ -5,7 +5,6 @@ import { useParticipantLanguage } from '../../core/participant/participantLangua
 import type { PrizeCatalog } from '../../core/prizes'
 import { PrizeImage } from '../../core/widgets/PrizePresentation'
 import type { StackPlayerPrizes } from '../../api/stackPrizes'
-import WalletPassLinks from '../../core/participant/WalletPassLinks'
 import StackAwardList, { StackWallet } from './StackAwardList'
 
 type Props = {
@@ -101,7 +100,6 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
                 {!prize.delivered && (
                   <div className="w-[clamp(100px,18vh,180px)] max-w-[calc(50%-0.5rem)] shrink-0 space-y-2">
                     <PrizeQR token={prize.token} label={`QR ${t('Premio del ranking')}`} />
-                    <WalletPassLinks token={prize.token} />
                   </div>
                 )}
               </div>
@@ -116,11 +114,11 @@ export default function RankingPrizeClaim({ gameId, playerToken, prizeCatalog, c
               <p>{t('No se pudieron actualizar los premios.')}</p>
               <button type="button" onClick={retry} className="underline">{t('Reintentar actualización de premios')}</button>
             </div>
-          ) : prize && (
-            prize.delivered
-              ? <p role="status" className="text-sm text-green-300">{t('Premio(s) ya recogido(s). ¡Disfrutad!')}</p>
-              : <p className="text-sm text-textSub">{t('Muestra este QR en el punto de recogida para canjear tu premio.')}</p>
-          )
+          ) : prize?.delivered ? (
+            <p role="status" className="text-sm text-textSub">
+              {t('Mirad la pantalla del evento para ver el resultado en vivo.')}
+            </p>
+          ) : null
       )}
       {enabled && stackPrizes && <>
         <StackWallet url={stackPrizes.walletUrl} expected={stackPrizes.walletExpected} />

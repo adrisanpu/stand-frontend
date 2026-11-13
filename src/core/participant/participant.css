@@ -15,6 +15,11 @@
   text-size-adjust: 100%;
 }
 
+.play-shell.bg-club[data-quiz-active="true"] {
+  height: auto;
+  overflow: visible;
+}
+
 .play-card {
   padding: 3rem clamp(12px, 4vw, 24px) 16px;
   overflow-wrap: anywhere;

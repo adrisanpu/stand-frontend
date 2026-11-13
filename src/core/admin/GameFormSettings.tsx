@@ -192,7 +192,9 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
   return <div className="space-y-4">
     {section !== 'appearance' && !features.playerForms && <p role="status">{t('El cuestionario está disponible en el plan Event 24h. Puedes editar los textos y los campos opcionales del registro.', 'Questionnaires are available on the Event 24h plan. You can edit registration text and optional fields.')}</p>}
     {(readOnly || confirmed.readOnly) && <p role="status">{t('Formulario en modo solo lectura.', 'This form is read only.')}</p>}
-    {(!section || section === 'questionnaire') && confirmed.locked && <p role="status">{t('Ya hay respuestas: las preguntas y el momento del cuestionario están bloqueados. Puedes editar la presentación.', 'Responses exist: questions and questionnaire timing are locked. Presentation is still editable.')}</p>}
+    {(!section || section === 'questionnaire') && confirmed.locked && <p role="status">{features.playerForms
+      ? t('Ya hay respuestas: las preguntas y el momento están bloqueados. Puedes desactivar el cuestionario y volver a activarlo en el mismo momento.', 'Responses exist: questions and timing are locked. You can disable the questionnaire and reactivate it at the same time.')
+      : t('Ya hay respuestas: las preguntas y el momento están bloqueados. Puedes desactivar el cuestionario; para volver a activarlo necesitas el plan Event 24h.', 'Responses exist: questions and timing are locked. You can disable the questionnaire; reactivation requires the Event 24h plan.')}</p>}
     {section && section !== 'appearance' && <p className="text-xs">{t('Guardar aplica los cambios pendientes de registro y cuestionario. El lienzo del Home se guarda por separado en Home.', 'Saving applies pending registration and questionnaire changes. The Home canvas is saved separately in Home.')}</p>}
     {canvasMounted && <div hidden={section !== 'appearance'}>
       {section === 'appearance' && error && <p role="alert">{error}</p>}
@@ -288,19 +290,26 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
               {t(field.es, field.en)} {t('(opcional)', '(optional)')}
             </label>)}
           </fieldset>}
-          {(!section || section === 'questionnaire') && <fieldset disabled={confirmed.locked || !features.playerForms} className="space-y-3 rounded-xl border border-current/15 p-3">
+          {(!section || section === 'questionnaire') && <fieldset className="space-y-3 rounded-xl border border-current/15 p-3">
             <legend className="px-1 font-medium">{t('Cuestionario', 'Questionnaire')}</legend>
             <label className="block text-sm">{t('Momento del cuestionario', 'Questionnaire timing')}
               <select className="mt-1 w-full rounded-lg border border-current/20 bg-transparent p-2"
+                disabled={!features.playerForms && confirmed.formConfig.quizMoment === 'disabled'}
                 value={config.quizMoment} onChange={event => changeConfig({ quizMoment: event.target.value as GameFormConfig['quizMoment'] })}>
                 {momentLabels.map(([value, label]) => <option key={value} value={value}
-                  disabled={value === 'after_game' && ['INFOCARDS', 'IMPOSTOR'].includes(confirmed.gameType)}>{label}</option>)}
+                  disabled={(value === 'after_game' && ['INFOCARDS', 'IMPOSTOR'].includes(confirmed.gameType))
+                    || (value !== 'disabled' && (
+                      (!features.playerForms && value !== confirmed.formConfig.quizMoment)
+                      || (confirmed.locked && value !== (confirmed.formConfig.quizMoment === 'disabled'
+                        ? confirmed.quizPreviousMoment : confirmed.formConfig.quizMoment))
+                    ))}>{label}</option>)}
               </select>
             </label>
             {['INFOCARDS', 'IMPOSTOR'].includes(confirmed.gameType) && <p className="text-xs">
               {t('Este juego no tiene un final individual verificable. El cuestionario después del juego no está disponible.', 'This game has no verifiable individual finish. The after-game questionnaire is unavailable.')}
             </p>}
             <p className="text-xs">{t('Hasta 5 preguntas, 3 opciones por pregunta y una sola respuesta. Sin puntuación.', 'Up to 5 questions, 3 options each and a single answer. No scoring.')}</p>
+            <fieldset disabled={confirmed.locked || !features.playerForms} className="space-y-3">
             {draft.questions.map((question, index) => <fieldset key={question.id} className="space-y-2 border-t border-current/15 pt-3">
               <legend className="text-sm font-medium">{t('Pregunta', 'Question')} {index + 1}</legend>
               <label className="block text-sm">{t('Texto de la pregunta', 'Question text')} {index + 1}
@@ -339,6 +348,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
               }}>
               {t('Añadir pregunta', 'Add question')}
             </button>
+            </fieldset>
           </fieldset>}
         </fieldset>
         {error && <p role="alert">{error}</p>}

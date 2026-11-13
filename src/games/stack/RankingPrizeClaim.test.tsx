@@ -28,7 +28,7 @@ it('shows the server-issued ranking claim and generates its QR locally', async (
   expect(qr).toHaveAttribute('src', expect.stringContaining('data:image/gif;base64,'))
   expect(screen.getByRole('img', { name: 'Consola' })).toHaveAttribute('src', '/prize.png')
   expect(publicApi.getPlayer).toHaveBeenCalledWith('session', 'GAME1')
-  expect(screen.getByText(/Muestra este QR/)).toBeInTheDocument()
+  expect(screen.queryByText(/Muestra este QR/)).not.toBeInTheDocument()
 })
 
 it('keeps the result overlay scrollable from its beginning on short screens', async () => {
@@ -85,6 +85,7 @@ it('preserves the Kivly Wallet link and STAND QR access with email delivery', as
   expect(screen.getByRole('link', { name: 'Añadir a mi wallet del club' })).toHaveAttribute(
     'href', 'https://club.kivly.store/add-to-wallet',
   )
+  expect(screen.queryByRole('link', { name: /Apple Wallet|Google Wallet/ })).not.toBeInTheDocument()
   expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
   expect(screen.getByText(/Email de tu premio aceptado por SES; entrega en bandeja no confirmada/)).toBeInTheDocument()
 })
@@ -99,7 +100,7 @@ it('replaces the QR with delivery confirmation on the next poll', async () => {
   })
   await act(async () => { vi.advanceTimersByTime(30000) })
   expect(screen.queryByRole('img', { name: 'QR Premio del ranking' })).not.toBeInTheDocument()
-  expect(screen.getByText(/ya recogido/)).toBeInTheDocument()
+  expect(screen.getByText('Mirad la pantalla del evento para ver el resultado en vivo.')).toBeInTheDocument()
 })
 
 it('removes a claim if the player drops out of the eligible ranking', async () => {
@@ -127,7 +128,7 @@ it('does not show a claim from a mismatched game response', async () => {
   expect(screen.queryByRole('img', { name: 'QR Premio del ranking' })).not.toBeInTheDocument()
 })
 
-it('keeps Kivly Wallet and STAND Wallet passes accessible alongside ranking prizes', async () => {
+it('keeps Kivly Wallet accessible while hiding STAND Wallet passes', async () => {
   vi.mocked(publicApi.getPlayer).mockResolvedValue({
     ...response, prizes: [], stackPrizes: {
       walletUrl: 'https://club.kivly.store/add-to-wallet', state: 'open', finalPrizesPending: false,
@@ -143,12 +144,7 @@ it('keeps Kivly Wallet and STAND Wallet passes accessible alongside ranking priz
   expect(position.compareDocumentPosition(wallet) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(wallet.compareDocumentPosition(prize) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(screen.getByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Añadir a Apple Wallet' })).toHaveAttribute(
-    'href', '/wallet/apple?token=qr',
-  )
-  expect(screen.getByRole('link', { name: 'Añadir a Google Wallet' })).toHaveAttribute(
-    'href', '/wallet/google?token=qr',
-  )
+  expect(screen.queryByRole('link', { name: /Apple Wallet|Google Wallet/ })).not.toBeInTheDocument()
   expect(screen.queryByRole('img', { name: 'Abre la wallet para ver tu premio' })).not.toBeInTheDocument()
 })
 
@@ -178,10 +174,10 @@ it('keeps STAND and Kivly prize claims available across prize refreshes', async 
   render(<RankingPrizeClaim gameId="GAME1" playerToken="session" enabled rank={1} />)
   await act(async () => {})
   expect(screen.getByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Añadir a Apple Wallet' })).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: /Apple Wallet|Google Wallet/ })).not.toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Añadir a mi wallet del club' })).toBeInTheDocument()
   await act(async () => { vi.advanceTimersByTime(30000) })
   expect(screen.getByRole('img', { name: 'QR Pizza' })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Añadir a Apple Wallet' })).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: /Apple Wallet|Google Wallet/ })).not.toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Añadir a mi wallet del club' })).toBeInTheDocument()
 })

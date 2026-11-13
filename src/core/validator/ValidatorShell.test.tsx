@@ -6,12 +6,17 @@ import { publicApi } from '../../api/publicApi'
 import ValidatorShell from './ValidatorShell'
 
 vi.mock('jsqr', () => ({ default: vi.fn() }))
-vi.mock('../../api/publicApi', () => ({ publicApi: { redeem: vi.fn() } }))
+vi.mock('../../api/publicApi', () => ({ publicApi: { getGame: vi.fn(), redeem: vi.fn() } }))
 
 const stop = vi.fn()
 
 beforeEach(() => {
   vi.mocked(jsQR).mockReset()
+  vi.mocked(publicApi.getGame).mockReset()
+  vi.mocked(publicApi.getGame).mockResolvedValue({
+    ok: true, gameId: 'ABC123', gameType: 'EMPAREJA2', isActive: true,
+    playerCount: 0, validatedCount: 0, recentPairs: [], joinUrl: '',
+  })
   vi.mocked(publicApi.redeem).mockReset()
   stop.mockClear()
   vi.stubGlobal('navigator', {
@@ -67,14 +72,14 @@ it('keeps legacy delivery confirmations working without catalog details', async 
   })
   renderValidator()
   expect(await screen.findByText('Premio por pareja entregado a adri.')).toBeInTheDocument()
-  expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: 'Consola' })).not.toBeInTheDocument()
 })
 
 it('does not show a prize when redemption fails', async () => {
   vi.mocked(publicApi.redeem).mockRejectedValue(Object.assign(new Error('AlreadyDelivered'), { status: 409 }))
   renderValidator()
   expect(await screen.findByText('Este premio ya se había entregado.')).toBeInTheDocument()
-  expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: 'Consola' })).not.toBeInTheDocument()
 })
 
 it('does not mistake a required survey for an already collected prize', async () => {
@@ -82,4 +87,20 @@ it('does not mistake a required survey for an already collected prize', async ()
   renderValidator()
   expect(await screen.findByText('El participante debe completar el cuestionario antes de recibir el premio.')).toBeInTheDocument()
   expect(screen.queryByText('Este premio ya se había entregado.')).not.toBeInTheDocument()
+})
+
+it('uses the game participant colors and configured logo', async () => {
+  vi.mocked(publicApi.getGame).mockResolvedValue({
+    ok: true, gameId: 'ABC123', gameType: 'EMPAREJA2', isActive: true,
+    playerCount: 0, validatedCount: 0, recentPairs: [], joinUrl: '',
+    formLogoUrl: 'https://assets.example.test/event-logo.png',
+    appearance: { themeMode: 'dark', colors: { primary: '#123456', accent: '#654321' } },
+  })
+  renderValidator()
+
+  expect(await screen.findByRole('img', { name: 'Logo del cliente' })).toHaveAttribute(
+    'src', 'https://assets.example.test/event-logo.png',
+  )
+  await waitFor(() => expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('#123456'))
+  expect(document.documentElement.style.getPropertyValue('--color-accent')).toBe('#654321')
 })

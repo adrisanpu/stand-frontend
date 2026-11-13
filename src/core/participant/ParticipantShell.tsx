@@ -280,6 +280,7 @@ function ParticipantContent() {
         ref={viewportRef}
         lang={language}
         className="play-shell bg-club text-textMain font-sans"
+        data-quiz-active={quizActive ? 'true' : undefined}
       >
         <div className="relative mx-auto max-w-md w-full flex flex-col">
           {gameType === 'STACK' && gameMeta?.stackPrizeRules

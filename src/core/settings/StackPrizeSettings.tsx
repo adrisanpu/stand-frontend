@@ -869,8 +869,8 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
       <section className="rounded-xl border border-white/10 p-3 space-y-2">
         <h3 className="text-sm font-semibold">{t('Entrega de premios', 'Reward delivery')}</h3>
         <p className="text-xs text-textSub">{t(
-          'STAND entrega sus premios mediante su tarjeta Wallet y envía el enlace al correo verificado. Si Kivly está conectado, los premios Kivly usan automáticamente su enlace Wallet.',
-          'STAND delivers its prizes through a STAND Wallet pass and emails the link to the verified address. When Kivly is connected, Kivly rewards automatically use their Kivly Wallet link.',
+          'Los premios STAND se envían al correo verificado con un QR para canjearlos. Si Kivly está conectado, sus premios usan automáticamente el enlace Wallet de Kivly.',
+          'STAND prizes are emailed to the verified address with a QR code for redemption. When Kivly is connected, Kivly rewards automatically use their Kivly Wallet link.',
         )}</p>
         {!data.emailAvailable && <p className="text-xs text-amber-300">{t(
           'El envío de premios por correo aún no está habilitado en este entorno.',

@@ -42,18 +42,22 @@ const data: StackPlayerPrizes = {
   ],
 }
 it('shows separate locally generated QR codes for two units of the same STAND prize', () => {
-  render(<StackAwardList data={data} />)
+  render(<StackAwardList data={{ ...data, awards: data.awards.map(award => ({
+    ...award, ...(award.source === 'stand' ? { emailState: 'pending' as const } : {}),
+  })) }} />)
   const qr = screen.getAllByRole('img', { name: 'QR Pizza' })
   expect(qr).toHaveLength(2)
   expect(qr[0].getAttribute('src')).not.toBe(qr[1].getAttribute('src'))
   expect(qr[0]).toHaveAttribute('src', expect.stringContaining('data:image/gif;base64,'))
   expect(screen.queryByRole('img', { name: 'QR Coffee' })).not.toBeInTheDocument()
+  expect(screen.queryByText(/Preparando el email/)).not.toBeInTheDocument()
+  expect(screen.queryByText('Recógelo mostrando este QR.')).not.toBeInTheDocument()
   expect(screen.getByText('Asignado a tu cuenta del club. No necesitas reclamarlo aquí.')).toBeInTheDocument()
 })
 it('does not show a QR for an already collected prize', () => {
   render(<StackAwardList data={{ ...data, awards: [{ ...data.awards[0], state: 'delivered' }] }} />)
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
-  expect(screen.getByText('Premio recogido. ¡Disfrútalo!')).toBeInTheDocument()
+  expect(screen.getByText('Mirad la pantalla del evento para ver el resultado en vivo.')).toBeInTheDocument()
 })
 it.each(['queued', 'sending', 'reconciliation_required'] as const)('shows email blocked before the %s reward is confirmed without offering retry', (state) => {
   render(<ParticipantLanguageProvider><ParticipantLanguageSelector /><StackAwardList data={{

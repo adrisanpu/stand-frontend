@@ -3,7 +3,6 @@ import qrcode from 'qrcode-generator'
 import { publicApi } from '../../api/publicApi'
 import type { StackAward, StackPlayerPrizes } from '../../api/stackPrizes'
 import { useParticipantLanguage } from '../../core/participant/participantLanguage'
-import WalletPassLinks from '../../core/participant/WalletPassLinks'
 import { inventoryReasonText } from '../../core/inventoryReason'
 
 function AwardQR({ award }: { award: StackAward }) {
@@ -101,14 +100,15 @@ export default function StackAwardList({ data, locked = false, gameId, playerTok
       </div>
       <div className="flex flex-col sm:flex-row items-center gap-4">
         {!locked && award.source === 'stand' && award.state === 'available' && <AwardQR award={award} />}
-        {!locked && award.source === 'stand' && award.state === 'available' && award.token
-          && <WalletPassLinks token={award.token} />}
-        <p role="status" className={`text-sm ${award.state.includes('required') ? 'text-amber-300' : 'text-textSub'}`}>{states[award.state]}</p>
+        {!(award.source === 'stand' && ['available', 'delivered'].includes(award.state))
+          && <p role="status" className={`text-sm ${award.state.includes('required') ? 'text-amber-300' : 'text-textSub'}`}>
+            {states[award.state]}
+          </p>}
       </div>
-      {award.emailState && <p role="status" className="text-sm text-textSub">
+      {award.source !== 'stand' && award.emailState && <p role="status" className="text-sm text-textSub">
         {emailStates[award.emailState]}
       </p>}
-      {award.emailState === 'failed' && gameId && playerToken && <button type="button" className="text-sm underline"
+      {award.source !== 'stand' && award.emailState === 'failed' && gameId && playerToken && <button type="button" className="text-sm underline"
         disabled={retrying !== null} onClick={() => void retryEmail(award.id)}>
         {retrying === award.id ? t('Reintentando…') : t('Reintentar email')}
       </button>}
@@ -124,6 +124,11 @@ export default function StackAwardList({ data, locked = false, gameId, playerTok
         </span>
       </div>}
     </article>)}
+    {data.awards.some(award => award.source === 'stand')
+      && data.awards.filter(award => award.source === 'stand').every(award => award.state === 'delivered')
+      && <p role="status" className="text-sm text-textSub">
+        {t('Mirad la pantalla del evento para ver el resultado en vivo.')}
+      </p>}
     {retryError && <p role="alert" className="text-sm text-red-300">{t('No se pudo reintentar el email.')}</p>}
     {data.finalPrizesPending && <p className="text-sm text-textSub">{t('El ranking definitivo y sus premios se decidirán al cerrar el juego.')}</p>}
     {data.state === 'closed' && <p className="text-sm text-textSub">{t('Juego cerrado. Tus premios siguen disponibles aquí.')}</p>}

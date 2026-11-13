@@ -14,9 +14,11 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 const award = { id: 'one', name: 'Medal', state: 'available' as const, token: 'claim-token' }
 
 it('shows persisted awards immediately without repeating the initial session request', () => {
-  render(<NativePrizeClaims gameId="GAME" playerToken="session" initialAwards={[award]} />)
+  render(<NativePrizeClaims gameId="GAME" playerToken="session" initialAwards={[{ ...award, emailState: 'pending' }]} />)
   expect(screen.getByText('Medal')).toBeInTheDocument()
   expect(screen.getByText('claim-token')).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: /Wallet/ })).not.toBeInTheDocument()
+  expect(screen.queryByText(/Preparando el email/)).not.toBeInTheDocument()
   expect(publicApi.getPlayer).not.toHaveBeenCalled()
 })
 
@@ -29,7 +31,7 @@ it('updates collection state and removes the consumed QR', async () => {
   render(<NativePrizeClaims gameId="GAME" playerToken="session" initialAwards={[award]} />)
   await act(async () => { await vi.advanceTimersByTimeAsync(30000) })
   expect(screen.queryByText('claim-token')).not.toBeInTheDocument()
-  expect(screen.getByText(/ya recogido/)).toBeInTheDocument()
+  expect(screen.getByText('Mirad la pantalla del evento para ver el resultado en vivo.')).toBeInTheDocument()
 })
 
 it('keeps an update failure explicit and hides stale QR claims until recovery', async () => {

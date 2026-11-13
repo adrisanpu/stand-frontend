@@ -214,19 +214,41 @@ it('keeps unsaved changes on failure and requires explicit reload before retry',
   await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Dirección (opcional)' })).not.toBeChecked())
 })
 
-it('locks questions and timing after answers but allows presentation saves', async () => {
+it('allows disabling and restoring the original timing after answers while keeping questions locked', async () => {
   snapshot.locked = true
   snapshot.formConfig.quizMoment = 'after_registration'
   snapshot.questions = [{ id: 'q1', text: 'Choose', options: [{ title: 'One', payload: 'EVENT_q1_a' }] }]
   await mount()
-  expect(screen.getByLabelText('Momento del cuestionario')).toBeDisabled()
+  expect(screen.getByLabelText('Momento del cuestionario')).toBeEnabled()
+  expect(screen.getByRole('option', { name: 'Antes de recoger un premio' })).toBeDisabled()
   expect(screen.getByLabelText('Texto de la pregunta 1')).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Añadir pregunta' })).toBeDisabled()
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Dirección (opcional)' }))
+  fireEvent.change(screen.getByLabelText('Momento del cuestionario'), { target: { value: 'disabled' } })
+  snapshot.quizPreviousMoment = 'after_registration'
   fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
   await screen.findByText('Formulario guardado y confirmado.')
   expect(snapshot.questions[0].text).toBe('Choose')
-  expect(snapshot.formConfig.quizMoment).toBe('after_registration')
+  expect(snapshot.formConfig.quizMoment).toBe('disabled')
+  expect(screen.getByRole('option', { name: 'Después del registro' })).toBeEnabled()
+  expect(screen.getByRole('option', { name: 'Antes de recoger un premio' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Momento del cuestionario'), { target: { value: 'after_registration' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
+  await waitFor(() => expect(snapshot.formConfig.quizMoment).toBe('after_registration'))
+  expect(screen.getByLabelText('Texto de la pregunta 1')).toBeDisabled()
+})
+
+it('allows a free account to disable an existing questionnaire but not reactivate it', async () => {
+  user.plan = 'free'
+  snapshot.formConfig.quizMoment = 'after_registration'
+  snapshot.questions = [{ id: 'q1', text: 'Choose', options: [{ title: 'One', payload: 'EVENT_q1_a' }] }]
+  await mount()
+  expect(screen.getByLabelText('Momento del cuestionario')).toBeEnabled()
+  expect(screen.getByRole('option', { name: 'Antes de recoger un premio' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Momento del cuestionario'), { target: { value: 'disabled' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
+  await screen.findByText('Formulario guardado y confirmado.')
+  expect(snapshot.formConfig.quizMoment).toBe('disabled')
+  expect(screen.getByLabelText('Momento del cuestionario')).toBeDisabled()
 })
 
 it('enforces plan, read-only and mandatory phone constraints', async () => {

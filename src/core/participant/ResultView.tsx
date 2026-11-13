@@ -5,7 +5,6 @@ import QRCode from '../widgets/QRCode'
 import { useParticipantLanguage } from './participantLanguage'
 import type { PrizeCatalog } from '../prizes'
 import PrizePresentation from '../widgets/PrizePresentation'
-import WalletPassLinks from './WalletPassLinks'
 
 type Props = {
   gameId: string
@@ -77,11 +76,9 @@ export default function ResultView({ gameId, prizeCatalog }: Props) {
     <div className="text-center space-y-4">
       <div className="text-5xl" aria-hidden>✓</div>
       <h2 className="text-2xl font-bold text-green-300">{t('¡Pareja válida!')}</h2>
-      <p className="text-textSub">
-        {t(pending.length > 0
-          ? 'Muestra este QR en el punto de recogida para canjear tu premio.'
-          : 'Mirad la pantalla del evento para ver el resultado en vivo.')}
-      </p>
+      {pending.length === 0 && delivered.length > 0 && (
+        <p className="text-textSub">{t('Mirad la pantalla del evento para ver el resultado en vivo.')}</p>
+      )}
 
       {loading && <p className="text-sm text-textSub">{t('Cargando premios...')}</p>}
       {loadError && <p role="alert" className="text-sm text-red-300">{t('No se pudieron actualizar los premios.')}</p>}
@@ -91,14 +88,12 @@ export default function ResultView({ gameId, prizeCatalog }: Props) {
           <p className="text-sm font-medium">{t(PRIZE_LABEL[p.kind] || p.kind)}</p>
           <PrizePresentation prize={catalog?.[p.kind]} />
           <QRCode data={p.token} size={220} alt={`QR ${t(PRIZE_LABEL[p.kind] || p.kind)}`} className="!bg-white !p-3" />
-          <WalletPassLinks token={p.token} />
         </div>
       ))}
 
       {delivered.length > 0 && pending.length === 0 && (
         <div className="space-y-3">
           {delivered.map((prize) => <PrizePresentation key={prize.kind} prize={catalog?.[prize.kind]} />)}
-          <p className="text-sm text-green-300/90">{t('Premio(s) ya recogido(s). ¡Disfrutad!')}</p>
         </div>
       )}
     </div>

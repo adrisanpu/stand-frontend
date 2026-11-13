@@ -67,7 +67,7 @@ export default function ParticipantQuiz({ gameId, playerToken, gameMeta, childre
         setAnswers(current => Object.fromEntries(Object.entries(current).filter(([id, payload]) =>
           questions.some(q => q.id === id && q.options.some(opt => opt.payload === payload)))))
         setError(false)
-        if (!data.quiz.completed && data.quiz.moment !== 'disabled') timer = setTimeout(refresh, 5000)
+        if (!data.quiz.completed) timer = setTimeout(refresh, 5000)
       } catch {
         if (!cancelled) setError(true)
       }
@@ -78,7 +78,7 @@ export default function ParticipantQuiz({ gameId, playerToken, gameMeta, childre
 
   const mandatory = (quiz?.moment ?? gameMeta.formConfig?.quizMoment) === 'after_registration'
     || (quiz?.moment === 'after_game' && quiz.finished)
-  const needsQuiz = !!quiz && !quiz.completed && (mandatory || open)
+  const needsQuiz = !!quiz && quiz.moment !== 'disabled' && !quiz.completed && (mandatory || open)
   const invitation = quiz && !quiz.completed && !mandatory
     && (quiz.moment === 'raffle' || (quiz.moment === 'prize' && quiz.prizePending))
 
