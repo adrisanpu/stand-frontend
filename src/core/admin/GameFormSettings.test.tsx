@@ -45,14 +45,14 @@ async function mount() {
   const dirty = vi.fn()
   const busy = vi.fn()
   render(<GameFormSettings gameId="EVENT" onDirtyChange={dirty} onBusyChange={busy} />)
-  await screen.findByLabelText('Título del registro')
+  await screen.findByLabelText('Logo guardado')
   return { dirty, busy }
 }
 
 it('loads the selected event and saves keys and expected revision, not signed URLs', async () => {
   const { dirty } = await mount()
   expect(api.get).toHaveBeenCalledWith('/v1/game?gameId=EVENT&form=true')
-  fireEvent.change(screen.getByLabelText('Título del registro'), { target: { value: 'Our event' } })
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Dirección (opcional)' }))
   fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
   expect(await screen.findByText('Formulario guardado y confirmado.')).toBeInTheDocument()
   expect(api.put).toHaveBeenCalledWith('/v1/game', { gameId: 'EVENT', form: {
@@ -63,7 +63,29 @@ it('loads the selected event and saves keys and expected revision, not signed UR
   expect(screen.getByTestId('qr')).toHaveTextContent('/play/EVENT')
 })
 
-it('shares the selected logo across both tabs and saves only its media key', async () => {
+it('saves a primary and accent palette for the event from registration settings', async () => {
+  const onFrameChange = vi.fn()
+  render(<GameFormSettings gameId="EVENT" section="registration" onFrameChange={onFrameChange} />)
+  await screen.findByLabelText('Logo guardado')
+
+  fireEvent.change(screen.getByLabelText('Color primario de la partida'), { target: { value: '#123456' } })
+  fireEvent.change(screen.getByLabelText('Color de acento de la partida'), { target: { value: '#654321' } })
+  expect(onFrameChange).toHaveBeenLastCalledWith(expect.objectContaining({
+    appearance: { themeMode: 'dark', colors: { primary: '#123456', accent: '#654321' } },
+  }))
+
+  expect(screen.queryByRole('button', { name: 'Guardar colores' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
+  await screen.findByText('Colores de la partida guardados y confirmados.')
+  expect(api.put).toHaveBeenCalledWith('/v1/game', { gameId: 'EVENT', form: expect.objectContaining({
+    expectedRevision: 'r1',
+    formConfig: expect.objectContaining({
+      appearance: { themeMode: 'dark', colors: { primary: '#123456', accent: '#654321' } },
+    }),
+  }) })
+})
+
+it('saves the shared logo in registration and inherits it in questionnaire preview without duplicate controls', async () => {
   const sectionDirty = vi.fn()
   const { rerender } = render(<GameFormSettings gameId="EVENT" section="registration" onSectionDirtyChange={sectionDirty} />)
   await screen.findByLabelText('Logo guardado')
@@ -75,19 +97,23 @@ it('shares the selected logo across both tabs and saves only its media key', asy
   expect(sectionDirty).toHaveBeenCalledWith('registration', true)
   expect(sectionDirty).toHaveBeenCalledWith('questionnaire', true)
   expect(api.put).not.toHaveBeenCalled()
-  rerender(<GameFormSettings gameId="EVENT" section="questionnaire" onSectionDirtyChange={sectionDirty} />)
-  expect(screen.getByLabelText('Logo guardado')).toHaveValue('users/owner/logos/image.png')
-  expect(screen.getByRole('region', { name: 'Vista previa' }).querySelector('img')).toHaveAttribute('src', 'https://image.test/signed.png')
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar cuestionario' }))
-  await screen.findByText('Cuestionario guardado y confirmado.')
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
+  await screen.findByText('Formulario guardado y confirmado.')
   expect(api.put).toHaveBeenCalledTimes(1)
   expect(api.put).toHaveBeenCalledWith('/v1/game', expect.objectContaining({
     form: expect.objectContaining({ formConfig: expect.objectContaining({ logoKey: 'users/owner/logos/image.png' }) }),
   }))
   expect(JSON.stringify(vi.mocked(api.put).mock.calls)).not.toContain('signed.png')
+
+  rerender(<GameFormSettings gameId="EVENT" section="questionnaire" onSectionDirtyChange={sectionDirty} />)
+  expect(screen.queryByLabelText('Logo guardado')).not.toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'Vista previa' }).querySelector('img')).toHaveAttribute('src', 'https://image.test/signed.png')
+  expect(screen.getByRole('button', { name: 'Guardar cuestionario' })).toBeDisabled()
+
+  rerender(<GameFormSettings gameId="EVENT" section="registration" onSectionDirtyChange={sectionDirty} />)
   fireEvent.change(screen.getByLabelText('Logo guardado'), { target: { value: '' } })
-  expect(screen.getByRole('region', { name: 'Vista previa' }).querySelector('img')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: 'Guardar cuestionario' }))
+  expect(screen.getByRole('region', { name: 'Vista previa' }).querySelector('img[src="https://image.test/signed.png"]')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
   await waitFor(() => expect(snapshot.formConfig.logoKey).toBeNull())
 })
 
@@ -156,7 +182,7 @@ it('previews the same two-step registration and optional fields that are saved f
   })
 })
 
-it.each(['registration', 'questionnaire'] as const)('places the %s QR below the preview at the bottom of its column', async section => {
+it.each(['registration', 'questionnaire'] as const)('places the %s QR above a contained preview', async section => {
   render(<GameFormSettings gameId="EVENT" section={section} />)
   const preview = await screen.findByRole('region', { name: 'Vista previa' })
   const aside = screen.getByRole('complementary', { name: 'Vista previa del formulario' })
@@ -166,25 +192,26 @@ it.each(['registration', 'questionnaire'] as const)('places the %s QR below the 
   expect(aside).toHaveClass('flex', 'flex-col')
   const qr = screen.getByTestId('qr')
   expect(aside).toContainElement(qr)
-  expect(qr.parentElement?.parentElement).toHaveClass('mt-auto', 'pt-12')
-  expect(preview.compareDocumentPosition(qr) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(preview.compareDocumentPosition(qr) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+  expect(aside).toHaveClass('lg:h-[calc(92dvh-13rem)]', 'lg:overflow-hidden')
+  expect(preview).toHaveClass('flex-1', 'overflow-y-auto')
 })
 
 it('keeps unsaved changes on failure and requires explicit reload before retry', async () => {
   await mount()
   vi.mocked(api.put).mockRejectedValue(new Error('FormChanged'))
-  fireEvent.change(screen.getByLabelText('Título del registro'), { target: { value: 'Unsaved title' } })
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Dirección (opcional)' }))
   fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('FormChanged')
-  expect(screen.getByLabelText('Título del registro')).toHaveValue('Unsaved title')
+  expect(screen.getByRole('checkbox', { name: 'Dirección (opcional)' })).toBeChecked()
   expect(screen.getByRole('button', { name: 'Guardar formulario' })).toBeDisabled()
   fireEvent.click(screen.getByRole('button', { name: 'Recargar formulario' }))
   expect(screen.getByRole('alertdialog')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Seguir editando' }))
-  expect(screen.getByLabelText('Título del registro')).toHaveValue('Unsaved title')
+  expect(screen.getByRole('checkbox', { name: 'Dirección (opcional)' })).toBeChecked()
   fireEvent.click(screen.getByRole('button', { name: 'Recargar formulario' }))
   fireEvent.click(screen.getByRole('button', { name: 'Recargar y descartar' }))
-  await waitFor(() => expect(screen.getByLabelText('Título del registro')).toHaveValue('Join us'))
+  await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Dirección (opcional)' })).not.toBeChecked())
 })
 
 it('locks questions and timing after answers but allows presentation saves', async () => {
@@ -195,7 +222,7 @@ it('locks questions and timing after answers but allows presentation saves', asy
   expect(screen.getByLabelText('Momento del cuestionario')).toBeDisabled()
   expect(screen.getByLabelText('Texto de la pregunta 1')).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Añadir pregunta' })).toBeDisabled()
-  fireEvent.change(screen.getByLabelText('Título del registro'), { target: { value: 'New heading' } })
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Dirección (opcional)' }))
   fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
   await screen.findByText('Formulario guardado y confirmado.')
   expect(snapshot.questions[0].text).toBe('Choose')
@@ -216,7 +243,7 @@ it('enforces plan, read-only and mandatory phone constraints', async () => {
   cleanup()
   user.plan = 'free'
   await mount()
-  expect(screen.getByLabelText('Título del registro')).not.toBeDisabled()
+  expect(screen.getByRole('checkbox', { name: 'Dirección (opcional)' })).not.toBeDisabled()
   expect(screen.getByLabelText('Momento del cuestionario')).toBeDisabled()
   expect(screen.getByLabelText('Subir logo')).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Exportar respuestas' })).toBeDisabled()
@@ -224,7 +251,7 @@ it('enforces plan, read-only and mandatory phone constraints', async () => {
   user.plan = 'event'
   snapshot.readOnly = true
   await mount()
-  expect(screen.getByLabelText('Título del registro')).toBeDisabled()
+  expect(screen.getByRole('checkbox', { name: 'Dirección (opcional)' })).toBeDisabled()
 })
 
 it('previews radio answers locally without writes and rejects unavailable after-game timing', async () => {
@@ -243,8 +270,9 @@ it('previews radio answers locally without writes and rejects unavailable after-
   expect(api.post).not.toHaveBeenCalled()
 })
 
-it('generates only a local draft and saves canonical question IDs explicitly', async () => {
+it('adds manual questions and saves canonical question IDs explicitly', async () => {
   await mount()
+  expect(screen.queryByText('Generar borrador con IA')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Añadir pregunta' }))
   fireEvent.change(screen.getByLabelText('Texto de la pregunta 1'), { target: { value: 'Manual question' } })
   fireEvent.change(screen.getByLabelText('Opción 1.1'), { target: { value: 'One' } })
@@ -253,17 +281,7 @@ it('generates only a local draft and saves canonical question IDs explicitly', a
   await screen.findByText('Formulario guardado y confirmado.')
   expect(snapshot.questions[0].id).toBe('q1')
   expect(snapshot.questions[0].options[0].payload).toBe('EVENT_q1_a')
-  vi.mocked(api.put).mockClear()
-  vi.mocked(api.post).mockResolvedValue({ ok: true, gameId: 'EVENT',
-    questions: [{ id: 'q1', text: 'Generated', options: [{ title: 'Answer', payload: 'EVENT_q1_a' }] }] })
-  fireEvent.click(screen.getByText('Generar borrador con IA'))
-  fireEvent.change(screen.getByLabelText('Tema del cuestionario'), { target: { value: 'Our brand' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Generar preguntas' }))
-  await waitFor(() => expect(screen.getByLabelText('Texto de la pregunta 1')).toHaveValue('Generated'))
-  expect(api.post).toHaveBeenCalledWith('/v1/game/quiz/generate', {
-    gameId: 'EVENT', text: 'Our brand', numQuestions: 3, numOptions: 3, useEmojis: false, draftOnly: true,
-  })
-  expect(api.put).not.toHaveBeenCalled()
+  expect(api.post).not.toHaveBeenCalled()
 })
 
 it('rejects invalid questions and malformed/unconfirmed API responses', async () => {
@@ -287,7 +305,7 @@ it('retains unchanged legacy options for presentation saves but rejects new over
   expect(validateFormDraft(formDraft(snapshot))).toContain('1 y 3')
   expect(validateFormDraft(formDraft(snapshot), previous)).toBeNull()
   await mount()
-  fireEvent.change(screen.getByLabelText('Título del registro'), { target: { value: 'New presentation' } })
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Dirección (opcional)' }))
   fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
   await screen.findByText('Formulario guardado y confirmado.')
   expect(snapshot.questions).toEqual(previous)
@@ -314,6 +332,7 @@ it('retains and saves both tab drafts with the same revision and shared appearan
   expect(screen.queryByLabelText('Vista previa del formulario')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Vista previa del home')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Título del registro')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Descripción del registro')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Momento del cuestionario')).not.toBeInTheDocument()
   expect(screen.queryByText('Aspecto de la partida')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Color principal')).not.toBeInTheDocument()
@@ -324,21 +343,30 @@ it('retains and saves both tab drafts with the same revision and shared appearan
   expect(api.put).not.toHaveBeenCalled()
   expect(api.post).not.toHaveBeenCalled()
   rerender(<GameFormSettings gameId="EVENT" section="registration" />)
-  fireEvent.change(screen.getByLabelText('Título del registro'), { target: { value: 'Register here' } })
+  expect(screen.queryByLabelText('Título del registro')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Descripción del registro')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Dirección (opcional)' }))
   expect(screen.queryByLabelText('Color principal')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Exportar respuestas' })).not.toBeInTheDocument()
   rerender(<GameFormSettings gameId="EVENT" section="questionnaire" />)
-  fireEvent.change(screen.getByLabelText('Título del cuestionario'), { target: { value: 'Your feedback' } })
+  expect(screen.queryByLabelText('Título del cuestionario')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Descripción del cuestionario')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Color principal')).not.toBeInTheDocument()
-  expect(screen.getByRole('region', { name: 'Vista previa' })).toHaveStyle('--color-primary: #123456')
+  const phone = within(screen.getByRole('region', { name: 'Vista previa' })).getByRole('group', { name: 'Vista en el móvil del participante' })
+  expect(phone).toHaveStyle('--color-primary: #123456')
+  expect(phone).toHaveAttribute('data-participant-theme', 'light')
+  expect(phone.querySelector('.play-shell .play-card')).not.toBeNull()
+  expect(document.documentElement.style.getPropertyValue('--color-primary')).not.toBe('#123456')
   fireEvent.click(screen.getByRole('button', { name: 'Guardar cuestionario' }))
   await screen.findByText('Cuestionario guardado y confirmado.')
   expect(api.put).toHaveBeenCalledWith('/v1/game', { gameId: 'EVENT', form: expect.objectContaining({
     expectedRevision: 'r1',
-    formConfig: expect.objectContaining({ registrationTitle: 'Register here', quizTitle: 'Your feedback',
+    participantFields: expect.objectContaining({ address: expect.objectContaining({ enabled: true }) }),
+    formConfig: expect.objectContaining({ registrationTitle: 'Join us', quizTitle: 'Tell us',
       appearance: expect.objectContaining({ colors: expect.objectContaining({ primary: '#123456' }) }) }),
   }) })
   rerender(<GameFormSettings gameId="EVENT" section="registration" />)
-  expect(screen.getByLabelText('Título del registro')).toHaveValue('Register here')
+  expect(screen.queryByLabelText('Título del registro')).not.toBeInTheDocument()
+  expect(screen.getByRole('checkbox', { name: 'Dirección (opcional)' })).toBeChecked()
   expect(screen.getByRole('button', { name: 'Guardar formulario' })).toBeDisabled()
 })

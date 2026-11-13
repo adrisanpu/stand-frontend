@@ -70,6 +70,22 @@ describe('isolated playable previews', () => {
     expect(screen.queryByRole('button', { name: 'Reiniciar prueba' })).not.toBeInTheDocument()
   })
 
+  it('renders the trial inside the participant phone shell with the event look', () => {
+    render(<GamePlayPreview gameType="T1MER" settings={{}} frame={{
+      appearance: { themeMode: 'light', colors: { primary: '#123456', accent: '#654321' } },
+      logoUrl: '/event-logo.png', bannerUrl: '/event-banner.png',
+    }} />)
+    const phone = screen.getByRole('group', { name: 'Vista en el móvil del participante' })
+    expect(phone).toHaveAttribute('data-participant-theme', 'light')
+    expect(phone).toHaveStyle('--color-primary: #123456')
+    expect(phone.querySelector('.play-shell .play-card img[src="/event-banner.png"]')).not.toBeNull()
+    expect(phone.querySelector('.play-logo')).toHaveAttribute('src', '/event-logo.png')
+    expect(phone).toContainElement(screen.getByRole('button', { name: 'Empezar' }))
+    const reset = screen.getByRole('button', { name: 'Reiniciar prueba' })
+    expect(reset.querySelector('svg')).toBeInTheDocument()
+    expect(phone).not.toContainElement(reset)
+  })
+
   it('plays T1MER with the real target, hidden clock and local result; resets', () => {
     render(<GamePlayPreview gameType="T1MER" settings={{}} />)
     fireEvent.click(screen.getByRole('button', { name: 'Empezar' }))

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import SaveButton from '../ui/SaveButton'
 import type { GameDefinition } from '../types'
@@ -28,6 +28,7 @@ type Props = {
   onReadyChange?: (ready: boolean) => void
   editConditions?: boolean
   readOnly?: boolean
+  conditionsHeaderAside?: ReactNode
 }
 type Draft = NativePrizeDraft
 const slotNames = ['validation', 'ranking', 'raffle'] as const
@@ -78,7 +79,8 @@ export default function OperatorPrizeSettings(props: Props) {
 }
 
 export function LegacyPrizeSettings({
-  gameId, gameDefinition, settings, plan, onPersist, onSavingChange, onDirtyChange, onReadyChange, editConditions = false, readOnly = false,
+  gameId, gameDefinition, settings, plan, onPersist, onSavingChange, onDirtyChange, onReadyChange,
+  editConditions = false, readOnly = false, conditionsHeaderAside,
 }: Props) {
   const { t } = useOperatorLanguage()
   const slots = getOperatorPrizeSlotVisibility(gameDefinition, getFeaturesByPlan(plan))
@@ -247,6 +249,7 @@ export function LegacyPrizeSettings({
       <fieldset disabled={readOnly || loading || loadError || saving || refreshWarning} className="space-y-2 min-w-0">
         {editConditions ? !loading && !loadError && <NativePrizeRuleEditor slots={slots} drafts={drafts}
           available={sharedCatalog} inventory={inventory} errors={numberErrors} onChange={changeDraft}
+          headerAside={conditionsHeaderAside}
           onValidityChange={setNativeRulesValid}
           onMove={(from, to) => {
             setDrafts(current => ({ ...current, [to]: { ...current[from] },

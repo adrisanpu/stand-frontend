@@ -1,10 +1,12 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { getHomeCanvas, saveHomeCanvas, type HomeCanvasResponse } from '../../api/homeCanvas'
 import HomeCanvasEditor from './HomeCanvasEditor'
+import { toBlob } from 'html-to-image'
 
 vi.mock('../../api/homeCanvas', () => ({ getHomeCanvas: vi.fn(), saveHomeCanvas: vi.fn() }))
+vi.mock('html-to-image', () => ({ toBlob: vi.fn() }))
 let saved: HomeCanvasResponse
 beforeEach(() => {
   vi.clearAllMocks()
@@ -17,13 +19,84 @@ beforeEach(() => {
   vi.mocked(getHomeCanvas).mockImplementation(async () => structuredClone(saved))
   vi.mocked(saveHomeCanvas).mockImplementation(async (_id, homeCanvas) => ({ ...saved, homeRevision: 'two', homeCanvas }))
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 async function mount(advanced = true) {
   const dirty = vi.fn()
   render(<HomeCanvasEditor gameId="EVENT" gameName="Event" appearance={null} advanced={advanced} onDirtyChange={dirty} />)
   await screen.findByRole('combobox', { name: 'Añadir componente' })
   return dirty
 }
+
+it.each([
+  ['Horizontal', 'landscape', 1920, 1080],
+  ['Vertical', 'portrait', 1080, 1920],
+] as const)('downloads the current %s draft as a full-size PNG without editing controls', async (label, orientation, width, height) => {
+  const blob = new Blob(['snapshot'], { type: 'image/png' })
+  const createObjectURL = vi.fn(() => 'blob:snapshot')
+  const revokeObjectURL = vi.fn()
+  vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
+  const downloads: HTMLAnchorElement[] = []
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    downloads.push(this)
+  })
+  vi.mocked(toBlob).mockImplementation(async stage => {
+    expect(stage.closest('.home-canvas-snapshot')).not.toBeNull()
+    return blob
+  })
+  const dirty = await mount()
+  fireEvent.click(screen.getByRole('button', { name: label }))
+  fireEvent.change(screen.getByRole('combobox', { name: 'Añadir componente' }), { target: { value: 'text' } })
+  fireEvent.change(screen.getByLabelText('Texto', { selector: 'textarea' }), { target: { value: 'Draft snapshot' } })
+  const download = screen.getByRole('button', { name: 'Descargar snapshot del lienzo' })
+  expect(download.previousElementSibling).toHaveAccessibleName('Recargar lienzo')
+  expect(download.querySelector('svg')).toBeInTheDocument()
+  fireEvent.click(download)
+  await waitFor(() => expect(click).toHaveBeenCalledOnce())
+  const [stage, options] = vi.mocked(toBlob).mock.calls[0]
+  expect(stage).toHaveTextContent('Draft snapshot')
+  expect(options).toMatchObject({
+    width, height, pixelRatio: 1, style: { transform: 'none' },
+    fetchRequestInit: { mode: 'cors', credentials: 'omit', cache: 'reload' },
+    includeQueryParams: true,
+  })
+  expect(options?.cacheBust).not.toBe(true)
+  expect(options?.filter?.(screen.getByRole('button', { name: 'Mover Texto' }))).toBe(false)
+  expect(options?.filter?.(screen.getByRole('button', { name: 'Redimensionar Texto' }))).toBe(false)
+  expect(options?.filter?.(stage.querySelector('.home-canvas-text')!)).toBe(true)
+  expect(downloads[0].download).toBe(`home-EVENT-${orientation}.png`)
+  expect(downloads[0].href).toBe('blob:snapshot')
+  expect(createObjectURL).toHaveBeenCalledWith(blob)
+  expect(stage.closest('.home-canvas-snapshot')).toBeNull()
+  expect(document.querySelector('a[download]')).not.toBeInTheDocument()
+  await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:snapshot'), { timeout: 2000 })
+  expect(saveHomeCanvas).not.toHaveBeenCalled()
+  expect(dirty).toHaveBeenLastCalledWith(true)
+})
+
+it.each([null, new Error('Image fetch failed')])('reports snapshot failures and restores editing without saving', async failure => {
+  if (failure instanceof Error) vi.mocked(toBlob).mockRejectedValue(failure)
+  else vi.mocked(toBlob).mockResolvedValue(failure)
+  await mount()
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar snapshot del lienzo' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo descargar el snapshot del lienzo.')
+  expect(screen.getByRole('button', { name: 'Descargar snapshot del lienzo' })).toBeEnabled()
+  expect(document.querySelector('.home-canvas-snapshot')).not.toBeInTheDocument()
+  expect(saveHomeCanvas).not.toHaveBeenCalled()
+})
+
+it('explains image embedding failures instead of hiding the image error event', async () => {
+  vi.mocked(toBlob).mockImplementation(async (_stage, options) => {
+    options?.onImageErrorHandler?.(new Event('error'))
+    return null
+  })
+  await mount()
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar snapshot del lienzo' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo incorporar una imagen al PNG.')
+  expect(screen.getByRole('button', { name: 'Descargar snapshot del lienzo' })).toBeEnabled()
+  expect(document.querySelector('.home-canvas-snapshot')).not.toBeInTheDocument()
+  expect(saveHomeCanvas).not.toHaveBeenCalled()
+})
+
 it('starts empty and keeps two independent drafts when changing orientation', async () => {
   const dirty = await mount()
   fireEvent.change(screen.getByRole('combobox', { name: 'Añadir componente' }), { target: { value: 'qr' } })
@@ -45,19 +118,16 @@ it('starts empty and keeps two independent drafts when changing orientation', as
   expect(config.portrait.items[0].text).toBe('Hola evento')
   expect(dirty).toHaveBeenLastCalledWith(false)
 })
-it('keeps add, style and background media controls together above the canvas', async () => {
+it('puts the components menu next to orientation and the selection options in one panel above the canvas', async () => {
   await mount()
   const toolbar = screen.getByRole('region', { name: 'Editar selección' })
-  const add = within(toolbar).getByRole('combobox', { name: 'Añadir componente' })
-  const row = add.parentElement!
-  expect(row).toContainElement(screen.getByLabelText('Color de fondo del lienzo'))
-  expect(row).toContainElement(screen.getByLabelText('Tamaño general del texto'))
-  expect(row).toContainElement(screen.getByRole('button', { name: 'Negrita' }))
-  const mediaMenu = within(row).getByText('Imagen / vídeo de fondo')
-  expect(mediaMenu.closest('details')).not.toHaveAttribute('open')
-  fireEvent.click(mediaMenu)
-  expect(mediaMenu.closest('details')).toHaveAttribute('open')
-  expect(screen.getByLabelText('Subir imagen o vídeo')).toBeVisible()
+  const add = screen.getByRole('combobox', { name: 'Añadir componente' })
+  expect(add.closest('header')).toContainElement(screen.getByRole('button', { name: 'Horizontal' }))
+  expect(add.parentElement).toHaveTextContent('Componentes')
+  expect(toolbar).toContainElement(screen.getByLabelText('Color de fondo del lienzo'))
+  expect(toolbar).toContainElement(screen.getByLabelText('Tamaño general del texto'))
+  expect(toolbar).toContainElement(screen.getByRole('button', { name: 'Negrita' }))
+  expect(toolbar).toContainElement(screen.getByLabelText('Subir imagen o vídeo'))
   expect(toolbar.compareDocumentPosition(document.querySelector('[data-home-stage]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(screen.queryByRole('button', { name: '+ Texto' })).not.toBeInTheDocument()
   expect(screen.queryByRole('option', { name: 'Ranking' })).toBeInTheDocument()
@@ -117,7 +187,7 @@ it('uses one selection panel, defaults to canvas and selects it again on empty-s
   fireEvent.click(screen.getByRole('button', { name: 'Mover Texto' }))
   expect(screen.getByLabelText('Tamaño del texto')).toHaveValue(32)
   expect(screen.queryByLabelText('Subir imagen o vídeo')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Seleccionar fondo' }))
+  fireEvent.click(document.querySelector('[data-home-stage]')!)
   expect(screen.getByLabelText('Color de fondo del lienzo')).toHaveValue('#123456')
   fireEvent.click(screen.getByRole('button', { name: 'Guardar lienzo' }))
   await screen.findByText('Lienzo guardado y confirmado.')
@@ -300,7 +370,6 @@ it('allows Free layout/text editing but gates backgrounds and custom text colors
   expect(screen.getByLabelText('Texto', { selector: 'textarea' })).not.toBeDisabled()
   expect(screen.getByLabelText('Color (Event)')).toBeDisabled()
   expect(screen.queryByLabelText('Subir imagen o vídeo')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Seleccionar fondo' }))
-  fireEvent.click(screen.getByText('Imagen / vídeo de fondo (Event)'))
+  fireEvent.click(document.querySelector('[data-home-stage]')!)
   expect(screen.getByLabelText('Subir imagen o vídeo')).toBeDisabled()
 })

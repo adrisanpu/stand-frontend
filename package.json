@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "html-to-image": "^1.11.13",
     "jsqr": "^1.4.0",
     "qrcode-generator": "^2.0.0",
     "react": "^18.2.0",

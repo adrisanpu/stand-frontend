@@ -1,4 +1,4 @@
-import { Fragment, useState, type MouseEvent } from 'react'
+import { Fragment, useState, type MouseEvent, type ReactNode } from 'react'
 import type { StackPrizeCondition, StackPrizeItem, StackPrizeRule, StackPrizeScoreOperator } from '../../api/stackPrizes'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import IconButton from '../ui/IconButton'
@@ -19,7 +19,7 @@ export function invalidStackRules(rules: StackPrizeRule[]): boolean {
 
 const interactive = (event: MouseEvent) => !!(event.target as HTMLElement).closest('input,select,button,label')
 
-export default function StackRuleEditor({ rules, catalog, available = catalog, raffles, onChange, onAddPrize, stock, onStockChange }: {
+export default function StackRuleEditor({ rules, catalog, available = catalog, raffles, onChange, onAddPrize, stock, onStockChange, headerAside }: {
   rules: StackPrizeRule[]
   catalog: StackPrizeItem[]
   available?: StackPrizeItem[]
@@ -29,6 +29,7 @@ export default function StackRuleEditor({ rules, catalog, available = catalog, r
   /** Per-event sub-stock drafts by catalog prize id; enables the editable Substock column. */
   stock?: Record<string, string>
   onStockChange?: (prizeId: string, value: string) => void
+  headerAside?: ReactNode
 }) {
   const { t } = useOperatorLanguage()
   const [selected, setSelected] = useState<number | null>(rules.length ? 0 : null)
@@ -141,8 +142,15 @@ export default function StackRuleEditor({ rules, catalog, available = catalog, r
   </section>
 
   return <div className="space-y-3">
-    <div className="flex items-center gap-2">
-      <IconButton icon="add" label={t('Añadir regla', 'Add rule')} disabled={rules.length >= 8 || !available.length} onClick={addRule} />
+    <div className="grid gap-3 md:grid-cols-2 md:items-center">
+      <div className="flex items-center gap-2">
+        <IconButton icon="add" label={t('Añadir regla', 'Add rule')} disabled={rules.length >= 8 || !available.length} onClick={addRule} />
+        <p className="text-xs text-textSub">{t(
+          'Cada condición admite un premio por participante. Solo se muestran las condiciones compatibles con este juego.',
+          'Each condition supports one prize per participant. Only conditions supported by this game are shown.',
+        )}</p>
+      </div>
+      {headerAside}
     </div>
     {!!rules.length && <div className="overflow-x-auto">
       <table className="admin-table w-full text-left text-sm" aria-label={t('Condiciones', 'Conditions')}>

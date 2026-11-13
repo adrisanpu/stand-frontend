@@ -32,7 +32,7 @@ Tras pulsar un juego en el catálogo, el bloque informativo usa **dos columnas d
 Both the + action and the coverflow guide open the existing configuration modal.
 For a new event it first shows the game explanation, name and Create action.
 After creation, the same modal opens Home and requires explicit confirmation of
-all six panels: **Home, Game, Registration form, Questionnaire, Prizes, Raffle**.
+all six panels: **Home, Registration, Game, Questionnaire, Prizes, Raffle**.
 Defaults may be confirmed without edits; changes must be saved first. Editing a
 confirmed panel clears its confirmation until it is reviewed again. Progress and
 its revision are stored on the server; the creation URL becomes `?setup=<gameId>`
@@ -46,14 +46,15 @@ not a new publication state or a change to public participant access.
 
 ### Event registration and survey
 
-**Juegos > Configurar partida > Formulario de registro / Cuestionario** provides
+**Juegos > Configurar partida > Registro / Cuestionario** provides
 two separate settings tabs and their corresponding live previews. Registration
-fields belong to the registration tab; questions and timing belong to the
-questionnaire tab. **Home**, the first tab, contains only the Home canvas editor, without
-a separate preview; the old event appearance controls and separate appearance save
-button have been removed. Existing saved logo/banner/theme overrides remain
-in use; empty overrides inherit the account appearance.
-**Game** contains mechanics and an isolated playable preview. It uses loaded,
+fields and the shared event primary/accent palette belong to the Registration tab;
+questions and timing belong to the Questionnaire tab. **Home**, the first tab,
+contains the Home canvas editor, without a separate preview. Saving the palette
+stores it in the event form configuration and applies it to Home, registration,
+questionnaire and gameplay at `/play`; resetting colors restores the game defaults.
+Existing saved logo/banner/theme overrides remain in use for events not yet configured.
+**Game**, the third tab, contains mechanics and an isolated playable preview. It uses loaded,
 unsaved mechanic drafts and local simulated opponents where appropriate, without
 registration, participant sessions, real scores, prize allocation or multiplayer
 rooms. All available games are supported; CUPIDO remains unavailable. SEMAFORO
@@ -71,16 +72,16 @@ The QR is generated locally. Preview CSS variables are scoped to its
 canvas and never change the operator theme. Registration and Questionnaire
 keep their own previews. Registration and questionnaire retain a single draft
 across tab changes; saving either applies pending edits from both sections.
-Registration has a fixed layout: edit its title, description and requested
-optional fields (address, company, sex, birth date). Email, full name and phone
+Registration has a fixed layout; its title and description are not editable here.
+It can configure requested optional fields (address, company, sex, birth date). Email, full name and phone
 appear as checked, locked fields in the settings; legal consent cannot be
 disabled either. Sex is an optional male/female selector stored as `sex`
 (`male` / `female`), never relabeled or migrated from historical job titles.
 Historical job titles remain available in administrative responses and exports.
 Its preview renders the actual Play
 `JoinForm`, with a local email-to-details transition and no verification messages,
-participant creation, uploads or session writes. Appearance is inherited rather
-than independently edited in this panel. Questionnaire retains its existing controls.
+participant creation, uploads or session writes. The event palette is edited in Home and shared with this panel's preview.
+Questionnaire retains its existing controls.
 Both tabs offer the same shared registration/questionnaire logo: choose from the
 account's image library, upload an image up to 5 MB or select **No logo**.
 Selection updates both previews immediately; save either tab to persist the
@@ -89,8 +90,8 @@ selected logo. This customization retains the Event plan restriction. Changing
 the shared logo invalidates both panels during initial setup.
 Neither the preview nor the public registration form displays a step counter or
 progress bar; the email/details/verification flow itself is unchanged.
-Registration and Questionnaire keep their QR and participant link at the bottom
-of the right-hand preview column, with extra separation from the form.
+Registration and Questionnaire show their QR and participant link above the
+right-hand preview; the preview scrolls within its viewport-sized panel.
 On the EMPAREJA2 Play screen, the assigned character name and participant name
 and avatar sit above and outside the character image panel, without overlays.
 Canvas background uploads do not change the account logo. Empty overrides retain the
@@ -160,6 +161,15 @@ does not disable running the raffle from settings or change prize eligibility.
 The existing plan gate still applies.
 
 ### Editable Home canvas
+
+Next to **Reload canvas**, a download icon exports a PNG snapshot of the current
+orientation, including unsaved edits, at 1920x1080 or 1080x1920. It excludes the
+editing grid, selection/resize handles and empty-canvas hint. Exporting does not
+save or reload the draft; failures are reported in the editor. Video backgrounds
+use their current frame rather than exporting a video.
+Snapshot resource requests reload in anonymous CORS mode to avoid cached
+display-only responses. Signed URL query parameters remain intact, and image
+embedding failures explicitly ask the operator to refresh their links.
 
 The QR scales to its panel's available width and height while preserving its
 square proportions. Its black backing is always square and fitted to the shorter

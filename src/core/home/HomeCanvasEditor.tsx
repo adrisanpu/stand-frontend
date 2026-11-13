@@ -7,10 +7,13 @@ import type { ParticipantAppearance } from '../theme/appearance'
 import HomeCanvas from './HomeCanvas'
 import useHomeSamples from './HomeSamples'
 import {
-  HOME_GRID, HOME_ITEM_TYPES, HOME_MIN_SIZE, canPlaceHomeItem, findHomeSpace,
+  HOME_GRID, HOME_UNIT, HOME_ITEM_TYPES, HOME_MIN_SIZE, canPlaceHomeItem, findHomeSpace,
   type HomeCanvasConfig, type HomeComposition, type HomeItem, type HomeItemType, type HomeOrientation, type HomeStyle,
 } from './canvasModel'
 import { homePreviewTheme } from './previewTheme'
+import IconButton, { iconPaths } from '../ui/IconButton'
+import SaveButton from '../ui/SaveButton'
+import MediaPicker from '../ui/MediaPicker'
 
 type Props = {
   gameId: string
@@ -53,7 +56,7 @@ function StyleControls<T extends HomeStyle>({ value, inherited, onChange, advanc
   ]
   const sizeLabel = canvas ? t('Tamaño general del texto', 'General text size') : t('Tamaño del texto', 'Text size')
   const shortLabels = { backgroundColor: t('Fondo', 'Background'), accentColor: t('Acento', 'Accent'), color: t('Texto', 'Text') }
-  return <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+  return <div className="contents">
     {colors.map(({ key, label }) => <fieldset key={key} disabled={!advanced} className="flex items-center gap-1">
       <label className="flex items-center gap-2 text-xs">{shortLabels[key]} {!advanced && '(Event)'}
         <input type="color" aria-label={`${label}${!advanced ? ' (Event)' : ''}`} className="h-8 w-9 cursor-pointer" value={value[key] ?? inherited[key] ?? '#FFFFFF'}
@@ -104,6 +107,8 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
   const [orientation, setOrientation] = useState<HomeOrientation>('landscape')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const previewRef = useRef<HTMLDivElement>(null)
   const busyRef = useRef(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -238,6 +243,46 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
     const result = await fetchUserMedia()
     setMedia(result['home-background']?.items ?? [])
   }
+  const downloadSnapshot = () => void run(async () => {
+    setDownloading(true)
+    const preview = previewRef.current
+    try {
+      const stage = preview?.querySelector<HTMLElement>('[data-home-stage]')
+      if (!stage) throw new Error(t('El lienzo no está disponible.', 'The canvas is not available.'))
+      const { toBlob } = await import('html-to-image')
+      const { cols, rows } = HOME_GRID[orientation]
+      preview?.classList.add('home-canvas-snapshot')
+      const blob = await toBlob(stage, {
+        width: cols * HOME_UNIT, height: rows * HOME_UNIT, pixelRatio: 1,
+        style: { transform: 'none' },
+        // Reload in CORS mode without modifying S3's signed query parameters.
+        fetchRequestInit: { mode: 'cors', credentials: 'omit', cache: 'reload' },
+        includeQueryParams: true,
+        onImageErrorHandler: () => {
+          throw new Error(t(
+            'No se pudo incorporar una imagen al PNG. Comprueba la conexión y recarga el lienzo para renovar sus enlaces.',
+            'Could not embed an image in the PNG. Check your connection and reload the canvas to renew its links.',
+          ))
+        },
+        filter: node => !(node instanceof Element && node.matches('.home-item-select, .home-item-resize, .home-canvas-empty')),
+      })
+      if (!blob) throw new Error(t('No se pudo generar la imagen.', 'Could not generate the image.'))
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `home-${gameId.replace(/[^a-zA-Z0-9_-]/g, '_')}-${orientation}.png`
+      document.body.appendChild(link)
+      try { link.click() } finally {
+        link.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+    } catch (reason) {
+      throw new Error(`${t('No se pudo descargar el snapshot del lienzo.', 'Could not download the canvas snapshot.')} ${reason instanceof Error ? reason.message : ''}`)
+    } finally {
+      preview?.classList.remove('home-canvas-snapshot')
+      setDownloading(false)
+    }
+  })
   const background = composition?.background
   const backgroundUrl = media.find(item => item.key === background?.key)?.url
     ?? (background?.key === confirmed?.homeCanvas[orientation].background?.key ? confirmed?.homeBackgroundUrls[orientation] : null)
@@ -246,77 +291,76 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div><h3 className="text-xl font-semibold">{t('Lienzo del Home', 'Home canvas')}</h3>
         <p className="text-sm text-textSub">{t('Añade componentes y arrástralos. Las flechas mueven o redimensionan el elemento enfocado.', 'Add and drag components. Arrow keys move or resize the focused element.')}</p></div>
-      <div className="flex gap-2" role="group" aria-label={t('Orientación del lienzo', 'Canvas orientation')}>
-        {(['landscape', 'portrait'] as const).map(value => <button key={value} type="button" disabled={busy} aria-pressed={orientation === value}
-          className={`min-h-11 rounded-lg border px-3 py-2 ${value === orientation ? 'border-primary bg-primary/10 font-semibold' : 'border-current/20'}`}
-          onClick={() => { drag.current = null; setOrientation(value); setSelectedId(null); setNotice('') }}>
-          {value === 'landscape' ? t('Horizontal', 'Landscape') : t('Vertical', 'Portrait')}
-        </button>)}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-2" role="group" aria-label={t('Orientación del lienzo', 'Canvas orientation')}>
+          {(['landscape', 'portrait'] as const).map(value => <button key={value} type="button" disabled={busy} aria-pressed={orientation === value}
+            className={`min-h-11 rounded-lg border px-3 py-2 ${value === orientation ? 'border-primary bg-primary/10 font-semibold' : 'border-current/20'}`}
+            onClick={() => { drag.current = null; setOrientation(value); setSelectedId(null); setNotice('') }}>
+            {value === 'landscape' ? t('Horizontal', 'Landscape') : t('Vertical', 'Portrait')}
+          </button>)}
+        </div>
+        {composition && <div className="relative inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/20 px-3 py-2 text-sm font-medium text-textMain transition-colors hover:bg-primary/30 focus-within:outline focus-within:outline-2 focus-within:outline-primary [&:has(select:disabled)]:opacity-50">
+          <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d={iconPaths.add} />
+          </svg>
+          <span aria-hidden="true">{t('Componentes', 'Components')}</span>
+          <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+          </svg>
+          <select aria-label={t('Añadir componente', 'Add component')} value=""
+            disabled={disabled || composition.items.length >= 40}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+            onChange={event => {
+              const type = HOME_ITEM_TYPES.find(type => type === event.target.value)
+              if (type) add(type)
+            }}>
+            <option value="" disabled>{t('Añadir componente', 'Add component')}</option>
+            {HOME_ITEM_TYPES.filter(type => (type !== 'ranking' || definition?.showRanking)
+              && (type !== 'raffle' || confirmed?.showRaffleOnHome !== false)).map(type => <option
+              key={type} value={type} disabled={type !== 'text' && composition.items.some(item => item.type === type)}>
+              {labels[type]}
+            </option>)}
+          </select>
+        </div>}
       </div>
     </header>
     {draft && composition && <fieldset disabled={disabled} className="min-w-0 w-full max-w-full space-y-3">
-      <div className="space-y-2 rounded-lg border border-current/15 px-3 py-2" role="region" aria-label={t('Editar selección', 'Edit selection')}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-sm font-semibold">{selected ? labels[selected.type] : t('Fondo del lienzo', 'Canvas background')}</h4>
-          {selected && <div className="flex items-center gap-3">
-            <button type="button" className="min-h-11 text-xs underline" onClick={() => setSelectedId(null)}>
-              {t('Seleccionar fondo', 'Select background')}
-            </button>
-          <button type="button" className="min-h-11 text-xs underline"
-            onClick={() => { change({ items: composition.items.filter(item => item.id !== selected.id) }); setSelectedId(null) }}>
-            {t('Eliminar componente', 'Remove component')}
-          </button>
-          </div>}
-        </div>
-        <div className="relative flex flex-wrap items-center gap-x-4 gap-y-2">
-        <select aria-label={t('Añadir componente', 'Add component')} value=""
-          disabled={composition.items.length >= 40}
-          className="min-h-11 max-w-full rounded-lg border border-current/20 bg-transparent px-3 py-2 text-sm"
-          onChange={event => {
-            const type = HOME_ITEM_TYPES.find(type => type === event.target.value)
-            if (type) add(type)
-          }}>
-          <option value="" disabled>{t('Añadir componente', 'Add component')}</option>
-          {HOME_ITEM_TYPES.filter(type => (type !== 'ranking' || definition?.showRanking)
-            && (type !== 'raffle' || confirmed?.showRaffleOnHome !== false)).map(type => <option
-            key={type} value={type} disabled={type !== 'text' && composition.items.some(item => item.type === type)}>
-            {labels[type]}
-          </option>)}
-        </select>
-        {!selected && <details>
-          <summary className="flex min-h-11 cursor-pointer items-center rounded-lg border border-current/20 px-3 py-2 text-xs">
-            {t('Imagen / vídeo de fondo', 'Background image / video')} {!advanced && '(Event)'}
-          </summary>
-          <fieldset disabled={!advanced} className="absolute left-0 top-full z-30 mt-2 w-72 max-w-[75vw] space-y-3 rounded-xl border border-current/20 bg-[var(--color-background,#0B0A12)] p-3 shadow-lg">
-            <button type="button" className="min-h-11 text-sm underline" onClick={() => void run(refreshMedia)}>{t('Abrir biblioteca de fondos', 'Open background library')}</button>
-            <label className="block text-sm">{t('Fondo guardado', 'Saved background')}
-              <select className="mt-1 w-full rounded border border-current/20 bg-transparent p-2" value={background?.key ?? ''}
-                onChange={event => {
-                  const item = media.find(item => item.key === event.target.value)
-                  change({ background: item ? { key: item.key, type: item.contentType.startsWith('video/') ? 'video' : 'image' } : null })
-                }}>
-                <option value="">{t('Sin fondo', 'No background')}</option>
-                {background && !media.some(item => item.key === background.key) && <option value={background.key}>{t('Fondo actual', 'Current background')}</option>}
-                {media.map(item => <option key={item.id} value={item.key}>{item.name || item.fileName}</option>)}
-              </select>
-            </label>
-            <label className="block text-sm">{t('Subir imagen o vídeo', 'Upload image or video')}
-              <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,video/mp4,video/webm" className="mt-2 block w-full"
-                onChange={event => {
-                  const file = event.target.files?.[0]
-                  event.target.value = ''
-                  if (!file) return
-                  void run(async () => {
-                    const item = await uploadHomeBackground(file)
-                    change({ background: { key: item.key, type: file.type.startsWith('video/') ? 'video' : 'image' } })
-                    await refreshMedia()
-                  })
-                }} />
-            </label>
-            <p className="text-xs">{t('Imágenes hasta 5 MB. MP4/WebM hasta 100 MB, en bucle y con sonido. La vista del editor permanece silenciada.', 'Images up to 5 MB. MP4/WebM up to 100 MB, looped with sound. The editor preview stays muted.')}</p>
-          </fieldset>
-        </details>}
-        {selected && <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-current/15 px-3 py-2" role="region" aria-label={t('Editar selección', 'Edit selection')}>
+        <h4 className="text-sm font-semibold">{selected ? labels[selected.type] : t('Fondo del lienzo', 'Canvas background')}</h4>
+        {!selected && <fieldset disabled={!advanced} className="w-72 max-w-full"
+          title={advanced ? t('Imagen ≤ 5 MB · MP4/WebM ≤ 100 MB (bucle con sonido).', 'Image ≤ 5 MB · MP4/WebM ≤ 100 MB (looped with sound).')
+            : t('Imagen / vídeo de fondo disponible en el plan Event.', 'Background image / video available on the Event plan.')}>
+          <legend className="sr-only">{t('Imagen / vídeo de fondo', 'Background image / video')}</legend>
+          <MediaPicker selectLabel={t('Fondo guardado', 'Saved background')} uploadLabel={t('Subir imagen o vídeo', 'Upload image or video')}
+            libraryLabel={t('Abrir biblioteca de fondos', 'Open background library')} emptyLabel={t('Sin fondo', 'No background')}
+            value={background?.key ?? ''} accept="image/png,image/jpeg,image/webp,image/svg+xml,video/mp4,video/webm"
+            options={[
+              ...(background && !media.some(item => item.key === background.key)
+                ? [{ value: background.key, label: t('Fondo actual', 'Current background') }] : []),
+              ...media.map(item => ({ value: item.key, label: item.name || item.fileName })),
+            ]}
+            onSelect={value => {
+              const item = media.find(item => item.key === value)
+              change({ background: item ? { key: item.key, type: item.contentType.startsWith('video/') ? 'video' : 'image' } : null })
+            }}
+            onOpenLibrary={() => void run(refreshMedia)}
+            onUpload={file => void run(async () => {
+              const item = await uploadHomeBackground(file)
+              change({ background: { key: item.key, type: file.type.startsWith('video/') ? 'video' : 'image' } })
+              await refreshMedia()
+            })} />
+        </fieldset>}
+        {selected?.type === 'text' && <>
+          <label className="flex items-center gap-2 text-xs">{t('Texto', 'Text')}
+            <textarea maxLength={1000} rows={1} value={selected.text ?? ''}
+              className="w-48 resize-x rounded border border-current/20 bg-transparent p-1 text-sm" onChange={event => updateItem({ ...selected, text: event.target.value })} /></label>
+          <label className="flex items-center gap-2 text-xs">{t('Alineación', 'Alignment')}
+            <select value={selected.align ?? 'center'} className="rounded border border-current/20 bg-transparent p-1"
+              onChange={event => updateItem({ ...selected, align: event.target.value as HomeItem['align'] })}>
+              <option value="left">{t('Izquierda', 'Left')}</option><option value="center">{t('Centro', 'Center')}</option><option value="right">{t('Derecha', 'Right')}</option>
+            </select></label>
+        </>}
+        {selected && <div className="flex items-center gap-2">
           <label className="flex items-center gap-2 text-xs">{t('Fondo', 'Background')}
             <select aria-label={t('Fondo del componente', 'Component background')} className="rounded border border-current/20 bg-transparent p-1"
               value={selected.backgroundColor === undefined ? 'default' : selected.backgroundColor === 'transparent' ? 'transparent' : 'color'}
@@ -328,7 +372,7 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
                 } else updateItem({ ...selected, backgroundColor: event.target.value === 'transparent' ? 'transparent' : '#152F3A' })
               }}>
               <option value="default">{t('Predeterminado', 'Default')}</option>
-              <option value="transparent">{t('Transparente (sin color)', 'Transparent (no color)')}</option>
+              <option value="transparent">{t('Transparente', 'Transparent')}</option>
               <option value="color">{t('Color', 'Color')}</option>
             </select>
           </label>
@@ -341,26 +385,16 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
           : selected.type !== 'qr' && <StyleControls key={`${orientation}-${selected.id}`} value={selected}
           inherited={{ color: composition.color ?? inheritedStyle.color, accentColor: composition.accentColor ?? inheritedStyle.accentColor,
             fontSize: composition.fontSize ?? 48, bold: composition.bold }} onChange={updateItem} advanced={advanced} onInvalid={setNotice} />}
-        </div>
-        {selected?.type === 'qr' && <p className="text-xs">{t('El propio código QR conserva su contraste para poder escanearlo.', 'The QR code itself retains its contrast so it remains scannable.')}</p>}
-        {selected?.type === 'text' && <div className="flex flex-wrap items-start gap-3">
-          <label className="block text-sm">{t('Texto', 'Text')}
-            <textarea maxLength={1000} rows={2} value={selected.text ?? ''}
-              className="mt-1 w-full rounded border border-current/20 bg-transparent p-2" onChange={event => updateItem({ ...selected, text: event.target.value })} /></label>
-          <div className="flex flex-wrap gap-4">
-            <label className="text-sm">{t('Alineación', 'Alignment')}
-              <select value={selected.align ?? 'center'} className="ml-2 rounded border border-current/20 bg-transparent p-2"
-                onChange={event => updateItem({ ...selected, align: event.target.value as HomeItem['align'] })}>
-                <option value="left">{t('Izquierda', 'Left')}</option><option value="center">{t('Centro', 'Center')}</option><option value="right">{t('Derecha', 'Right')}</option>
-              </select></label>
-          </div>
-        </div>}
+        {selected?.type === 'qr' && <p className="text-xs" title={t('El propio código QR conserva su contraste para poder escanearlo.', 'The QR code itself retains its contrast so it remains scannable.')}>
+          {t('El QR conserva su contraste.', 'The QR keeps its contrast.')}</p>}
+        {selected && <IconButton icon="delete" className="ml-auto" label={t('Eliminar componente', 'Remove component')}
+          onClick={() => { change({ items: composition.items.filter(item => item.id !== selected.id) }); setSelectedId(null) }} />}
       </div>
       <div className={`mx-auto min-w-0 w-full rounded-xl border border-current/20 overflow-hidden ${orientation === 'portrait' ? 'max-w-[420px]' : 'max-w-full'}`}
         onClick={event => {
           if (!disabled && event.target instanceof Element && !event.target.closest('[data-home-item]')) setSelectedId(null)
         }}>
-        <div style={homePreviewTheme(definition, appearance)}>
+        <div ref={previewRef} style={homePreviewTheme(definition, appearance)}>
           <HomeCanvas composition={composition} orientation={orientation} gameId={gameId} gameName={gameName}
             logoSrc={logoSrc || definition?.assets?.logo} backgroundUrl={backgroundUrl} preview {...samples}
             overlay={item => <>
@@ -382,10 +416,13 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
     {error && <p role="alert" className="text-sm">{error}</p>}
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-current/15 pt-3">
       <p className="text-xs">{dirty ? t('Lienzo con cambios sin guardar', 'Canvas has unsaved changes') : t('Lienzo sin cambios pendientes', 'Canvas has no pending changes')}</p>
-      <div className="flex gap-3">
-        <button type="button" disabled={busy} className="min-h-11 rounded-lg border border-current/20 px-3 py-2"
-          onClick={() => dirty ? setConfirmReload(true) : reloadCanvas()}>{t('Recargar lienzo', 'Reload canvas')}</button>
-        <button type="button" disabled={disabled || !dirty} className="min-h-11 rounded-lg bg-primary px-4 py-2 text-white disabled:opacity-40"
+      <div className="ml-auto flex gap-2">
+        <IconButton icon="reload" className="!h-11 !w-11" label={t('Recargar lienzo', 'Reload canvas')} disabled={busy}
+          onClick={() => dirty ? setConfirmReload(true) : reloadCanvas()} />
+        <IconButton icon="download" className="!h-11 !w-11"
+          label={downloading ? t('Descargando snapshot…', 'Downloading snapshot…') : t('Descargar snapshot del lienzo', 'Download canvas snapshot')}
+          disabled={busy || !draft} onClick={downloadSnapshot} />
+        <SaveButton iconOnly disabled={disabled || !dirty}
           onClick={() => {
             if (!draft || !confirmed) return
             void run(async () => {
@@ -400,7 +437,7 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
                 throw new Error(`${t('No se confirmó el guardado. Recarga antes de reintentar.', 'Saving was not confirmed. Reload before retrying.')} ${reason instanceof Error ? reason.message : ''}`)
               }
             })
-          }}>{busy ? t('Guardando…', 'Saving…') : t('Guardar lienzo', 'Save canvas')}</button>
+          }}>{t('Guardar lienzo', 'Save canvas')}</SaveButton>
       </div>
     </div>
     {confirmReload && <div role="alertdialog" aria-label={t('Descartar cambios del lienzo', 'Discard canvas changes')} className="space-y-2 border rounded p-3">

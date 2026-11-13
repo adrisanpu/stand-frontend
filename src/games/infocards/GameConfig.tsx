@@ -41,7 +41,6 @@ type ProcessResponse = {
   ok: boolean
   gameId: string
   cards: InfoCard[]
-  quizGenerated: boolean
 }
 
 type PutResponse = {
@@ -80,10 +79,6 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, o
   const [text, setText] = useState('')
   const [pdfFiles, setPdfFiles] = useState<File[]>([])
   const [numCards, setNumCards] = useState(6)
-  const [generateQuiz, setGenerateQuiz] = useState(false)
-  const [numQuestions, setNumQuestions] = useState(3)
-  const [numOptions, setNumOptions] = useState(3)
-  const [useEmojis, setUseEmojis] = useState(false)
   const [aiStatus, setAiStatus] = useState<Status>('idle')
   const [aiMessage, setAiMessage] = useState('')
 
@@ -311,8 +306,6 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, o
         text: text.trim() || undefined,
         fileKeys: fileKeys.length > 0 ? fileKeys : undefined,
         numCards,
-        generateQuiz,
-        ...(generateQuiz ? { numQuestions, numOptions, useEmojis } : {}),
       })
 
       if (!processRes.ok) throw new Error(t('El procesamiento no se completó correctamente.', 'Processing did not complete successfully.'))
@@ -321,7 +314,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, o
       setCards(newCards)
       setCardsDirty(false)
       setAiStatus('done')
-      setAiMessage(t(`Listo. Se generaron ${newCards.length} tarjetas.${processRes.quizGenerated ? ' Cuestionario generado.' : ''}`, `Done. ${newCards.length} cards generated.${processRes.quizGenerated ? ' Questionnaire generated.' : ''}`))
+      setAiMessage(t(`Listo. Se generaron ${newCards.length} tarjetas.`, `Done. ${newCards.length} cards generated.`))
       setAiExpanded(false)
       onChange({ ...settings, processed: true, cardsCount: newCards.length, close: true })
     } catch (err) {
@@ -473,7 +466,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, o
 
         {aiExpanded && (
           <div className="mt-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-3">
-            <div className="grid grid-cols-2 items-end gap-3">
+            <div className="grid grid-cols-1 items-end gap-3">
               <div className="min-w-0">
                 <label htmlFor="infocards-num-cards" className="block text-xs font-medium text-gray-400 mb-1">{t('Nº de tarjetas', 'Number of cards')}</label>
                 <select
@@ -488,58 +481,6 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange, o
                   ))}
                 </select>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer select-none h-10 items-center pb-0.5">
-                <input
-                  type="checkbox"
-                  checked={generateQuiz}
-                  onChange={e => setGenerateQuiz(e.target.checked)}
-                  disabled={isAiLoading}
-                  className="rounded border-white/20 bg-[rgba(255,255,255,0.05)] text-indigo-500 focus:ring-white/20 disabled:opacity-50"
-                />
-                <span className="text-sm text-gray-300 whitespace-nowrap">{t('Generar cuestionario', 'Generate questionnaire')}</span>
-              </label>
-              {generateQuiz && (
-                <>
-                  <div className="min-w-0">
-                    <label htmlFor="infocards-num-questions" className="block text-xs font-medium text-gray-400 mb-1">{t('Nº preguntas', 'Number of questions')}</label>
-                    <select
-                      id="infocards-num-questions"
-                      value={numQuestions}
-                      onChange={e => setNumQuestions(Number(e.target.value))}
-                      disabled={isAiLoading}
-                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none disabled:opacity-50"
-                    >
-                      {[1, 2, 3, 4, 5].map(n => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="infocards-num-options" className="block text-xs font-medium text-gray-400 mb-1">{t('Nº respuestas', 'Number of answers')}</label>
-                    <select
-                      id="infocards-num-options"
-                      value={numOptions}
-                      onChange={e => setNumOptions(Number(e.target.value))}
-                      disabled={isAiLoading}
-                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none disabled:opacity-50"
-                    >
-                      {[2, 3, 4].map(n => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer select-none h-10 items-center pb-0.5">
-                    <input
-                      type="checkbox"
-                      checked={useEmojis}
-                      onChange={e => setUseEmojis(e.target.checked)}
-                      disabled={isAiLoading}
-                      className="rounded border-white/20 bg-[rgba(255,255,255,0.05)] text-indigo-500 focus:ring-white/20 disabled:opacity-50"
-                    />
-                    <span className="text-sm text-gray-300 whitespace-nowrap">{t('Emojis', 'Emojis')}</span>
-                  </label>
-                </>
-              )}
             </div>
 
             {/* Fila 2: Textarea 70% + Zona PDF 30% */}

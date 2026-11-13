@@ -85,7 +85,7 @@ it('keeps creation errors on the first step and allows retry', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('No se ha podido crear')
   expect(screen.getByLabelText('Nombre de la partida')).toHaveValue('NEW_EVENT')
   fireEvent.click(screen.getByRole('button', { name: 'Crear' }))
-  await screen.findByRole('tab', { name: 'Game' })
+  await screen.findByRole('tab', { name: 'Juego' })
 })
 
 it('does not allow closing a newly created event before its setup progress has loaded', async () => {

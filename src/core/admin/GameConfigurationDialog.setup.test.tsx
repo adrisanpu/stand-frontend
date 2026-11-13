@@ -14,11 +14,11 @@ vi.mock('../shell/GameGate', () => ({
     <button onClick={() => onGameCreated('Event', 'NEW')}>Create test event</button>,
 }))
 vi.mock('./GameFormSettings', () => ({
-  default: ({ onReadyChange, onSectionDirtyChange, section }: {
+  default: function MockGameFormSettings({ onReadyChange, onSectionDirtyChange, section }: {
     onReadyChange: (section: 'appearance' | 'registration' | 'questionnaire', ready: boolean) => void
     onSectionDirtyChange: (section: 'appearance' | 'registration' | 'questionnaire', dirty: boolean) => void
     section: 'appearance' | 'registration' | 'questionnaire'
-  }) => {
+  }) {
     useEffect(() => {
       onReadyChange('appearance', true)
       onReadyChange('registration', true)
@@ -32,13 +32,13 @@ vi.mock('./GameFormSettings', () => ({
   },
 }))
 vi.mock('./RewardConditions', () => ({
-  default: ({ onReadyChange }: { onReadyChange: (ready: boolean) => void }) => {
+  default: function MockRewardConditions({ onReadyChange }: { onReadyChange: (ready: boolean) => void }) {
     useEffect(() => { onReadyChange(true) }, [onReadyChange])
     return <p>Reward settings</p>
   },
 }))
 vi.mock('../widgets/Raffle', () => ({
-  default: ({ onReadyChange }: { onReadyChange: (ready: boolean) => void }) => {
+  default: function MockRaffle({ onReadyChange }: { onReadyChange: (ready: boolean) => void }) {
     useEffect(() => { onReadyChange(true) }, [onReadyChange])
     return <p>Raffle settings</p>
   },
@@ -85,7 +85,7 @@ it('opens new events in Home, requires all six explicit confirmations and only t
   fireEvent.click(screen.getByRole('button', { name: 'Create test event' }))
   await waitFor(() => expect(confirm()).toBeEnabled())
   expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual([
-    'Home', 'Game', 'Formulario de registro', 'Cuestionario', 'Premios', 'Sorteo',
+    'Home', 'Registro', 'Juego', 'Cuestionario', 'Premios', 'Sorteo',
   ])
   expect(screen.getByRole('tab', { name: 'Home' })).toHaveAttribute('aria-selected', 'true')
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar configuración' }))
@@ -95,10 +95,15 @@ it('opens new events in Home, requires all six explicit confirmations and only t
   window.dispatchEvent(unload)
   expect(unload.defaultPrevented).toBe(true)
   expect(screen.getByRole('button', { name: 'Finalizar configuración' })).toBeDisabled()
-  for (let index = 0; index < 6; index++) {
+  const reviewOrder = ['Home', 'Registro', 'Juego', 'Cuestionario', 'Premios', 'Sorteo']
+  for (let index = 0; index < reviewOrder.length; index++) {
+    expect(screen.getByRole('tab', { name: reviewOrder[index] })).toHaveAttribute('aria-selected', 'true')
     await waitFor(() => expect(confirm()).toBeEnabled())
     await act(async () => { fireEvent.click(confirm()) })
     expect(progress?.confirmedSections).toHaveLength(index + 1)
+    if (reviewOrder[index + 1]) {
+      await waitFor(() => expect(screen.getByRole('tab', { name: reviewOrder[index + 1] })).toHaveAttribute('aria-selected', 'true'))
+    }
   }
   expect(close).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Finalizar configuración' }))
@@ -110,14 +115,14 @@ it('opens new events in Home, requires all six explicit confirmations and only t
 it('resumes the first pending panel and preserves review progress across remounts', async () => {
   progress!.confirmedSections = ['appearance', 'configuration']
   const first = mount()
-  await screen.findByRole('tab', { name: 'Formulario de registro' })
-  expect(screen.getByRole('tab', { name: 'Formulario de registro' })).toHaveAttribute('aria-selected', 'true')
+  await screen.findByRole('tab', { name: 'Registro' })
+  expect(screen.getByRole('tab', { name: 'Registro' })).toHaveAttribute('aria-selected', 'true')
   await act(async () => { fireEvent.click(confirm()) })
   first.unmount()
   mount()
   await screen.findByRole('tab', { name: 'Cuestionario' })
   expect(screen.getByRole('tab', { name: 'Cuestionario' })).toHaveAttribute('aria-selected', 'true')
-  expect(progress?.confirmedSections).toEqual(['appearance', 'configuration', 'form'])
+  expect(progress?.confirmedSections).toEqual(['appearance', 'form', 'configuration'])
 })
 
 it('blocks closing a resumed setup while the server progress is still loading', () => {

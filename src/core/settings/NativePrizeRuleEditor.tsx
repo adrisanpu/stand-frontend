@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import type { SharedPrize } from '../../api/sharedPrizeCatalog'
 import type { PrizeInventory } from '../../api/prizeInventory'
 import type { PrizeSlot } from '../prizes'
@@ -21,7 +21,7 @@ const emptyPrize = (): NativePrizeDraft => ({
   name: '', limit: '', topX: '3', imageKey: null, imageUrl: null, sharedPrizeId: '',
 })
 
-export default function NativePrizeRuleEditor({ slots, drafts, available, inventory, onChange, onMove, errors, onValidityChange }: {
+export default function NativePrizeRuleEditor({ slots, drafts, available, inventory, onChange, onMove, errors, onValidityChange, headerAside }: {
   slots: OperatorPrizeSlotVisibility
   drafts: Record<PrizeSlot, NativePrizeDraft>
   available: SharedPrize[]
@@ -30,6 +30,7 @@ export default function NativePrizeRuleEditor({ slots, drafts, available, invent
   onMove: (from: PrizeSlot, to: PrizeSlot) => void
   errors: Partial<Record<PrizeSlot, boolean>>
   onValidityChange: (valid: boolean) => void
+  headerAside?: ReactNode
 }) {
   const { t } = useOperatorLanguage()
   const supported = slotOrder.filter(slot => slots[slot])
@@ -44,18 +45,23 @@ export default function NativePrizeRuleEditor({ slots, drafts, available, invent
     raffle: t('gane un sorteo', 'a player wins a raffle'),
   })[slot]
   return <div className="space-y-3">
-    <IconButton icon="add" label={t('Añadir regla', 'Add rule')} disabled={!unused.length || !available.length}
-      onClick={() => {
-        const slot = unused[0]
-        if (!slot) return
-        setRules(current => [...current, slot])
-        setSelected(slot)
-        onChange(slot, {})
-      }} />
-    <p className="text-xs text-textSub">{t(
-      'Cada condición admite un premio por participante. Solo se muestran las condiciones compatibles con este juego.',
-      'Each condition supports one prize per participant. Only conditions supported by this game are shown.',
-    )}</p>
+    <div className="grid gap-3 md:grid-cols-2 md:items-center">
+      <div className="flex items-center gap-2">
+        <IconButton icon="add" label={t('Añadir regla', 'Add rule')} disabled={!unused.length || !available.length}
+          onClick={() => {
+            const slot = unused[0]
+            if (!slot) return
+            setRules(current => [...current, slot])
+            setSelected(slot)
+            onChange(slot, {})
+          }} />
+        <p className="text-xs text-textSub">{t(
+          'Cada condición admite un premio por participante. Solo se muestran las condiciones compatibles con este juego.',
+          'Each condition supports one prize per participant. Only conditions supported by this game are shown.',
+        )}</p>
+      </div>
+      {headerAside}
+    </div>
     {!valid && <p role="status" className="text-xs text-textSub">{t(
       'Selecciona un premio o elimina esta regla antes de guardar.',
       'Select a prize or remove this rule before saving.',

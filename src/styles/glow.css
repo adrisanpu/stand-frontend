@@ -35,12 +35,12 @@
   background: var(--color-background, #0B0A12);
   color: #fff;
 }
-html.light-mode .stack-prize-select {
+html.light-mode .stack-prize-select:not(.participant-preview *) {
   color: #000;
   border-color: #9CA3AF;
 }
-html.light-mode .stack-prize-select option,
-html.light-mode .stack-prize-select optgroup {
+html.light-mode .stack-prize-select:not(.participant-preview *) option,
+html.light-mode .stack-prize-select:not(.participant-preview *) optgroup {
   background: #fff;
   color: #000;
 }
@@ -164,7 +164,7 @@ html.light-mode #root {
 }
 
 /* Light mode card styles */
-html.light-mode .card {
+html.light-mode .card:not(.participant-preview *) {
   background: var(--color-surface, #FFFFFF);
   border-color: rgba(var(--color-primary-rgb, 176,38,255), 0.28);
   box-shadow: 0 8px 22px rgba(21,47,58,0.08);
@@ -174,16 +174,16 @@ html.light-mode .card {
 }
 
 /* Light mode text improvements - darker text for better readability */
-html.light-mode .text-gray-300,
-html.light-mode .text-gray-400 {
+html.light-mode .text-gray-300:not(.participant-preview *),
+html.light-mode .text-gray-400:not(.participant-preview *) {
   color: #4B5563 !important; /* gray-600 - darker for better readability */
 }
 
-html.light-mode .text-gray-500 {
+html.light-mode .text-gray-500:not(.participant-preview *) {
   color: #374151 !important; /* gray-700 - even darker */
 }
 
-html.light-mode .text-gray-600 {
+html.light-mode .text-gray-600:not(.participant-preview *) {
   color: #1F2937 !important; /* gray-800 - very dark */
 }
 
@@ -205,7 +205,7 @@ html body :is(button, [role="button"], a[class*="rounded"][class*="border"], a[c
   color: #F87171;
 }
 
-html.light-mode body :is(button, [role="button"], a[class*="rounded"][class*="border"], a[class*="rounded"][class*="bg-"]):is(
+html.light-mode body :is(button, [role="button"], a[class*="rounded"][class*="border"], a[class*="rounded"][class*="bg-"]):not(.participant-preview *):is(
   [class^="text-red-"], [class*=" text-red-"],
   [class^="bg-red-"], [class*=" bg-red-"],
   [class^="border-red-"], [class*=" border-red-"],
@@ -256,7 +256,7 @@ html.light-mode body :is(
   input[type="text"], input[type="number"], input[type="email"],
   input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
   textarea
-) {
+):not(.participant-preview *) {
   border-color: #9CA3AF;
   background-color: #FFFFFF;
   color: var(--color-text-main, #0F172A);
@@ -387,36 +387,36 @@ html.light-mode .admin-topbar {
   background: rgba(255,255,255,0.82);
 }
 
-html.light-mode .admin-shell .card {
+html.light-mode .admin-shell .card:not(.participant-preview *) {
   border-color: #D8E0DB;
   background: var(--stand-surface);
   box-shadow: 0 8px 22px rgba(21,47,58,0.06);
 }
 
-html.light-mode .admin-shell .text-gray-300,
-html.light-mode .admin-shell .text-gray-400 {
+html.light-mode .admin-shell .text-gray-300:not(.participant-preview *),
+html.light-mode .admin-shell .text-gray-400:not(.participant-preview *) {
   color: #4B6168;
 }
 
-html.light-mode .admin-shell .text-gray-500,
-html.light-mode .admin-shell .text-gray-600 {
+html.light-mode .admin-shell .text-gray-500:not(.participant-preview *),
+html.light-mode .admin-shell .text-gray-600:not(.participant-preview *) {
   color: #364D55;
 }
 
-html.light-mode .admin-shell .text-red-300,
-html.light-mode .admin-shell .text-red-400,
-html.light-mode .admin-shell .text-red-500 {
+html.light-mode .admin-shell .text-red-300:not(.participant-preview *),
+html.light-mode .admin-shell .text-red-400:not(.participant-preview *),
+html.light-mode .admin-shell .text-red-500:not(.participant-preview *) {
   color: #A83228;
 }
 
-html.light-mode .admin-shell .text-green-300,
-html.light-mode .admin-shell .text-green-400 {
+html.light-mode .admin-shell .text-green-300:not(.participant-preview *),
+html.light-mode .admin-shell .text-green-400:not(.participant-preview *) {
   color: var(--stand-score);
 }
 
-html.light-mode .admin-shell .text-amber-300,
-html.light-mode .admin-shell .text-amber-400,
-html.light-mode .admin-shell .text-yellow-300 {
+html.light-mode .admin-shell .text-amber-300:not(.participant-preview *),
+html.light-mode .admin-shell .text-amber-400:not(.participant-preview *),
+html.light-mode .admin-shell .text-yellow-300:not(.participant-preview *) {
   color: #765307;
 }
 
@@ -424,38 +424,38 @@ html.light-mode .admin-shell :is(
   input:not([type]), input[type="text"], input[type="number"], input[type="email"],
   input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
   textarea, select
-) {
+):not(.participant-preview *) {
   border-color: #C6D1CC;
   background-color: #FFFFFF;
   color: var(--stand-ink);
 }
 
-html.light-mode .admin-shell input::placeholder,
-html.light-mode .admin-shell textarea::placeholder {
+html.light-mode .admin-shell input:not(.participant-preview *)::placeholder,
+html.light-mode .admin-shell textarea:not(.participant-preview *)::placeholder {
   color: #617378;
   opacity: 1;
 }
 
-html.light-mode .admin-shell :is(input, textarea, select):focus-visible {
+html.light-mode .admin-shell :is(input, textarea, select):focus-visible:not(.participant-preview *) {
   border-color: var(--stand-signal);
   outline-color: var(--stand-signal);
 }
 
-html.light-mode .admin-shell :is(button, [role="button"]) {
+html.light-mode .admin-shell :is(button, [role="button"]):not(.participant-preview *) {
   transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
-html.light-mode .admin-shell :is(button, [role="button"]):hover:not(:disabled) {
+html.light-mode .admin-shell :is(button, [role="button"]):hover:not(:disabled):not(.participant-preview *) {
   border-color: var(--stand-signal);
 }
 
-html.light-mode .admin-shell button[class~="bg-primary/20"] {
+html.light-mode .admin-shell button[class~="bg-primary/20"]:not(.participant-preview *) {
   border-color: var(--stand-signal);
   background-color: var(--stand-signal);
   color: #FFFFFF;
 }
 
-html.light-mode .admin-shell button[class~="bg-primary/20"]:hover:not(:disabled) {
+html.light-mode .admin-shell button[class~="bg-primary/20"]:hover:not(:disabled):not(.participant-preview *) {
   border-color: #963824;
   background-color: #963824;
 }
@@ -478,45 +478,45 @@ html.light-mode .admin-shell button[class~="bg-primary/20"]:hover:not(:disabled)
   input:not([type]), input[type="text"], input[type="number"], input[type="email"],
   input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
   textarea, select
-) {
+):not(.participant-preview *) {
   border-color: #C6D1CC;
   background-color: #FFFFFF;
   color: var(--stand-ink);
 }
 
-.admin-dialog :is(button, [role="button"]):hover:not(:disabled) {
+.admin-dialog :is(button, [role="button"]):hover:not(:disabled):not(.participant-preview *) {
   border-color: var(--stand-signal);
 }
 
-.admin-dialog button[class~="bg-primary/20"] {
+.admin-dialog button[class~="bg-primary/20"]:not(.participant-preview *) {
   border-color: var(--stand-signal);
   background-color: var(--stand-signal);
   color: #FFFFFF;
 }
 
-.admin-dialog .text-gray-300,
-.admin-dialog .text-gray-400 {
+.admin-dialog .text-gray-300:not(.participant-preview *),
+.admin-dialog .text-gray-400:not(.participant-preview *) {
   color: #4B6168;
 }
 
-.admin-dialog .text-gray-500 {
+.admin-dialog .text-gray-500:not(.participant-preview *) {
   color: #364D55;
 }
 
-.admin-dialog .text-red-300,
-.admin-dialog .text-red-400,
-.admin-dialog .text-red-500 {
+.admin-dialog .text-red-300:not(.participant-preview *),
+.admin-dialog .text-red-400:not(.participant-preview *),
+.admin-dialog .text-red-500:not(.participant-preview *) {
   color: #A83228;
 }
 
-.admin-dialog .text-green-300,
-.admin-dialog .text-green-400 {
+.admin-dialog .text-green-300:not(.participant-preview *),
+.admin-dialog .text-green-400:not(.participant-preview *) {
   color: var(--stand-score);
 }
 
-.admin-dialog .text-amber-300,
-.admin-dialog .text-amber-400,
-.admin-dialog .text-yellow-300 {
+.admin-dialog .text-amber-300:not(.participant-preview *),
+.admin-dialog .text-amber-400:not(.participant-preview *),
+.admin-dialog .text-yellow-300:not(.participant-preview *) {
   color: #765307;
 }
 

@@ -3,7 +3,7 @@ import { normalizeGameType } from '../core/gameTypeMap'
 import { getGameById } from '../games'
 import type { PrizeCatalog } from '../core/prizes'
 
-export const SETUP_REVIEW_SECTIONS = ['appearance', 'configuration', 'form', 'questionnaire', 'conditions', 'prizes'] as const
+export const SETUP_REVIEW_SECTIONS = ['appearance', 'form', 'configuration', 'questionnaire', 'conditions', 'prizes'] as const
 export type SetupReviewSection = typeof SETUP_REVIEW_SECTIONS[number]
 export type SetupReviewProgress = {
   version: 1

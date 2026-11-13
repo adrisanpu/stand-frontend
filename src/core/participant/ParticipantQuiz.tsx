@@ -1,7 +1,32 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { publicApi, type ParticipantQuizState, type PublicGameResponse } from '../../api/publicApi'
+import type { FormQuestion } from '../formConfig'
 import { FormHeader, QuizFields } from './FormPresentation'
 import { useParticipantLanguage } from './participantLanguage'
+
+/** The questionnaire card exactly as participants see it; shared with the operator preview. */
+export function QuizCard({ title, description, logoUrl, bannerUrl, questions, answers, saving = false, namePrefix, onChange, onBack }: {
+  title?: string
+  description: string
+  logoUrl?: string | null
+  bannerUrl?: string | null
+  questions: FormQuestion[]
+  answers: Record<string, string>
+  saving?: boolean
+  namePrefix?: string
+  onChange: (questionId: string, payload: string) => void
+  onBack?: () => void
+}) {
+  const { t } = useParticipantLanguage()
+  return <div className="space-y-4 rounded-xl bg-club p-4 text-textMain">
+    <FormHeader title={title} description={description} logoUrl={logoUrl} bannerUrl={bannerUrl} />
+    <QuizFields questions={questions} answers={answers} disabled={saving} namePrefix={namePrefix} onChange={onChange} />
+    {saving && <p role="status">{t('Guardando…')}</p>}
+    {onBack && <button type="button" className="underline" disabled={saving} onClick={onBack}>
+      {t('Volver al juego')}
+    </button>}
+  </div>
+}
 
 export default function ParticipantQuiz({ gameId, playerToken, gameMeta, children, onActiveChange }: {
   gameId: string
@@ -64,13 +89,13 @@ export default function ParticipantQuiz({ gameId, playerToken, gameMeta, childre
 
   if (!enabled) return <>{children}</>
 
-  const submit = async () => {
+  const submit = async (submittedAnswers: Record<string, string> = answers) => {
     if (!quiz || !playerToken || busy.current) return
     busy.current = true
     setSaving(true)
     setError(false)
     try {
-      const data = await publicApi.submitQuiz(gameId, playerToken, answers, quiz.revision)
+      const data = await publicApi.submitQuiz(gameId, playerToken, submittedAnswers, quiz.revision)
       if (!data.ok || !data.quiz?.completed) throw new Error('Quiz not confirmed')
       setQuiz(data.quiz)
       setOpen(false)
@@ -86,29 +111,25 @@ export default function ParticipantQuiz({ gameId, playerToken, gameMeta, childre
   return <>
     {error && <div role="alert" className="mb-4 space-y-2">
       <p>{t('No se pudo confirmar el cuestionario. Tus respuestas no se han descartado.')}</p>
-      <button type="button" className="underline" disabled={saving} onClick={() => setRetry(value => value + 1)}>
-        {t('Recargar cuestionario')}
+      <button type="button" className="underline" disabled={saving} onClick={() => quiz
+        ? void submit(answers) : setRetry(value => value + 1)}>
+        {t(quiz ? 'Reintentar envío' : 'Recargar cuestionario')}
       </button>
     </div>}
     {!quiz && mandatory && !error && <p role="status">{t('Cargando cuestionario…')}</p>}
     {needsQuiz && quiz &&
-      <form className="space-y-4 rounded-xl bg-club p-4 text-textMain" onSubmit={event => {
-        event.preventDefault()
-        void submit()
-      }}>
-        <FormHeader title={gameMeta.formConfig?.quizTitle || t('Cuéntanos tu opinión')}
-          description={gameMeta.formConfig?.quizDescription || ''}
-          logoUrl={gameMeta.formLogoUrl} bannerUrl={gameMeta.formBannerUrl} />
-        <QuizFields questions={quiz.questions} answers={answers} disabled={saving}
-          onChange={(id, payload) => setAnswers(current => ({ ...current, [id]: payload }))} />
-        <button type="submit" disabled={saving || quiz.questions.some(q => !answers[q.id])}
-          className="w-full rounded-xl bg-primary px-4 py-3 font-semibold disabled:opacity-50">
-          {saving ? t('Guardando…') : t('Enviar respuestas')}
-        </button>
-        {!mandatory && <button type="button" className="underline" disabled={saving} onClick={() => setOpen(false)}>
-          {t('Volver al juego')}
-        </button>}
-      </form>}
+      <QuizCard title={gameMeta.formConfig?.quizTitle || undefined}
+        description={gameMeta.formConfig?.quizDescription || ''}
+        logoUrl={gameMeta.formLogoUrl} bannerUrl={gameMeta.formBannerUrl}
+        questions={quiz.questions} answers={answers} saving={saving}
+        onChange={(id, payload) => {
+          const nextAnswers = { ...answers, [id]: payload }
+          setAnswers(nextAnswers)
+          if (quiz.questions.length > 0 && quiz.questions.every(question => !!nextAnswers[question.id])) {
+            void submit(nextAnswers)
+          }
+        }}
+        onBack={mandatory ? undefined : () => setOpen(false)} />}
     {invitation && !open && <div className="mb-4 space-y-2 rounded-xl border border-primary/30 p-4">
       <p>{t(quiz.moment === 'raffle'
         ? 'Completa el cuestionario para participar en el sorteo.'

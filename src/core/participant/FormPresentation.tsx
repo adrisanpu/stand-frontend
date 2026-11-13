@@ -2,7 +2,7 @@ import { useId } from 'react'
 import type { FormQuestion } from '../formConfig'
 
 export type FormHeaderProps = {
-  title: string
+  title?: string
   description: string
   logoUrl?: string | null
   bannerUrl?: string | null
@@ -12,7 +12,7 @@ export function FormHeader({ title, description, logoUrl, bannerUrl }: FormHeade
   return <header className="space-y-3">
     {bannerUrl && <img src={bannerUrl} alt="" className="max-h-44 w-full rounded-xl object-cover" />}
     {logoUrl && <img src={logoUrl} alt="" className="mx-auto max-h-20 max-w-[70%] object-contain" />}
-    <h2 className="break-words text-2xl font-semibold">{title}</h2>
+    {title && <h2 className="break-words text-2xl font-semibold">{title}</h2>}
     {description && <p className="whitespace-pre-wrap break-words text-sm">{description}</p>}
   </header>
 }

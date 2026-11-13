@@ -3,6 +3,7 @@ import type { GameConfigProps } from '../../core/types'
 import { useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
 import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import SaveButton from '../../core/ui/SaveButton'
+import IconButton from '../../core/ui/IconButton'
 import { api } from '../../api/api'
 import { DEFAULT_RULET4_CONFIG, isRulet4Config, type Rulet4Settings, type Rulet4PanelConfig } from './rulet4Logic'
 import { useMechanicsDraft } from '../useMechanicsDraft'
@@ -108,7 +109,7 @@ export default function Rulet4GameConfig({ gameId, settings, settingsLoaded, onC
     <div className="space-y-6">
       {status === 'loading' && <p role="status">{t('Cargando configuración...', 'Loading settings...')}</p>}
       {message && <p role={status === 'error' || saveFailed ? 'alert' : 'status'}>{message}</p>}
-      {status === 'error' && <button type="button" onClick={() => setReload((value) => value + 1)}>{t('Reintentar carga', 'Retry loading')}</button>}
+      {status === 'error' && <div className="flex justify-end"><IconButton icon="reload" label={t('Reintentar carga', 'Retry loading')} onClick={() => setReload((value) => value + 1)} /></div>}
       <fieldset disabled={status !== 'ready' || saving} className="space-y-6">
       <div className="space-y-4">
         {panels.map((panel, index) => (

@@ -17,6 +17,7 @@ import GameGate from '../shell/GameGate'
 import GameFormSettings from './GameFormSettings'
 import { inputManager } from '../input/inputManager'
 import GamePlayPreview from './GamePlayPreview'
+import type { ParticipantPhoneFrame } from '../participant/ParticipantPhonePreview'
 import QRCode from '../widgets/QRCode'
 import { getRedeemUrl } from '../lib/joinUrl'
 
@@ -47,6 +48,7 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
   const savingMechanics = useRef(false)
   const [mechanicsDirty, setMechanicsDirty] = useState(false)
   const [mechanicsDraft, setMechanicsDraft] = useState<Record<string, unknown> | null>(null)
+  const [phoneFrame, setPhoneFrame] = useState<ParticipantPhoneFrame>({})
   const [conditionsDirty, setConditionsDirty] = useState(false)
   const [formDirty, setFormDirty] = useState(false)
   const [section, setSection] = useState<SetupReviewSection>(initialSection)
@@ -298,7 +300,7 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
           }} />}
         {gameId && !data && !loadError && <p role="status">{t('Cargando configuración…', 'Loading settings…')}</p>}
         {loadError && <div role="alert"><p>{t('No se pudo cargar esta partida. Comprueba tu sesión y el backend.', 'Could not load this event. Check your session and backend.')}</p>
-          <button type="button" className="mt-3 underline" onClick={() => setReload(value => value + 1)}>{t('Reintentar', 'Retry')}</button>
+          <div className="mt-3 flex justify-end"><IconButton icon="reload" label={t('Reintentar', 'Retry')} onClick={() => setReload(value => value + 1)} /></div>
         </div>}
         {gameId && data && <>
           {readOnly && <p role="status">{t('Solo lectura: esta partida está inactiva o en proceso de cierre.', 'Read only: this event is inactive or closing.')}</p>}
@@ -306,8 +308,8 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
             className="flex gap-1 overflow-x-auto border-b border-current/15">
             {([
               ['appearance', 'Home'],
-              ['configuration', 'Game'],
-              ['form', t('Formulario de registro', 'Registration form')],
+              ['form', t('Registro', 'Registration')],
+              ['configuration', t('Juego', 'Game')],
               ['questionnaire', t('Cuestionario', 'Questionnaire')],
               ['conditions', t('Premios', 'Prizes')],
               ['prizes', t('Sorteo', 'Raffle')],
@@ -333,8 +335,8 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
           </nav>
           <section role="tabpanel" id="event-panel-configuration" aria-labelledby="event-tab-configuration"
             hidden={section !== 'configuration'} tabIndex={0} className="space-y-3 py-2">
-            <div className="grid items-start gap-6 lg:grid-cols-2">
-            <div className="min-w-0 space-y-3">
+            <div className="grid items-stretch gap-6 lg:h-[calc(92dvh-14rem)] lg:min-h-80 lg:grid-cols-2">
+            <div className="min-w-0 space-y-3 lg:overflow-y-auto">
             {Component ? <>
               <fieldset disabled={readOnly || busy || saveUncertain || discard} onChangeCapture={() => { markMechanicsDirty(true); setMessage('') }}
                 onClickCapture={event => { if ((event.target as HTMLElement).closest('button')) { markMechanicsDirty(true); setMessage('') } }}>
@@ -353,12 +355,14 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
             </div>}
             </div>
             {section === 'configuration' && <aside aria-label={t('Prueba del juego', 'Game trial')}
-              className="min-w-0 w-full space-y-3 rounded-xl border border-current/20 p-5">
-              <h3 className="font-semibold">{t('Vista previa jugable', 'Playable preview')}</h3>
-              <p className="text-sm">{t('Simulación local: sin registro, resultados ni premios reales.', 'Local simulation: no registration, real results or prizes.')}</p>
-              {!Component || mechanicsDraft
-                ? <GamePlayPreview gameType={data.game.gameType} settings={Component ? mechanicsDraft! : settings} gameId={gameId} />
-                : <p role="status">{t('Esperando una configuración del juego cargada correctamente.', 'Waiting for successfully loaded game settings.')}</p>}
+              className="flex min-h-0 min-w-0 w-full flex-col overflow-hidden rounded-xl border border-current/20 p-5">
+              <h3 className="mb-3 shrink-0 font-semibold">{t('Vista previa', 'Preview')}</h3>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {!Component || mechanicsDraft
+                  ? <GamePlayPreview gameType={data.game.gameType} settings={Component ? mechanicsDraft! : settings} gameId={gameId}
+                    frame={{ ...phoneFrame, prizeCatalog: data.prizeCatalog }} />
+                  : <p role="status">{t('Esperando una configuración del juego cargada correctamente.', 'Waiting for successfully loaded game settings.')}</p>}
+              </div>
             </aside>}
             </div>
           </section>
@@ -368,21 +372,22 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
             hidden={section !== 'appearance' && section !== 'form' && section !== 'questionnaire'}
             tabIndex={0} className="space-y-3 py-2">
             <fieldset disabled={busy || discard} className="min-w-0 w-full max-w-full">
-              <GameFormSettings gameId={gameId} gameName={data.game.gameName} readOnly={readOnly} section={formSection}
+              <GameFormSettings gameId={gameId} gameName={data.game.gameName} readOnly={readOnly} section={formSection} prizeCatalog={data.prizeCatalog} onFrameChange={setPhoneFrame}
                 onBusyChange={formBusy} onDirtyChange={setFormDirty} onReadyChange={formReady} onSectionDirtyChange={formSectionDirty} />
             </fieldset>
           </section>
           <section role="tabpanel" id="event-panel-conditions" aria-labelledby="event-tab-conditions"
             hidden={section !== 'conditions'} tabIndex={0} className="space-y-3 py-2">
-            <div className="flex items-center gap-3 rounded-xl border border-current/15 p-3">
-              <QRCode data={getRedeemUrl(gameId)} size={80} margin={4}
-                alt={t('QR validador de premios', 'Prize validator QR code')} className="!bg-white !p-1" />
-              <a className="min-w-0 break-all text-sm underline" href={getRedeemUrl(gameId)} target="_blank" rel="noreferrer">
-                {t('Abrir validador de premios', 'Open prize validator')}
-              </a>
-            </div>
             <fieldset disabled={busy || discard}>
-              <RewardConditions data={data} readOnly={readOnly} onBusyChange={conditionsBusy} onDirtyChange={markConditionsDirty} onReadyChange={conditionsReady} />
+              <RewardConditions data={data} readOnly={readOnly}
+                headerAside={<div className="flex min-w-0 items-center gap-3 rounded-xl border border-current/15 p-3">
+                  <QRCode data={getRedeemUrl(gameId)} size={80} margin={4}
+                    alt={t('QR validador de premios', 'Prize validator QR code')} className="!bg-white !p-1" />
+                  <a className="min-w-0 break-all text-sm underline" href={getRedeemUrl(gameId)} target="_blank" rel="noreferrer">
+                    {t('Abrir validador de premios', 'Open prize validator')}
+                  </a>
+                </div>}
+                onBusyChange={conditionsBusy} onDirtyChange={markConditionsDirty} onReadyChange={conditionsReady} />
             </fieldset>
           </section>
           <section role="tabpanel" id="event-panel-prizes" aria-labelledby="event-tab-prizes"
@@ -412,7 +417,7 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
               disabled={busy || !data || loadError || !!setupError || !progress || progress.confirmedSections.length !== 6 || mechanicsDirty || formDirty || conditionsDirty}
               onClick={() => void finish()}>{t('Finalizar configuración', 'Finish setup')}</button>
           </div>
-          {(setupError || missingSetup) && <button type="button" className="underline" disabled={busy}
+          {(setupError || missingSetup) && <div className="flex justify-end"><IconButton icon="reload" label={t('Recargar progreso', 'Reload progress')} disabled={busy}
             onClick={() => {
               if (!gameId) return
               sourceBusy('review', true)
@@ -422,9 +427,9 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
                 setReviewVersion(value => value + 1)
               }).catch(() => setSetupError(t('No se pudo recargar el progreso.', 'Could not reload progress.')))
                 .finally(() => sourceBusy('review', false))
-            }}>{t('Recargar progreso', 'Reload progress')}</button>}
+            }} /></div>}
         </div>}
-        {saveUncertain && <button type="button" disabled={busy} className="underline" onClick={() => {
+        {saveUncertain && <div className="flex justify-end"><IconButton icon="reload" label={t('Recargar configuración', 'Reload settings')} disabled={busy} onClick={() => {
           if ((mechanicsDirty || formDirty || conditionsDirty)
             && !window.confirm(t('Se descartarán los cambios sin guardar al recargar la configuración.', 'Reloading settings will discard unsaved changes.'))) return
           setMechanicsDirty(false)
@@ -432,7 +437,7 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
           setFormDirty(false)
           setSaveUncertain(false)
           setReload(value => value + 1)
-        }}>{t('Recargar configuración', 'Reload settings')}</button>}
+        }} /></div>}
         {busy && <p role="status">{t('Guardando…', 'Saving…')}</p>}
         {discard && <div ref={discardDialog} role="alertdialog" aria-label={t('Descartar cambios', 'Discard changes')} className="space-y-3 rounded-xl border border-current/20 p-4">
           <p>{t('Hay cambios sin guardar. ¿Quieres descartarlos y cerrar?', 'There are unsaved changes. Discard them and close?')}</p>

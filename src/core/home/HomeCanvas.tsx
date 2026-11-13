@@ -87,7 +87,7 @@ function VideoBackground({ src, preview, controls }: { src: string; preview: boo
     void element.play().then(() => setBlocked(false)).catch(() => setFailed(true))
   }
   return <>
-    <video ref={video} src={src} loop playsInline muted={muted} autoPlay
+    <video ref={video} src={src} crossOrigin="anonymous" loop playsInline muted={muted} autoPlay
       className="absolute inset-0 h-full w-full object-cover" aria-hidden="true"
       onTimeUpdate={() => { if (video.current && video.current.currentTime > 0) time.current = video.current.currentTime }}
       onLoadedMetadata={() => {
@@ -149,7 +149,7 @@ export default function HomeCanvas({
         </div>
       case 'logo':
         return <div className="card h-full flex items-center justify-center p-5">
-          {logoSrc ? <img src={logoSrc} alt={t('Logo del evento', 'Event logo')} className="h-full w-full object-contain" />
+          {logoSrc ? <img crossOrigin="anonymous" src={logoSrc} alt={t('Logo del evento', 'Event logo')} className="h-full w-full object-contain" />
             : <h1 className="text-5xl font-bold text-center break-words">{gameName}</h1>}
         </div>
       case 'players': return players
@@ -171,7 +171,7 @@ export default function HomeCanvas({
       style={{ ...styleVariables(composition), ...(stretch ? { width: size.width, height: size.height } : { width, height, transform: `scale(${scale})` }) }}>
       {composition.background && backgroundUrl && (composition.background.type === 'video'
         ? <VideoBackground key={composition.background.key} src={backgroundUrl} preview={preview || !!overlay} controls={controls} />
-        : <img src={backgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover" onError={() => setImageError(true)} />)}
+        : <img crossOrigin="anonymous" src={backgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover" onError={() => setImageError(true)} />)}
       {imageError && <p role="alert" className="home-media-error">{t('No se puede cargar la imagen de fondo.', 'Background image could not be loaded.')}</p>}
       {composition.items.map(item => <div key={item.id} className="home-canvas-item"
         data-home-item={item.id} style={{ left: item.x * unitX, top: item.y * unitY, width: item.w * unitX, height: item.h * unitY }}>

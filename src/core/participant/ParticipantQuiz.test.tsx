@@ -48,6 +48,12 @@ describe('participant survey placement', () => {
     expect(publicApi.submitQuiz).not.toHaveBeenCalled()
   })
 
+  it('does not show a default heading when no questionnaire title is configured', async () => {
+    show(quiz, { ...game, formConfig: { ...game.formConfig!, quizTitle: '' } })
+    await screen.findByLabelText('Pizza')
+    expect(screen.queryByRole('heading', { name: 'Cuéntanos tu opinión' })).not.toBeInTheDocument()
+  })
+
   it('does not request participant data before registration or when disabled', () => {
     show(quiz, game, null)
     expect(screen.getByText('Jugar')).toBeInTheDocument()
@@ -58,10 +64,26 @@ describe('participant survey placement', () => {
     show()
     expect(screen.queryByText('Jugar')).not.toBeInTheDocument()
     fireEvent.click(await screen.findByLabelText('Pizza'))
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar respuestas' }))
     await screen.findByText('Jugar')
     expect(publicApi.submitQuiz).toHaveBeenCalledWith('ABC123', 'token', { q1: 'ABC123_q1_a' }, 'r1')
-    expect(screen.queryByText('Enviar respuestas')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Enviar respuestas' })).not.toBeInTheDocument()
+  })
+
+  it('submits automatically only after every question has an answer', async () => {
+    const multipleQuestions = { ...quiz, questions: [
+      ...quiz.questions,
+      { id: 'q2', text: '¿Qué prefieres beber?', options: [
+        { title: 'Agua', payload: 'ABC123_q2_a' }, { title: 'Café', payload: 'ABC123_q2_b' },
+      ] },
+    ] }
+    show(multipleQuestions)
+    fireEvent.click(await screen.findByLabelText('Pizza'))
+    expect(publicApi.submitQuiz).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByLabelText('Agua'))
+    await screen.findByText('Jugar')
+    expect(publicApi.submitQuiz).toHaveBeenCalledWith('ABC123', 'token', {
+      q1: 'ABC123_q1_a', q2: 'ABC123_q2_a',
+    }, 'r1')
   })
 
   it('restores a completed survey without asking again', async () => {
@@ -97,15 +119,17 @@ describe('participant survey placement', () => {
     expect(screen.getByText('Jugar')).toBeInTheDocument()
   })
 
-  it('keeps entered answers on failed save and explicit reload', async () => {
-    vi.mocked(publicApi.submitQuiz).mockRejectedValue(new Error('Network failed'))
+  it('keeps entered answers on failed save and retries submission', async () => {
+    vi.mocked(publicApi.submitQuiz)
+      .mockRejectedValueOnce(new Error('Network failed'))
+      .mockResolvedValueOnce(response({ ...quiz, completed: true }))
     show()
     fireEvent.click(await screen.findByLabelText('Pasta'))
-    fireEvent.click(screen.getByText('Enviar respuestas'))
     await screen.findByRole('alert')
-    fireEvent.click(screen.getByText('Recargar cuestionario'))
-    await waitFor(() => expect(publicApi.getPlayer).toHaveBeenCalledTimes(2))
     expect(screen.getByLabelText('Pasta')).toBeChecked()
-    expect(screen.queryByText('Jugar')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Reintentar envío'))
+    await screen.findByText('Jugar')
+    expect(publicApi.submitQuiz).toHaveBeenCalledTimes(2)
+    expect(publicApi.submitQuiz).toHaveBeenLastCalledWith('ABC123', 'token', { q1: 'ABC123_q1_b' }, 'r1')
   })
 })

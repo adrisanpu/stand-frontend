@@ -255,15 +255,15 @@ describe('unified game configuration save', () => {
     expect(screen.getByLabelText('Palabras (una por línea)')).toHaveClass('w-full')
   })
 
-  it('pairs INFOCARDS generation counts without narrowing the description editor', async () => {
+  it('limits INFOCARDS AI controls to card generation', async () => {
     mount(definition('INFOCARDS', InfocardsConfig))
     await waitFor(() => expect(footer()).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'IA' }))
     const grid = screen.getByLabelText('Nº de tarjetas').parentElement?.parentElement
-    expect(grid).toHaveClass('grid', 'grid-cols-2')
-    fireEvent.click(screen.getByLabelText('Generar cuestionario'))
-    expect(screen.getByLabelText('Nº preguntas').parentElement?.parentElement).toBe(grid)
-    expect(screen.getByLabelText('Nº respuestas').parentElement?.parentElement).toBe(grid)
+    expect(grid).toHaveClass('grid', 'grid-cols-1')
+    expect(screen.queryByLabelText('Generar cuestionario')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Nº preguntas')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Nº respuestas')).not.toBeInTheDocument()
     expect(grid).not.toContainElement(screen.getByPlaceholderText('Describe tu producto, servicio o marca aquí...'))
     expect(api.put).not.toHaveBeenCalled()
   })

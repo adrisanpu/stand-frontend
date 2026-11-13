@@ -29,6 +29,60 @@ const DEFAULT_STAND_PALETTE: ThemeColors = {
   textSub: '#9AA0A6',
 }
 
+export type ParticipantPalette = { dark: boolean; variables: Record<string, string> }
+
+/** Resolves the participant theme exactly as ThemeProvider applies it, without touching the document. */
+export function resolveParticipantPalette(game: Pick<GameDefinition, 'colors'> | null, appearance?: ParticipantAppearance | null,
+  saved: { colors?: ThemeColors | null; themeMode?: string | null } = {}): ParticipantPalette {
+  const isDarkMode = (appearance?.themeMode ?? saved.themeMode) !== 'light'
+  const customColors = appearance ? null : saved.colors ?? null
+  let colors = customColors || (game ?? { colors: DEFAULT_STAND_PALETTE }).colors
+
+  if (!customColors && !isDarkMode) {
+    colors = {
+      ...colors,
+      background: '#F5F5F7',
+      surface: '#FFFFFF',
+      textMain: '#0F172A',
+      textSub: '#475569',
+    }
+  }
+
+  if (customColors && !isDarkMode) {
+    if (colors.surface === 'rgba(255,255,255,0.04)' || colors.surface === 'rgba(0,0,0,0.04)') {
+      colors = { ...colors, surface: '#FFFFFF' }
+    }
+    if (colors.textMain === '#EAEAF2' || colors.textMain === '#1D1D1F') {
+      colors = { ...colors, textMain: '#0F172A', textSub: '#475569' }
+    }
+  }
+
+  if (appearance?.colors) colors = { ...colors, ...appearance.colors }
+
+  const primaryRgb = hexToRgb(colors.primary) || { r: 176, g: 38, b: 255 }
+  const accentRgb = hexToRgb(colors.accent) || { r: 34, g: 211, b: 238 }
+  const primary = `${primaryRgb.r},${primaryRgb.g},${primaryRgb.b}`
+  const accent = `${accentRgb.r},${accentRgb.g},${accentRgb.b}`
+  return {
+    dark: isDarkMode,
+    variables: {
+      '--color-primary': colors.primary,
+      '--color-accent': colors.accent,
+      '--color-background': colors.background,
+      '--color-surface': colors.surface,
+      '--color-text-main': colors.textMain,
+      '--color-text-sub': colors.textSub,
+      '--color-primary-rgb': primary,
+      '--color-accent-rgb': accent,
+      '--color-primary-gradient-1': `rgba(${primary},0.18)`,
+      '--color-primary-gradient-2': `rgba(${primary},0.10)`,
+      '--color-accent-gradient': `rgba(${accent},0.16)`,
+      '--color-border-gradient-1': `rgba(${primary},0.65)`,
+      '--color-border-gradient-2': `rgba(${accent},0.65)`,
+    },
+  }
+}
+
 export function ThemeProvider({
   game,
   appearance,
@@ -47,99 +101,19 @@ export function ThemeProvider({
   }, [])
 
   useEffect(() => {
-    // Check for custom color palette in localStorage
     let customColors: ThemeColors | null = null
     try {
       const saved = localStorage.getItem(STORAGE_KEY_COLORS)
-      if (saved) {
-        customColors = JSON.parse(saved) as ThemeColors
-      }
+      if (saved) customColors = JSON.parse(saved) as ThemeColors
     } catch {
       // Invalid saved data, ignore
     }
-
-    // Check for theme mode (dark/light)
-    const savedThemeMode = localStorage.getItem(STORAGE_KEY_THEME_MODE)
-    const isDarkMode = (appearance?.themeMode ?? savedThemeMode) !== 'light'
-    if (appearance) customColors = null
-
-    // Always apply theme - if no game, use default gray theme
-    // But prioritize custom colors if they exist
-    const defaultTheme = {
-      id: 'default',
-      name: 'Stand',
-      colors: DEFAULT_STAND_PALETTE,
-    }
-
-    const themeToApply = game || defaultTheme
-    let colors = customColors || themeToApply.colors
-
-    // If using default palette (not custom), adjust background colors based on theme mode
-    if (!customColors && !isDarkMode) {
-      // Apply light mode colors to default palette
-      colors = {
-        ...colors,
-        background: '#F5F5F7',
-        surface: '#FFFFFF', // Solid white for better card visibility
-        textMain: '#0F172A', // Darker for better readability (slate-900)
-        textSub: '#475569', // Darker gray for better contrast (slate-600)
-      }
-    }
-
-    // If using custom colors in light mode, ensure surface is visible and text is dark
-    if (customColors && !isDarkMode) {
-      // Check if surface is transparent (dark mode style)
-      if (colors.surface === 'rgba(255,255,255,0.04)' || colors.surface === 'rgba(0,0,0,0.04)') {
-        colors = {
-          ...colors,
-          surface: '#FFFFFF', // Override transparent surface with solid white
-        }
-      }
-      // Ensure text colors are dark enough for light mode
-      if (colors.textMain === '#EAEAF2' || colors.textMain === '#1D1D1F') {
-        colors = {
-          ...colors,
-          textMain: '#0F172A', // Very dark for better readability
-          textSub: '#475569', // Dark gray for good contrast
-        }
-      }
-    }
-
-    if (appearance?.colors) colors = { ...colors, ...appearance.colors }
-
+    const palette = resolveParticipantPalette(game, appearance,
+      { colors: customColors, themeMode: localStorage.getItem(STORAGE_KEY_THEME_MODE) })
     const root = document.documentElement
-
-    // Apply CSS variables
-    root.style.setProperty('--color-primary', colors.primary)
-    root.style.setProperty('--color-accent', colors.accent)
-    root.style.setProperty('--color-background', colors.background)
-    root.style.setProperty('--color-surface', colors.surface)
-    root.style.setProperty('--color-text-main', colors.textMain)
-    root.style.setProperty('--color-text-sub', colors.textSub)
-
-    // Apply theme mode class to html element
-    if (isDarkMode) {
-      document.documentElement.classList.remove('light-mode')
-      document.documentElement.classList.add('dark-mode')
-    } else {
-      document.documentElement.classList.remove('dark-mode')
-      document.documentElement.classList.add('light-mode')
-    }
-
-    // Extract RGB values for gradient backgrounds
-    const primaryRgb = hexToRgb(colors.primary) || { r: 176, g: 38, b: 255 }
-    const accentRgb = hexToRgb(colors.accent) || { r: 34, g: 211, b: 238 }
-
-    // Apply RGB values for use in CSS rgba() functions
-    root.style.setProperty('--color-primary-rgb', `${primaryRgb.r},${primaryRgb.g},${primaryRgb.b}`)
-    root.style.setProperty('--color-accent-rgb', `${accentRgb.r},${accentRgb.g},${accentRgb.b}`)
-
-    // Apply pre-computed rgba values for gradients (for better browser compatibility)
-    root.style.setProperty('--color-primary-gradient-1', `rgba(${primaryRgb.r},${primaryRgb.g},${primaryRgb.b},0.18)`)
-    root.style.setProperty('--color-primary-gradient-2', `rgba(${primaryRgb.r},${primaryRgb.g},${primaryRgb.b},0.10)`)
-    root.style.setProperty('--color-accent-gradient', `rgba(${accentRgb.r},${accentRgb.g},${accentRgb.b},0.16)`)
-    root.style.setProperty('--color-border-gradient-1', `rgba(${primaryRgb.r},${primaryRgb.g},${primaryRgb.b},0.65)`)
-    root.style.setProperty('--color-border-gradient-2', `rgba(${accentRgb.r},${accentRgb.g},${accentRgb.b},0.65)`)
+    for (const [name, value] of Object.entries(palette.variables)) root.style.setProperty(name, value)
+    root.classList.toggle('light-mode', !palette.dark)
+    root.classList.toggle('dark-mode', palette.dark)
   }, [game, appearance, themeRevision])
 
   return (

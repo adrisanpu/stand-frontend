@@ -2,7 +2,8 @@ import { useOperatorLanguage } from '../shell/operatorLanguage'
 import { useEffect, useRef, useState } from 'react'
 import { normalizeGameType } from '../gameTypeMap'
 import PlayableGamePreview, { previewConfigurationError, type PreviewContent } from './PlayableGamePreview'
-import { ParticipantLanguageProvider } from '../participant/participantLanguage'
+import ParticipantPhonePreview, { type ParticipantPhoneFrame } from '../participant/ParticipantPhonePreview'
+import IconButton from '../ui/IconButton'
 
 export type GamePlayPreviewProps = {
   gameType: string
@@ -11,9 +12,11 @@ export type GamePlayPreviewProps = {
   /** Only SEMAFORO uses this ID, to read its saved questionnaire when content is not supplied. */
   gameId?: string
   content?: PreviewContent
+  /** Participant look (theme, logo, banner, prizes) so the trial renders inside the real phone shell. */
+  frame?: ParticipantPhoneFrame
 }
 
-export default function GamePlayPreview({ gameType, settings, gameId, content }: GamePlayPreviewProps) {
+export default function GamePlayPreview({ gameType, settings, gameId, content, frame }: GamePlayPreviewProps) {
   const { language, t } = useOperatorLanguage()
   const [reset, setReset] = useState(0)
   const [hidden, setHidden] = useState(document.hidden)
@@ -43,18 +46,20 @@ export default function GamePlayPreview({ gameType, settings, gameId, content }:
   if (settings === undefined) return <StaticGamePlayPreview gameType={gameType} />
   const type = normalizeGameType(gameType)
   const error = previewConfigurationError(type, settings, t)
-  return <section className="space-y-4" aria-label={t('Prueba jugable aislada', 'Isolated playable preview')}>
-    <p className="text-sm text-textSub">{t('Simulación local: no registra participantes, resultados ni premios y no contacta con el club.', 'Local simulation: no participants, results or prizes are registered and the club is not contacted.')}</p>
+  return <section className="flex min-h-full flex-col gap-3" aria-label={t('Prueba jugable aislada', 'Isolated playable preview')}>
     {changed && <p role="status">{t('La configuración ha cambiado. La prueba se ha reiniciado con el borrador.', 'Settings changed. The preview restarted with the draft.')}</p>}
-    <button type="button" className="min-h-11 rounded-lg border border-primary/30 px-4 py-2" onClick={() => {
-      setReset(value => value + 1)
-      setChanged(false)
-    }}>{t('Reiniciar prueba', 'Reset preview')}</button>
+    <div className="flex justify-end">
+      <IconButton icon="reset" label={t('Reiniciar prueba', 'Reset preview')} onClick={() => {
+        setReset(value => value + 1)
+        setChanged(false)
+      }} />
+    </div>
     {error ? <p role="alert">{error}</p> : hidden ? <p role="status">{t('Prueba detenida al salir de esta pestaña. Se reiniciará al volver.', 'Preview stopped when leaving this tab. It will restart on return.')}</p>
-      : <ParticipantLanguageProvider key={language} initialLanguage={language}>
+      : <ParticipantPhonePreview gameType={type} screen="play" language={language} {...frame}
+        label={t('Vista en el móvil del participante', 'Participant phone view')}>
         <PlayableGamePreview key={`${type}:${gameId ?? ''}:${signature}:${reset}`} gameType={type} settings={mechanics.current.settings!}
           gameId={gameId} content={content} />
-      </ParticipantLanguageProvider>}
+      </ParticipantPhonePreview>}
   </section>
 }
 

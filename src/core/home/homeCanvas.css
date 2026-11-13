@@ -21,6 +21,7 @@
   background-image: linear-gradient(to right, #89969c40 1px, transparent 1px), linear-gradient(to bottom, #89969c40 1px, transparent 1px);
   background-size: 60px 60px;
 }
+.home-canvas-snapshot .home-canvas-editing::after { content: none; }
 .home-canvas-item { position: absolute; padding: 10px; min-width: 0; min-height: 0; }
 .home-canvas-widget { width: 100%; height: 100%; overflow: auto; min-height: 0; }
 .home-canvas-widget > div { max-width: 100%; min-height: 0; }

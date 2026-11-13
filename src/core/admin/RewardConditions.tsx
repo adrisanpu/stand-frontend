@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { getOperatorGameConfiguration, type OperatorGameConfiguration } from '../../api/operatorGames'
 import { stackPrizeApi, type StackPrizeItem, type StackPrizeSettingsResponse, type StackPrizeRule } from '../../api/stackPrizes'
 import { useCurrentUser } from '../../auth/useCurrentUser'
@@ -15,6 +15,7 @@ import { getGameById } from '../../games'
 type Props = {
   data: OperatorGameConfiguration
   readOnly: boolean
+  headerAside?: ReactNode
   onBusyChange: (busy: boolean) => void
   onDirtyChange: (dirty: boolean) => void
   onReadyChange?: (ready: boolean) => void
@@ -28,7 +29,7 @@ const stockDrafts = (catalog: StackPrizeItem[]) =>
   Object.fromEntries(catalog.map(item => [item.id, item.stockTotal === null ? '' : String(item.stockTotal)]))
 const validCount = (value: string) => /^\d+$/.test(value.trim()) && Number.isSafeInteger(Number(value.trim()))
 
-function StackConditions({ data, readOnly, onBusyChange, onDirtyChange, onReadyChange }: Props) {
+function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyChange, onReadyChange }: Props) {
   const { t } = useOperatorLanguage()
   const { plan, loading: planLoading, error: planError } = useCurrentUser()
   const [snapshot, setSnapshot] = useState<StackPrizeSettingsResponse | null>(null)
@@ -148,14 +149,14 @@ function StackConditions({ data, readOnly, onBusyChange, onDirtyChange, onReadyC
     {planError && <p role="alert">{t('No se pudo consultar el plan. Cierra y vuelve a abrir el panel antes de editar condiciones.',
       'Could not load your plan. Close and reopen the panel before editing conditions.')}</p>}
     {error && <div role="alert" className="space-y-2"><p>{error}</p>
-      <IconButton icon="reload" label={t('Recargar condiciones', 'Reload conditions')} disabled={busy} onClick={() => {
+      <div className="flex justify-end"><IconButton icon="reload" label={t('Recargar condiciones', 'Reload conditions')} disabled={busy} onClick={() => {
         if (dirty && !window.confirm(t('Se descartarán los cambios de condiciones sin guardar.', 'Unsaved condition changes will be discarded.'))) return
         setDirty(false)
         setRulesDirty(false)
         onDirtyChange(false)
         setSaved(false)
         setReload(value => value + 1)
-      }} />
+      }} /></div>
     </div>}
     {!snapshot && !error && <p role="status">{t('Cargando condiciones…', 'Loading conditions…')}</p>}
     {snapshot && <>
@@ -166,6 +167,7 @@ function StackConditions({ data, readOnly, onBusyChange, onDirtyChange, onReadyC
       <fieldset disabled={readOnly || busy || !!error || !!planError || planLoading || snapshot.state !== 'open'}
         className="min-w-0">
         <StackRuleEditor rules={rules} catalog={catalog} available={available} raffles={getFeaturesByPlan(plan).raffles}
+          headerAside={headerAside}
           onAddPrize={(ruleIndex, groupIndex, prizeId) => {
             const prize = available.find(item => item.id === prizeId)
             if (!prize) return
@@ -213,13 +215,13 @@ function StackConditions({ data, readOnly, onBusyChange, onDirtyChange, onReadyC
   </div>
 }
 
-function NativeConditions({ data, readOnly, onBusyChange, onDirtyChange, onReadyChange }: Props) {
+function NativeConditions({ data, readOnly, headerAside, onBusyChange, onDirtyChange, onReadyChange }: Props) {
   const { t } = useOperatorLanguage()
   const catalog = data.prizeCatalog ?? {}
   const { plan } = useCurrentUser()
   const definition = getGameById(data.game.gameType)
   if (definition) return <LegacyPrizeSettings gameId={data.game.gameId} gameDefinition={definition}
-    settings={data.configuration} plan={plan} editConditions readOnly={readOnly}
+    settings={data.configuration} plan={plan} editConditions readOnly={readOnly} conditionsHeaderAside={headerAside}
     onPersist={() => undefined} onSavingChange={onBusyChange} onDirtyChange={onDirtyChange} onReadyChange={onReadyChange} />
   return <div className="space-y-2">
     <p className="text-sm text-textSub">{t(
