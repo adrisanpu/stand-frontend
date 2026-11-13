@@ -57,7 +57,7 @@ describe.each([
   it('does not allow saving defaults after a failed load', async () => {
     vi.mocked(api.get).mockRejectedValue(new Error('Sin conexión'))
     render(<Config gameId="ABC123" gameName="Event" settings={{}} onChange={vi.fn()} />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión')
+    expect(await screen.findByText('Sin conexión')).toHaveAttribute('role', 'alert')
     expect(screen.getByRole('button', { name: 'Guardar configuración' })).toBeDisabled()
     expect(api.put).not.toHaveBeenCalled()
   })

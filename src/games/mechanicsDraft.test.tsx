@@ -66,11 +66,13 @@ describe('mechanics drafts are distinct from save notifications', () => {
     expect(registerSave.mock.lastCall?.[0].validate()).toBe('La palabra objetivo no puede estar vacía')
   })
 
-  it('emits EMPAREJA2 pool size and edits', () => {
+  it('emits EMPAREJA2 pool size and edits', async () => {
+    vi.mocked(api.get).mockResolvedValue({ ok: true, pairs: [] })
     render(<Empareja2GameConfig {...props} settings={{ numPairs: 4, catalogPairCount: 20 }} />)
     expect(onDraftChange).toHaveBeenLastCalledWith({ numPairs: 4, catalogPairCount: 20 })
     fireEvent.change(screen.getByRole('slider'), { target: { value: '8' } })
     expect(onDraftChange).toHaveBeenLastCalledWith({ numPairs: 8, catalogPairCount: 20 })
+    expect(await screen.findByText('No hay parejas disponibles.')).toBeInTheDocument()
   })
 
   it('emits IMPOSTOR words/player count, including an invalid empty word list', () => {

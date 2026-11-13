@@ -11,6 +11,7 @@ import Rulet4Config from '../../games/rulet4/GameConfig'
 import StackConfig from '../../games/stack/GameConfig'
 import ImpostorConfig from '../../games/impostor/GameConfig'
 import Empareja2Config from '../../games/empareja2/GameConfig'
+import * as empareja2Contributions from '../../games/empareja2/contributions'
 import { DEFAULT_STACK_CONFIG } from '../../games/stack/stackLogic'
 import { GAME_ACCESS_CAPABILITIES } from './gameAccess'
 
@@ -230,6 +231,96 @@ describe('unified game configuration save', () => {
     }))
   })
 
+  it('saves the selected EMPAREJA2 difficulty without an information icon', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      ...gameResponse({ gameId: 'ABC123', gameName: 'Game', gameType: 'EMPAREJA2' }),
+      settings: { empareja2: { numPairs: 5 } }, empareja2CatalogPairCount: 10,
+    })
+    const { onSaved } = mount(definition('EMPAREJA2', Empareja2Config))
+    const slider = await screen.findByRole('slider', { name: 'Número de parejas (dificultad)' })
+    expect(slider).toHaveValue('5')
+    expect(screen.queryByRole('button', { name: 'Información sobre la dificultad' })).not.toBeInTheDocument()
+    fireEvent.change(slider, { target: { value: '2' } })
+    expect(screen.getByText('parejas seleccionadas')).toHaveTextContent('2 parejas seleccionadas')
+    expect(api.put).not.toHaveBeenCalled()
+    await waitFor(() => expect(footer()).toBeEnabled())
+    fireEvent.click(footer())
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(api.put).toHaveBeenCalledWith('/v1/game', {
+      gameId: 'ABC123', settings: { empareja2: { numPairs: 2 } },
+    })
+  })
+
+  it('publishes multiple complete pair drafts only when saving the configuration', async () => {
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url.startsWith('/v1/game/empareja2/catalog')) return { ok: true, pairs: [] }
+      return { ...gameResponse({ gameId: 'ABC123', gameName: 'Game', gameType: 'EMPAREJA2' }),
+        settings: { empareja2: { numPairs: 2 } }, empareja2CatalogPairCount: 5 }
+    })
+    const upload = vi.spyOn(empareja2Contributions, 'uploadDrafts').mockResolvedValue([
+      [{ name: 'Uno', imageKey: 'key1' }, { name: 'Dos', imageKey: 'key2' }],
+      [{ name: 'Tres', imageKey: 'key3' }, { name: 'Cuatro', imageKey: 'key4' }],
+    ])
+    URL.createObjectURL = vi.fn().mockReturnValue('blob:preview')
+    URL.revokeObjectURL = vi.fn()
+    const { onSaved } = mount(definition('EMPAREJA2', Empareja2Config))
+    await screen.findByRole('slider')
+    fireEvent.click(screen.getByRole('button', { name: 'Añadir pareja' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Añadir pareja' }))
+    const names = ['Uno', 'Dos', 'Tres', 'Cuatro']
+    const inputs = screen.getAllByLabelText(/Personaje .* · Nombre/)
+    const files = screen.getAllByLabelText(/Personaje .* · Imagen/)
+    names.forEach((name, index) => {
+      fireEvent.change(inputs[index], { target: { value: name } })
+      fireEvent.change(files[index], { target: { files: [new File(['image'], `${name}.png`, { type: 'image/png' })] } })
+    })
+    expect(api.put).not.toHaveBeenCalled()
+    fireEvent.click(footer())
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(api.put).toHaveBeenCalledWith('/v1/game/empareja2/catalog', expect.objectContaining({
+      gameId: 'ABC123', numPairs: 2, pairs: expect.arrayContaining([expect.any(Array)]),
+    }))
+    upload.mockRestore()
+  })
+
+  it('retries an uncertain publication using the same operation without reuploading', async () => {
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url.startsWith('/v1/game/empareja2/catalog')) return { ok: true, pairs: [] }
+      return { ...gameResponse({ gameId: 'ABC123', gameName: 'Game', gameType: 'EMPAREJA2' }),
+        settings: { empareja2: { numPairs: 2 } }, empareja2CatalogPairCount: 5 }
+    })
+    const upload = vi.spyOn(empareja2Contributions, 'uploadDrafts').mockResolvedValue([
+      [{ name: 'Uno', imageKey: 'key1' }, { name: 'Dos', imageKey: 'key2' }],
+    ])
+    URL.createObjectURL = vi.fn().mockReturnValue('blob:preview')
+    URL.revokeObjectURL = vi.fn()
+    let attempts = 0
+    vi.mocked(api.put).mockImplementation(async (url) => {
+      if (url === '/v1/game/empareja2/catalog' && attempts++ === 0) throw new Error('Conexión perdida')
+      return { ok: true }
+    })
+    const { onSaved } = mount(definition('EMPAREJA2', Empareja2Config))
+    await screen.findByRole('slider')
+    fireEvent.click(screen.getByRole('button', { name: 'Añadir pareja' }))
+    const names = screen.getAllByLabelText(/Personaje .* · Nombre/)
+    const files = screen.getAllByLabelText(/Personaje .* · Imagen/)
+    for (let index = 0; index < 2; index++) {
+      fireEvent.change(names[index], { target: { value: index === 0 ? 'Uno' : 'Dos' } })
+      fireEvent.change(files[index], { target: { files: [new File(['image'], 'image.png', { type: 'image/png' })] } })
+    }
+    fireEvent.click(footer())
+    expect(await screen.findByText(/Publicación pendiente de confirmación/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Añadir pareja' })).toBeDisabled()
+    fireEvent.click(footer())
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const writes = vi.mocked(api.put).mock.calls.filter(([url]) => url === '/v1/game/empareja2/catalog')
+    expect(writes).toHaveLength(2)
+    expect(writes[1][1]).toEqual(writes[0][1])
+    expect(upload).toHaveBeenCalledTimes(1)
+    upload.mockRestore()
+  })
+
   it('pairs all four STACK parameters and omits redundant introductory copy', async () => {
     vi.mocked(api.get).mockResolvedValue(gameResponse({
       playMode: 'mobile', type: { STACK: DEFAULT_STACK_CONFIG },
@@ -331,9 +422,7 @@ describe('unified game configuration save', () => {
     await waitFor(() => expect(footer()).toBeEnabled())
     await waitFor(() => expect(screen.queryByText('Cargando configuración...')).not.toBeInTheDocument())
     fireEvent.click(footer())
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'El modo y acceso se guardaron, pero la configuración del juego no: Servidor caído',
-    )
+    expect(await screen.findByText('El modo y acceso se guardaron, pero la configuración del juego no: Servidor caído')).toBeInTheDocument()
     expect(onSaved).not.toHaveBeenCalled()
     expect(onSettingsChange).not.toHaveBeenCalled()
     expect(footer()).toBeEnabled()

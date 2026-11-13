@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
 import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
@@ -6,6 +6,9 @@ import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
 import SaveButton from '../../core/ui/SaveButton'
 import { localizeOperatorMessage } from '../operatorText'
 import { useMechanicsDraft } from '../useMechanicsDraft'
+import Catalog from './Catalog'
+import ContributionEditor from './ContributionEditor'
+import { newId, uploadDrafts, validateDrafts, type DraftPair } from './contributions'
 
 export type Empareja2Settings = {
   numPairs?: number
@@ -37,6 +40,14 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
   const [saveMessage, setSaveMessage] = useState<string>('')
   const [loaded, setLoaded] = useState(settingsLoaded || !gameId)
   const [loadError, setLoadError] = useState('')
+  const [draftPairs, setDraftPairs] = useState<DraftPair[]>([])
+  const [catalogRevision, setCatalogRevision] = useState(0)
+  const operationId = useRef<string | null>(null)
+  const [pendingPublication, setPendingPublication] = useState<{
+    operationId: string
+    numPairs: number
+    pairs: Array<Array<{ name: string; imageKey: string }>>
+  } | null>(null)
   const storedNumPairs = (settings as Empareja2Settings | null)?.numPairs
   useMechanicsDraft(loaded ? {
     numPairs: numPairsInput.trim() === '' ? catalogPairCount ?? 50 : Number(numPairsInput),
@@ -72,7 +83,12 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
     }
   }, [gameId, settingsLoaded])
 
-  const validate = () => (loaded ? null : loadError || t('La configuración del juego aún se está cargando.', 'The game configuration is still loading.'))
+  const validate = () => {
+    if (!loaded) return loadError || t('La configuración del juego aún se está cargando.', 'The game configuration is still loading.')
+    if (draftPairs.length && !gameId) return t('Guarda primero la partida para añadir parejas.', 'Save the game before adding pairs.')
+    if (draftPairs.length && (!catalogPairCount || catalogPairCount < 1)) return t('El catálogo aún no está listo para añadir parejas.', 'The catalog is not ready to accept new pairs.')
+    return validateDrafts(draftPairs)
+  }
 
   const persist = async () => {
     const invalid = validate()
@@ -87,17 +103,42 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
       ...(!registerSave ? { emailRequired } : {}),
     }
     if (gameId) {
-      await api.put('/v1/game', {
-        gameId,
-        ...(!registerSave ? { participantFields: {
-          email: { required: emailRequired },
-        } } : {}),
-        settings: {
-          empareja2: {
-            numPairs: numPairsClamped,
-          },
-        },
-      })
+      if (draftPairs.length) {
+        if (!registerSave) {
+          await api.put('/v1/game', { gameId, participantFields: { email: { required: emailRequired } } })
+        }
+        let publication = pendingPublication
+        if (!publication) {
+          operationId.current ??= newId()
+          const pairs = await uploadDrafts(gameId, draftPairs)
+          publication = { operationId: operationId.current, numPairs: numPairsClamped, pairs }
+          setPendingPublication(publication)
+        }
+        let result: { ok: boolean }
+        try {
+          result = await api.put<{ ok: boolean }>('/v1/game/empareja2/catalog', { gameId, ...publication })
+        } catch (error) {
+          const status = (error as { status?: number }).status
+          if (status != null && status >= 400 && status < 500) {
+            setPendingPublication(null)
+            operationId.current = null
+          }
+          throw error
+        }
+        if (!result?.ok) throw new Error(t('No se pudieron publicar las parejas.', 'Could not publish the pairs.'))
+        setNumPairsInput(String(numPairsClamped))
+        setCatalogPairCount((count) => count == null ? count : count + draftPairs.length)
+        setDraftPairs([])
+        setCatalogRevision((revision) => revision + 1)
+        operationId.current = null
+        setPendingPublication(null)
+      } else {
+        await api.put('/v1/game', {
+          gameId,
+          ...(!registerSave ? { participantFields: { email: { required: emailRequired } } } : {}),
+          settings: { empareja2: { numPairs: numPairsClamped } },
+        })
+      }
     }
     onChange(newSettings)
   }
@@ -152,18 +193,6 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
             <label className="block text-sm font-medium text-gray-300" htmlFor="empareja2-difficulty-range">
               {t('Dificultad para encontrar a tu pareja', 'Difficulty finding your match')}
             </label>
-            <span className="group relative inline-flex">
-              <button
-                type="button"
-                aria-label={t('Información sobre la dificultad', 'Information about the difficulty')}
-                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25 text-[10px] font-semibold text-gray-300/90"
-              >
-                i
-              </button>
-              <span className="pointer-events-none absolute left-1/2 top-0 z-20 hidden w-72 -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-lg border border-white/15 bg-[rgba(17,24,39,0.98)] p-2 text-xs text-gray-200 shadow-lg group-hover:block">
-                {t('Cada partida usa un subconjunto del catálogo. Más parejas en juego hace más difícil encontrar a la tuya; menos parejas lo hace más fácil. El deslizador elige cuántas parejas distintas entran en cada partida.', 'Each game uses a subset of the catalog. More pairs in play make it harder to find yours; fewer pairs make it easier. The slider chooses how many different pairs are included in each game.')}
-              </span>
-            </span>
           </div>
           {sliderDisabled ? (
             <p className="text-sm text-gray-500 py-2">{t('Cargando número de parejas del catálogo...', 'Loading the number of pairs in the catalog...')}</p>
@@ -181,7 +210,7 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
                   max={maxPairs}
                   value={numPairsValue}
                   onChange={(e) => setNumPairsInput(e.target.value)}
-                  disabled={sliderDisabled}
+                  disabled={sliderDisabled || pendingPublication != null}
                   className="empareja2-difficulty-slider h-3 w-full rounded-full appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                   aria-label={t('Número de parejas (dificultad)', 'Number of pairs (difficulty)')}
                 />
@@ -192,6 +221,17 @@ export default function Empareja2GameConfig({ gameId, gameName: _gameName, setti
             </div>
           )}
         </div>
+
+        <Catalog gameId={gameId} selected={sliderDisabled ? null : numPairsValue} revision={catalogRevision} onPublishedCount={setCatalogPairCount} />
+        {pendingPublication && <p role="status" className="text-sm text-amber-300">
+          {t('Publicación pendiente de confirmación. Vuelve a guardar para comprobarla sin duplicar parejas.', 'Publication is awaiting confirmation. Save again to check it without duplicating pairs.')}
+        </p>}
+        {gameId && <fieldset disabled={pendingPublication != null}>
+          <ContributionEditor pairs={draftPairs} onChange={(pairs) => {
+            operationId.current = null
+            setDraftPairs(pairs)
+          }} />
+        </fieldset>}
 
         {!embedded && <div className="space-y-3 border-t border-white/10 pt-4">
           <p className="text-sm font-medium text-gray-300">{t('Datos del participante', 'Participant information')}</p>
