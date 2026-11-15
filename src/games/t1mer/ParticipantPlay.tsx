@@ -4,6 +4,7 @@ import { loadAssignment, savePlayerSession } from '../../core/participant/player
 import { useParticipantLanguage } from '../../core/participant/participantLanguage'
 import ProfileAvatar from '../../core/widgets/ProfileAvatar'
 import { formatTimer, timerDifference } from './timerLogic'
+import TimerDisplay from './TimerDisplay'
 
 type GameState = 'preparing' | 'playing' | 'hidden' | 'finished'
 
@@ -97,13 +98,10 @@ export default function T1merParticipantPlay({ gameId, playerToken, onFinished }
         </div>
       </div>
 
-      <div className="h-24 flex items-center justify-center">
-        {gameState === 'hidden' || gameState === 'finished' ? (
-          <p className="text-4xl font-bold text-textSub tracking-widest font-digital">??:??.?</p>
-        ) : (
-          <p className="text-5xl font-digital font-bold tabular-nums">{formatTimer(timer)}</p>
-        )}
-      </div>
+      <TimerDisplay
+        value={gameState === 'hidden' || gameState === 'finished' ? '??:??.?' : formatTimer(timer)}
+        countingHidden={gameState === 'hidden'}
+      />
 
       {gameState === 'preparing' && (
         <>

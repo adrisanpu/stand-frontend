@@ -8,6 +8,20 @@ This repo is the **frontend only**. Backend lives in a separate repo: [stand-bac
 
 ## Administration and event home
 
+The Responses panel (`/admin/responses`) is a question-by-question summary,
+with horizontal bars, answer counts and percentages instead of a participant
+table. Percentages use nonblank answers to each question, including incomplete
+forms; participants who skipped that question are excluded. Options with no
+votes remain visible, and answers that no longer match configured options are
+explicitly counted. Existing answers to questions without options appear as
+text lists without participant details; this does not add free-text questions
+to the questionnaire editor.
+The panel retains event selection, archived read-only events and the form
+configuration link. CSV export includes all event participants and their
+answers, with existing plan restrictions and spreadsheet-formula protection.
+Participant contact details remain in Clients rather than the summary.
+Charts use existing HTML/CSS styles without an additional chart library.
+
 The Clients panel lists one person per owner and normalized verified email,
 grouping their event participations. It requests 25 clients at a time, with
 previous/next arrows and an exact `1-25 of total` range above the list.

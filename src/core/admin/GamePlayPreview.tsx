@@ -4,6 +4,7 @@ import { normalizeGameType } from '../gameTypeMap'
 import PlayableGamePreview, { previewConfigurationError, type PreviewContent } from './PlayableGamePreview'
 import ParticipantPhonePreview, { type ParticipantPhoneFrame } from '../participant/ParticipantPhonePreview'
 import IconButton from '../ui/IconButton'
+import TimerDisplay from '../../games/t1mer/TimerDisplay'
 
 export type GamePlayPreviewProps = {
   gameType: string
@@ -98,7 +99,7 @@ function StaticGamePlayPreview({ gameType }: { gameType: string }) {
     case 'T1MER':
       return <div className="space-y-6 text-center">
         <p className="text-sm text-textSub">{t('Jugando como', 'Playing as')} Alex</p>
-        <p className="py-6 font-digital text-5xl font-bold tabular-nums">00:00.0</p>
+        <TimerDisplay value="00:00.0" />
         <p className="text-sm text-textSub">{t('Detén el cronómetro lo más cerca posible de 10 segundos.', 'Stop the timer as close to 10 seconds as possible.')}</p>
         <button type="button" disabled className={actionClass}>{t('EMPEZAR', 'START')}</button>
       </div>

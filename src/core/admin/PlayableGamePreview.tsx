@@ -4,6 +4,7 @@ import { createStackScene, type StackSceneController } from '../../games/stack/s
 import { isRulet4Config, rulet4Segments, type Rulet4Settings } from '../../games/rulet4/rulet4Logic'
 import Rulet4Wheel, { type WheelSpin } from '../../games/rulet4/Rulet4Wheel'
 import { formatTimer, timerDifference } from '../../games/t1mer/timerLogic'
+import TimerDisplay from '../../games/t1mer/TimerDisplay'
 import { L3trasPlayView } from '../../games/l3tras/ParticipantPlay'
 import { PairPlayView } from '../../games/semaforo/ParticipantPlay'
 import { InfocardsPlayView } from '../../games/infocards/ParticipantPlay'
@@ -64,7 +65,10 @@ function TimerPreview() {
   }, [phase])
   return <div className="space-y-4 text-center">
     <p>{t('Detén el cronómetro lo más cerca posible de 10 segundos. Se oculta a los 5 s.', 'Stop the timer as close to 10 seconds as possible. It hides at 5 s.')}</p>
-    <p role="timer" className="font-digital text-5xl tabular-nums">{phase === 'running' && elapsed >= 5 ? '??:??.?' : formatTimer(elapsed)}</p>
+    <TimerDisplay
+      value={phase === 'running' && elapsed >= 5 ? '??:??.?' : formatTimer(elapsed)}
+      countingHidden={phase === 'running' && elapsed >= 5}
+    />
     {phase === 'idle' && <button className={buttonClass} onClick={() => {
       start.current = Date.now()
       setPhase('running')

@@ -67,6 +67,7 @@ describe('isolated playable previews', () => {
   it('keeps the existing Home caller inert without settings', () => {
     render(<GamePlayPreview gameType="T1MER" />)
     expect(screen.getByRole('button')).toBeDisabled()
+    expect(screen.getByRole('timer')).toHaveTextContent('00:00.0')
     expect(screen.queryByRole('button', { name: 'Reiniciar prueba' })).not.toBeInTheDocument()
   })
 
@@ -88,11 +89,16 @@ describe('isolated playable previews', () => {
 
   it('plays T1MER with the real target, hidden clock and local result; resets', () => {
     render(<GamePlayPreview gameType="T1MER" settings={{}} />)
+    expect(screen.getByRole('timer')).toHaveTextContent('00:00.0')
     fireEvent.click(screen.getByRole('button', { name: 'Empezar' }))
-    act(() => vi.advanceTimersByTime(6000))
+    act(() => vi.advanceTimersByTime(4990))
+    expect(screen.getByRole('timer')).not.toHaveTextContent('??:??.?')
+    act(() => vi.advanceTimersByTime(1010))
     expect(screen.getByRole('timer')).toHaveTextContent('??:??.?')
+    expect(screen.getByRole('timer')).toHaveClass('t1mer-clock__digits--counting')
     act(() => vi.advanceTimersByTime(4000))
     fireEvent.click(screen.getByRole('button', { name: 'Detener' }))
+    expect(screen.getByRole('timer')).not.toHaveClass('t1mer-clock__digits--counting')
     expect(screen.getByText(/Resultado simulado: 10.000 s/)).toHaveTextContent('Diferencia: 0.000 s')
     reset()
     expect(screen.getByRole('timer')).toHaveTextContent('00:00.0')
