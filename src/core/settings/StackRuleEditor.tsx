@@ -1,5 +1,5 @@
 import { Fragment, useState, type MouseEvent, type ReactNode } from 'react'
-import type { StackPrizeCondition, StackPrizeItem, StackPrizeRule, StackPrizeScoreOperator } from '../../api/stackPrizes'
+import type { StackAutoCloseDuration, StackPrizeCondition, StackPrizeItem, StackPrizeRule, StackPrizeScoreOperator } from '../../api/stackPrizes'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import IconButton from '../ui/IconButton'
 
@@ -19,7 +19,7 @@ export function invalidStackRules(rules: StackPrizeRule[]): boolean {
 
 const interactive = (event: MouseEvent) => !!(event.target as HTMLElement).closest('input,select,button,label')
 
-export default function StackRuleEditor({ rules, catalog, available = catalog, raffles, onChange, onAddPrize, stock, onStockChange, headerAside }: {
+export default function StackRuleEditor({ rules, catalog, available = catalog, raffles, onChange, onAddPrize, stock, onStockChange, headerAside, autoClose }: {
   rules: StackPrizeRule[]
   catalog: StackPrizeItem[]
   available?: StackPrizeItem[]
@@ -30,6 +30,11 @@ export default function StackRuleEditor({ rules, catalog, available = catalog, r
   stock?: Record<string, string>
   onStockChange?: (prizeId: string, value: string) => void
   headerAside?: ReactNode
+  autoClose?: {
+    duration: StackAutoCloseDuration | null
+    savedAt?: number
+    onChange: (duration: StackAutoCloseDuration | null) => void
+  }
 }) {
   const { t } = useOperatorLanguage()
   const [selected, setSelected] = useState<number | null>(rules.length ? 0 : null)
@@ -141,6 +146,34 @@ export default function StackRuleEditor({ rules, catalog, available = catalog, r
     </div>
   </section>
 
+  const firstFinalTopIndex = rules.findIndex(rule => rule.condition === 'top_final')
+  const autoCloseFields = autoClose && <div className="mt-2 space-y-2 border-t border-current/10 pt-2 text-xs">
+    <label className="flex items-center gap-2 font-semibold">
+      <input type="checkbox" checked={autoClose.duration !== null}
+        onChange={event => autoClose.onChange(event.target.checked ? { hours: 1, minutes: 0 } : null)} />
+      {t('Cerrar automáticamente', 'Close automatically')}
+    </label>
+    {autoClose.duration && <div className="flex flex-wrap gap-2">
+      {(['hours', 'minutes'] as const).map(unit => <label key={unit} className="flex items-center gap-1">
+        {unit === 'hours' ? t('Horas', 'Hours') : t('Minutos', 'Minutes')}
+        <input type="number" min={0} max={unit === 'minutes' ? 59 : undefined} step={1} className={`${field} w-16`}
+          value={Number.isFinite(autoClose.duration?.[unit]) ? autoClose.duration?.[unit] : ''}
+          onChange={event => {
+            if (autoClose.duration) autoClose.onChange({ ...autoClose.duration, [unit]: event.target.valueAsNumber })
+          }} />
+      </label>)}
+    </div>}
+    <p className="text-textSub">{t(
+      'Un contador para todo el juego. Empieza al guardar y no se reinicia si la duración no cambia.',
+      'One timer for the entire game. It starts when you save and does not reset if the duration is unchanged.',
+    )}</p>
+    {autoClose.savedAt !== undefined && <p className="text-textSub">
+      {autoClose.duration ? <>{t('Cierre guardado:', 'Saved closing time:')}{' '}
+        <time dateTime={new Date(autoClose.savedAt * 1000).toISOString()}>{new Date(autoClose.savedAt * 1000).toLocaleString()}</time></>
+        : t('El cierre automático se cancelará al guardar.', 'The automatic close will be cancelled when you save.')}
+    </p>}
+  </div>
+
   return <div className="space-y-3">
     <div className="grid gap-3 md:grid-cols-2 md:items-center">
       <div className="flex items-center gap-2">
@@ -203,6 +236,7 @@ export default function StackRuleEditor({ rules, catalog, available = catalog, r
                   </>}
                   {!rule.condition.startsWith('top_') && rule.condition !== 'score' && <span className="text-textSub">—</span>}
                 </div>
+                {index === firstFinalTopIndex && autoCloseFields}
               </td>
               <td className="p-2 text-textSub">{summary(rule)}</td>
               <td className="w-10 p-2">
@@ -217,5 +251,9 @@ export default function StackRuleEditor({ rules, catalog, available = catalog, r
         })}</tbody>
       </table>
     </div>}
+    {firstFinalTopIndex === -1 && autoClose?.savedAt !== undefined && <p className="text-sm text-textSub">
+      {t('El cierre automático se cancelará al guardar porque ya no hay premios de top final.',
+        'The automatic close will be cancelled when you save because there are no final ranking prizes.')}
+    </p>}
   </div>
 }

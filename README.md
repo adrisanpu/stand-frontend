@@ -368,7 +368,7 @@ both the operator screen and `/play`; the wheel animates the returned snapshot
 and index. A lost response can be retried without generating a second result.
 Reloading a participant session restores its result.
 
-The participant registration form shows the selected client logo centered at the top, falling back to the game's logo when none is configured, instead of displaying the event name.
+The participant registration form shows the selected client logo centered at the top, falling back to the game's logo when none is configured, instead of displaying the event name. In the game's **Registro** tab, choose **ES** or **EN** as the default language for `/play`. Spanish is used when no default is saved, and participants can still change their language from the selector in `/play`.
 
 Web registration always requires email verification, including legacy games with email disabled. **Enviar código / Send code** sends registration fields, consent and participant language (`es`/`en`) to `POST /v1/public/email/request`. The pending step retains the details and consent in memory, shows the masked email, and accepts a six-digit code including leading zeros, paste and one-time-code autofill. Codes expire after 10 minutes with at most 5 attempts; the server remains authoritative. Resend uses the captured registration details and current consent, waits for the server's `resendAvailableAt` (normally 60 seconds), and respects rate-limit retry delays. **Cambiar datos / Change details** discards the local challenge before editing.
 

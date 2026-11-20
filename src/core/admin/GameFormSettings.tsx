@@ -31,7 +31,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
   /** Reports the participant look (theme, logo, banner) from the current draft so other previews can match it. */
   onFrameChange?: (frame: ParticipantPhoneFrame) => void
 }) {
-  const { language, t } = useOperatorLanguage()
+  const { t } = useOperatorLanguage()
   const { plan } = useCurrentUser()
   const features = getFeaturesByPlan(plan)
   const [confirmed, setConfirmed] = useState<GameFormResponse | null>(null)
@@ -65,6 +65,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
     callbacks.current.onSectionDirtyChange?.('registration',
       draft.formConfig.registrationTitle !== saved.formConfig.registrationTitle
       || draft.formConfig.registrationDescription !== saved.formConfig.registrationDescription
+      || (draft.formConfig.defaultLanguage ?? 'es') !== (saved.formConfig.defaultLanguage ?? 'es')
       || draft.formConfig.logoKey !== saved.formConfig.logoKey
       || appearanceDirty
       || JSON.stringify(draft.participantFields) !== JSON.stringify(saved.participantFields))
@@ -175,6 +176,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
   </div>
 
   const config = draft.formConfig
+  const defaultLanguage = config.defaultLanguage ?? 'es'
   const palette = resolveParticipantPalette(getGameById(confirmed.gameType) ?? null, config.appearance)
   const effectivePrimary = config.appearance?.colors?.primary ?? palette.variables['--color-primary']
   const effectiveAccent = config.appearance?.colors?.accent ?? palette.variables['--color-accent']
@@ -215,6 +217,14 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
       <div className="min-w-0 space-y-4">
         <fieldset disabled={disabled} className="space-y-4">
           <legend className="mb-3 text-lg font-semibold">{t('Contenido', 'Content')}</legend>
+          {(!section || section === 'registration') && <label className="block text-sm">
+            {t('Idioma por defecto', 'Default language')}
+            <select className="ml-2 rounded-lg border border-current/20 bg-surface px-2 py-1"
+              value={defaultLanguage} onChange={event => changeConfig({ defaultLanguage: event.target.value === 'en' ? 'en' : 'es' })}>
+              <option value="es">ES</option>
+              <option value="en">EN</option>
+            </select>
+          </label>}
           {section === 'registration' && <fieldset disabled={!features.advancedCustomization}
             className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-current/15 px-3 py-2">
             <legend className="px-1 text-sm font-medium">{t('Colores de la partida', 'Event colors')}</legend>
@@ -408,13 +418,13 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
           aria-labelledby={!section ? `form-preview-tab-${preview}` : undefined}
           aria-label={section ? t('Vista previa', 'Preview') : undefined}
           className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-          <ParticipantPhonePreview gameType={confirmed.gameType} screen="form" language={language}
+          <ParticipantPhonePreview gameType={confirmed.gameType} screen="form" language={defaultLanguage}
             label={t('Vista en el móvil del participante', 'Participant phone view')} {...frame} prizeCatalog={prizeCatalog}>
             {preview === 'registration' ? <JoinForm preview gameId={gameId} onJoined={() => undefined} gameMeta={{
               ok: true, gameId, gameType: confirmed.gameType, isActive: true,
               playerCount: 0, validatedCount: 0, recentPairs: [], joinUrl: confirmed.joinUrl,
               participantFields: resolveParticipantFields(draft.participantFields),
-              formConfig: { ...config, registrationTitle: config.registrationTitle || t('Participa', 'Join in') },
+              formConfig: { ...config, registrationTitle: config.registrationTitle || (defaultLanguage === 'en' ? 'Join in' : 'Participa') },
               formLogoUrl: frame.logoUrl, formBannerUrl: frame.bannerUrl,
               loyalty: confirmed.loyalty, prizeCatalog,
             }} /> : <QuizCard title={config.quizTitle || undefined}

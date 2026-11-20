@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
-
-type Language = 'es' | 'en'
+import type { ParticipantLanguage as Language } from '../formConfig'
 const translations: Record<string, string> = {
   'Vista previa: no se envían emails ni se registran participantes.': 'Preview: no emails are sent and no participants are registered.',
   'Revisa la dirección (máximo 300 caracteres).': 'Check the address (up to 300 characters).',
@@ -79,8 +78,11 @@ const translations: Record<string, string> = {
   'Falta el teléfono en tu ficha de Kivly. Pide al equipo que lo revise para poder enviarte el QR.': 'Your Kivly record is missing a phone. Ask the team to check it so we can email your QR.',
   'Top al terminar tu partida': 'Top when you finish your game',
   'Top al cerrar el juego': 'Top when the game closes',
+  'Cierra en': 'Closes in',
+  'Cerrando': 'Closing',
+  'Cerrado': 'Closed',
   'El juego se está cerrando o ya ha cerrado. No se admiten nuevos intentos.': 'The game is closing or closed. New attempts are not accepted.',
-  'El equipo ha excluido tu intento pendiente del cierre. No tiene puntuación ni premios.': 'The team excluded your pending attempt from closure. It has no score or prizes.',
+  'Tu intento quedó sin terminar al cerrar el juego. No tiene puntuación ni premios.': 'Your attempt was unfinished when the game closed. It has no score or prizes.',
   'Tu tarjeta del club': 'Your club card',
   'Guárdala en Apple Wallet o Google Wallet. Los premios Kivly se asignan automáticamente a tu cuenta.': 'Save it to Apple Wallet or Google Wallet. Kivly rewards are assigned to your account automatically.',
   'Añadir a mi wallet': 'Add to my wallet',
@@ -328,7 +330,8 @@ const ParticipantLanguageContext = createContext<{
 })
 
 export function ParticipantLanguageProvider({ children, initialLanguage = 'es' }: { children: ReactNode; initialLanguage?: Language }) {
-  const [language, setLanguage] = useState<Language>(initialLanguage)
+  const [override, setLanguage] = useState<Language>()
+  const language = override ?? initialLanguage
   const t = (text: string) => language === 'en' ? translations[text] ?? text : text
   return (
     <ParticipantLanguageContext.Provider value={{ language, t, setLanguage }}>

@@ -63,6 +63,19 @@ it('loads the selected event and saves keys and expected revision, not signed UR
   expect(screen.getByTestId('qr')).toHaveTextContent('/play/EVENT')
 })
 
+it('saves the default language from registration settings and previews it', async () => {
+  const onSectionDirtyChange = vi.fn()
+  render(<GameFormSettings gameId="EVENT" section="registration" onSectionDirtyChange={onSectionDirtyChange} />)
+  const language = await screen.findByRole('combobox', { name: 'Idioma por defecto' })
+  expect(language).toHaveValue('es')
+  fireEvent.change(language, { target: { value: 'en' } })
+  expect(screen.getByRole('combobox', { name: 'Language' })).toHaveValue('en')
+  expect(onSectionDirtyChange).toHaveBeenCalledWith('registration', true)
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
+  await screen.findByText('Formulario guardado y confirmado.')
+  expect(snapshot.formConfig.defaultLanguage).toBe('en')
+})
+
 it('saves a primary and accent palette for the event from registration settings', async () => {
   const onFrameChange = vi.fn()
   render(<GameFormSettings gameId="EVENT" section="registration" onFrameChange={onFrameChange} />)

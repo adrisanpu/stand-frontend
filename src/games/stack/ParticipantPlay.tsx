@@ -325,7 +325,7 @@ export default function StackParticipantPlay({ gameId, playerToken, config, assi
         </p>
       )}
       {prizeState !== 'open' && !hasResult && <p role="status" className="text-sm text-textSub">{t('El juego se está cerrando o ya ha cerrado. No se admiten nuevos intentos.')}</p>}
-      {assignment.attempt?.status === 'excluded' && <p role="alert" className="text-sm text-amber-300">{t('El equipo ha excluido tu intento pendiente del cierre. No tiene puntuación ni premios.')}</p>}
+      {assignment.attempt?.status === 'excluded' && <p role="alert" className="text-sm text-amber-300">{t('Tu intento quedó sin terminar al cerrar el juego. No tiene puntuación ni premios.')}</p>}
       {hasResult && (
         <>
           {savedScore != null && kivlyRewardEnabled && <KivlyRewardCard gameId={gameId} playerToken={playerToken} />}

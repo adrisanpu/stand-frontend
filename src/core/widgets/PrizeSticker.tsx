@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { GamePrize } from '../prizes'
 import type { StickerPrize } from './stackPrizePromotions'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
@@ -18,9 +18,10 @@ interface PrizeStickerProps {
   nextLabel?: string
   pauseLabel?: string
   resumeLabel?: string
+  itemDetail?: (item: StickerPrize) => ReactNode
 }
 
-export default function PrizeSticker({ prize, label, current, max, compact = false, topX, inline = false, heading, items, nextLabel, pauseLabel, resumeLabel }: PrizeStickerProps) {
+export default function PrizeSticker({ prize, label, current, max, compact = false, topX, inline = false, heading, items, nextLabel, pauseLabel, resumeLabel, itemDetail }: PrizeStickerProps) {
   const { t } = useOperatorLanguage()
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
@@ -51,6 +52,7 @@ export default function PrizeSticker({ prize, label, current, max, compact = fal
   }
   if (!label && !prize?.imageUrl) return null
   const sliding = Boolean(items && items.length > 1)
+  const detail = item && itemDetail?.(item)
   const badge = items
     ? heading
     : heading ?? (topX != null ? `${t('PREMIO TOP', 'TOP PRIZE')} ${topX}` : t('PREMIO', 'PRIZE'))
@@ -70,11 +72,12 @@ export default function PrizeSticker({ prize, label, current, max, compact = fal
       <div key={item?.id ?? 'label'} className={`min-w-0 flex-1 ${sliding ? 'prize-catalog-slide' : ''}`}>
         {label
           ? <p title={label} className={`font-bold leading-tight text-textMain break-words [overflow-wrap:anywhere] line-clamp-2 ${HOME_BODY_TEXT}`}>
-              {badge && <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-primary">{badge}<span className="sr-only">: </span></span>}
+              {badge && <span title={itemDetail ? badge : undefined} className={`block text-[10px] font-semibold text-primary ${itemDetail ? 'line-clamp-2' : 'truncate uppercase tracking-wider'}`}>{badge}<span className="sr-only">: </span></span>}
               <span className={badge ? 'line-clamp-1' : 'line-clamp-2'}>{label}</span>
             </p>
           : badge && <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-primary">{badge}</p>}
-        {sliding && <div aria-hidden="true" className="mt-1 flex gap-1">
+        {detail}
+        {sliding && !detail && <div aria-hidden="true" className="mt-1 flex gap-1">
           {items!.map((entry, position) => <span key={entry.id}
             className={`h-1 rounded-full transition-all ${position === index % items!.length ? 'w-3 bg-primary' : 'w-1 bg-white/30'}`} />)}
         </div>}

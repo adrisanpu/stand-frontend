@@ -25,6 +25,7 @@ import CupidoParticipantPlay from '../../games/cupido/ParticipantPlay'
 import InfocardsParticipantPlay from '../../games/infocards/ParticipantPlay'
 import { isRulet4Assignment, type Rulet4Assignment } from '../../games/rulet4/rulet4Logic'
 import { ParticipantLanguageProvider, ParticipantLanguageSelector, useParticipantLanguage } from './participantLanguage'
+import type { ParticipantLanguage } from '../formConfig'
 import { ProfilePhotosContext } from '../widgets/ProfileAvatar'
 import { profilePhotoEnabled } from '../lib/participantFields'
 import './participant.css'
@@ -49,14 +50,23 @@ function t1merResultFromAssignment(a: T1merAssignment): {
 }
 
 export default function ParticipantShell() {
+  const { gameId = '' } = useParams()
+  return <ParticipantGame key={gameId} gameId={gameId} />
+}
+
+function ParticipantGame({ gameId }: { gameId: string }) {
+  const [defaultLanguage, setDefaultLanguage] = useState<ParticipantLanguage>('es')
   return (
-    <ParticipantLanguageProvider>
-      <ParticipantContent />
+    <ParticipantLanguageProvider initialLanguage={defaultLanguage}>
+      <ParticipantContent gameId={gameId} onDefaultLanguage={setDefaultLanguage} />
     </ParticipantLanguageProvider>
   )
 }
 
-function ParticipantContent() {
+function ParticipantContent({ gameId, onDefaultLanguage }: {
+  gameId: string
+  onDefaultLanguage: (language: ParticipantLanguage) => void
+}) {
   const viewportRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const element = viewportRef.current
@@ -89,7 +99,6 @@ function ParticipantContent() {
     }
   }, [])
   const { language, t } = useParticipantLanguage()
-  const { gameId = '' } = useParams()
   const [step, setStep] = useState<Step>('loading')
   const [gameMeta, setGameMeta] = useState<PublicGameResponse | null>(null)
   const [playerToken, setPlayerToken] = useState<string | null>(null)
@@ -97,6 +106,8 @@ function ParticipantContent() {
   const [photoUploadWarning, setPhotoUploadWarning] = useState(false)
   const [loadVersion, setLoadVersion] = useState(0)
   const [prizeRefreshFailed, setPrizeRefreshFailed] = useState(false)
+  const [expiredClose, setExpiredClose] = useState<number>()
+  const prizeRefreshVersion = useRef(0)
   const [quizActive, setQuizActive] = useState(false)
   const activeGameId = useRef(gameId)
   activeGameId.current = gameId
@@ -120,39 +131,68 @@ function ParticipantContent() {
   const isMobile = gameMeta && WEB_PLAY_TYPES.has(gameType)
     ? resolveGameAccess(gameType, gameMeta).playMode === 'mobile' : false
   const hasPrizeCatalog = currentGameMeta?.prizeCatalog !== undefined || currentGameMeta?.stackPrizeRules !== undefined
+  const stackClosesAt = currentGameMeta?.stackAutoCloseAt
+  const stackPrizeState = currentGameMeta?.stackPrizeState === 'closed' ? 'closed'
+    : currentGameMeta?.stackPrizeState === 'closing' || (stackClosesAt !== undefined
+      && (expiredClose === stackClosesAt || Date.now() >= stackClosesAt * 1000)) ? 'closing' : 'open'
 
   const refreshPrizes = useCallback(async () => {
+    const version = ++prizeRefreshVersion.current
     try {
       const meta = await publicApi.getGame(gameId)
-      if (activeGameId.current !== gameId) return
+      if (activeGameId.current !== gameId || version !== prizeRefreshVersion.current) return
       if (!meta.ok || meta.gameId !== gameId) throw new Error('Invalid game metadata')
       setGameMeta((previous) => previous?.gameId === gameId
-        ? { ...previous, prizeCatalog: meta.prizeCatalog, stackPrizeRules: meta.stackPrizeRules, stackPrizeState: meta.stackPrizeState }
+        ? { ...previous, prizeCatalog: meta.prizeCatalog, stackPrizeRules: meta.stackPrizeRules,
+          stackPrizeState: meta.stackPrizeState, stackAutoCloseAt: meta.stackAutoCloseAt,
+          ...(gameType === 'STACK' && { isActive: meta.isActive, lifecycleState: meta.lifecycleState }) }
         : previous)
       setPrizeRefreshFailed(false)
     } catch {
-      if (activeGameId.current === gameId) setPrizeRefreshFailed(true)
+      if (activeGameId.current === gameId && version === prizeRefreshVersion.current) setPrizeRefreshFailed(true)
     }
-  }, [gameId])
+  }, [gameId, gameType])
 
   useEffect(() => {
     setPrizeRefreshFailed(false)
+  }, [gameId])
+
+  useEffect(() => {
     if (!hasPrizeCatalog) return
+    const isStack = gameType === 'STACK'
+    const refreshEvery = isStack ? (stackPrizeState === 'closing' ? 10000 : 30000) : 30 * 60 * 1000
     let lastRefresh = Date.now()
     const refresh = () => {
       lastRefresh = Date.now()
       void refreshPrizes()
     }
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && Date.now() - lastRefresh >= 30 * 60 * 1000) refresh()
+      if (document.visibilityState === 'visible' && (isStack || Date.now() - lastRefresh >= refreshEvery)) refresh()
     }
-    const interval = window.setInterval(refresh, 30 * 60 * 1000)
+    const interval = window.setInterval(() => {
+      if (!isStack || document.visibilityState === 'visible') refresh()
+    }, refreshEvery)
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => {
       window.clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [gameId, hasPrizeCatalog, refreshPrizes])
+  }, [gameId, gameType, hasPrizeCatalog, refreshPrizes, stackPrizeState])
+
+  useEffect(() => {
+    if (stackClosesAt === undefined) return
+    let timer: number
+    const check = () => {
+      const delay = stackClosesAt * 1000 - Date.now()
+      if (delay > 0) timer = window.setTimeout(check, Math.min(delay, 2_147_483_647))
+      else {
+        setExpiredClose(stackClosesAt)
+        void refreshPrizes()
+      }
+    }
+    check()
+    return () => window.clearTimeout(timer)
+  }, [stackClosesAt, refreshPrizes])
 
   const applyAssignment = useCallback((meta: PublicGameResponse, token: string, assignment: PlayerAssignment | null) => {
     const gt = normalizeGameType(meta.gameType)
@@ -233,6 +273,7 @@ function ParticipantContent() {
           return
         }
         resolveGameAccess(gt, meta)
+        onDefaultLanguage(meta.formConfig?.defaultLanguage === 'en' ? 'en' : 'es')
         setGameMeta(meta)
         const token = loadPlayerToken(gameId)
         if (token) {
@@ -277,7 +318,7 @@ function ParticipantContent() {
     return () => {
       cancelled = true
     }
-  }, [gameId, loadVersion, applyAssignment])
+  }, [gameId, loadVersion, applyAssignment, onDefaultLanguage])
 
   return (
     <ThemeProvider game={game ?? null} appearance={currentGameMeta?.formConfig?.appearance ?? currentGameMeta?.appearance}>
@@ -290,7 +331,7 @@ function ParticipantContent() {
       >
         <div className="relative mx-auto max-w-md w-full flex flex-col">
           {gameType === 'STACK' && gameMeta?.stackPrizeRules
-            ? <StackPrizePromo rules={gameMeta.stackPrizeRules} />
+            ? <StackPrizePromo rules={gameMeta.stackPrizeRules} closesAt={stackClosesAt} state={stackPrizeState} />
             : <ParticipantPrizePromo catalog={currentGameMeta?.prizeCatalog} stickers />}
           <div className="relative w-full">
           <ParticipantLanguageSelector />
@@ -340,7 +381,10 @@ function ParticipantContent() {
               </button>
             </div>
           )}
-          {step === 'join' && gameMeta && (
+          {step === 'join' && gameType === 'STACK' && stackPrizeState !== 'open' && (
+            <p role="status" className="text-center text-textSub">{t('El juego se está cerrando o ya ha cerrado. No se admiten nuevos intentos.')}</p>
+          )}
+          {step === 'join' && gameMeta && (gameType !== 'STACK' || stackPrizeState === 'open') && (
             <JoinForm
               gameId={gameId}
               gameMeta={gameMeta}
@@ -373,7 +417,7 @@ function ParticipantContent() {
           })()}
 
           {gameType === 'STACK' && step === 'play' && stackAssignment && playerToken && (
-            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} showPrizePromo={false} kivlyRewardEnabled={Boolean(gameMeta?.kivlyReward)} prizeState={gameMeta?.stackPrizeState} />
+            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} showPrizePromo={false} kivlyRewardEnabled={Boolean(gameMeta?.kivlyReward)} prizeState={stackPrizeState} />
           )}
 
           {gameType === 'IMPOSTOR' && step === 'play' && impostorAssignment && playerToken && (

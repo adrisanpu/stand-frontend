@@ -54,6 +54,40 @@ async function advanceToParticipantDetails(email = 'player@example.test') {
 }
 
 describe('ParticipantShell STACK integration', () => {
+  it('updates the top-final countdown and shows closing, then confirmed closed, without resetting play', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(1_800_000_000_000)
+      const meta: PublicGameResponse = {
+        ok: true, gameId: 'GAME1234', gameType: 'STACK', isActive: true, playMode: 'mobile', joinChannel: 'web',
+        playerCount: 1, validatedCount: 0, recentPairs: [], joinUrl: '', stackPrizeState: 'open',
+        stackAutoCloseAt: 1_800_000_002, stackPrizeRules: [{ condition: 'top_final', topX: 3, names: ['Copa'] }],
+      }
+      vi.mocked(publicApi.getGame).mockClear().mockResolvedValue(meta)
+      savePlayerSession('GAME1234', 'token', assignment)
+      vi.mocked(publicApi.getPlayer).mockResolvedValue({
+        ok: true, gameType: 'STACK', gameId: 'GAME1234', playerToken: 'token', assignment, prizes: [],
+      })
+      renderParticipant()
+      await act(async () => {})
+      const scene = screen.getByText('Escena STACK: disponible')
+      expect(screen.getByText('Top 3 al cerrar')).toBeInTheDocument()
+      expect(screen.getByRole('timer')).toHaveTextContent('Cierra en 00:00:02')
+      await act(async () => { vi.advanceTimersByTime(1000) })
+      expect(screen.getByRole('timer')).toHaveTextContent('Cierra en 00:00:01')
+      expect(publicApi.getGame).toHaveBeenCalledTimes(1)
+      await act(async () => { vi.advanceTimersByTime(1000) })
+      expect(screen.queryByRole('timer')).not.toBeInTheDocument()
+      expect(screen.getByText('Cerrando')).toBeInTheDocument()
+      vi.mocked(publicApi.getGame).mockResolvedValue({ ...meta, stackAutoCloseAt: undefined, isActive: false, stackPrizeState: 'closed' })
+      await act(async () => { vi.advanceTimersByTime(10000) })
+      expect(screen.getByText('Cerrado')).toBeInTheDocument()
+      expect(screen.getByText('Escena STACK: disponible')).toBe(scene)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it.each(['L3TRAS', 'SEMAFORO', 'CUPIDO', 'INFOCARDS'] as const)('restores %s into its real mobile experience', async gameType => {
     const restored: MobileAssignment = {
       gameType, playerId: 1, displayName: 'Alex', validationCode: 1234, validated: false,
@@ -572,6 +606,24 @@ describe('ParticipantShell STACK integration', () => {
 
     renderParticipant()
     expect(await screen.findByRole('button', { name: 'Continuar' })).toBeInTheDocument()
+  })
+
+  it('opens registration in the game’s default language and allows a local override', async () => {
+    vi.mocked(publicApi.getGame).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'T1MER', isActive: true,
+      playerCount: 0, validatedCount: 0, recentPairs: [], joinUrl: '/play/GAME1234',
+      formConfig: { defaultLanguage: 'en', registrationTitle: '', registrationDescription: '', quizTitle: '',
+        quizDescription: '', logoKey: null, bannerKey: null, appearance: null, quizMoment: 'disabled' },
+    })
+    renderParticipant()
+    expect(await screen.findByRole('button', { name: 'Continue' })).toBeInTheDocument()
+    const selector = screen.getByRole('combobox', { name: 'Language' })
+    expect(selector).toHaveValue('en')
+    fireEvent.change(screen.getByLabelText(/Email/), { target: { value: 'ana@example.test' } })
+    fireEvent.change(selector, { target: { value: 'es' } })
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Email/)).toHaveValue('ana@example.test')
+    expect(publicApi.getGame).toHaveBeenCalledTimes(1)
   })
 
   it('switches registration language without losing entered values or fetching again', async () => {

@@ -2,6 +2,18 @@ import { expect, it } from 'vitest'
 import { stackPrizePromotions } from './stackPrizePromotions'
 import type { StackPrizePromotion } from '../../api/stackPrizes'
 
+it('keeps distinct conditions for the same prize in participant promotions', () => {
+  const promotions: StackPrizePromotion[] = [
+    { condition: 'completed', names: ['Copa'] },
+    { condition: 'top_finish', topX: 3, names: ['Copa'] },
+    { condition: 'top_final', topX: 3, names: ['Copa'] },
+    { condition: 'raffle', names: ['Copa'] },
+    { condition: 'score', scoreOperator: '>=', scoreValue: 20, names: ['Copa'] },
+  ]
+  expect(stackPrizePromotions([...promotions, promotions[0]], es => es, undefined, true).map(item => item.heading))
+    .toEqual(['Completa la partida', 'Top 3 al terminar', 'Top 3 al cerrar', 'Gana un sorteo', 'Puntuación >= 20'])
+})
+
 const rules: StackPrizePromotion[] = [
   { condition: 'completed', names: ['Pizza'], prizes: [{ id: 'pizza', name: 'Pizza', imageUrl: '/pizza.png' }] },
   { condition: 'top_finish', topX: 3, names: ['Pizza', 'Bebida'], prizes: [{ id: 'pizza', name: 'Pizza' }, { id: 'drink', name: 'Bebida' }] },

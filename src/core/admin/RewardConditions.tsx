@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { getOperatorGameConfiguration, type OperatorGameConfiguration } from '../../api/operatorGames'
-import { stackPrizeApi, type StackPrizeItem, type StackPrizeSettingsResponse, type StackPrizeRule } from '../../api/stackPrizes'
+import { stackPrizeApi, type StackAutoCloseDuration, type StackPrizeItem, type StackPrizeSettingsResponse, type StackPrizeRule } from '../../api/stackPrizes'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
 import StackRuleEditor, { invalidStackRules } from '../settings/StackRuleEditor'
@@ -28,6 +28,8 @@ export default function RewardConditions(props: Props) {
 const stockDrafts = (catalog: StackPrizeItem[]) =>
   Object.fromEntries(catalog.map(item => [item.id, item.stockTotal === null ? '' : String(item.stockTotal)]))
 const validCount = (value: string) => /^\d+$/.test(value.trim()) && Number.isSafeInteger(Number(value.trim()))
+const closeDuration = (value: StackPrizeSettingsResponse['autoClose']): StackAutoCloseDuration | null =>
+  value ? { hours: value.hours, minutes: value.minutes } : null
 
 function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyChange, onReadyChange }: Props) {
   const { t } = useOperatorLanguage()
@@ -38,6 +40,8 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
   const [available, setAvailable] = useState<StackPrizeItem[]>([])
   const [catalog, setCatalog] = useState<StackPrizeItem[]>([])
   const [rulesDirty, setRulesDirty] = useState(false)
+  const [autoClose, setAutoClose] = useState<StackAutoCloseDuration | null>(null)
+  const [autoCloseDirty, setAutoCloseDirty] = useState(false)
   const [error, setError] = useState('')
   const [selectionError, setSelectionError] = useState('')
   const [saved, setSaved] = useState(false)
@@ -81,6 +85,8 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
       setAvailable(choices)
       setCatalog(result.program.catalog)
       setRules(result.program.rules)
+      setAutoClose(closeDuration(result.autoClose))
+      setAutoCloseDirty(false)
       setStock(stockDrafts(result.program.catalog))
     }).catch(() => {
       if (!cancelled) setError(t('No se pudieron cargar las condiciones.', 'Could not load conditions.'))
@@ -114,13 +120,22 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
             ? stock[prize.id].trim() === '' ? null : Number(stock[prize.id]) : prize.stockTotal))))
           throw new Error('Prize associations not confirmed')
       }
-      if (rulesDirty) {
-        const result = await stackPrizeApi.saveRules(data.game.gameId, rules, next.programRevision ?? snapshot.programRevision)
-        next = { ...next, program: result.program, programRevision: result.programRevision }
+      if (rulesDirty || autoCloseDirty) {
+        if (next.autoClose?.closesAt !== snapshot.autoClose?.closesAt
+          || next.autoClose?.hours !== snapshot.autoClose?.hours || next.autoClose?.minutes !== snapshot.autoClose?.minutes)
+          throw new Error('Automatic closing settings changed')
+        const args = [data.game.gameId, rules, next.programRevision ?? snapshot.programRevision] as const
+        const result = autoCloseDirty
+          ? await stackPrizeApi.saveRules(...args, hasFinalTop ? autoClose : null)
+          : await stackPrizeApi.saveRules(...args)
+        next = { ...next, program: result.program, programRevision: result.programRevision,
+          autoClose: result.autoClose === undefined ? next.autoClose : result.autoClose }
       }
       setSnapshot(next)
       setCatalog(next.program.catalog)
       setRules(next.program.rules)
+      setAutoClose(closeDuration(next.autoClose))
+      setAutoCloseDirty(false)
       setStock(stockDrafts(next.program.catalog))
       setRulesDirty(false)
       setDirty(false)
@@ -138,13 +153,20 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
   const savedStock = snapshot ? stockDrafts(snapshot.program.catalog) : {}
   const changedStock = Object.keys(stock).filter(id => stock[id] !== savedStock[id])
   const invalidStock = changedStock.some(id => stock[id].trim() !== '' && !validCount(stock[id]))
+  const hasFinalTop = rules.some(rule => rule.condition === 'top_final')
+  const invalidAutoClose = Boolean(hasFinalTop && autoClose && (
+    !Number.isSafeInteger(autoClose.hours) || autoClose.hours < 0
+    || !Number.isInteger(autoClose.minutes) || autoClose.minutes < 0 || autoClose.minutes > 59
+    || !(autoClose.hours || autoClose.minutes)
+    || Math.ceil(Date.now() / 1000) + autoClose.hours * 3600 + autoClose.minutes * 60 + 120 > 253402300799
+  ))
   const markDirty = () => { setDirty(true); onDirtyChange(true); setSaved(false) }
   const readyCallback = useRef(onReadyChange)
   readyCallback.current = onReadyChange
   useEffect(() => {
     readyCallback.current?.(!!snapshot && !busy && !error && !planError && !planLoading
-      && !dirty && !selectionError && !invalidStock && !invalidStackRules(rules))
-  }, [snapshot, busy, error, planError, planLoading, dirty, selectionError, invalidStock, rules])
+      && !dirty && !selectionError && !invalidStock && !invalidAutoClose && !invalidStackRules(rules))
+  }, [snapshot, busy, error, planError, planLoading, dirty, selectionError, invalidStock, invalidAutoClose, rules])
   return <div className="space-y-2">
     {planError && <p role="alert">{t('No se pudo consultar el plan. Cierra y vuelve a abrir el panel antes de editar condiciones.',
       'Could not load your plan. Close and reopen the panel before editing conditions.')}</p>}
@@ -168,6 +190,8 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
         className="min-w-0">
         <StackRuleEditor rules={rules} catalog={catalog} available={available} raffles={getFeaturesByPlan(plan).raffles}
           headerAside={headerAside}
+          autoClose={{ duration: autoClose, savedAt: snapshot.autoClose?.closesAt,
+            onChange: value => { setAutoClose(value); setAutoCloseDirty(true); markDirty() } }}
           onAddPrize={(ruleIndex, groupIndex, prizeId) => {
             const prize = available.find(item => item.id === prizeId)
             if (!prize) return
@@ -199,6 +223,10 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
         'Define el substock de los premios seleccionados: cada cantidad reserva unidades exclusivas para esta partida. Vacío no reserva unidades.',
         'Set the sub-stock for selected prizes: each quantity reserves exclusive units for this event. Blank reserves no units.',
       )}</p>}
+      {dirty && invalidAutoClose && <p role="alert">{t(
+        'Introduce una duración válida: horas enteras y minutos entre 0 y 59, con un total mayor que cero.',
+        'Enter a valid duration: whole hours and minutes from 0 to 59, with a total greater than zero.',
+      )}</p>}
       {dirty && invalidStackRules(rules) && <p role="alert">{t(
         'Revisa las reglas: cada grupo necesita premios, cantidades entre 1 y 10, top entre 1 y 100 y puntuaciones enteras no negativas con un rango válido.',
         'Check the rules: each group needs prizes, quantities from 1 to 10, top from 1 to 100 and non-negative integer scores with a valid range.',
@@ -208,7 +236,7 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
       {saved && <p role="status" className="text-sm text-textSub">{t('Condiciones guardadas. Se conservan los premios ya adjudicados.', 'Conditions saved. Previously awarded prizes are preserved.')}</p>}
       {!readOnly && <div className="flex justify-end">
         <SaveButton iconOnly
-          disabled={busy || !!error || !!planError || planLoading || !dirty || invalidStackRules(rules) || invalidStock || snapshot.state !== 'open'}
+          disabled={busy || !!error || !!planError || planLoading || !dirty || invalidStackRules(rules) || invalidStock || invalidAutoClose || snapshot.state !== 'open'}
           onClick={() => void save()}>{t('Guardar condiciones', 'Save conditions')}</SaveButton>
       </div>}
     </>}

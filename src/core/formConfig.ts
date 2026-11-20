@@ -4,10 +4,12 @@ import { PARTICIPANT_PROFILE_FIELDS, resolveParticipantFields } from './lib/part
 
 export const QUIZ_MOMENTS = ['disabled', 'after_registration', 'after_game', 'prize', 'raffle'] as const
 export type QuizMoment = typeof QUIZ_MOMENTS[number]
+export type ParticipantLanguage = 'es' | 'en'
 export type FormQuestion = { id: string; text: string; options: { title: string; payload: string }[] }
 export type GameFormConfig = {
   registrationTitle: string
   registrationDescription: string
+  defaultLanguage?: ParticipantLanguage
   quizTitle: string
   quizDescription: string
   logoKey: string | null
@@ -87,6 +89,7 @@ export function isGameFormResponse(value: unknown): value is GameFormResponse {
     && nullableText(data.logoUrl) && nullableText(data.bannerUrl)
     && !!config && ['registrationTitle', 'registrationDescription', 'quizTitle', 'quizDescription']
       .every(key => typeof config[key as keyof GameFormConfig] === 'string')
+    && (config.defaultLanguage === undefined || config.defaultLanguage === 'es' || config.defaultLanguage === 'en')
     && nullableText(config.logoKey) && nullableText(config.bannerKey)
     && QUIZ_MOMENTS.includes(config.quizMoment)
     && (config.appearance === null || (!!config.appearance

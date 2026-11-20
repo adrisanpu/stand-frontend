@@ -48,6 +48,34 @@ function mount() {
   return { onDirtyChange, onBusyChange }
 }
 
+it('saves a game-wide automatic close only with a valid final-top duration', async () => {
+  snapshot.program.catalog = [{ id: 'existing', source: 'stand', name: 'Medal', stockTotal: null }]
+  snapshot.program.rules = [{ id: 'final', condition: 'top_final', topX: 3,
+    groups: [{ allocations: [{ prizeId: 'existing', quantity: 1 }] }] }]
+  vi.mocked(stackPrizeApi.saveRules).mockImplementationOnce(async (_, rules, __, duration) => ({
+    ok: true, program: { ...snapshot.program, rules }, programRevision: 'scheduled',
+    autoClose: duration ? { ...duration, closesAt: 1_800_000_000 } : null,
+  }))
+  mount()
+  const checkbox = await screen.findByRole('checkbox', { name: 'Cerrar automáticamente' })
+  const parameters = screen.getByLabelText('Top 1').closest('td')
+  expect(parameters).toContainElement(checkbox)
+  fireEvent.click(checkbox)
+  expect(parameters).toContainElement(screen.getByLabelText('Horas'))
+  expect(parameters).toContainElement(screen.getByLabelText('Minutos'))
+  fireEvent.change(screen.getByLabelText('Horas'), { target: { value: '0' } })
+  expect(screen.getByRole('button', { name: 'Guardar condiciones' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Minutos'), { target: { value: '60' } })
+  expect(screen.getByRole('button', { name: 'Guardar condiciones' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Minutos'), { target: { value: '15' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar condiciones' }))
+  expect(await screen.findByText(/Cierre guardado/)).toBeInTheDocument()
+  expect(stackPrizeApi.saveRules).toHaveBeenCalledWith('NEW', snapshot.program.rules, 'original', { hours: 0, minutes: 15 })
+  fireEvent.change(screen.getByLabelText('Condición 1'), { target: { value: 'completed' } })
+  expect(screen.queryByRole('checkbox', { name: 'Cerrar automáticamente' })).not.toBeInTheDocument()
+  expect(screen.getByText(/se cancelará al guardar/)).toBeInTheDocument()
+})
+
 it('offers every existing catalog prize and saves selected associations before the new rules', async () => {
   const { onDirtyChange, onBusyChange } = mount()
   fireEvent.click(await screen.findByRole('button', { name: 'Añadir regla' }))

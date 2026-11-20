@@ -1,6 +1,8 @@
 import { api } from './api'
 
 export type StackPrizeCondition = 'completed' | 'top_finish' | 'top_final' | 'raffle' | 'score'
+export type StackAutoCloseDuration = { hours: number; minutes: number }
+export type StackAutoClose = StackAutoCloseDuration & { closesAt: number }
 export type StackPrizeScoreOperator = '>' | '>=' | '=' | '<=' | '<' | 'between'
 export type StackPrizeItem = {
   id: string
@@ -71,6 +73,7 @@ export type StackPrizeSettingsResponse = {
   emailAvailable?: boolean
   program: StackPrizeProgram
   programRevision?: string
+  autoClose?: StackAutoClose | null
   state: StackPlayerPrizes['state']
   pendingPlayers: { playerId: number; name: string }[]
   awards: (Omit<StackAward, 'token'> & { playerId: number })[]
@@ -86,9 +89,9 @@ export type StackPrizeSettingsResponse = {
 }
 export const stackPrizeApi = {
   get: (gameId: string) => api.get<StackPrizeSettingsResponse>(`/v1/game/stack/prizes?gameId=${encodeURIComponent(gameId)}`),
-  async saveRules(gameId: string, rules: StackPrizeRule[], expectedRevision: string) {
-    const data = await api.put<{ ok: boolean; program: StackPrizeProgram; programRevision: string }>(
-      '/v1/game/stack/prizes', { gameId, action: 'rules', rules, expectedRevision },
+  async saveRules(gameId: string, rules: StackPrizeRule[], expectedRevision: string, autoClose?: StackAutoCloseDuration | null) {
+    const data = await api.put<{ ok: boolean; program: StackPrizeProgram; programRevision: string; autoClose?: StackAutoClose | null }>(
+      '/v1/game/stack/prizes', { gameId, action: 'rules', rules, expectedRevision, ...(autoClose !== undefined && { autoClose }) },
     )
     if (data?.ok !== true || data.program?.version !== 3 || typeof data.programRevision !== 'string')
       throw new Error('Reward conditions update not confirmed')

@@ -102,6 +102,7 @@ export type PublicGameResponse = {
   stackFinishSupported?: boolean
   stackPrizeState?: 'open' | 'closing' | 'closed'
   stackPrizeRules?: import('./stackPrizes').StackPrizePromotion[]
+  stackAutoCloseAt?: number
   joinUrl: string
 }
 
