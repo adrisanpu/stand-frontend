@@ -39,9 +39,9 @@ export default function NativePrizeClaims({ gameId, playerToken, initialAwards, 
     {!error && unavailable.length > 0 && <p role="status" className="text-sm text-textSub">
       {[...new Set(unavailable.map(item => inventoryReasonText(item.reason, language)))].join(' ')}
     </p>}
-    {awards.map(award => <article key={award.id} className="rounded-xl border border-current/20 p-3 space-y-2">
-      <h3 className="font-semibold">{award.name}</h3>
-      {award.imageUrl && <img src={award.imageUrl} alt="" className="mx-auto h-16 w-16 object-contain" />}
+    {awards.map(award => <article key={award.id} className="flex flex-col items-center gap-2 rounded-xl border border-current/20 p-3 text-center">
+      {award.imageUrl && <img src={award.imageUrl} alt="" className="h-16 w-16 object-contain" />}
+      <h3 className="w-full font-semibold break-words">{award.name}</h3>
       {award.state === 'available' && emailOnly
         ? <PrizeEmailNotice />
         : award.state === 'available' && award.token && !error

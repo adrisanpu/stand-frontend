@@ -96,14 +96,14 @@ export default function StackAwardList({ data, locked = false, gameId, playerTok
       && <p className="text-sm text-textSub">{t('Todavía no tienes premios asignados.')}</p>}
     {data.awards.map((award) => <article key={award.id} className="relative rounded-xl border border-white/10 bg-black/20 p-3">
       <div className={`space-y-2 ${locked ? 'opacity-30' : ''}`}>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col items-center gap-2 text-center">
         {award.imageUrl && <img src={award.imageUrl} alt="" className="w-14 h-14 object-contain" />}
-        <h3 className="flex-1 min-w-0 font-semibold break-words">{award.name}</h3>
+        <h3 className="w-full min-w-0 font-semibold break-words">{award.name}</h3>
       </div>
-      <div className="flex flex-col sm:flex-row items-center gap-4">
+      <div className="flex flex-col items-center gap-4">
         {!locked && award.source === 'stand' && award.state === 'available' && (emailOnly ? <PrizeEmailNotice /> : <AwardQR award={award} />)}
         {!(award.source === 'stand' && ['available', 'delivered'].includes(award.state))
-          && <p role="status" className={`text-sm ${award.state.includes('required') ? 'text-amber-300' : 'text-textSub'}`}>
+          && <p role="status" className={`text-sm text-center ${award.state.includes('required') ? 'text-amber-300' : 'text-textSub'}`}>
             {states[award.state]}
           </p>}
       </div>
