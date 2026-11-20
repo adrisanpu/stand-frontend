@@ -40,6 +40,12 @@ function show(state = quiz, meta = game, token: string | null = 'token') {
 }
 
 describe('participant survey placement', () => {
+  it('sizes the questionnaire card to its content instead of the full viewport', async () => {
+    show()
+    const heading = await screen.findByRole('heading', { name: 'Tu opinión' })
+    expect(heading.closest('.quiz-card')).toHaveClass('bg-club', '!min-h-0')
+  })
+
   it('renders the saved shared form logo above the questionnaire', async () => {
     show(quiz, { ...game, formLogoUrl: '/event-logo.png',
       formConfig: { ...game.formConfig!, logoKey: 'users/owner/logos/event.png' } })

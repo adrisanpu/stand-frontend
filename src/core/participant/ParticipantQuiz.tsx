@@ -18,7 +18,7 @@ export function QuizCard({ title, description, logoUrl, bannerUrl, questions, an
   onBack?: () => void
 }) {
   const { t } = useParticipantLanguage()
-  return <div className="space-y-4 rounded-xl bg-club p-4 text-textMain">
+  return <div className="quiz-card space-y-4 rounded-xl bg-club !min-h-0 p-4 text-textMain">
     <FormHeader title={title} description={description} logoUrl={logoUrl} bannerUrl={bannerUrl} />
     <QuizFields questions={questions} answers={answers} disabled={saving} namePrefix={namePrefix} onChange={onChange} />
     {saving && <p role="status">{t('Guardando…')}</p>}
