@@ -189,6 +189,25 @@ describe('same-game returning participant', () => {
     expect(screen.getByLabelText('Código de verificación')).toBeInTheDocument()
   })
 
+  it('known client of the operator only fills missing required fields and keeps the photo option', async () => {
+    vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValueOnce({
+      ok: true, detailsRequired: true, existingPlayer: false, knownClient: true,
+      fields: { username: false, phone: true, consent: false, loyaltyConsent: false },
+    }).mockResolvedValueOnce(challengeResponse())
+    render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, gameType: 'STACK', participantFields: { profilePhoto: { enabled: true } } }} onJoined={vi.fn()} />)
+    await submitEmail()
+    expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Foto de perfil (opcional)')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '612345678' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Enviar código' })) })
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    expect(publicApi.resumeEmailRegistration).toHaveBeenLastCalledWith({
+      mode: 'resume', gameId: 'ABC123', email: 'player@example.com', phone: '+34 612345678', language: 'es',
+    })
+    expect(screen.getByLabelText('Código de verificación')).toBeInTheDocument()
+  })
+
   it('shows initial request failures without falling through to signup', async () => {
     vi.mocked(publicApi.resumeEmailRegistration).mockRejectedValueOnce(new PublicApiError('raw', 502, 'EmailDeliveryFailed'))
     render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
@@ -592,16 +611,25 @@ describe('participant registration fields', () => {
   })
 
   describe('optional participant photo', () => {
+    const photoMeta: PublicGameResponse = { ...meta, participantFields: { profilePhoto: { enabled: true } } }
     const noRequiredFields = {
       ...meta,
       participantFields: {
         email: { required: false },
         phone: { required: false },
+        profilePhoto: { enabled: true },
       },
     }
 
+    it('hides the photo picker unless the game asks for it', async () => {
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      await fillFullName()
+      expect(screen.queryByLabelText('Foto de perfil (opcional)')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Elegir foto de perfil' })).not.toBeInTheDocument()
+    })
+
     it('opens the file picker from the avatar and releases replaced previews', async () => {
-      const { unmount } = render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      const { unmount } = render(<JoinForm gameId="ABC123" gameMeta={photoMeta} onJoined={vi.fn()} />)
       await fillFullName()
       const input = screen.getByLabelText('Foto de perfil (opcional)')
       const pick = vi.spyOn(input, 'click')
@@ -623,7 +651,7 @@ describe('participant registration fields', () => {
       new File([], 'empty.png', { type: 'image/png' }),
       new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' }),
     ])('rejects invalid photo files without keeping a preview: $name', async (file) => {
-      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      render(<JoinForm gameId="ABC123" gameMeta={photoMeta} onJoined={vi.fn()} />)
       await fillFullName()
       fireEvent.change(screen.getByLabelText('Foto de perfil (opcional)'), { target: { files: [file] } })
       expect(screen.getByRole('alert')).toHaveTextContent('Usa una imagen JPG, PNG o WebP de hasta 5 MB.')

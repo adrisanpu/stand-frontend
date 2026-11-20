@@ -62,6 +62,8 @@ export type StackPlayerPrizes = {
   deliveryChannel?: 'wallet' | 'email'
   state: 'open' | 'closing' | 'closed'
   finalPrizesPending: boolean
+  /** True while the player's prize calculation or delivery is still in progress. */
+  pending?: boolean
 }
 export type StackPrizeSettingsResponse = {
   ok: true

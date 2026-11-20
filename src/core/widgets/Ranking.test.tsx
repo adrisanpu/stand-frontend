@@ -8,6 +8,14 @@ vi.mock('../../api/api', () => ({ api: { get: vi.fn() } }))
 afterEach(cleanup)
 
 describe('Ranking game score formatting', () => {
+  it('hides avatars unless the game asks for profile photos', async () => {
+    vi.mocked(api.get).mockResolvedValue({ ok: true, results: [{ rank: 1, username: 'Ana', score: 1, profilePicUrl: '/ana.png' }] })
+    const { container } = render(<Ranking gameId="GAME1234" gameType="STACK" />)
+    await screen.findByText('Ana')
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('.home-ranking-avatar')).toBeNull()
+  })
+
   it.each([true, false])('shows profile photos or initial avatars (compact=%s)', async (compact) => {
     vi.mocked(api.get).mockResolvedValue({
       ok: true,
@@ -17,7 +25,7 @@ describe('Ranking game score formatting', () => {
         { rank: 3, username: 'Ana', score: 1, profilePicUrl: '/ana.png' },
       ],
     })
-    const { container } = render(<Ranking gameId="GAME1234" gameType="STACK" compact={compact} />)
+    const { container } = render(<Ranking gameId="GAME1234" gameType="STACK" compact={compact} showAvatars />)
     await screen.findByText('Rosa')
     expect(container.querySelectorAll('img')).toHaveLength(1)
     expect(container.querySelector('img')).toHaveAttribute('src', '/ana.png')
@@ -37,7 +45,8 @@ describe('Ranking game score formatting', () => {
     await screen.findByText('Player 1')
     expect(screen.queryByTestId('prize-sticker')).not.toBeInTheDocument()
     expect(screen.queryByText(/Copa/)).not.toBeInTheDocument()
-    expect(screen.getAllByLabelText('Premio')).toHaveLength(2)
+    expect(screen.queryByText('🎁')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.home-ranking-row.bg-primary\\/10')).toHaveLength(2)
     expect(screen.getByText('+2 más').parentElement).toHaveClass('overflow-y-auto', 'flex-1', 'min-h-0')
     expect(api.get).toHaveBeenCalledWith('/v1/game/score?gameId=GAME1234&limit=20')
   })
@@ -56,18 +65,18 @@ describe('Ranking game score formatting', () => {
     expect(screen.queryByText(/PRIZE|PREMIO|Copa/)).not.toBeInTheDocument()
   })
 
-  it('shows STACK score in bloques, including zero, without timer units', async () => {
+  it('shows STACK score as a plain number, including zero, without units', async () => {
     vi.mocked(api.get).mockResolvedValue({ ok: true, results: [{ rank: 1, username: 'Rosa', score: 0 }] })
     render(<Ranking gameId="GAME1234" gameType="STACK" />)
-    expect(await screen.findByText('0 bloques')).toBeInTheDocument()
+    expect(await screen.findByTestId('ranking-score')).toHaveTextContent(/^0$/)
     expect(screen.queryByText('N/A')).not.toBeInTheDocument()
     expect(screen.queryByText(/ms$/)).not.toBeInTheDocument()
   })
 
-  it('keeps T1MER time formatting unchanged', async () => {
+  it('shows T1MER time without units', async () => {
     vi.mocked(api.get).mockResolvedValue({ ok: true, results: [{ rank: 1, username: 'Rosa', timer: 10.1, score: 100 }] })
     render(<Ranking gameId="GAME1234" gameType="T1MER" />)
-    expect(await screen.findByText('10.100s')).toBeInTheDocument()
+    expect(await screen.findByTestId('ranking-score')).toHaveTextContent(/^10\.100$/)
     expect(screen.queryByText(/bloques$/)).not.toBeInTheDocument()
   })
 })

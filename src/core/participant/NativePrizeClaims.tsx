@@ -3,14 +3,17 @@ import { publicApi, type NativePrizeAward, type PlayerResponse } from '../../api
 import { inventoryReasonText } from '../inventoryReason'
 import QRCode from '../widgets/QRCode'
 import { useParticipantLanguage } from './participantLanguage'
+import PrizeEmailNotice from './PrizeEmailNotice'
 
-export default function NativePrizeClaims({ gameId, playerToken, initialAwards, initialUnavailable = [] }: {
+export default function NativePrizeClaims({ gameId, playerToken, initialAwards, initialUnavailable = [], initialEmailOnly = false }: {
   gameId: string; playerToken: string; initialAwards: NativePrizeAward[]
   initialUnavailable?: NonNullable<PlayerResponse['prizeUnavailable']>
+  initialEmailOnly?: boolean
 }) {
   const { t, language } = useParticipantLanguage()
   const [awards, setAwards] = useState<NativePrizeAward[]>(initialAwards)
   const [unavailable, setUnavailable] = useState(initialUnavailable)
+  const [emailOnly, setEmailOnly] = useState(initialEmailOnly)
   const [error, setError] = useState(false)
   useEffect(() => {
     let cancelled = false
@@ -20,6 +23,7 @@ export default function NativePrizeClaims({ gameId, playerToken, initialAwards, 
         if (!result.ok || result.gameId !== gameId) throw new Error('Invalid prize response')
         if (!cancelled) {
           setAwards(result.nativePrizes ?? []); setUnavailable(result.prizeUnavailable ?? []); setError(false)
+          setEmailOnly(result.prizeNotification?.play === false)
         }
       } catch {
         if (!cancelled) setError(true)
@@ -38,7 +42,9 @@ export default function NativePrizeClaims({ gameId, playerToken, initialAwards, 
     {awards.map(award => <article key={award.id} className="rounded-xl border border-current/20 p-3 space-y-2">
       <h3 className="font-semibold">{award.name}</h3>
       {award.imageUrl && <img src={award.imageUrl} alt="" className="mx-auto h-16 w-16 object-contain" />}
-      {award.state === 'available' && award.token && !error
+      {award.state === 'available' && emailOnly
+        ? <PrizeEmailNotice />
+        : award.state === 'available' && award.token && !error
         ? <QRCode data={award.token} size={220} alt={`QR ${award.name}`} className="!bg-white !p-3" />
         : award.state !== 'delivered' && <p>{t('No se pudieron actualizar los premios.')}</p>}
     </article>)}

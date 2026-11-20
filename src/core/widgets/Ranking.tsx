@@ -33,6 +33,7 @@ interface RankingProps {
   topX?: number // highlights the top X rows as prize positions
   maxPrizeRanking?: number // ensures enough rows are fetched for the prize limit
   gameType?: string // when "T1MER", show only position + username (truncated), no timer/score
+  showAvatars?: boolean // profile photos are shown only when the game asks participants for one
 }
 
 function truncateUsername(username: string | undefined, maxLen: number, anonymous: string): string {
@@ -53,6 +54,7 @@ export default function Ranking({
   topX: legacyTopX,
   maxPrizeRanking: legacyMax,
   gameType,
+  showAvatars = false,
 }: RankingProps) {
   const { t } = useOperatorLanguage()
   const topX = prize ? prize.topX : legacyTopX
@@ -106,45 +108,34 @@ export default function Ranking({
           displayList.map((entry, index) => {
             const rank = entry.rank || index + 1
             const isPrizeRow = topX != null && rank <= topX
+            const name = isT1mer
+              ? truncateUsername(entry.username, T1MER_USERNAME_MAX_LEN, t('Anónimo', 'Anonymous'))
+              : (entry.username || t('Anónimo', 'Anonymous'))
             return (
                 <div
                   key={entry.rank || index}
-                  className={`flex items-center justify-between rounded-lg min-w-0 ${
-                  compact ? 'p-1.5 gap-1' : 'p-2 sm:p-3 gap-2 sm:gap-3'
+                  className={`home-ranking-row flex items-center rounded-lg min-w-0 ${
+                  compact ? 'px-2 py-1.5 gap-2' : 'px-2.5 py-2 sm:px-3 sm:py-2.5 gap-2 sm:gap-3'
                     } ${
                   isPrizeRow
                       ? 'bg-primary/10 border border-primary/40'
                       : 'bg-surface border border-white/10'
                     }`}
                 >
-                  <div className="flex items-center min-w-0 flex-1 gap-2 sm:gap-3 overflow-hidden">
-                    <span className={`text-[var(--color-primary)] font-bold flex-shrink-0 ${HOME_BODY_TEXT} ${compact ? 'w-5' : 'w-5 sm:w-6'}`}>
-                      {rank}
+                  <span className={`home-ranking-rank text-[var(--color-primary)] font-bold flex-shrink-0 text-center tabular-nums ${HOME_BODY_TEXT} ${compact ? 'w-5' : 'w-6'}`}>
+                    {rank}
+                  </span>
+                  {showAvatars && <ProfileAvatar profilePicUrl={entry.profilePicUrl} username={entry.username} size={compact ? 'sm' : 'md'} className="home-ranking-avatar" />}
+                  <span className="min-w-0 flex-1" title={entry.username || undefined}>
+                    <span className={`home-ranking-name block truncate text-textMain font-medium leading-tight ${HOME_BODY_TEXT}`}>{name}</span>
+                  </span>
+                  <span className="home-ranking-score flex items-center flex-shrink-0 whitespace-nowrap" data-testid="ranking-score">
+                    <span className="home-ranking-value text-textMain font-bold tabular-nums text-base leading-none">
+                      {isStack
+                        ? (typeof entry.score === 'number' ? entry.score : '–')
+                        : (typeof entry.timer === 'number' ? entry.timer.toFixed(3) : '–')}
                     </span>
-                    <ProfileAvatar profilePicUrl={entry.profilePicUrl} username={entry.username} size={compact ? 'sm' : 'md'} />
-                    <span className={`text-textMain font-medium min-w-0 flex items-baseline gap-1.5 overflow-hidden ${HOME_BODY_TEXT}`} title={entry.username || undefined}>
-                      <span className="truncate">{isT1mer ? truncateUsername(entry.username, T1MER_USERNAME_MAX_LEN, t('Anónimo', 'Anonymous')) : (entry.username || t('Anónimo', 'Anonymous'))}</span>
-                      {isPrizeRow && (
-                        <span className={`flex-shrink-0 ${HOME_BODY_TEXT} text-primary`} aria-label={t('Premio', 'Prize')}>
-                          🎁
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="text-right flex-shrink-0 ml-2">
-                    <div className={`text-textMain font-semibold ${HOME_BODY_TEXT}`}>
-                      {isStack && typeof entry.score === 'number'
-                        ? `${entry.score} ${t('bloques', 'blocks')}`
-                        : entry.timer !== undefined && typeof entry.timer === 'number'
-                          ? `${entry.timer.toFixed(3)}s`
-                          : 'N/A'}
-                    </div>
-                    {!isT1mer && !isStack && entry.score !== undefined && typeof entry.score === 'number' && (
-                      <div className={`text-textSub ${HOME_BODY_TEXT}`}>
-                        {entry.score.toFixed(0)}ms
-                      </div>
-                    )}
-                  </div>
+                  </span>
                 </div>
               )
             })

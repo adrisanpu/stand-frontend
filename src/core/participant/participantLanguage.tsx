@@ -281,6 +281,8 @@ const translations: Record<string, string> = {
   'Muestra este QR en el punto de recogida para canjear tu premio.': 'Show this QR code at the collection point to claim your prize.',
   'Mirad la pantalla del evento para ver el resultado en vivo.': 'Look at the event screen to see the live result.',
   'Cargando premios...': 'Loading prizes...',
+  'Preparando tu premio…': 'Preparing your prize…',
+  'Te enviamos el QR de tu premio por email. Revisa tu bandeja de entrada y spam.': 'We emailed you your prize QR. Check your inbox and spam folder.',
   'Premio(s) ya recogido(s). ¡Disfrutad!': 'Prize(s) already collected. Enjoy!',
   'Validar otra pareja': 'Validate another pair',
   'Juego no disponible': 'Game unavailable',

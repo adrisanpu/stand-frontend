@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { createContext, useContext, useState } from 'react'
+
+/** False inside participant views of games that don't ask for a profile photo: avatars render nothing. */
+export const ProfilePhotosContext = createContext(true)
 
 function avatarInitial(username: string | undefined): string {
   const raw = (username || 'A').replace(/^@/, '').trim()
@@ -22,6 +25,8 @@ const SIZE: Record<NonNullable<Props['size']>, string> = {
 /** Circular IG profile pic or initials fallback (shared by ranking / play / display). */
 export default function ProfileAvatar({ profilePicUrl, username, size = 'md', className = '' }: Props) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const enabled = useContext(ProfilePhotosContext)
+  if (!enabled) return null
   const sizeClass = SIZE[size]
   const pic = typeof profilePicUrl === 'string' ? profilePicUrl.trim() : ''
   if (pic && pic !== failedUrl) {

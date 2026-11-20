@@ -24,11 +24,13 @@ import type { GameFormConfig } from '../formConfig'
 import HomeCanvas from '../home/HomeCanvas'
 import HomeAdminButton from '../home/HomeAdminButton'
 import { validateHomeCanvas, type HomeCanvasConfig, type HomeBackgroundUrls } from '../home/canvasModel'
+import type { ParticipantFieldsConfig } from '../../api/publicApi'
+import { profilePhotoEnabled } from '../lib/participantFields'
 
 type AppShellProps = { initialGame?: OperatorGame; onReturnToAdmin?: () => void }
 type Metadata = {
   ok: boolean
-  game?: { gameType: string; showRaffleOnHome?: boolean }
+  game?: { gameType: string; showRaffleOnHome?: boolean; participantFields?: ParticipantFieldsConfig }
   formConfig?: GameFormConfig
   formLogoUrl?: string | null
   prizeCatalog?: PrizeCatalog
@@ -171,6 +173,7 @@ function AppContent({ initialGame, onReturnToAdmin }: AppShellProps) {
           players={<Players gameName={gameName} gameId={gameId} gameType={gameType ?? undefined}
             compact countersOnly={gameDefinition?.id === 'EMPAREJA2'} />}
           ranking={showRanking ? <Ranking gameId={gameId} gameType={gameType ?? undefined} compact
+            showAvatars={profilePhotoEnabled(current.game?.participantFields)}
             prize={catalog?.ranking} topX={topX}
             maxPrizeRanking={catalog !== undefined ? catalog.ranking?.limit ?? undefined : readMaxPrizeRanking(gameSettings)} /> : undefined}
           raffle={showRaffle ? <RaffleData gameId={gameId} gameName={gameName} compact /> : undefined}

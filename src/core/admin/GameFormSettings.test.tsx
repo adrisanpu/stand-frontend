@@ -182,6 +182,16 @@ it('previews the same two-step registration and optional fields that are saved f
   })
 })
 
+it('saves the optional profile photo setting, disabled by default', async () => {
+  await mount()
+  const toggle = screen.getByRole('checkbox', { name: 'Foto de perfil (opcional)' })
+  expect(toggle).not.toBeChecked()
+  fireEvent.click(toggle)
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar formulario' }))
+  await screen.findByText('Formulario guardado y confirmado.')
+  expect(snapshot.participantFields).toMatchObject({ profilePhoto: { enabled: true } })
+})
+
 it.each(['registration', 'questionnaire'] as const)('places the %s QR above a contained preview', async section => {
   render(<GameFormSettings gameId="EVENT" section={section} />)
   const preview = await screen.findByRole('region', { name: 'Vista previa' })

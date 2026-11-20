@@ -57,6 +57,13 @@
 .home-canvas-widget h2 { font-size: calc(36px * var(--home-text-scale)); line-height: 1.15; }
 .home-canvas-widget p, .home-canvas-widget span, .home-canvas-widget button { font-size: calc(26px * var(--home-text-scale)); }
 .home-canvas-widget h3, .home-canvas-widget div.text-textMain, .home-canvas-widget div.text-textSub { font-size: calc(26px * var(--home-text-scale)); }
+.home-canvas-widget .home-ranking-row { padding: calc(12px * var(--home-text-scale)) calc(16px * var(--home-text-scale)); gap: calc(14px * var(--home-text-scale)); }
+.home-canvas-widget .home-ranking-rank { width: calc(40px * var(--home-text-scale)); font-size: calc(28px * var(--home-text-scale)); line-height: 1; }
+.home-canvas-widget .home-ranking-avatar { width: calc(52px * var(--home-text-scale)); height: calc(52px * var(--home-text-scale)); font-size: calc(24px * var(--home-text-scale)); line-height: 1; }
+.home-canvas-widget .home-ranking-name { font-size: calc(28px * var(--home-text-scale)); line-height: 1.2; }
+.home-canvas-widget .home-ranking-prize { font-size: calc(26px * var(--home-text-scale)); line-height: 1; }
+.home-canvas-widget .home-ranking-value { font-size: calc(32px * var(--home-text-scale)); line-height: 1; }
+.home-canvas-widget .home-ranking-unit { font-size: calc(16px * var(--home-text-scale)); line-height: 1.1; }
 .home-canvas-widget [data-testid='prize-sticker'] { margin-bottom: 0; flex-shrink: 0; }
 .home-item-select { position: absolute; inset: 0; z-index: 1; cursor: grab; touch-action: none; border: 2px solid transparent; }
 .home-item-select:focus-visible, .home-item-select[aria-pressed='true'] { border-color: #b84833; outline: 2px solid white; outline-offset: -5px; background: #b848330d; }

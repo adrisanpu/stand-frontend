@@ -61,6 +61,21 @@ it('shows inventory reasons for a finished player without grants and clears them
   expect(screen.getByText('Todavía no tienes premios asignados.')).toBeInTheDocument()
 })
 
+it('shows a loading animation and polls quickly while the prize is being prepared', async () => {
+  vi.useFakeTimers()
+  const stackPrizes = { walletUrl: null, state: 'open' as const, finalPrizesPending: false, awards: [], pending: true }
+  vi.mocked(publicApi.getPlayer).mockResolvedValue({ ...response, prizes: [], stackPrizes })
+  render(<RankingPrizeClaim gameId="GAME1" playerToken="session" rank={2} />)
+  await act(async () => {})
+  expect(screen.getByText('Preparando tu premio…')).toBeInTheDocument()
+  vi.mocked(publicApi.getPlayer).mockResolvedValue({
+    ...response, prizes: [], stackPrizes: { ...stackPrizes, pending: false },
+  })
+  await act(async () => { vi.advanceTimersByTime(2000) })
+  expect(publicApi.getPlayer).toHaveBeenCalledTimes(2)
+  expect(screen.queryByText('Preparando tu premio…')).not.toBeInTheDocument()
+})
+
 it('shows no prize or QR when the server does not grant a ranking claim', async () => {
   vi.mocked(publicApi.getPlayer).mockResolvedValue({ ...response, prizes: [] })
   const { container } = render(<RankingPrizeClaim gameId="GAME1" playerToken="session" prizeCatalog={response.prizeCatalog} />)

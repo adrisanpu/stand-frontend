@@ -25,6 +25,8 @@ import CupidoParticipantPlay from '../../games/cupido/ParticipantPlay'
 import InfocardsParticipantPlay from '../../games/infocards/ParticipantPlay'
 import { isRulet4Assignment, type Rulet4Assignment } from '../../games/rulet4/rulet4Logic'
 import { ParticipantLanguageProvider, ParticipantLanguageSelector, useParticipantLanguage } from './participantLanguage'
+import { ProfilePhotosContext } from '../widgets/ProfileAvatar'
+import { profilePhotoEnabled } from '../lib/participantFields'
 import './participant.css'
 
 type Empareja2Step = 'loading' | 'unsupported' | 'join' | 'assignment' | 'validate' | 'result'
@@ -109,6 +111,7 @@ function ParticipantContent() {
   } | null>(null)
   const [nativeAwards, setNativeAwards] = useState<NativePrizeAward[]>([])
   const [prizeUnavailable, setPrizeUnavailable] = useState<NonNullable<PlayerResponse['prizeUnavailable']>>([])
+  const [prizeEmailOnly, setPrizeEmailOnly] = useState(false)
 
   const currentGameMeta = gameMeta?.gameId === gameId ? gameMeta : null
   const gameType = currentGameMeta ? normalizeGameType(currentGameMeta.gameType) : ''
@@ -205,6 +208,7 @@ function ParticipantContent() {
     setPhotoUploadWarning(false)
     setNativeAwards([])
     setPrizeUnavailable([])
+    setPrizeEmailOnly(false)
     setStackAssignment(null)
     setImpostorAssignment(null)
     setRulet4Assignment(null)
@@ -254,6 +258,7 @@ function ParticipantContent() {
           }
           setNativeAwards(player.nativePrizes ?? [])
           setPrizeUnavailable(player.prizeUnavailable ?? [])
+          setPrizeEmailOnly(player.prizeNotification?.play === false)
           if (!meta.isActive && gt !== 'STACK') {
             setPlayerToken(player.playerToken)
             setStep('registered')
@@ -276,6 +281,7 @@ function ParticipantContent() {
 
   return (
     <ThemeProvider game={game ?? null} appearance={currentGameMeta?.formConfig?.appearance ?? currentGameMeta?.appearance}>
+      <ProfilePhotosContext.Provider value={profilePhotoEnabled(currentGameMeta?.participantFields)}>
       <div
         ref={viewportRef}
         lang={language}
@@ -421,12 +427,13 @@ function ParticipantContent() {
             />
           )}
           {(gameType !== 'STACK' || !currentGameMeta?.lifecycleState || nativeAwards.length > 0) && playerToken
-            && <NativePrizeClaims key={`${gameId}:${playerToken}`} gameId={gameId} playerToken={playerToken} initialAwards={nativeAwards} initialUnavailable={prizeUnavailable} />}
+            && <NativePrizeClaims key={`${gameId}:${playerToken}`} gameId={gameId} playerToken={playerToken} initialAwards={nativeAwards} initialUnavailable={prizeUnavailable} initialEmailOnly={prizeEmailOnly} />}
           </ParticipantQuiz>}
         </div>
         </div>
         </div>
       </div>
+      </ProfilePhotosContext.Provider>
     </ThemeProvider>
   )
 }

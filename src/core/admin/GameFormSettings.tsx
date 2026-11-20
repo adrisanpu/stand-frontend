@@ -282,6 +282,13 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
               {label} {t('(obligatorio)', '(required)')}
             </label>)}
             <div className="border-t border-current/15" />
+            <label className="flex min-h-[28px] items-center gap-2">
+              <input type="checkbox" checked={draft.participantFields.profilePhoto?.enabled === true}
+                onChange={event => setDraft({ ...draft, participantFields: {
+                  ...resolveParticipantFields(draft.participantFields), profilePhoto: { enabled: event.target.checked },
+                } })} />
+              {t('Foto de perfil', 'Profile photo')} {t('(opcional)', '(optional)')}
+            </label>
             {OPTIONAL_REGISTRATION_FIELDS.map(field => <label key={field.key} className="flex min-h-[28px] items-center gap-2">
               <input type="checkbox" checked={draft.participantFields[field.key]?.enabled === true}
                 onChange={event => setDraft({ ...draft, participantFields: {

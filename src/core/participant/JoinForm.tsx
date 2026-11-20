@@ -80,6 +80,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined, preview = false }
   const [error, setError] = useState<string | null>(null)
   const [challenge, setChallenge] = useState<(EmailChallengeResponse & { registration: EmailRegistration | ResumeEmailRequest }) | null>(null)
   const [details, setDetails] = useState<EmailDetailsResponse | null>(null)
+  const resuming = details !== null && (details.existingPlayer || details.knownClient === true)
   const [code, setCode] = useState('')
   const [invalidChallenge, setInvalidChallenge] = useState(false)
   const [now, setNow] = useState(Date.now)
@@ -312,7 +313,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined, preview = false }
     setLoading(true)
     const version = generation.current
     try {
-      const registration: EmailRegistration | ResumeEmailRequest = details?.existingPlayer ? {
+      const registration: EmailRegistration | ResumeEmailRequest = resuming && details ? {
         mode: 'resume',
         gameId, email: email.trim(),
         ...(showName ? { username: trimmedUsername } : {}),
@@ -370,11 +371,12 @@ export default function JoinForm({ gameId, gameMeta, onJoined, preview = false }
     }
   }
 
-  const showName = !details?.existingPlayer || details.fields.username
-  const showPhone = phoneEnabled && (!details?.existingPlayer || details.fields.phone)
-  const showConsent = !details?.existingPlayer || details.fields.consent
-  const showClubConsent = !!gameMeta.loyalty && (!details?.existingPlayer || details.fields.loyaltyConsent)
-  const nameColumn = details?.existingPlayer ? 'col-start-1' : 'col-start-2'
+  const showName = !resuming || details.fields.username
+  const showPhone = phoneEnabled && (!resuming || details.fields.phone)
+  const showConsent = !resuming || details.fields.consent
+  const showClubConsent = !!gameMeta.loyalty && (!resuming || details.fields.loyaltyConsent)
+  const askPhoto = pf.profilePhoto.enabled && !details?.existingPlayer
+  const nameColumn = askPhoto ? 'col-start-2' : 'col-start-1'
 
   return (
     <form onSubmit={handleSubmit} noValidate className="participant-form space-y-4">
@@ -403,8 +405,8 @@ export default function JoinForm({ gameId, gameMeta, onJoined, preview = false }
 
       {step === 2 && <>
       <fieldset disabled={loading} className="space-y-4">
-      <div className={`${showName ? 'grid' : 'hidden'} ${details?.existingPlayer ? 'grid-cols-1' : 'grid-cols-[5rem_minmax(0,1fr)] gap-x-3'}`}>
-      {!details?.existingPlayer && <div className="contents">
+      <div className={`${showName || askPhoto ? 'grid' : 'hidden'} ${askPhoto ? 'grid-cols-[5rem_minmax(0,1fr)] gap-x-3' : 'grid-cols-1'}`}>
+      {askPhoto && <div className="contents">
         <label className="sr-only" htmlFor="join-photo">
           {t('Foto de perfil (opcional)')}
         </label>
@@ -481,7 +483,7 @@ export default function JoinForm({ gameId, gameMeta, onJoined, preview = false }
         </div>
       </div>}
       {OPTIONAL_REGISTRATION_FIELDS.filter(({ key }) => pf[key].enabled
-        && (!details?.existingPlayer || details.fields[key])).map(field => <label key={field.key} className="block space-y-1 text-sm">
+        && (!resuming || details.fields[key])).map(field => <label key={field.key} className="block space-y-1 text-sm">
         <span>{language === 'en' ? field.en : field.es}{t(' (opcional)')}</span>
         {field.key === 'sex' ? <select autoComplete={field.autoComplete}
           value={profile.sex ?? ''} onChange={event => setProfile(current => ({ ...current, sex: event.target.value }))}

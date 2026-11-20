@@ -41,6 +41,12 @@ const data: StackPlayerPrizes = {
     { id: 'a3', name: 'Coffee', source: 'kivly', condition: 'completed', state: 'confirmed' },
   ],
 }
+it('shows an email notice instead of the QR when prizes are delivered by email only', () => {
+  render(<StackAwardList emailOnly data={{ ...data, awards: data.awards.map(award => ({ ...award, token: null })) }} />)
+  expect(screen.queryByRole('img', { name: /^QR / })).not.toBeInTheDocument()
+  expect(screen.getAllByText(/Te enviamos el QR de tu premio por email/).length).toBeGreaterThan(0)
+})
+
 it('shows separate locally generated QR codes for two units of the same STAND prize', () => {
   render(<StackAwardList data={{ ...data, awards: data.awards.map(award => ({
     ...award, ...(award.source === 'stand' ? { emailState: 'pending' as const } : {}),

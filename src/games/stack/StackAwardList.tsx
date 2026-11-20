@@ -4,6 +4,7 @@ import { publicApi } from '../../api/publicApi'
 import type { StackAward, StackPlayerPrizes } from '../../api/stackPrizes'
 import { useParticipantLanguage } from '../../core/participant/participantLanguage'
 import { inventoryReasonText } from '../../core/inventoryReason'
+import PrizeEmailNotice from '../../core/participant/PrizeEmailNotice'
 
 function AwardQR({ award }: { award: StackAward }) {
   const source = useMemo(() => {
@@ -45,12 +46,13 @@ export function StackWallet({ url, expected = false, onOpen, highlight = true }:
   </div>
 }
 
-export default function StackAwardList({ data, locked = false, gameId, playerToken, onRefresh }: {
+export default function StackAwardList({ data, locked = false, gameId, playerToken, onRefresh, emailOnly = false }: {
   data: StackPlayerPrizes
   locked?: boolean
   gameId?: string
   playerToken?: string
   onRefresh?: () => void
+  emailOnly?: boolean
 }) {
   const { t, language } = useParticipantLanguage()
   const inventoryMessages = [...new Set(Object.values(data.inventoryReasons ?? {})
@@ -99,7 +101,7 @@ export default function StackAwardList({ data, locked = false, gameId, playerTok
         <h3 className="flex-1 min-w-0 font-semibold break-words">{award.name}</h3>
       </div>
       <div className="flex flex-col sm:flex-row items-center gap-4">
-        {!locked && award.source === 'stand' && award.state === 'available' && <AwardQR award={award} />}
+        {!locked && award.source === 'stand' && award.state === 'available' && (emailOnly ? <PrizeEmailNotice /> : <AwardQR award={award} />)}
         {!(award.source === 'stand' && ['available', 'delivered'].includes(award.state))
           && <p role="status" className={`text-sm ${award.state.includes('required') ? 'text-amber-300' : 'text-textSub'}`}>
             {states[award.state]}

@@ -197,7 +197,7 @@ describe('ParticipantShell STACK integration', () => {
       ok: true, gameId: 'GAME1234', gameType: 'T1MER', isActive: true,
       playMode: 'mobile', joinChannel: 'web', playerCount: 0, validatedCount: 0,
       recentPairs: [], joinUrl: '',
-      participantFields: { email: { required: false }, phone: { required: false } },
+      participantFields: { email: { required: false }, phone: { required: false }, profilePhoto: { enabled: true } },
     })
     vi.mocked(publicApi.join).mockResolvedValue({
       ok: true, gameId: 'GAME1234', gameType: 'T1MER', playerToken: 'player-token',
@@ -605,6 +605,7 @@ describe('ParticipantShell STACK integration', () => {
       vi.mocked(publicApi.getGame).mockResolvedValue({
         ok: true, gameId: 'GAME1234', gameType: 'EMPAREJA2', playMode: 'mobile',
         isActive: true, playerCount: 1, validatedCount: 0, recentPairs: [], joinUrl: '',
+        participantFields: { profilePhoto: { enabled: true } },
       })
       const pair = {
         participantName: '@ana', profilePicUrl: '/ana.png',
@@ -701,8 +702,23 @@ describe('ParticipantShell STACK integration', () => {
     vi.mocked(publicApi.getGame).mockResolvedValue({
       ok: true, gameId: 'GAME1234', gameType, playMode, joinChannel, isActive: true,
       playerCount: 1, validatedCount: 0, recentPairs: [], joinUrl: '/play/GAME1234',
+      participantFields: { profilePhoto: { enabled: true } },
     })
   }
+
+  it('hides the participant avatar when the game does not ask for profile photos', async () => {
+    vi.mocked(publicApi.getGame).mockResolvedValue({
+      ok: true, gameId: 'GAME1234', gameType: 'EMPAREJA2', playMode: 'mobile', joinChannel: 'web', isActive: true,
+      playerCount: 1, validatedCount: 0, recentPairs: [], joinUrl: '/play/GAME1234',
+    })
+    const pair = { ...pairAssignment, participantName: '@ana', profilePicUrl: 'https://images.test/ana.png' }
+    savePlayerSession('GAME1234', 'token', pair)
+    vi.mocked(publicApi.getPlayer).mockResolvedValue(playerResponse('EMPAREJA2', pair))
+    const { container } = renderParticipant()
+    expect(await screen.findByText('@ana')).toBeInTheDocument()
+    expect(container.querySelector('img[src="https://images.test/ana.png"]')).toBeNull()
+    expect(screen.getByText('@ana').parentElement?.querySelector('.rounded-full')).toBeNull()
+  })
 
   function playerResponse(gameType: string, playerAssignment: PlayerAssignment): PlayerResponse {
     return {

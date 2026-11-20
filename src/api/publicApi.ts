@@ -57,6 +57,7 @@ export type ParticipantProfile = Partial<Record<OptionalParticipantField, string
 export type ParticipantFieldsConfig = {
   email?: { required?: boolean }
   phone?: { required?: boolean; enabled?: boolean }
+  profilePhoto?: { enabled?: boolean }
 } & Partial<Record<OptionalParticipantField, { enabled?: boolean }>>
 
 export type PublicRankingEntry = {
@@ -330,6 +331,8 @@ export type EmailDetailsResponse = {
   ok: true
   detailsRequired: true
   existingPlayer: boolean
+  /** Email already verified in another game of the same operator. */
+  knownClient?: boolean
   fields: { username: boolean; phone: boolean; consent: boolean; loyaltyConsent: boolean }
     & Partial<Record<OptionalParticipantField, boolean>>
 }
@@ -357,6 +360,8 @@ export type PlayerPrize = {
   token: string
   delivered: boolean
 }
+
+export type PrizeNotification = { play: boolean; email: boolean }
 
 export type NativePrizeAward = {
   id: string
@@ -387,6 +392,7 @@ export type PlayerResponse = {
   prizeCatalog?: PrizeCatalog
   stackPrizes?: import('./stackPrizes').StackPlayerPrizes
   nativePrizes?: NativePrizeAward[]
+  prizeNotification?: PrizeNotification
   prizeUnavailable?: { condition: string; reason: string }[]
   quiz?: ParticipantQuizState
 }

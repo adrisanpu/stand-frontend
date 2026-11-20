@@ -12,6 +12,7 @@ import Raffle from '../widgets/Raffle'
 import type { GameConfigSaveRegistration } from '../types'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import RewardConditions from './RewardConditions'
+import PrizeNotificationSettings from './PrizeNotificationSettings'
 import SaveButton from '../ui/SaveButton'
 import GameGate from '../shell/GameGate'
 import GameFormSettings from './GameFormSettings'
@@ -378,7 +379,8 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
           </section>
           <section role="tabpanel" id="event-panel-conditions" aria-labelledby="event-tab-conditions"
             hidden={section !== 'conditions'} tabIndex={0} className="space-y-3 py-2">
-            <fieldset disabled={busy || discard}>
+            <fieldset disabled={busy || discard} className="space-y-3">
+              <PrizeNotificationSettings gameId={gameId} readOnly={readOnly} />
               <RewardConditions data={data} readOnly={readOnly}
                 headerAside={<div className="flex min-w-0 items-center gap-3 rounded-xl border border-current/15 p-3">
                   <QRCode data={getRedeemUrl(gameId)} size={80} margin={4}

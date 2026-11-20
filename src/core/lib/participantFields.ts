@@ -18,10 +18,16 @@ export function participantProfileValue(key: OptionalParticipantField, value: st
   return value
 }
 
+/** Whether the game asks participants for a profile photo (off unless explicitly enabled). */
+export function profilePhotoEnabled(fields?: ParticipantFieldsConfig) {
+  return fields?.profilePhoto?.enabled === true
+}
+
 export function resolveParticipantFields(fields?: ParticipantFieldsConfig, _gameType?: string) {
   return {
     email: { required: true },
     phone: { required: true, enabled: true },
+    profilePhoto: { enabled: fields?.profilePhoto?.enabled === true },
     address: { enabled: fields?.address?.enabled === true },
     company: { enabled: fields?.company?.enabled === true },
     sex: { enabled: fields?.sex?.enabled === true },
