@@ -203,7 +203,8 @@ it.each(['registration', 'questionnaire'] as const)('places the %s QR above a co
   const qr = screen.getByTestId('qr')
   expect(aside).toContainElement(qr)
   expect(preview.compareDocumentPosition(qr) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
-  expect(aside).toHaveClass('lg:h-[calc(92dvh-13rem)]', 'lg:overflow-hidden')
+  expect(aside).toHaveClass('lg:max-h-[calc(92dvh-13rem)]', 'lg:self-start', 'lg:overflow-hidden')
+  expect(aside).not.toHaveClass('lg:h-[calc(92dvh-13rem)]')
   expect(preview).toHaveClass('flex-1', 'overflow-y-auto')
 })
 

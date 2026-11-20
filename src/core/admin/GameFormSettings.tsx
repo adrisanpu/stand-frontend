@@ -389,7 +389,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
           <button type="button" className="underline" onClick={() => setDiscardReload(false)}>{t('Seguir editando', 'Keep editing')}</button>
         </div>}
       </div>
-      <aside className="flex min-w-0 flex-col gap-4 lg:h-[calc(92dvh-13rem)] lg:min-h-80 lg:overflow-hidden"
+      <aside className="flex min-w-0 flex-col gap-4 lg:max-h-[calc(92dvh-13rem)] lg:self-start lg:overflow-hidden"
         aria-label={t('Vista previa del formulario', 'Form preview')}>
         <div className="flex shrink-0 items-center gap-3 rounded-xl border border-current/15 p-3">
           <QRCode data={confirmed.joinUrl} size={80} margin={4} alt={t('QR de participación', 'Participant QR code')} className="!bg-white !p-1" />
