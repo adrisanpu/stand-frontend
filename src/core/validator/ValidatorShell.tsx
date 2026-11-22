@@ -59,7 +59,7 @@ export default function ValidatorShell() {
     setMessage(null)
     setPrize(null)
     try {
-      const res = await publicApi.redeem(token, gameId)
+      const res = await publicApi.redeem(token, gameId || undefined)
       setPrize(res.prize ?? null)
       setStatus('ok')
       const kindLabel = PRIZE_LABEL[res.kind] || res.kind
@@ -105,7 +105,6 @@ export default function ValidatorShell() {
   }, [stopCamera])
 
   useEffect(() => {
-    if (!gameId) return
     void startScan()
     return () => stopCamera()
   }, [gameId, startScan, stopCamera])

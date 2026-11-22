@@ -11,6 +11,7 @@ const response = {
   questions: [{ id: 'q1', text: 'Question?', options: [{ title: 'Yes', payload: 'yes' }] }],
   players: [{
     playerId: 1, name: 'Ana', email: 'ana@example.test', completed: true,
+    joinedAt: '2026-01-01T02:03:04Z',
     completedAt: '2026-01-02T03:04:05Z', answers: { q1: 'yes' },
   }],
 }
@@ -38,5 +39,18 @@ it('preserves authenticated profile fields and rejects malformed profile values'
   vi.mocked(api.get).mockResolvedValue({ ...response, players: [{ ...player, company: { unexpected: true } }] })
   await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
   vi.mocked(api.get).mockResolvedValue({ ...response, players: [{ ...player, sex: [] }] })
+  await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
+})
+
+it('accepts missing or null registration timestamps and rejects malformed timestamps', async () => {
+  vi.mocked(api.get).mockResolvedValue({
+    ...response, players: [{ ...response.players[0], joinedAt: null }],
+  })
+  await expect(getFormResponses('ABC123')).resolves.toMatchObject({
+    players: [{ joinedAt: null }],
+  })
+  vi.mocked(api.get).mockResolvedValue({
+    ...response, players: [{ ...response.players[0], joinedAt: 123 }],
+  })
   await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
 })

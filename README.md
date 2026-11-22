@@ -8,9 +8,10 @@ This repo is the **frontend only**. Backend lives in a separate repo: [stand-bac
 
 ## Administration and event home
 
-The Responses panel (`/admin/responses`) is a question-by-question summary,
-with horizontal bars, answer counts and percentages instead of a participant
-table. Percentages use nonblank answers to each question, including incomplete
+The Analytics panel (`/admin/analytics`) combines player metrics with a question-by-question summary,
+with a cumulative registration timeline and phone-prefix country breakdown.
+Questionnaire results use horizontal bars, answer counts and percentages instead
+of a participant table. Percentages use nonblank answers to each question, including incomplete
 forms; participants who skipped that question are excluded. Options with no
 votes remain visible, and answers that no longer match configured options are
 explicitly counted. Existing answers to questions without options appear as

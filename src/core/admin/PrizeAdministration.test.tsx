@@ -57,6 +57,11 @@ it('provides one shared catalog container without selecting a game', async () =>
   </MemoryRouter>)
 
   expect(await screen.findByRole('rowheader', { name: 'Premio bienvenida' })).toBeInTheDocument()
+  const validator = screen.getByRole('region', { name: 'Validador de premios' })
+  const url = `${window.location.origin}/redeem`
+  expect(within(validator).getByRole('link', { name: 'Abrir validador de premios' })).toHaveAttribute('href', url)
+  expect(within(validator).getByRole('img', { name: 'QR validador de premios' })).toHaveAttribute('data-qr-value', url)
+  expect(validator.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(screen.getByRole('region', { name: 'Catálogo e inventario de premios' })).toBeInTheDocument()
   expect(screen.queryByText(/compartidos por todas las partidas/)).not.toBeInTheDocument()
   expect(screen.queryByRole('combobox', { name: 'Partida' })).not.toBeInTheDocument()

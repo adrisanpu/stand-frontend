@@ -6,6 +6,8 @@ import { getFeaturesByPlan } from '../../auth/featureFlags'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import { PARTICIPANT_PROFILE_FIELDS, participantProfileValue } from '../lib/participantFields'
+import { PHONE_COUNTRIES } from '../participant/phoneCountries'
+import PlayerCountriesMap from './PlayerCountriesMap'
 
 export function buildResponsesSummary(players: FormResponsePlayer[], questions: FormResponseQuestion[]) {
   const answeredPlayers = new Set<number>()
@@ -36,6 +38,115 @@ export function buildResponsesSummary(players: FormResponsePlayer[], questions: 
     completedCount: players.filter(player => player.completed).length,
     questions: summaries,
   }
+}
+
+type RegistrationPoint = { timestamp: number; count: number }
+type PlayerCountryCount = { code: string | null; count: number }
+
+function phoneCountryCode(phone: string | null | undefined): string | null {
+  const value = phone?.trim()
+  if (!value || (!value.startsWith('+') && !value.startsWith('00'))) return null
+  const digits = value.startsWith('00') ? value.slice(2).replace(/\D/g, '') : value.slice(1).replace(/\D/g, '')
+  if (!digits) return null
+  const matches = PHONE_COUNTRIES.filter(country => digits.startsWith(country.prefix.slice(1)))
+    .sort((a, b) => b.prefix.length - a.prefix.length)
+  const longestPrefix = matches[0]?.prefix
+  if (!longestPrefix) return null
+  const samePrefix = matches.filter(country => country.prefix === longestPrefix)
+  return samePrefix.find(country => country.code === 'GB' || country.code === 'RU')?.code
+    ?? samePrefix[0]?.code
+    ?? null
+}
+
+export function buildPlayerAnalytics(players: FormResponsePlayer[], questions: FormResponseQuestion[]) {
+  const registrationCounts = new Map<number, number>()
+  players.forEach(player => {
+    if (!player.joinedAt) return
+    const timestamp = Date.parse(player.joinedAt)
+    if (Number.isFinite(timestamp)) {
+      registrationCounts.set(timestamp, (registrationCounts.get(timestamp) ?? 0) + 1)
+    }
+  })
+  let runningCount = 0
+  const registrations: RegistrationPoint[] = [...registrationCounts]
+    .sort(([first], [second]) => first - second)
+    .map(([timestamp, count]) => {
+      runningCount += count
+      return { timestamp, count: runningCount }
+    })
+
+  const countryCounts = new Map<string | null, number>()
+  players.forEach(player => {
+    const code = phoneCountryCode(player.phone)
+    countryCounts.set(code, (countryCounts.get(code) ?? 0) + 1)
+  })
+  const countries: PlayerCountryCount[] = [...countryCounts]
+    .map(([code, count]) => ({ code, count }))
+    .sort((first, second) => {
+      if (first.code === null || second.code === null) {
+        return first.code === second.code ? 0 : first.code === null ? 1 : -1
+      }
+      return second.count - first.count || first.code.localeCompare(second.code)
+    })
+  const responseSummary = buildResponsesSummary(players, questions)
+
+  return {
+    playerCount: players.length,
+    answeredCount: responseSummary.answeredCount,
+    completedCount: responseSummary.completedCount,
+    registrations,
+    countries,
+  }
+}
+
+function RegistrationChart({ points, language, t }: {
+  points: RegistrationPoint[]
+  language: 'es' | 'en'
+  t: (spanish: string, english?: string) => string
+}) {
+  if (points.length === 0) return <p className="text-sm text-textSub">
+    {t('No hay fechas de registro disponibles.', 'No registration timestamps are available.')}
+  </p>
+
+  const left = 44
+  const right = 676
+  const top = 18
+  const bottom = 188
+  const maxCount = Math.max(...points.map(point => point.count), 1)
+  const firstTimestamp = points[0].timestamp
+  const lastTimestamp = points[points.length - 1].timestamp
+  const x = (timestamp: number) => firstTimestamp === lastTimestamp
+    ? (left + right) / 2
+    : left + (timestamp - firstTimestamp) / (lastTimestamp - firstTimestamp) * (right - left)
+  const y = (count: number) => bottom - count / maxCount * (bottom - top)
+  const path = points.map((point, index) =>
+    `${index === 0 ? 'M' : 'L'} ${x(point.timestamp)} ${y(point.count)}`,
+  ).join(' ')
+  const dateFormat = new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'es-ES', {
+    dateStyle: 'medium', timeStyle: 'short',
+  })
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col justify-center">
+      <svg role="img" aria-label={t('Registros acumulados en el tiempo', 'Cumulative registrations over time')}
+        viewBox="0 0 720 220" className="h-56 max-h-full w-full overflow-visible">
+        <line x1={left} y1={bottom} x2={right} y2={bottom} stroke="currentColor" opacity=".2" />
+        <line x1={left} y1={top} x2={left} y2={bottom} stroke="currentColor" opacity=".2" />
+        <path d={path} fill="none" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+        {points.map(point => <circle key={point.timestamp} cx={x(point.timestamp)} cy={y(point.count)} r="4"
+          fill="currentColor"><title>{`${dateFormat.format(point.timestamp)} · ${point.count}`}</title></circle>)}
+        <text x={left} y="210" textAnchor="start" className="fill-current text-[11px]">
+          {dateFormat.format(firstTimestamp)}
+        </text>
+        <text x={right} y="210" textAnchor="end" className="fill-current text-[11px]">
+          {dateFormat.format(lastTimestamp)}
+        </text>
+      </svg>
+      <p className="text-sm text-textSub">
+        {t('Registros acumulados', 'Cumulative registrations')}: <span className="tabular-nums">{points[points.length - 1].count}</span>
+      </p>
+    </div>
+  )
 }
 
 function csvCell(value: unknown): string {
@@ -95,7 +206,7 @@ function downloadCsv(
   URL.revokeObjectURL(url)
 }
 
-export default function ResponsesAdmin() {
+export default function AnalyticsAdmin() {
   const { language, t } = useOperatorLanguage()
   const { plan } = useCurrentUser()
   const canExportResults = getFeaturesByPlan(plan).exportResults
@@ -148,13 +259,17 @@ export default function ResponsesAdmin() {
   const summary = useMemo(() => responses
     ? buildResponsesSummary(responses.players, responses.questions)
     : null, [responses])
+  const playerAnalytics = useMemo(() => responses
+    ? buildPlayerAnalytics(responses.players, responses.questions)
+    : null, [responses])
   const percentageFormat = new Intl.NumberFormat(language === 'en' ? 'en-GB' : 'es-ES', {
     maximumFractionDigits: 1,
   })
+  const countryNames = new Intl.DisplayNames([language === 'en' ? 'en-GB' : 'es-ES'], { type: 'region' })
   const selectedGame = games.find(game => game.gameId === selectedId)
 
   return (
-    <section aria-label={t('Respuestas', 'Responses')} className="mt-6 space-y-6">
+    <section aria-label={t('Analíticas', 'Analytics')} className="mt-6 space-y-6">
       <div className="card flex flex-wrap items-end gap-4 p-4">
         <label className="min-w-[14rem] flex-1 space-y-1 text-sm font-medium">
           <span>{t('Partida', 'Event')}</span>
@@ -187,23 +302,63 @@ export default function ResponsesAdmin() {
       {gameStatus === 'ready' && games.length === 0 && (
         <p className="text-sm text-textSub">{t('No hay partidas disponibles.', 'There are no events available.')}</p>
       )}
-      {responseStatus === 'loading' && <p role="status">{t('Cargando respuestas…', 'Loading responses…')}</p>}
+      {responseStatus === 'loading' && <p role="status">{t('Cargando analíticas…', 'Loading analytics…')}</p>}
       {responseStatus === 'error' && <div role="alert" className="space-y-2">
-        <p>{t('No se pudieron cargar las respuestas.', 'Could not load responses.')}</p>
+        <p>{t('No se pudieron cargar las analíticas.', 'Could not load analytics.')}</p>
         <button type="button" className="rounded-lg border border-current/20 px-3 py-2"
           onClick={() => setRetry(value => value + 1)}>{t('Reintentar', 'Retry')}</button>
       </div>}
-      {responseStatus === 'ready' && responses && summary && (
+      {responseStatus === 'ready' && responses && summary && playerAnalytics && (
         <>
-          <section aria-label={t('Resumen de respuestas', 'Response summary')} className="card space-y-4 p-4 sm:p-6">
+          <section aria-label={t('Métricas de jugadores', 'Player metrics')} className="space-y-4">
+            <h2 className="text-lg font-semibold">{t('Métricas de jugadores', 'Player metrics')}</h2>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <article className="card p-4">
+                <p className="text-sm text-textSub">{t('Jugadores registrados', 'Registered players')}</p>
+                <p className="mt-1 text-3xl font-semibold tabular-nums">{playerAnalytics.playerCount}</p>
+              </article>
+              <article className="card p-4">
+                <p className="text-sm text-textSub">{t('Con respuestas', 'With answers')}</p>
+                <p className="mt-1 text-3xl font-semibold tabular-nums">{playerAnalytics.answeredCount}</p>
+              </article>
+              <article className="card p-4">
+                <p className="text-sm text-textSub">{t('Cuestionarios completados', 'Completed questionnaires')}</p>
+                <p className="mt-1 text-3xl font-semibold tabular-nums">{playerAnalytics.completedCount}</p>
+              </article>
+              <article className="card p-4">
+                <p className="text-sm text-textSub">{t('Tasa de finalización', 'Completion rate')}</p>
+                <p className="mt-1 text-3xl font-semibold tabular-nums">
+                  {percentageFormat.format(playerAnalytics.playerCount
+                    ? playerAnalytics.completedCount / playerAnalytics.playerCount * 100
+                    : 0)}%
+                </p>
+              </article>
+            </div>
+          </section>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <section aria-label={t('Registros acumulados', 'Cumulative registrations')} className="card flex h-[28rem] min-h-0 flex-col gap-4 overflow-hidden p-4 sm:p-6">
+              <h2 className="text-lg font-semibold">{t('Evolución de registros', 'Registration timeline')}</h2>
+              <RegistrationChart points={playerAnalytics.registrations} language={language} t={t} />
+            </section>
+            <section aria-label={t('Países de los jugadores', 'Player countries')} className="card flex h-[28rem] min-h-0 flex-col gap-4 overflow-hidden p-4 sm:p-6">
+              <div>
+                <h2 className="text-lg font-semibold">{t('Países de los jugadores', 'Player countries')}</h2>
+                <p className="mt-1 text-sm text-textSub">
+                  {t('Inferidos a partir del prefijo del teléfono.', 'Inferred from the phone calling code.')}
+                </p>
+              </div>
+              {playerAnalytics.countries.length === 0 && <p className="text-sm text-textSub">
+                {t('Todavía no hay jugadores registrados.', 'There are no registered players yet.')}
+              </p>}
+              <PlayerCountriesMap countries={playerAnalytics.countries}
+                countryName={code => countryNames.of(code) ?? code}
+                percentageFormat={percentageFormat} playerCount={playerAnalytics.playerCount} t={t} />
+            </section>
+          </div>
+          <section aria-label={t('Respuestas del cuestionario', 'Questionnaire responses')} className="card space-y-4 p-4 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold">{t('Resumen de respuestas', 'Response summary')}</h2>
-                <p className="mt-2 text-sm text-textSub">{t('Participantes con respuestas', 'Participants with answers')}</p>
-                <p className="text-3xl font-semibold tabular-nums">{summary.answeredCount}</p>
-                <p className="mt-1 text-sm text-textSub">
-                  {t('Formularios completados', 'Completed forms')}: <span className="tabular-nums">{summary.completedCount}</span>
-                </p>
+                <h2 className="text-lg font-semibold">{t('Respuestas del cuestionario', 'Questionnaire responses')}</h2>
               </div>
               <button type="button" disabled={!canExportResults}
                 onClick={() => downloadCsv(responses.gameId, responses.players, responses.questions, t, language)}

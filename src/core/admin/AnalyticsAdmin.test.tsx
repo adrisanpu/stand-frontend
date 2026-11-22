@@ -5,7 +5,7 @@ import { getFormResponses, type FormResponses } from '../../api/formResponses'
 import { listOperatorGames } from '../../api/operatorGames'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { OperatorLanguageProvider, OperatorLanguageSelector } from '../shell/operatorLanguage'
-import ResponsesAdmin, { buildResponsesCsv, buildResponsesSummary } from './ResponsesAdmin'
+import AnalyticsAdmin, { buildPlayerAnalytics, buildResponsesCsv, buildResponsesSummary } from './AnalyticsAdmin'
 
 vi.mock('../../api/formResponses', () => ({ getFormResponses: vi.fn() }))
 vi.mock('../../api/operatorGames', () => ({ listOperatorGames: vi.fn() }))
@@ -19,14 +19,16 @@ const responses: FormResponses = {
   ] }],
   players: [
     { playerId: 1, name: 'Ana', email: 'ana@example.test', completed: true,
+      phone: '+34612345678', joinedAt: '2026-01-01T03:04:05Z',
       completedAt: '2026-01-02T03:04:05Z', answers: { q1: 'first' } },
     { playerId: 2, name: 'Bob', email: 'bob@example.test', completed: false,
+      phone: '+33123456789', joinedAt: '2026-01-02T03:04:05Z',
       completedAt: null, answers: { q1: 'second' } },
   ],
 }
 
 function mount() {
-  return render(<OperatorLanguageProvider><OperatorLanguageSelector /><MemoryRouter><ResponsesAdmin /></MemoryRouter></OperatorLanguageProvider>)
+  return render(<OperatorLanguageProvider><OperatorLanguageSelector /><MemoryRouter><AnalyticsAdmin /></MemoryRouter></OperatorLanguageProvider>)
 }
 
 beforeEach(() => {
@@ -39,7 +41,7 @@ beforeEach(() => {
 it('keeps responses readable but gates CSV export on the current plan', async () => {
   vi.mocked(useCurrentUser).mockReturnValue({ plan: 'free' } as ReturnType<typeof useCurrentUser>)
   mount()
-  await screen.findByRole('region', { name: 'Resumen de respuestas' })
+  await screen.findByRole('region', { name: 'Respuestas del cuestionario' })
   expect(screen.getByRole('region', { name: 'Distribución: Favourite?' })).toHaveTextContent('1 (50%)')
   expect(screen.getByRole('button', { name: 'Exportar CSV' })).toBeDisabled()
   expect(screen.getByText('Exportar resultados está disponible en el plan Event.')).toBeInTheDocument()
@@ -53,9 +55,19 @@ afterEach(() => {
 
 it('shows question charts without a participant table and links to configuration', async () => {
   mount()
-  const header = await screen.findByRole('region', { name: 'Resumen de respuestas' })
-  expect(header).toHaveTextContent('Participantes con respuestas2')
-  expect(header).toHaveTextContent('Formularios completados: 1')
+  const metrics = await screen.findByRole('region', { name: 'Métricas de jugadores' })
+  expect(metrics).toHaveTextContent('Jugadores registrados2')
+  expect(metrics).toHaveTextContent('Con respuestas2')
+  expect(metrics).toHaveTextContent('Cuestionarios completados1')
+  expect(metrics).toHaveTextContent('Tasa de finalización50%')
+  expect(screen.getByRole('img', { name: 'Registros acumulados en el tiempo' })).toBeInTheDocument()
+  const registrations = screen.getByRole('region', { name: 'Registros acumulados' })
+  expect(registrations).toHaveClass('h-[28rem]')
+  const countries = screen.getByRole('region', { name: 'Países de los jugadores' })
+  expect(countries).toHaveClass('h-[28rem]')
+  expect(within(countries).getByRole('img', { name: 'Mapa de países de los jugadores' })).toBeInTheDocument()
+  expect(countries).toHaveTextContent('España1 (50%)')
+  expect(countries).toHaveTextContent('Francia1 (50%)')
   expect(screen.getByRole('link', { name: 'Configurar formulario' })).toHaveAttribute(
     'href', '/admin/games?form=ABC123',
   )
@@ -82,7 +94,7 @@ it('loads archived games on request and presents readable load errors', async ()
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar las partidas.')
   expect(listOperatorGames).toHaveBeenNthCalledWith(2, true)
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
-  expect(await screen.findByRole('region', { name: 'Resumen de respuestas' })).toBeInTheDocument()
+  expect(await screen.findByRole('region', { name: 'Respuestas del cuestionario' })).toBeInTheDocument()
   expect(listOperatorGames).toHaveBeenNthCalledWith(3, true)
 })
 
@@ -112,6 +124,25 @@ it('aggregates every loaded participant, including incomplete forms', async () =
   expect(chart).toHaveTextContent('25 (96,2%)')
   expect(chart).toHaveTextContent('1 (3,8%)')
   expect(screen.queryByText('Player 1')).not.toBeInTheDocument()
+})
+
+it('aggregates player metrics, sorted registration timestamps, and unknown phone countries', () => {
+  const analytics = buildPlayerAnalytics([
+    { ...responses.players[0], joinedAt: '2026-01-02T00:00:00Z', phone: '+34612345678' },
+    { ...responses.players[1], joinedAt: 'not-a-date', phone: '+999123456789' },
+    { ...responses.players[1], playerId: 3, joinedAt: '2026-01-01T00:00:00Z', phone: null, answers: {} },
+  ], responses.questions)
+  expect(analytics.playerCount).toBe(3)
+  expect(analytics.answeredCount).toBe(2)
+  expect(analytics.completedCount).toBe(1)
+  expect(analytics.registrations).toEqual([
+    { timestamp: Date.parse('2026-01-01T00:00:00Z'), count: 1 },
+    { timestamp: Date.parse('2026-01-02T00:00:00Z'), count: 2 },
+  ])
+  expect(analytics.countries).toEqual([
+    { code: 'ES', count: 1 },
+    { code: null, count: 2 },
+  ])
 })
 
 it('uses each question’s nonblank answers as the denominator and reports unknown options', () => {
@@ -206,7 +237,7 @@ it('shows an explicit empty-events state without requesting responses', async ()
 it('retries response load errors', async () => {
   vi.mocked(getFormResponses).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(responses)
   mount()
-  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar las respuestas.')
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar las analíticas.')
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
   expect(await screen.findByRole('region', { name: 'Distribución: Favourite?' })).toBeInTheDocument()
   expect(getFormResponses).toHaveBeenCalledTimes(2)
@@ -230,20 +261,20 @@ it('localizes chart labels and fractional percentages in English', async () => {
     ...responses, players: [...responses.players, { ...responses.players[1], playerId: 3 }],
   })
   mount()
-  await screen.findByRole('region', { name: 'Resumen de respuestas' })
+  await screen.findByRole('region', { name: 'Respuestas del cuestionario' })
   fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
   const chart = screen.getByRole('region', { name: 'Distribution: Favourite?' })
   expect(chart).toHaveTextContent('Answers: 3')
   expect(chart).toHaveTextContent('1 (33.3%)')
   expect(chart).toHaveTextContent('2 (66.7%)')
-  expect(screen.getByRole('region', { name: 'Response summary' })).toHaveTextContent('Completed forms: 1')
+  expect(screen.getByRole('region', { name: 'Player metrics' })).toHaveTextContent('Completion rate33.3%')
 })
 
 it('downloads all event records as CSV, including participants without answers', async () => {
   const allPlayers = [...responses.players, { ...responses.players[1], playerId: 3, name: 'No answers', answers: {} }]
   vi.mocked(getFormResponses).mockResolvedValue({ ...responses, players: allPlayers })
   mount()
-  await screen.findByRole('region', { name: 'Resumen de respuestas' })
+  await screen.findByRole('region', { name: 'Respuestas del cuestionario' })
   const createObjectURL = vi.fn((blob: Blob) => {
     expect(blob.type).toBe('text/csv;charset=utf-8')
     return 'blob:csv'
@@ -287,7 +318,7 @@ it('keeps registration details out of the summary but preserves safe CSV profile
     company: '=Company', sex: 'female', jobTitle: 'Engineer', birthDate: '2000-01-02' }
   vi.mocked(getFormResponses).mockResolvedValue({ ...responses, players: [player] })
   mount()
-  await screen.findByRole('region', { name: 'Resumen de respuestas' })
+  await screen.findByRole('region', { name: 'Respuestas del cuestionario' })
   expect(screen.queryByText('Street 1')).not.toBeInTheDocument()
   expect(screen.queryByText('Engineer')).not.toBeInTheDocument()
   expect(screen.queryByText('Femenino')).not.toBeInTheDocument()

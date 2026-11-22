@@ -47,6 +47,21 @@ function renderValidator() {
   )
 }
 
+it('scans and redeems prizes without restricting the event in the general validator', async () => {
+  vi.mocked(publicApi.redeem).mockResolvedValue({
+    ok: true, gameId: 'OTHER', playerId: 1, kind: 'award', delivered: true, label: 'adri',
+  })
+  render(
+    <MemoryRouter initialEntries={['/redeem']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Routes><Route path="/redeem" element={<ValidatorShell />} /></Routes>
+    </MemoryRouter>,
+  )
+  expect(await screen.findByText('Premio STAND entregado a adri.')).toBeInTheDocument()
+  expect(publicApi.redeem).toHaveBeenCalledWith('prize-token', undefined)
+  expect(publicApi.getGame).not.toHaveBeenCalled()
+  expect(stop).toHaveBeenCalled()
+})
+
 it('shows the redeemed prize image and name above the delivery confirmation and clears them on rescan', async () => {
   vi.mocked(publicApi.redeem).mockResolvedValue({
     ok: true, gameId: 'ABC123', playerId: 1, kind: 'ranking', delivered: true, label: 'adri',

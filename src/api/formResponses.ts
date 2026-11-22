@@ -13,6 +13,7 @@ export type FormResponsePlayer = Partial<Record<OptionalParticipantField, string
   name: string | null
   email: string | null
   phone?: string | null
+  joinedAt?: string | null
   completed: boolean
   completedAt: string | null
   answers: Record<string, string>
@@ -45,6 +46,7 @@ function isResponse(value: unknown): value is FormResponses {
       && (typeof player.email === 'string' || player.email === null)
       && [player.phone, ...PARTICIPANT_PROFILE_FIELDS.map(({ key }) => player[key])]
         .every(value => value === undefined || value === null || typeof value === 'string')
+      && (player.joinedAt === undefined || player.joinedAt === null || typeof player.joinedAt === 'string')
       && typeof player.completed === 'boolean'
       && (typeof player.completedAt === 'string' || player.completedAt === null)
       && isRecord(player.answers)
