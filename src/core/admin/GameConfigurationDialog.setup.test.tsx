@@ -115,13 +115,12 @@ it('opens new events in Home, requires all six explicit confirmations and only t
 it('resumes the first pending panel and preserves review progress across remounts', async () => {
   progress!.confirmedSections = ['appearance', 'configuration']
   const first = mount()
-  await screen.findByRole('tab', { name: 'Registro' })
-  expect(screen.getByRole('tab', { name: 'Registro' })).toHaveAttribute('aria-selected', 'true')
+  await waitFor(() => expect(screen.getByRole('tab', { name: 'Registro' })).toHaveAttribute('aria-selected', 'true'))
+  await waitFor(() => expect(confirm()).toBeEnabled())
   await act(async () => { fireEvent.click(confirm()) })
   first.unmount()
   mount()
-  await screen.findByRole('tab', { name: 'Cuestionario' })
-  expect(screen.getByRole('tab', { name: 'Cuestionario' })).toHaveAttribute('aria-selected', 'true')
+  await waitFor(() => expect(screen.getByRole('tab', { name: 'Cuestionario' })).toHaveAttribute('aria-selected', 'true'))
   expect(progress?.confirmedSections).toEqual(['appearance', 'form', 'configuration'])
 })
 

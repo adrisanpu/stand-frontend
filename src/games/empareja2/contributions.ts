@@ -17,7 +17,8 @@ export function validateDrafts(pairs: DraftPair[]): string | null {
   if (pairs.length > MAX_DRAFT_PAIRS) return 'Se permiten hasta 10 parejas por guardado.'
   for (const pair of pairs) {
     for (const character of pair.characters) {
-      if (!character.name.trim() || character.name.trim().length > 80 || /[\x00-\x1f]/.test(character.name)) {
+      if (!character.name.trim() || character.name.trim().length > 80
+        || Array.from(character.name).some(char => char.charCodeAt(0) < 32)) {
         return 'Cada personaje necesita un nombre de hasta 80 caracteres.'
       }
       if (!character.file) return 'Selecciona una imagen para cada personaje.'
