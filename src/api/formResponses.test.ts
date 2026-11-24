@@ -11,6 +11,7 @@ const response = {
   questions: [{ id: 'q1', text: 'Question?', options: [{ title: 'Yes', payload: 'yes' }] }],
   players: [{
     playerId: 1, name: 'Ana', email: 'ana@example.test', completed: true,
+    joinedAt: '2026-01-01T02:03:04Z',
     completedAt: '2026-01-02T03:04:05Z', answers: { q1: 'yes' },
   }],
 }
@@ -39,4 +40,31 @@ it('preserves authenticated profile fields and rejects malformed profile values'
   await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
   vi.mocked(api.get).mockResolvedValue({ ...response, players: [{ ...player, sex: [] }] })
   await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
+})
+
+it('accepts missing or null registration timestamps and rejects malformed timestamps', async () => {
+  vi.mocked(api.get).mockResolvedValue({
+    ...response, players: [{ ...response.players[0], joinedAt: null }],
+  })
+  await expect(getFormResponses('ABC123')).resolves.toMatchObject({
+    players: [{ joinedAt: null }],
+  })
+  vi.mocked(api.get).mockResolvedValue({
+    ...response, players: [{ ...response.players[0], joinedAt: 123 }],
+  })
+  await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
+})
+
+it('preserves prize timestamps and rejects malformed event arrays, kinds, and dates', async () => {
+  const prizeEvents = [
+    { kind: 'awarded', timestamp: '2026-01-02T00:00:00Z' },
+    { kind: 'redeemed', timestamp: null },
+  ]
+  vi.mocked(api.get).mockResolvedValue({ ...response, prizeEvents })
+  await expect(getFormResponses('ABC123')).resolves.toMatchObject({ prizeEvents })
+  for (const invalid of [null, {}, [{ kind: 'other', timestamp: null }],
+    [{ kind: 'awarded', timestamp: 123 }], [{ kind: 'redeemed' }]]) {
+    vi.mocked(api.get).mockResolvedValue({ ...response, prizeEvents: invalid })
+    await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
+  }
 })

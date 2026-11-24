@@ -116,10 +116,12 @@ there is no questionnaire versioning or participant-answer reset.
 AI generation fills a local draft; it does not save or replace existing answers.
 Legacy registration/quiz settings open the same editor.
 
-**Administracion > Respuestas** provides event selection, registered/completed
-counts, answer distributions, participant search/status filtering and CSV export.
-Results are not combined across different questionnaires. Completion rates use
-registered participants, not visitors or an inferred abandonment funnel.
+**Administracion > Analiticas** provides event selection, player and questionnaire
+completion metrics, a cumulative registration timeline, a phone-prefix country
+breakdown, answer distributions and CSV export. Results are not combined across
+different questionnaires. Completion rates use registered participants, not
+visitors or an inferred abandonment funnel; country values are inferred from
+calling codes, not geolocation.
 Archived events remain available for consultation. Configuration and exports
 respect their existing plan/lifecycle restrictions; the panel does not add AI
 insights.

@@ -75,6 +75,7 @@ it('preserves explicit checkout return URLs after sign-in', async () => {
 
 it.each([
   ['/play/NEW', 'PUBLIC PLAYER'],
+  ['/redeem', 'PUBLIC REDEMPTION'],
   ['/redeem/NEW', 'PUBLIC REDEMPTION'],
 ])('keeps %s public', async (path, text) => {
   window.history.replaceState({}, '', path)

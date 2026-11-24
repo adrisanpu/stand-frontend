@@ -10,7 +10,7 @@ import PrizeAdministration from './PrizeAdministration'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import ProfileAvatar from '../widgets/ProfileAvatar'
 import AccountSettings from './AccountSettings'
-import ResponsesAdmin from './ResponsesAdmin'
+import AnalyticsAdmin from './AnalyticsAdmin'
 
 export default function AdminShell() {
   return (
@@ -34,18 +34,18 @@ function AdminContent() {
   const prizes = location.pathname === '/admin/prizes'
   const clients = location.pathname === '/admin/clients'
   const account = location.pathname === '/admin/account'
-  const responses = location.pathname === '/admin/responses'
+  const analytics = location.pathname === '/admin/analytics'
   const pageTitle = account ? t('Configurar cuenta', 'Account settings')
     : integrations ? t('Integraciones', 'Integrations')
       : prizes ? t('Premios', 'Prizes')
         : clients ? t('Clientes', 'Clients')
-          : responses ? t('Respuestas', 'Responses')
+          : analytics ? t('Analíticas', 'Analytics')
             : t('Juegos', 'Games')
   const pageDescription = account ? t('Gestiona tu perfil y consulta los datos de tu cuenta y plan.', 'Manage your profile and view your account and plan details.')
     : integrations ? t('Gestiona las conexiones de tu cuenta.', 'Manage your account connections.')
       : prizes ? t('Gestiona las fichas de premios compartidas por tus partidas.', 'Manage prize details shared across your events.')
         : clients ? t('Consulta participaciones y premios de tus clientes.', 'View your clients’ participation and prize history.')
-          : responses ? t('Consulta las respuestas de los formularios de tus partidas.', 'Review form responses from your events.')
+          : analytics ? t('Consulta métricas de jugadores y respuestas de los cuestionarios de tus partidas.', 'Review player metrics and questionnaire responses from your events.')
             : t('Gestiona tus partidas o elige un juego para crear una nueva.', 'Manage your events or choose a game to create one.')
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `block rounded-xl px-4 py-3 font-medium ${isActive ? 'bg-primary/20 text-textMain' : 'text-textSub hover:bg-surface hover:text-textMain'}`
@@ -70,7 +70,7 @@ function AdminContent() {
           <NavLink to="/admin/games" className={({ isActive }) => `admin-nav-link ${linkClass({ isActive })}`}>{t('Juegos', 'Games')}</NavLink>
           <NavLink to="/admin/prizes" className={({ isActive }) => `admin-nav-link ${linkClass({ isActive })}`}>{t('Premios', 'Prizes')}</NavLink>
           <NavLink to="/admin/clients" className={({ isActive }) => `admin-nav-link ${linkClass({ isActive })}`}>{t('Clientes', 'Clients')}</NavLink>
-          <NavLink to="/admin/responses" className={({ isActive }) => `admin-nav-link ${linkClass({ isActive })}`}>{t('Respuestas', 'Responses')}</NavLink>
+          <NavLink to="/admin/analytics" className={({ isActive }) => `admin-nav-link ${linkClass({ isActive })}`}>{t('Analíticas', 'Analytics')}</NavLink>
           <NavLink to="/admin/integrations" className={({ isActive }) => `admin-nav-link ${linkClass({ isActive })}`}>{t('Integraciones', 'Integrations')}</NavLink>
         </nav>
         <div className={`${menuOpen ? 'block' : 'hidden'} mt-6 border-t border-current/10 pt-4 md:mt-auto md:block`}>
@@ -141,7 +141,7 @@ function AdminContent() {
             <Route path="games/catalog" element={<Navigate to="/admin/games?create=1" replace />} />
             <Route path="prizes" element={<PrizeAdministration />} />
             <Route path="clients" element={<ClientsAdmin />} />
-            <Route path="responses" element={<ResponsesAdmin />} />
+            <Route path="analytics" element={<AnalyticsAdmin />} />
             <Route path="integrations" element={
               <div className="mt-6"><IntegrationsSettings embedded onBack={() => navigate('/admin/games')} onClose={() => navigate('/admin/games')} /></div>
             } />

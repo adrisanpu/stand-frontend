@@ -13,6 +13,7 @@ export type FormResponsePlayer = Partial<Record<OptionalParticipantField, string
   name: string | null
   email: string | null
   phone?: string | null
+  joinedAt?: string | null
   completed: boolean
   completedAt: string | null
   answers: Record<string, string>
@@ -24,6 +25,7 @@ export type FormResponses = {
   gameName: string
   questions: FormResponseQuestion[]
   players: FormResponsePlayer[]
+  prizeEvents?: { kind: 'awarded' | 'redeemed'; timestamp: string | null }[]
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -34,6 +36,10 @@ function isResponse(value: unknown): value is FormResponses {
   if (!isRecord(value) || value.ok !== true || typeof value.gameId !== 'string'
     || typeof value.gameName !== 'string' || !Array.isArray(value.questions)
     || !Array.isArray(value.players)) return false
+  if (value.prizeEvents !== undefined && (!Array.isArray(value.prizeEvents)
+    || !value.prizeEvents.every(event => isRecord(event)
+      && (event.kind === 'awarded' || event.kind === 'redeemed')
+      && (event.timestamp === null || typeof event.timestamp === 'string')))) return false
   return value.questions.every(question => isRecord(question)
     && typeof question.id === 'string' && typeof question.text === 'string'
     && Array.isArray(question.options)
@@ -45,6 +51,7 @@ function isResponse(value: unknown): value is FormResponses {
       && (typeof player.email === 'string' || player.email === null)
       && [player.phone, ...PARTICIPANT_PROFILE_FIELDS.map(({ key }) => player[key])]
         .every(value => value === undefined || value === null || typeof value === 'string')
+      && (player.joinedAt === undefined || player.joinedAt === null || typeof player.joinedAt === 'string')
       && typeof player.completed === 'boolean'
       && (typeof player.completedAt === 'string' || player.completedAt === null)
       && isRecord(player.answers)

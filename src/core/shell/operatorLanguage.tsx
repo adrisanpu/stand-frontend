@@ -14,8 +14,8 @@ const OperatorLanguageContext = createContext<OperatorLanguage>({
   t: (spanish) => spanish,
 })
 
-export function OperatorLanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>('es')
+export function OperatorLanguageProvider({ children, initialLanguage = 'es' }: { children: ReactNode; initialLanguage?: Language }) {
+  const [language, setLanguage] = useState<Language>(initialLanguage)
   const t = useCallback<Translate>((spanish, english) => language === 'en' ? english ?? spanish : spanish, [language])
 
   return (

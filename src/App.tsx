@@ -8,6 +8,7 @@ import Logout from './auth/Logout'
 import BillingSuccess from './pages/BillingSuccess'
 import BillingCancel from './pages/BillingCancel'
 import BillingCheckout from './pages/BillingCheckout'
+import GamePreviewPage from './pages/GamePreviewPage'
 import InputDebugOverlay from './core/input/InputDebugOverlay'
 import ParticipantShell from './core/participant/ParticipantShell'
 import ValidatorShell from './core/validator/ValidatorShell'
@@ -31,6 +32,7 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/logout" element={<Logout />} />
       <Route path="/billing/checkout" element={<BillingCheckout />} />
+      <Route path="/preview/:gameType" element={<GamePreviewPage />} />
       <Route
         path="/billing/success"
         element={
@@ -49,6 +51,7 @@ function AppRoutes() {
       />
       <Route path="/play/:gameId" element={<ParticipantShell />} />
       <Route path="/display/:gameId" element={<Navigate to="/home" replace />} />
+      <Route path="/redeem" element={<ValidatorShell />} />
       <Route path="/redeem/:gameId" element={<ValidatorShell />} />
       <Route
         path="/admin/*"

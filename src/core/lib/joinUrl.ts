@@ -9,6 +9,11 @@ export function getRedeemUrl(gameId: string): string {
   return `${base}/redeem/${encodeURIComponent(gameId.trim())}`
 }
 
+export function getGeneralRedeemUrl(): string {
+  const base = typeof window !== 'undefined' ? window.location.origin : 'https://playstand.app'
+  return `${base}/redeem`
+}
+
 /** QR target for all supported participant access. */
 export function getJoinUrl(gameId: string, _joinChannel?: string | null): string {
   return getWebPlayUrl(gameId)
