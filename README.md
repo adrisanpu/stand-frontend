@@ -10,6 +10,12 @@ This repo is the **frontend only**. Backend lives in a separate repo: [stand-bac
 
 The Analytics panel (`/admin/analytics`) combines player metrics with a question-by-question summary,
 with a cumulative registration timeline and phone-prefix country breakdown.
+The same fixed-height timeline includes prizes awarded and redeemed, using a
+shared time/count scale and separate line styles. Award creation dates count
+allocated units; only confirmed STAND deliveries count as redemptions (Kivly
+wallet assignments are not redemptions). Missing/invalid prize timestamps are
+excluded and reported, not replaced with the current time. Older backends show
+an explicit prize-history-unavailable notice; deploy the matching backend first.
 Questionnaire results use horizontal bars, answer counts and percentages instead
 of a participant table. Percentages use nonblank answers to each question, including incomplete
 forms; participants who skipped that question are excluded. Options with no

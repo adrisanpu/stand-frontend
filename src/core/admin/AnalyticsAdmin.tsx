@@ -43,6 +43,20 @@ export function buildResponsesSummary(players: FormResponsePlayer[], questions: 
 type RegistrationPoint = { timestamp: number; count: number }
 type PlayerCountryCount = { code: string | null; count: number }
 
+export function buildTimeline(timestamps: (string | null | undefined)[]) {
+  const counts = new Map<number, number>()
+  let undated = 0
+  for (const value of timestamps) {
+    const timestamp = value ? Date.parse(value) : NaN
+    if (!Number.isFinite(timestamp)) { undated += 1; continue }
+    counts.set(timestamp, (counts.get(timestamp) ?? 0) + 1)
+  }
+  let total = 0
+  const points: RegistrationPoint[] = [...counts].sort(([first], [second]) => first - second)
+    .map(([timestamp, count]) => ({ timestamp, count: total += count }))
+  return { points, undated }
+}
+
 function phoneCountryCode(phone: string | null | undefined): string | null {
   const value = phone?.trim()
   if (!value || (!value.startsWith('+') && !value.startsWith('00'))) return null
@@ -59,21 +73,7 @@ function phoneCountryCode(phone: string | null | undefined): string | null {
 }
 
 export function buildPlayerAnalytics(players: FormResponsePlayer[], questions: FormResponseQuestion[]) {
-  const registrationCounts = new Map<number, number>()
-  players.forEach(player => {
-    if (!player.joinedAt) return
-    const timestamp = Date.parse(player.joinedAt)
-    if (Number.isFinite(timestamp)) {
-      registrationCounts.set(timestamp, (registrationCounts.get(timestamp) ?? 0) + 1)
-    }
-  })
-  let runningCount = 0
-  const registrations: RegistrationPoint[] = [...registrationCounts]
-    .sort(([first], [second]) => first - second)
-    .map(([timestamp, count]) => {
-      runningCount += count
-      return { timestamp, count: runningCount }
-    })
+  const registrations = buildTimeline(players.map(player => player.joinedAt)).points
 
   const countryCounts = new Map<string | null, number>()
   players.forEach(player => {
@@ -99,52 +99,81 @@ export function buildPlayerAnalytics(players: FormResponsePlayer[], questions: F
   }
 }
 
-function RegistrationChart({ points, language, t }: {
+function RegistrationChart({ points, prizeEvents, language, t }: {
   points: RegistrationPoint[]
+  prizeEvents: FormResponses['prizeEvents']
   language: 'es' | 'en'
   t: (spanish: string, english?: string) => string
 }) {
-  if (points.length === 0) return <p className="text-sm text-textSub">
-    {t('No hay fechas de registro disponibles.', 'No registration timestamps are available.')}
-  </p>
+  const awarded = buildTimeline((prizeEvents ?? []).filter(event => event.kind === 'awarded').map(event => event.timestamp))
+  const redeemed = buildTimeline((prizeEvents ?? []).filter(event => event.kind === 'redeemed').map(event => event.timestamp))
+  const series = [
+    { label: t('Registros acumulados', 'Cumulative registrations'), points, color: 'var(--color-primary, #FF931F)', dash: undefined },
+    { label: t('Premios repartidos', 'Prizes awarded'), points: awarded.points, color: '#3B82F6', dash: '8 4' },
+    { label: t('Premios canjeados', 'Prizes redeemed'), points: redeemed.points, color: '#0D9488', dash: '2 4' },
+  ].filter((_, index) => index === 0 || prizeEvents !== undefined)
+  const allPoints = series.flatMap(item => item.points)
+  const undated = awarded.undated + redeemed.undated
 
   const left = 44
   const right = 676
   const top = 18
   const bottom = 188
-  const maxCount = Math.max(...points.map(point => point.count), 1)
-  const firstTimestamp = points[0].timestamp
-  const lastTimestamp = points[points.length - 1].timestamp
+  const maxCount = allPoints.reduce((max, point) => Math.max(max, point.count), 1)
+  const firstTimestamp = allPoints.reduce((min, point) => Math.min(min, point.timestamp), Infinity)
+  const lastTimestamp = allPoints.reduce((max, point) => Math.max(max, point.timestamp), -Infinity)
   const x = (timestamp: number) => firstTimestamp === lastTimestamp
     ? (left + right) / 2
     : left + (timestamp - firstTimestamp) / (lastTimestamp - firstTimestamp) * (right - left)
   const y = (count: number) => bottom - count / maxCount * (bottom - top)
-  const path = points.map((point, index) =>
-    `${index === 0 ? 'M' : 'L'} ${x(point.timestamp)} ${y(point.count)}`,
-  ).join(' ')
+  const path = (values: RegistrationPoint[]) => `M ${left} ${bottom} ` + values.map(point =>
+    `H ${x(point.timestamp)} V ${y(point.count)}`,
+  ).join(' ') + ` H ${right}`
   const dateFormat = new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'es-ES', {
     dateStyle: 'medium', timeStyle: 'short',
   })
 
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-center">
-      <svg role="img" aria-label={t('Registros acumulados en el tiempo', 'Cumulative registrations over time')}
-        viewBox="0 0 720 220" className="h-56 max-h-full w-full overflow-visible">
+      {allPoints.length === 0 ? <p className="mb-4 text-sm text-textSub">
+        {t('No hay fechas de registro o premios disponibles.', 'No registration or prize timestamps are available.')}
+      </p> : <svg role="img" aria-label={t('Evolución de registros y premios en el tiempo', 'Registrations and prizes over time')}
+        viewBox="0 0 720 220" className="h-56 min-h-0 w-full">
         <line x1={left} y1={bottom} x2={right} y2={bottom} stroke="currentColor" opacity=".2" />
         <line x1={left} y1={top} x2={left} y2={bottom} stroke="currentColor" opacity=".2" />
-        <path d={path} fill="none" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" />
-        {points.map(point => <circle key={point.timestamp} cx={x(point.timestamp)} cy={y(point.count)} r="4"
-          fill="currentColor"><title>{`${dateFormat.format(point.timestamp)} · ${point.count}`}</title></circle>)}
+        {[0, maxCount].map(count => <text key={count} x={left - 8} y={y(count) + 4}
+          textAnchor="end" className="fill-current text-[11px]">{count}</text>)}
+        {series.map(item => <g key={item.label} aria-label={item.label}>
+          <path d={path(item.points)} fill="none" stroke={item.color} strokeWidth="3"
+            strokeDasharray={item.dash} vectorEffect="non-scaling-stroke" />
+          {item.points.map(point => <circle key={point.timestamp} cx={x(point.timestamp)} cy={y(point.count)} r="4"
+            fill={item.color}><title>{`${item.label}: ${dateFormat.format(point.timestamp)} · ${point.count}`}</title></circle>)}
+        </g>)}
         <text x={left} y="210" textAnchor="start" className="fill-current text-[11px]">
           {dateFormat.format(firstTimestamp)}
         </text>
         <text x={right} y="210" textAnchor="end" className="fill-current text-[11px]">
           {dateFormat.format(lastTimestamp)}
         </text>
-      </svg>
-      <p className="text-sm text-textSub">
-        {t('Registros acumulados', 'Cumulative registrations')}: <span className="tabular-nums">{points[points.length - 1].count}</span>
+      </svg>}
+      <ul aria-label={t('Leyenda de evolución', 'Timeline legend')} className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-textSub">
+        {series.map(item => <li key={item.label}
+          className="flex items-center gap-2">
+          <svg aria-hidden="true" width="20" height="8" className="shrink-0">
+            <line x1="0" x2="20" y1="4" y2="4" stroke={item.color} strokeWidth="3" strokeDasharray={item.dash} />
+          </svg>
+          <span>{item.label}: <span className="tabular-nums">{item.points[item.points.length - 1]?.count ?? 0}</span></span>
+        </li>)}
+      </ul>
+      <p className="mt-2 text-xs text-textSub">
+        {prizeEvents === undefined
+          ? t('El backend no proporciona todavía el historial de premios.', 'The backend does not provide prize history yet.')
+          : t('Acumulados con fecha disponible. Los canjes de Kivly no están disponibles.',
+            'Cumulative totals with available timestamps. Kivly redemptions are not available.')}
       </p>
+      {undated > 0 && <p role="status" className="mt-1 text-xs text-textSub">
+        {t('Movimientos de premios sin fecha, excluidos del gráfico', 'Prize events without timestamps, excluded from the chart')}: {undated}
+      </p>}
     </div>
   )
 }
@@ -338,7 +367,7 @@ export default function AnalyticsAdmin() {
           <div className="grid gap-6 lg:grid-cols-2">
             <section aria-label={t('Registros acumulados', 'Cumulative registrations')} className="card flex h-[28rem] min-h-0 flex-col gap-4 overflow-hidden p-4 sm:p-6">
               <h2 className="text-lg font-semibold">{t('Evolución de registros', 'Registration timeline')}</h2>
-              <RegistrationChart points={playerAnalytics.registrations} language={language} t={t} />
+              <RegistrationChart points={playerAnalytics.registrations} prizeEvents={responses.prizeEvents} language={language} t={t} />
             </section>
             <section aria-label={t('Países de los jugadores', 'Player countries')} className="card flex h-[28rem] min-h-0 flex-col gap-4 overflow-hidden p-4 sm:p-6">
               <div>

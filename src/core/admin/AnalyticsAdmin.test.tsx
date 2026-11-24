@@ -5,7 +5,7 @@ import { getFormResponses, type FormResponses } from '../../api/formResponses'
 import { listOperatorGames } from '../../api/operatorGames'
 import { useCurrentUser } from '../../auth/useCurrentUser'
 import { OperatorLanguageProvider, OperatorLanguageSelector } from '../shell/operatorLanguage'
-import AnalyticsAdmin, { buildPlayerAnalytics, buildResponsesCsv, buildResponsesSummary } from './AnalyticsAdmin'
+import AnalyticsAdmin, { buildPlayerAnalytics, buildResponsesCsv, buildResponsesSummary, buildTimeline } from './AnalyticsAdmin'
 
 vi.mock('../../api/formResponses', () => ({ getFormResponses: vi.fn() }))
 vi.mock('../../api/operatorGames', () => ({ listOperatorGames: vi.fn() }))
@@ -60,7 +60,7 @@ it('shows question charts without a participant table and links to configuration
   expect(metrics).toHaveTextContent('Con respuestas2')
   expect(metrics).toHaveTextContent('Cuestionarios completados1')
   expect(metrics).toHaveTextContent('Tasa de finalización50%')
-  expect(screen.getByRole('img', { name: 'Registros acumulados en el tiempo' })).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Evolución de registros y premios en el tiempo' })).toBeInTheDocument()
   const registrations = screen.getByRole('region', { name: 'Registros acumulados' })
   expect(registrations).toHaveClass('h-[28rem]')
   const countries = screen.getByRole('region', { name: 'Países de los jugadores' })
@@ -84,6 +84,78 @@ it('shows question charts without a participant table and links to configuration
   expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   expect(screen.queryByRole('combobox', { name: 'Filtrar por estado' })).not.toBeInTheDocument()
   expect(screen.queryByRole('navigation', { name: 'Paginación de respuestas' })).not.toBeInTheDocument()
+})
+
+it('shows cumulative award and redemption series on the registration time axis', async () => {
+  vi.mocked(getFormResponses).mockResolvedValue({
+    ...responses,
+    prizeEvents: [
+      { kind: 'awarded', timestamp: '2025-12-31T00:00:00Z' },
+      { kind: 'awarded', timestamp: '2026-01-03T00:00:00Z' },
+      { kind: 'redeemed', timestamp: '2026-01-04T00:00:00Z' },
+      { kind: 'awarded', timestamp: null },
+      { kind: 'redeemed', timestamp: 'invalid' },
+    ],
+  })
+  mount()
+  const chart = await screen.findByRole('img', { name: 'Evolución de registros y premios en el tiempo' })
+  expect(chart.querySelectorAll('g > path')).toHaveLength(3)
+  expect(chart.querySelector('g[aria-label="Premios repartidos"] path')).toHaveAttribute('stroke-dasharray', '8 4')
+  expect(chart.querySelector('g[aria-label="Premios canjeados"] path')).toHaveAttribute('stroke-dasharray', '2 4')
+  expect(chart.querySelector('g[aria-label="Premios repartidos"] circle')).toHaveAttribute('cx', '44')
+  expect(chart.querySelector('g[aria-label="Premios canjeados"] circle')).toHaveAttribute('cx', '676')
+  const legend = screen.getByRole('list', { name: 'Leyenda de evolución' })
+  expect(legend).toHaveTextContent('Registros acumulados: 2')
+  expect(legend).toHaveTextContent('Premios repartidos: 2')
+  expect(legend).toHaveTextContent('Premios canjeados: 1')
+  expect(screen.getByRole('status')).toHaveTextContent('Movimientos de premios sin fecha, excluidos del gráfico: 2')
+  expect(chart.querySelectorAll('title')[2]).toHaveTextContent('Premios repartidos:')
+  fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
+  expect(screen.getByRole('list', { name: 'Timeline legend' })).toHaveTextContent('Prizes redeemed: 1')
+})
+
+it('shows prize events even without registration timestamps and handles a single timestamp', async () => {
+  vi.mocked(getFormResponses).mockResolvedValue({
+    ...responses, players: [], prizeEvents: [
+      { kind: 'awarded', timestamp: '2026-01-02T00:00:00Z' },
+      { kind: 'redeemed', timestamp: '2026-01-02T00:00:00Z' },
+    ],
+  })
+  mount()
+  const chart = await screen.findByRole('img', { name: 'Evolución de registros y premios en el tiempo' })
+  expect(chart.querySelector('circle')).toHaveAttribute('cx', '360')
+  expect(chart.outerHTML).not.toMatch(/NaN|Infinity/)
+  const legend = screen.getByRole('list', { name: 'Leyenda de evolución' })
+  expect(legend).toHaveTextContent('Registros acumulados: 0')
+  expect(legend).toHaveTextContent('Premios repartidos: 1')
+  expect(legend).toHaveTextContent('Premios canjeados: 1')
+})
+
+it('distinguishes unsupported prize history from a confirmed empty history', async () => {
+  mount()
+  expect(await screen.findByText('El backend no proporciona todavía el historial de premios.')).toBeInTheDocument()
+  expect(screen.getByRole('list', { name: 'Leyenda de evolución' })).not.toHaveTextContent('Premios repartidos')
+})
+
+it('keeps an empty timeline explicit and shows zero prize counts when history is supported', async () => {
+  vi.mocked(getFormResponses).mockResolvedValue({ ...responses, players: [], prizeEvents: [] })
+  mount()
+  expect(await screen.findByText('No hay fechas de registro o premios disponibles.')).toBeInTheDocument()
+  const legend = screen.getByRole('list', { name: 'Leyenda de evolución' })
+  expect(legend).toHaveTextContent('Premios repartidos: 0')
+  expect(legend).toHaveTextContent('Premios canjeados: 0')
+})
+
+it('groups simultaneous events, sorts them, and excludes missing or invalid timestamps', () => {
+  expect(buildTimeline([
+    '2026-01-02T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-02T00:00:00Z',
+    null, undefined, 'invalid',
+  ])).toEqual({
+    points: [
+      { timestamp: Date.parse('2026-01-01T00:00:00Z'), count: 1 },
+      { timestamp: Date.parse('2026-01-02T00:00:00Z'), count: 3 },
+    ], undated: 3,
+  })
 })
 
 it('loads archived games on request and presents readable load errors', async () => {

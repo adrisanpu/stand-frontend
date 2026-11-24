@@ -54,3 +54,17 @@ it('accepts missing or null registration timestamps and rejects malformed timest
   })
   await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
 })
+
+it('preserves prize timestamps and rejects malformed event arrays, kinds, and dates', async () => {
+  const prizeEvents = [
+    { kind: 'awarded', timestamp: '2026-01-02T00:00:00Z' },
+    { kind: 'redeemed', timestamp: null },
+  ]
+  vi.mocked(api.get).mockResolvedValue({ ...response, prizeEvents })
+  await expect(getFormResponses('ABC123')).resolves.toMatchObject({ prizeEvents })
+  for (const invalid of [null, {}, [{ kind: 'other', timestamp: null }],
+    [{ kind: 'awarded', timestamp: 123 }], [{ kind: 'redeemed' }]]) {
+    vi.mocked(api.get).mockResolvedValue({ ...response, prizeEvents: invalid })
+    await expect(getFormResponses('ABC123')).rejects.toThrow('Invalid form responses response')
+  }
+})

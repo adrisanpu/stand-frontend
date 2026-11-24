@@ -25,6 +25,7 @@ export type FormResponses = {
   gameName: string
   questions: FormResponseQuestion[]
   players: FormResponsePlayer[]
+  prizeEvents?: { kind: 'awarded' | 'redeemed'; timestamp: string | null }[]
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -35,6 +36,10 @@ function isResponse(value: unknown): value is FormResponses {
   if (!isRecord(value) || value.ok !== true || typeof value.gameId !== 'string'
     || typeof value.gameName !== 'string' || !Array.isArray(value.questions)
     || !Array.isArray(value.players)) return false
+  if (value.prizeEvents !== undefined && (!Array.isArray(value.prizeEvents)
+    || !value.prizeEvents.every(event => isRecord(event)
+      && (event.kind === 'awarded' || event.kind === 'redeemed')
+      && (event.timestamp === null || typeof event.timestamp === 'string')))) return false
   return value.questions.every(question => isRecord(question)
     && typeof question.id === 'string' && typeof question.text === 'string'
     && Array.isArray(question.options)
