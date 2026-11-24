@@ -1,0 +1,182 @@
+.play-shell.bg-club {
+  --play-viewport-height: 100dvh;
+  box-sizing: border-box;
+  height: var(--play-viewport-height);
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  padding: max(12px, env(safe-area-inset-top, 0px))
+    max(12px, env(safe-area-inset-right, 0px))
+    max(12px, env(safe-area-inset-bottom, 0px))
+    max(12px, env(safe-area-inset-left, 0px));
+  scroll-padding-block: 16px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.play-shell.bg-club[data-quiz-active="true"] {
+  height: auto;
+  overflow: visible;
+}
+
+.play-card {
+  padding: 3rem clamp(12px, 4vw, 24px) 16px;
+  overflow-wrap: anywhere;
+}
+
+.play-card > * + * {
+  margin-top: clamp(8px, calc(var(--play-viewport-height) * 0.018), 20px);
+}
+
+.play-shell .play-card {
+  border-radius: 10px;
+}
+
+.play-shell .participant-form :is(input:not([type="checkbox"]), textarea, select) {
+  border-color: rgba(var(--color-primary-rgb), 0.32);
+  border-radius: 7px;
+  background-color: rgba(255,255,255,0.05);
+  color: var(--color-text-main);
+}
+
+.play-shell .participant-form :is(input, textarea, select):focus-visible {
+  border-color: var(--color-primary);
+  outline-color: var(--color-primary);
+}
+
+.play-shell .participant-primary-action {
+  min-height: 44px;
+  border-radius: 7px;
+}
+
+html.light-mode .play-shell:not(.participant-preview *) .participant-form :is(input:not([type="checkbox"]), textarea, select),
+.participant-preview[data-participant-theme="light"] .play-shell .participant-form :is(input:not([type="checkbox"]), textarea, select) {
+  border-color: rgba(21,47,58,0.24);
+  background-color: rgba(21,47,58,0.035);
+  color: var(--color-text-main);
+}
+
+.play-shell .play-logo {
+  height: clamp(48px, calc(var(--play-viewport-height) * 0.14), 112px);
+}
+
+/* A minimum 16px computed font prevents iOS focus zoom without disabling pinch zoom. */
+.play-shell input,
+.play-shell textarea,
+.play-shell select {
+  font-size: max(16px, 1em);
+  max-width: 100%;
+}
+
+.play-shell input,
+.play-shell textarea {
+  min-width: 0;
+  scroll-margin-block: 16px;
+}
+
+.play-shell input[type="file"] {
+  white-space: normal;
+}
+
+.play-shell .stack-viewport {
+  height: clamp(160px, calc(var(--play-viewport-height) * 0.42), 400px);
+  min-height: 0;
+}
+
+.play-shell .play-wheel {
+  width: min(100%, max(140px, calc(var(--play-viewport-height) - 280px)));
+  margin-inline: auto;
+}
+
+.play-shell .play-character {
+  min-height: 0;
+  height: clamp(140px, calc(var(--play-viewport-height) * 0.3), 256px);
+}
+
+.play-shell .play-character > img {
+  height: 100%;
+  width: 100%;
+}
+
+.play-shell[data-keyboard="true"] .play-logo {
+  height: 32px;
+}
+
+@media (max-height: 650px) {
+  .play-card .space-y-6 > * + *,
+  .play-card .space-y-5 > * + *,
+  .play-card .space-y-4 > * + * {
+    margin-top: 10px;
+  }
+}
+
+/* Admin previews render the same phone shell, with the participant theme scoped to the frame instead of <html>. */
+.participant-preview {
+  container-type: inline-size;
+  color-scheme: dark;
+}
+
+.participant-preview[data-participant-theme="light"] {
+  color-scheme: light;
+}
+
+.participant-preview .play-shell.bg-club {
+  --play-viewport-height: 720px;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  padding: 12px;
+}
+
+.participant-preview .play-card {
+  padding-inline: clamp(12px, 4cqw, 24px);
+}
+
+.participant-preview[data-participant-theme="light"] .card {
+  background: var(--color-surface, #FFFFFF);
+  border-color: rgba(var(--color-primary-rgb, 176,38,255), 0.28);
+  box-shadow: 0 8px 22px rgba(21,47,58,0.08);
+}
+
+.participant-preview[data-participant-theme="light"] :is(.text-gray-300, .text-gray-400) {
+  color: #4B5563 !important;
+}
+
+.participant-preview[data-participant-theme="light"] .text-gray-500 {
+  color: #374151 !important;
+}
+
+.participant-preview[data-participant-theme="light"] .text-gray-600 {
+  color: #1F2937 !important;
+}
+
+.participant-preview[data-participant-theme="light"] :is(button, [role="button"], a[class*="rounded"][class*="border"], a[class*="rounded"][class*="bg-"]):is(
+  [class^="text-red-"], [class*=" text-red-"],
+  [class^="bg-red-"], [class*=" bg-red-"],
+  [class^="border-red-"], [class*=" border-red-"],
+  [data-tone="danger"]
+) {
+  color: #B91C1C;
+}
+
+.participant-preview[data-participant-theme="light"] :is(
+  input:not([type]),
+  input[type="text"], input[type="number"], input[type="email"],
+  input[type="password"], input[type="search"], input[type="tel"], input[type="url"],
+  textarea
+) {
+  border-color: #9CA3AF;
+  background-color: #FFFFFF;
+  color: var(--color-text-main, #0F172A);
+}
+
+.participant-preview[data-participant-theme="light"] .stack-prize-select {
+  color: #000;
+  border-color: #9CA3AF;
+}
+
+.participant-preview[data-participant-theme="light"] .stack-prize-select :is(option, optgroup) {
+  background: #fff;
+  color: #000;
+}

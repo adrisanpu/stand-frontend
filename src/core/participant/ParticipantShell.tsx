@@ -1,0 +1,483 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { ThemeProvider } from '../theme'
+import { getGameById } from '../../games'
+import { normalizeGameType } from '../gameTypeMap'
+import { PublicApiError, publicApi, isStackAssignment, isMobileAssignment, type MobileAssignment, type PublicGameResponse, type PlayerAssignment, type T1merAssignment, type StackAssignment, type ImpostorAssignment, type NativePrizeAward, type PlayerResponse } from '../../api/publicApi'
+import { clearPlayerSession, loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
+import { GAME_ACCESS_CAPABILITIES, resolveGameAccess } from '../settings/gameAccess'
+import JoinForm from './JoinForm'
+import ParticipantQuiz from './ParticipantQuiz'
+import ParticipantPrizePromo from './ParticipantPrizePromo'
+import AssignmentView from './AssignmentView'
+import ValidateView from './ValidateView'
+import ResultView from './ResultView'
+import NativePrizeClaims from './NativePrizeClaims'
+import T1merParticipantPlay from '../../games/t1mer/ParticipantPlay'
+import T1merParticipantResult from '../../games/t1mer/ParticipantResult'
+import StackParticipantPlay from '../../games/stack/ParticipantPlay'
+import StackPrizePromo from '../../games/stack/StackPrizePromo'
+import ImpostorParticipantPlay from '../../games/impostor/ParticipantPlay'
+import Rulet4ParticipantPlay from '../../games/rulet4/ParticipantPlay'
+import L3trasParticipantPlay from '../../games/l3tras/ParticipantPlay'
+import SemaforoParticipantPlay from '../../games/semaforo/ParticipantPlay'
+import CupidoParticipantPlay from '../../games/cupido/ParticipantPlay'
+import InfocardsParticipantPlay from '../../games/infocards/ParticipantPlay'
+import { isRulet4Assignment, type Rulet4Assignment } from '../../games/rulet4/rulet4Logic'
+import { ParticipantLanguageProvider, ParticipantLanguageSelector, useParticipantLanguage } from './participantLanguage'
+import type { ParticipantLanguage } from '../formConfig'
+import { ProfilePhotosContext } from '../widgets/ProfileAvatar'
+import { profilePhotoEnabled } from '../lib/participantFields'
+import './participant.css'
+
+type Empareja2Step = 'loading' | 'unsupported' | 'join' | 'assignment' | 'validate' | 'result'
+type T1merStep = 'loading' | 'unsupported' | 'join' | 'play' | 'result'
+type Step = Empareja2Step | T1merStep | 'load-error' | 'registered'
+
+const WEB_PLAY_TYPES = new Set(Object.keys(GAME_ACCESS_CAPABILITIES))
+
+function t1merResultFromAssignment(a: T1merAssignment): {
+  time: number
+  difference: number
+  rank: number | null
+} | null {
+  if (a.score == null || a.timer == null) return null
+  return {
+    time: a.timer,
+    difference: a.score / 1000,
+    rank: null,
+  }
+}
+
+export default function ParticipantShell() {
+  const { gameId = '' } = useParams()
+  return <ParticipantGame key={gameId} gameId={gameId} />
+}
+
+function ParticipantGame({ gameId }: { gameId: string }) {
+  const [defaultLanguage, setDefaultLanguage] = useState<ParticipantLanguage>('es')
+  return (
+    <ParticipantLanguageProvider initialLanguage={defaultLanguage}>
+      <ParticipantContent gameId={gameId} onDefaultLanguage={setDefaultLanguage} />
+    </ParticipantLanguageProvider>
+  )
+}
+
+function ParticipantContent({ gameId, onDefaultLanguage }: {
+  gameId: string
+  onDefaultLanguage: (language: ParticipantLanguage) => void
+}) {
+  const viewportRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const element = viewportRef.current
+    if (!element) return
+    const viewport = window.visualViewport
+    let frame = 0
+    const update = () => {
+      if (viewport && viewport.scale !== 1) return
+      const height = viewport?.height ?? window.innerHeight
+      element.style.setProperty('--play-viewport-height', `${height}px`)
+      element.dataset.keyboard = String(height < window.innerHeight * 0.8)
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const active = document.activeElement
+        if (active instanceof HTMLElement && element.contains(active)
+          && active.matches('input:not([type="checkbox"]):not([type="file"]), textarea')) {
+          active.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+        }
+      })
+    }
+    update()
+    window.addEventListener('resize', update)
+    viewport?.addEventListener('resize', update)
+    element.addEventListener('focusin', update)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('resize', update)
+      viewport?.removeEventListener('resize', update)
+      element.removeEventListener('focusin', update)
+    }
+  }, [])
+  const { language, t } = useParticipantLanguage()
+  const [step, setStep] = useState<Step>('loading')
+  const [gameMeta, setGameMeta] = useState<PublicGameResponse | null>(null)
+  const [playerToken, setPlayerToken] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [photoUploadWarning, setPhotoUploadWarning] = useState(false)
+  const [loadVersion, setLoadVersion] = useState(0)
+  const [prizeRefreshFailed, setPrizeRefreshFailed] = useState(false)
+  const [expiredClose, setExpiredClose] = useState<number>()
+  const prizeRefreshVersion = useRef(0)
+  const [quizActive, setQuizActive] = useState(false)
+  const activeGameId = useRef(gameId)
+  activeGameId.current = gameId
+  const [stackAssignment, setStackAssignment] = useState<StackAssignment | null>(null)
+  const [impostorAssignment, setImpostorAssignment] = useState<ImpostorAssignment | null>(null)
+  const [rulet4Assignment, setRulet4Assignment] = useState<Rulet4Assignment | null>(null)
+  const [mobileAssignment, setMobileAssignment] = useState<MobileAssignment | null>(null)
+  const [t1merResult, setT1merResult] = useState<{
+    time: number
+    difference: number
+    rank: number | null
+  } | null>(null)
+  const [nativeAwards, setNativeAwards] = useState<NativePrizeAward[]>([])
+  const [prizeUnavailable, setPrizeUnavailable] = useState<NonNullable<PlayerResponse['prizeUnavailable']>>([])
+  const [prizeEmailOnly, setPrizeEmailOnly] = useState(false)
+
+  const currentGameMeta = gameMeta?.gameId === gameId ? gameMeta : null
+  const gameType = currentGameMeta ? normalizeGameType(currentGameMeta.gameType) : ''
+  const game = getGameById(gameType)
+  const logo = currentGameMeta ? currentGameMeta.formLogoUrl || currentGameMeta.clientLogoUrl || game?.assets?.logo : undefined
+  const isMobile = gameMeta && WEB_PLAY_TYPES.has(gameType)
+    ? resolveGameAccess(gameType, gameMeta).playMode === 'mobile' : false
+  const hasPrizeCatalog = currentGameMeta?.prizeCatalog !== undefined || currentGameMeta?.stackPrizeRules !== undefined
+  const stackClosesAt = currentGameMeta?.stackAutoCloseAt
+  const stackPrizeState = currentGameMeta?.stackPrizeState === 'closed' ? 'closed'
+    : currentGameMeta?.stackPrizeState === 'closing' || (stackClosesAt !== undefined
+      && (expiredClose === stackClosesAt || Date.now() >= stackClosesAt * 1000)) ? 'closing' : 'open'
+
+  const refreshPrizes = useCallback(async () => {
+    const version = ++prizeRefreshVersion.current
+    try {
+      const meta = await publicApi.getGame(gameId)
+      if (activeGameId.current !== gameId || version !== prizeRefreshVersion.current) return
+      if (!meta.ok || meta.gameId !== gameId) throw new Error('Invalid game metadata')
+      setGameMeta((previous) => previous?.gameId === gameId
+        ? { ...previous, prizeCatalog: meta.prizeCatalog, stackPrizeRules: meta.stackPrizeRules,
+          stackPrizeState: meta.stackPrizeState, stackAutoCloseAt: meta.stackAutoCloseAt,
+          ...(gameType === 'STACK' && { isActive: meta.isActive, lifecycleState: meta.lifecycleState }) }
+        : previous)
+      setPrizeRefreshFailed(false)
+    } catch {
+      if (activeGameId.current === gameId && version === prizeRefreshVersion.current) setPrizeRefreshFailed(true)
+    }
+  }, [gameId, gameType])
+
+  useEffect(() => {
+    setPrizeRefreshFailed(false)
+  }, [gameId])
+
+  useEffect(() => {
+    if (!hasPrizeCatalog) return
+    const isStack = gameType === 'STACK'
+    const refreshEvery = isStack ? (stackPrizeState === 'closing' ? 10000 : 30000) : 30 * 60 * 1000
+    let lastRefresh = Date.now()
+    const refresh = () => {
+      lastRefresh = Date.now()
+      void refreshPrizes()
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && (isStack || Date.now() - lastRefresh >= refreshEvery)) refresh()
+    }
+    const interval = window.setInterval(() => {
+      if (!isStack || document.visibilityState === 'visible') refresh()
+    }, refreshEvery)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [gameId, gameType, hasPrizeCatalog, refreshPrizes, stackPrizeState])
+
+  useEffect(() => {
+    if (stackClosesAt === undefined) return
+    let timer: number
+    const check = () => {
+      const delay = stackClosesAt * 1000 - Date.now()
+      if (delay > 0) timer = window.setTimeout(check, Math.min(delay, 2_147_483_647))
+      else {
+        setExpiredClose(stackClosesAt)
+        void refreshPrizes()
+      }
+    }
+    check()
+    return () => window.clearTimeout(timer)
+  }, [stackClosesAt, refreshPrizes])
+
+  const applyAssignment = useCallback((meta: PublicGameResponse, token: string, assignment: PlayerAssignment | null) => {
+    const gt = normalizeGameType(meta.gameType)
+    if (!assignment) throw new Error('No se pudo recuperar tu participante. Solicita un nuevo enlace de participación.')
+    if (['L3TRAS', 'SEMAFORO', 'CUPIDO', 'INFOCARDS'].includes(gt)) {
+      if (!isMobileAssignment(assignment) || assignment.gameType !== gt) throw new Error('No se pudo recuperar tu participante.')
+      savePlayerSession(gameId, token, assignment)
+      setPlayerToken(token)
+      setMobileAssignment(assignment)
+      setStep('play')
+      return
+    }
+    if (gt === 'RULET4') {
+      if (!isRulet4Assignment(assignment)) throw new Error('No se pudo recuperar tu participante.')
+      savePlayerSession(gameId, token, assignment)
+      setPlayerToken(token)
+      setRulet4Assignment(assignment)
+      setStep('play')
+      return
+    }
+    if (isRulet4Assignment(assignment)) throw new Error('No se pudo recuperar tu participante.')
+    if (gt === 'STACK' && !isStackAssignment(assignment)) throw new Error('No se pudo recuperar tu participante.')
+    if (gt === 'EMPAREJA2' && !('characterName' in assignment)) throw new Error('No se pudo recuperar tu participante.')
+    if (gt === 'T1MER' && (!('displayName' in assignment) || isStackAssignment(assignment))) {
+      throw new Error('No se pudo recuperar tu participante.')
+    }
+    if (gt === 'IMPOSTOR' && (!('displayName' in assignment) || isStackAssignment(assignment))) {
+      throw new Error('No se pudo recuperar tu participante.')
+    }
+    savePlayerSession(gameId, token, assignment)
+    setPlayerToken(token)
+    if (gt === 'IMPOSTOR' && 'displayName' in assignment && !isStackAssignment(assignment)) {
+      setImpostorAssignment(assignment)
+      setStep('play')
+    } else if (gt !== 'EMPAREJA2' && gt !== 'T1MER' && gt !== 'STACK') {
+      setStep('registered')
+    } else if (isStackAssignment(assignment)) {
+      setStackAssignment(assignment)
+      setStep('play')
+    } else if (gt === 'T1MER' && 'displayName' in assignment) {
+      const result = t1merResultFromAssignment(assignment)
+      setT1merResult(result)
+      setStep(result ? 'result' : 'play')
+    } else {
+      setStep('validated' in assignment && assignment.validated ? 'result' : 'assignment')
+    }
+  }, [gameId])
+
+  useEffect(() => {
+    let cancelled = false
+    setStep('loading')
+    setError(null)
+    setPhotoUploadWarning(false)
+    setNativeAwards([])
+    setPrizeUnavailable([])
+    setPrizeEmailOnly(false)
+    setStackAssignment(null)
+    setImpostorAssignment(null)
+    setRulet4Assignment(null)
+    setMobileAssignment(null)
+    ;(async () => {
+      if (!gameId) {
+        setStep('unsupported')
+        return
+      }
+      try {
+        const meta = await publicApi.getGame(gameId)
+        if (cancelled) return
+        const closedStack = normalizeGameType(meta.gameType) === 'STACK'
+          && (meta.stackPrizeState === 'closing' || meta.stackPrizeState === 'closed')
+        if (!meta.ok || meta.gameId !== gameId || (!meta.isActive && !closedStack && !meta.lifecycleState)) {
+          setStep('unsupported')
+          return
+        }
+        const gt = normalizeGameType(meta.gameType)
+        if (!WEB_PLAY_TYPES.has(gt)) {
+          setStep('unsupported')
+          return
+        }
+        resolveGameAccess(gt, meta)
+        onDefaultLanguage(meta.formConfig?.defaultLanguage === 'en' ? 'en' : 'es')
+        setGameMeta(meta)
+        const token = loadPlayerToken(gameId)
+        if (token) {
+          let player
+          try {
+            player = await publicApi.getPlayer(token, gameId)
+          } catch (sessionError) {
+            if (cancelled) return
+            if (sessionError instanceof PublicApiError
+              && [401, 403, 404].includes(sessionError.status)
+              && ['InvalidPlayerToken', 'PlayerNotFound', 'KivlyMembershipRequired', 'KivlyConsentRequired'].includes(sessionError.code ?? '')) {
+              clearPlayerSession(gameId)
+              setPlayerToken(null)
+              setT1merResult(null)
+              setStep(meta.isActive ? 'join' : 'unsupported')
+              return
+            }
+            throw sessionError
+          }
+          if (cancelled) return
+          if (!player.ok || player.gameId !== gameId || normalizeGameType(player.gameType) !== gt || !player.playerToken) {
+            throw new Error('El enlace o la sesión de participante no es válido.')
+          }
+          setNativeAwards(player.nativePrizes ?? [])
+          setPrizeUnavailable(player.prizeUnavailable ?? [])
+          setPrizeEmailOnly(player.prizeNotification?.play === false)
+          if (!meta.isActive && gt !== 'STACK') {
+            setPlayerToken(player.playerToken)
+            setStep('registered')
+          } else applyAssignment(meta, player.playerToken, player.assignment)
+        } else {
+          setStep(meta.isActive ? 'join' : 'unsupported')
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'No se pudo cargar el juego')
+          const rejected = e instanceof PublicApiError && e.status >= 400 && e.status < 500 && e.status !== 408 && e.status !== 429
+          setStep(rejected ? 'unsupported' : 'load-error')
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [gameId, loadVersion, applyAssignment, onDefaultLanguage])
+
+  return (
+    <ThemeProvider game={game ?? null} appearance={currentGameMeta?.formConfig?.appearance ?? currentGameMeta?.appearance}>
+      <ProfilePhotosContext.Provider value={profilePhotoEnabled(currentGameMeta?.participantFields)}>
+      <div
+        ref={viewportRef}
+        lang={language}
+        className="play-shell bg-club text-textMain font-sans"
+        data-quiz-active={quizActive ? 'true' : undefined}
+      >
+        <div className="relative mx-auto max-w-md w-full flex flex-col">
+          {gameType === 'STACK' && gameMeta?.stackPrizeRules
+            ? <StackPrizePromo rules={gameMeta.stackPrizeRules} closesAt={stackClosesAt} state={stackPrizeState} />
+            : <ParticipantPrizePromo catalog={currentGameMeta?.prizeCatalog} stickers />}
+          <div className="relative w-full">
+          <ParticipantLanguageSelector />
+        <div className="play-card card relative w-full">
+          {step !== 'join' && !quizActive && currentGameMeta?.formBannerUrl && (
+            <img src={currentGameMeta.formBannerUrl} alt="" className="max-h-44 w-full rounded-xl object-cover" />
+          )}
+          {logo && !((step === 'join' || quizActive) && (gameMeta?.formLogoUrl || gameMeta?.formBannerUrl)) && (
+            <img
+              src={logo}
+              alt={currentGameMeta?.formLogoUrl || currentGameMeta?.clientLogoUrl ? t('Logo del cliente') : game?.name}
+              className="play-logo mx-auto w-auto max-w-full object-contain"
+            />
+          )}
+          {prizeRefreshFailed && (
+            <div role="alert" className="space-y-2 text-sm text-red-300">
+              <p>{t('No se pudieron actualizar los premios.')}</p>
+              <button type="button" onClick={() => void refreshPrizes()} className="underline">
+                {t('Reintentar actualización de premios')}
+              </button>
+            </div>
+          )}
+          {photoUploadWarning && (
+            <p role="status" className="text-sm text-amber-300">
+              {t('No se pudo guardar la foto; se muestra el avatar genérico.')}
+            </p>
+          )}
+          {step === 'loading' && <p className="text-center text-textSub">{t('Cargando...')}</p>}
+          {step === 'unsupported' && (
+            <div className="text-center space-y-2">
+              <p className="font-semibold">{t('Juego no disponible')}</p>
+              <p className="text-sm text-textSub">
+                {t(error || 'Este enlace no es válido o el juego no admite participación web todavía.')}
+              </p>
+            </div>
+          )}
+          {step === 'load-error' && (
+            <div className="text-center space-y-3">
+              <p className="font-semibold">{t('No se pudo cargar el juego')}</p>
+              <p role="alert" className="text-sm text-textSub">{error && t(error)}</p>
+              <button
+                type="button"
+                onClick={() => setLoadVersion((version) => version + 1)}
+                className="w-full rounded-xl py-3 font-bold text-primary bg-[rgba(var(--color-primary-rgb),0.2)] border border-[rgba(var(--color-primary-rgb),0.3)]"
+              >
+                {t('Reintentar carga')}
+              </button>
+            </div>
+          )}
+          {step === 'join' && gameType === 'STACK' && stackPrizeState !== 'open' && (
+            <p role="status" className="text-center text-textSub">{t('El juego se está cerrando o ya ha cerrado. No se admiten nuevos intentos.')}</p>
+          )}
+          {step === 'join' && gameMeta && (gameType !== 'STACK' || stackPrizeState === 'open') && (
+            <JoinForm
+              gameId={gameId}
+              gameMeta={gameMeta}
+              onJoined={(token, photoUploadFailed) => {
+                setPhotoUploadWarning(Boolean(photoUploadFailed))
+                applyAssignment(gameMeta, token, loadAssignment(gameId))
+              }}
+            />
+          )}
+
+          {gameMeta && <ParticipantQuiz key={`${gameId}:${playerToken}`} gameId={gameId} playerToken={playerToken}
+            gameMeta={gameMeta} onActiveChange={setQuizActive}>
+          {step === 'registered' && (
+            <div className="text-center space-y-2">
+              <h1 className="text-xl font-bold">{t(gameMeta?.isActive ? '¡Ya estás dentro!' : 'Juego no disponible')}</h1>
+              {gameMeta?.isActive && <p className="text-sm text-textSub">{t('Sigue las instrucciones del evento para jugar.')}</p>}
+            </div>
+          )}
+
+          {gameType === 'RULET4' && step === 'play' && rulet4Assignment && playerToken && (
+            <Rulet4ParticipantPlay key={`${gameId}:${rulet4Assignment.playerId}`} gameId={gameId}
+              playerToken={playerToken} config={currentGameMeta?.rulet4Config} assignment={rulet4Assignment} />
+          )}
+
+          {step === 'play' && mobileAssignment && playerToken && (() => {
+            const Play = { L3TRAS: L3trasParticipantPlay, SEMAFORO: SemaforoParticipantPlay,
+              CUPIDO: CupidoParticipantPlay, INFOCARDS: InfocardsParticipantPlay }[mobileAssignment.gameType]
+            return <Play key={`${gameId}:${mobileAssignment.playerId}`} gameId={gameId}
+              playerToken={playerToken} initialAssignment={mobileAssignment} />
+          })()}
+
+          {gameType === 'STACK' && step === 'play' && stackAssignment && playerToken && (
+            <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} showPrizePromo={false} kivlyRewardEnabled={Boolean(gameMeta?.kivlyReward)} prizeState={stackPrizeState} />
+          )}
+
+          {gameType === 'IMPOSTOR' && step === 'play' && impostorAssignment && playerToken && (
+            <ImpostorParticipantPlay
+              key={`${gameId}:${impostorAssignment.playerId}`}
+              gameId={gameId}
+              playerToken={playerToken}
+              initialAssignment={impostorAssignment}
+            />
+          )}
+
+          {gameType === 'EMPAREJA2' && step === 'assignment' && gameMeta && playerToken && (
+            <AssignmentView
+              gameId={gameId}
+              gameMeta={gameMeta}
+              playerToken={playerToken}
+              showPrizePromo={false}
+              onValidate={() => setStep('validate')}
+            />
+          )}
+          {gameType === 'EMPAREJA2' && isMobile && step === 'validate' && playerToken && (
+            <ValidateView
+              gameId={gameId}
+              playerToken={playerToken}
+              onResult={() => setStep('result')}
+              onBack={() => setStep('assignment')}
+            />
+          )}
+          {gameType === 'EMPAREJA2' && step === 'result' && (
+            <ResultView gameId={gameId} prizeCatalog={currentGameMeta?.prizeCatalog} />
+          )}
+
+          {gameType === 'T1MER' && isMobile && step === 'play' && playerToken && (
+            <T1merParticipantPlay
+              gameId={gameId}
+              playerToken={playerToken}
+              onFinished={(result) => {
+                setT1merResult(result)
+                setStep('result')
+              }}
+            />
+          )}
+          {gameType === 'T1MER' && step === 'result' && t1merResult && (
+            <T1merParticipantResult
+              gameId={gameId}
+              time={t1merResult.time}
+              difference={t1merResult.difference}
+              rank={t1merResult.rank}
+              prizeCatalog={currentGameMeta?.prizeCatalog}
+              showPrizePromo={false}
+            />
+          )}
+          {(gameType !== 'STACK' || !currentGameMeta?.lifecycleState || nativeAwards.length > 0) && playerToken
+            && <NativePrizeClaims key={`${gameId}:${playerToken}`} gameId={gameId} playerToken={playerToken} initialAwards={nativeAwards} initialUnavailable={prizeUnavailable} initialEmailOnly={prizeEmailOnly} />}
+          </ParticipantQuiz>}
+        </div>
+        </div>
+        </div>
+      </div>
+      </ProfilePhotosContext.Provider>
+    </ThemeProvider>
+  )
+}

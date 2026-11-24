@@ -1,0 +1,1057 @@
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { PublicApiError, publicApi, type PublicGameResponse } from '../../api/publicApi'
+import { savePlayerSession } from './playerSession'
+import JoinForm from './JoinForm'
+import ParticipantPrizePromo from './ParticipantPrizePromo'
+import { ParticipantLanguageProvider, ParticipantLanguageSelector } from './participantLanguage'
+import type { PrizeCatalog } from '../prizes'
+import { prizeText } from '../../test/prizeText'
+
+vi.mock('../../api/publicApi', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../api/publicApi')>(),
+  publicApi: { join: vi.fn(), requestEmailCode: vi.fn(), resumeEmailRegistration: vi.fn(), uploadParticipantPhoto: vi.fn() },
+}))
+vi.mock('./playerSession', () => ({ savePlayerSession: vi.fn() }))
+
+const meta: PublicGameResponse = {
+  ok: true, gameId: 'ABC123', gameType: 'T1MER', isActive: true,
+  playMode: 'mobile', joinChannel: 'web', playerCount: 0, validatedCount: 0,
+  recentPairs: [], joinUrl: '/play/ABC123',
+}
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValue({
+    ok: true, detailsRequired: true, existingPlayer: false,
+    fields: { username: true, phone: false, consent: true, loyaltyConsent: false },
+  })
+  vi.stubGlobal('URL', class extends URL {
+    static createObjectURL = vi.fn(() => 'blob:profile-preview')
+    static revokeObjectURL = vi.fn()
+  })
+  vi.mocked(publicApi.requestEmailCode).mockResolvedValue({
+    ok: true, challengeId: 'challenge-1', emailMasked: 'p***@example.com',
+    expiresAt: new Date(Date.now() + 600_000).toISOString(),
+    resendAvailableAt: new Date(Date.now() + 60_000).toISOString(),
+  })
+  vi.mocked(publicApi.join).mockResolvedValue({
+    ok: true, gameId: 'ABC123', gameType: 'T1MER', playerToken: 'token',
+    assignment: { playerId: 1, displayName: 'Jugador', validated: false },
+  })
+})
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+const catalog: PrizeCatalog = {
+  validation: { name: 'Mochila', limit: 20, imageKey: 'validation.png', imageUrl: '/prizes/backpack.png' },
+  ranking: { name: 'Auriculares', limit: null, topX: 3, imageKey: 'ranking.png', imageUrl: '/prizes/headphones.png' },
+  raffle: { name: 'Sorteo secreto', limit: 1, imageUrl: '/prizes/raffle.png' },
+}
+
+it('collects only enabled optional fields after the email step and binds them to verification', async () => {
+  render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, participantFields: {
+    address: { enabled: true }, company: { enabled: true }, sex: { enabled: true }, jobTitle: { enabled: true }, birthDate: { enabled: true },
+  } }} onJoined={vi.fn()} />)
+  expect(screen.queryByLabelText('Dirección (opcional)')).not.toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+  fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: 'Ana' } })
+  fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '+34 612345678' } })
+  fireEvent.change(screen.getByLabelText('Dirección (opcional)'), { target: { value: ' Main street 1 ' } })
+  fireEvent.change(screen.getByLabelText('Empresa (opcional)'), { target: { value: ' ACME ' } })
+  expect(screen.queryByLabelText('Cargo (opcional)')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Sexo (opcional)')).not.toBeRequired()
+  fireEvent.change(screen.getByLabelText('Sexo (opcional)'), { target: { value: 'female' } })
+  fireEvent.change(screen.getByLabelText('Fecha de nacimiento (opcional)'), { target: { value: '1990-02-20' } })
+  expect(screen.getByLabelText('Fecha de nacimiento (opcional)')).not.toBeRequired()
+  fireEvent.click(screen.getByRole('checkbox'))
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Enviar código' })) })
+  expect(publicApi.requestEmailCode).toHaveBeenCalledWith(expect.objectContaining({
+    address: 'Main street 1', company: 'ACME', sex: 'female', birthDate: '1990-02-20',
+    phone: '+34 612345678', username: 'Ana',
+  }))
+  expect(savePlayerSession).not.toHaveBeenCalled()
+  expect(publicApi.requestEmailCode).not.toHaveBeenCalledWith(expect.objectContaining({ jobTitle: expect.anything() }))
+})
+
+it('uses the real registration UI in preview without sending emails, joining or storing sessions', async () => {
+  const onJoined = vi.fn()
+  render(<JoinForm preview gameId="ABC123" gameMeta={meta} onJoined={onJoined} />)
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  expect(screen.queryByText(/Paso de registro/)).not.toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'preview@example.com' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+  fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: 'Preview' } })
+  fireEvent.click(screen.getByRole('checkbox'))
+  fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('El teléfono es obligatorio.')
+  fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '612345678' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+  expect(screen.getByRole('status')).toHaveTextContent('Vista previa')
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Volver a empezar' }))
+  expect(screen.getByLabelText('Email *')).toHaveValue('preview@example.com')
+  expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+  expect(publicApi.resumeEmailRegistration).not.toHaveBeenCalled()
+  expect(publicApi.join).not.toHaveBeenCalled()
+  expect(savePlayerSession).not.toHaveBeenCalled()
+  expect(onJoined).not.toHaveBeenCalled()
+})
+
+describe('same-game returning participant', () => {
+  const challengeResponse = () => ({
+    ok: true as const, challengeId: 'returning-code', emailMasked: 'p***@example.com',
+    expiresAt: new Date(Date.now() + 600_000).toISOString(),
+    resendAvailableAt: new Date(Date.now() + 60_000).toISOString(),
+  })
+
+  async function submitEmail() {
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+  }
+
+  it('goes directly to the code without identity fields or new consent and restores the session', async () => {
+    vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValue(challengeResponse())
+    const onJoined = vi.fn()
+    render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={onJoined} />)
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    await submitEmail()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Paso de registro/)).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Código de verificación')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cambiar datos' })).not.toBeInTheDocument()
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    expect(publicApi.resumeEmailRegistration).toHaveBeenCalledWith({
+      mode: 'resume', gameId: 'ABC123', email: 'player@example.com', language: 'es',
+    })
+    expect(savePlayerSession).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+    await waitFor(() => expect(onJoined).toHaveBeenCalledWith('token'))
+    expect(publicApi.join).toHaveBeenCalledWith({ gameId: 'ABC123', challengeId: 'returning-code', code: '012345' })
+  })
+
+  it('resends a returning challenge without fabricating name or consent', async () => {
+    vi.useFakeTimers()
+    vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValue(challengeResponse())
+    render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+    await submitEmail()
+    expect(screen.getByRole('button', { name: /Reenviar código/ })).toBeDisabled()
+    await act(async () => { vi.advanceTimersByTime(60_000) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reenviar código' })) })
+    expect(publicApi.resumeEmailRegistration).toHaveBeenCalledTimes(2)
+    expect(publicApi.resumeEmailRegistration).toHaveBeenLastCalledWith({
+      mode: 'resume', gameId: 'ABC123', email: 'player@example.com', language: 'es',
+    })
+  })
+
+  it('asks only for missing consent and keeps stored identity private', async () => {
+    vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValueOnce({
+      ok: true, detailsRequired: true, existingPlayer: true,
+      fields: { username: false, phone: false, consent: true, loyaltyConsent: false },
+    }).mockResolvedValueOnce(challengeResponse())
+    render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+    await submitEmail()
+    expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Foto de perfil (opcional)')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Teléfono (opcional)')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Debes aceptar')
+    fireEvent.click(screen.getByRole('checkbox'))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Enviar código' })) })
+    expect(screen.getByLabelText('Código de verificación')).toBeInTheDocument()
+    expect(publicApi.resumeEmailRegistration).toHaveBeenLastCalledWith({
+      mode: 'resume', gameId: 'ABC123', email: 'player@example.com', consent: true, language: 'es',
+    })
+  })
+
+  it('asks only for the missing required phone and uses the selected country prefix', async () => {
+    vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValueOnce({
+      ok: true, detailsRequired: true, existingPlayer: true,
+      fields: { username: false, phone: true, consent: false, loyaltyConsent: false },
+    }).mockResolvedValueOnce(challengeResponse())
+    render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, gameType: 'STACK' }} onJoined={vi.fn()} />)
+    await submitEmail()
+    expect(screen.getByLabelText('País y prefijo')).toHaveValue('ES')
+    fireEvent.change(screen.getByLabelText('País y prefijo'), { target: { value: 'FR' } })
+    fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '612345678' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Enviar código' })) })
+    expect(publicApi.resumeEmailRegistration).toHaveBeenLastCalledWith({
+      mode: 'resume', gameId: 'ABC123', email: 'player@example.com', phone: '+33 612345678', language: 'es',
+    })
+    expect(screen.getByLabelText('Código de verificación')).toBeInTheDocument()
+  })
+
+  it('known client of the operator only fills missing required fields and keeps the photo option', async () => {
+    vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValueOnce({
+      ok: true, detailsRequired: true, existingPlayer: false, knownClient: true,
+      fields: { username: false, phone: true, consent: false, loyaltyConsent: false },
+    }).mockResolvedValueOnce(challengeResponse())
+    render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, gameType: 'STACK', participantFields: { profilePhoto: { enabled: true } } }} onJoined={vi.fn()} />)
+    await submitEmail()
+    expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Foto de perfil (opcional)')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '612345678' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Enviar código' })) })
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    expect(publicApi.resumeEmailRegistration).toHaveBeenLastCalledWith({
+      mode: 'resume', gameId: 'ABC123', email: 'player@example.com', phone: '+34 612345678', language: 'es',
+    })
+    expect(screen.getByLabelText('Código de verificación')).toBeInTheDocument()
+  })
+
+  it('shows initial request failures without falling through to signup', async () => {
+    vi.mocked(publicApi.resumeEmailRegistration).mockRejectedValueOnce(new PublicApiError('raw', 502, 'EmailDeliveryFailed'))
+    render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+    await submitEmail()
+    expect(screen.getByRole('alert')).toHaveTextContent('No se pudo enviar el email.')
+    expect(screen.getByLabelText('Email *')).toBeEnabled()
+    expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
+  })
+
+  it('requires only renewed club consent when the terms have changed', async () => {
+    vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValueOnce({
+      ok: true, detailsRequired: true, existingPlayer: true,
+      fields: { username: false, phone: false, consent: false, loyaltyConsent: true },
+    }).mockResolvedValueOnce(challengeResponse())
+    render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty: {
+      clubName: 'Club', termsUrl: 'https://club.test/terms', privacyUrl: 'https://club.test/privacy', consentVersion: 'new-version',
+    } }} onJoined={vi.fn()} />)
+    await submitEmail()
+    expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Debes aceptar las condiciones del club')
+    fireEvent.click(screen.getByRole('checkbox'))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Enviar código' })) })
+    expect(publicApi.resumeEmailRegistration).toHaveBeenLastCalledWith({
+      mode: 'resume', gameId: 'ABC123', email: 'player@example.com', loyaltyConsentVersion: 'new-version', language: 'es',
+    })
+  })
+
+  it('ignores a stale email response after the game changes', async () => {
+    let resolve!: (value: ReturnType<typeof challengeResponse>) => void
+    vi.mocked(publicApi.resumeEmailRegistration).mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    const { rerender } = render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+    await submitEmail()
+    rerender(<JoinForm gameId="DEF456" gameMeta={meta} onJoined={vi.fn()} />)
+    await act(async () => { resolve(challengeResponse()) })
+    expect(screen.getByLabelText('Email *')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Código de verificación')).not.toBeInTheDocument()
+  })
+})
+
+it('requires a phone for STACK even when old metadata disables it', async () => {
+  render(<JoinForm gameId="ABC123" gameMeta={{
+    ...meta, gameType: 'STACK', participantFields: { phone: { enabled: false, required: false } },
+  }} onJoined={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.test' } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+  fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: 'Player' } })
+  fireEvent.click(screen.getAllByRole('checkbox')[0])
+  const phone = screen.getByLabelText('Teléfono *')
+  expect(phone).toBeRequired()
+  fireEvent.submit(phone.closest('form')!)
+  expect(screen.getByRole('alert')).toHaveTextContent('El teléfono es obligatorio.')
+  expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+  fireEvent.change(phone, { target: { value: 'invalid' } })
+  fireEvent.submit(phone.closest('form')!)
+  expect(screen.getByRole('alert')).toHaveTextContent('Introduce un teléfono válido.')
+  fireEvent.change(phone, { target: { value: '+34 612345678' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+  await screen.findByLabelText('Código de verificación')
+  expect(publicApi.requestEmailCode).toHaveBeenCalledWith(expect.objectContaining({ phone: '+34 612345678' }))
+})
+
+describe('Kivly club registration', () => {
+  const loyalty = {
+    clubName: 'Test club', privacyUrl: 'https://club.test/privacy',
+    termsUrl: 'https://club.test/terms', consentVersion: 'version-1',
+  }
+
+  async function fillRegistration() {
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'ana@club.test' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+    fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: 'Ana Test' } })
+    fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '+34 612345678' } })
+  }
+
+  it('requires one explicit consent for Stand and the club, and binds it to the email challenge', async () => {
+    const onJoined = vi.fn()
+    render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty }} onJoined={onJoined} />)
+    await fillRegistration()
+    const consent = screen.getByRole('checkbox')
+    expect(consent).not.toBeChecked()
+    expect(screen.getByRole('link', { name: 'Política de privacidad' })).toHaveAttribute('href', '/pages/privacy-es.html')
+    expect(screen.getByRole('link', { name: 'Condiciones del club' })).toHaveAttribute('href', loyalty.termsUrl)
+    fireEvent.submit(screen.getByLabelText('Nombre completo *').closest('form')!)
+    expect(screen.getByRole('alert')).toHaveTextContent('Debes aceptar la política de privacidad')
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    fireEvent.click(consent)
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    await screen.findByLabelText('Código de verificación')
+    expect(publicApi.requestEmailCode).toHaveBeenCalledWith({
+      gameId: 'ABC123', email: 'ana@club.test', username: 'Ana Test',
+      phone: '+34 612345678',
+      consent: true, loyaltyConsentVersion: 'version-1', language: 'es',
+    })
+    expect(onJoined).not.toHaveBeenCalled()
+    expect(savePlayerSession).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+    await waitFor(() => expect(onJoined).toHaveBeenCalledWith('token'))
+    expect(publicApi.join).toHaveBeenCalledWith({ gameId: 'ABC123', challengeId: 'challenge-1', code: '012345' })
+  })
+
+  it('discards the challenge and requires consent again when club terms change', async () => {
+    const { rerender } = render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty }} onJoined={vi.fn()} />)
+    await fillRegistration()
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    await screen.findByLabelText('Código de verificación')
+    rerender(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty: { ...loyalty, consentVersion: 'version-2' } }} onJoined={vi.fn()} />)
+    expect(screen.queryByLabelText('Código de verificación')).not.toBeInTheDocument()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+    expect(screen.getByLabelText('Nombre completo *')).toHaveValue('Ana Test')
+    expect(publicApi.join).not.toHaveBeenCalled()
+  })
+
+  it.each(['KivlyRegistrationBusy', 'KivlyReconciliationRequired', 'KivlyUnavailable',
+    'KivlyRegistrationPending', 'KivlyIdentityConflict', 'KivlyIdentityReviewRequired',
+    'KivlyAlreadyPlayed', 'KivlyDuplicateParticipation'])(
+    'does not grant access after %s and keeps verification details for recovery', async (code) => {
+      const onJoined = vi.fn()
+      vi.mocked(publicApi.join).mockRejectedValueOnce(new PublicApiError('Private upstream details', 409, code))
+      render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty }} onJoined={onJoined} />)
+      await fillRegistration()
+      fireEvent.click(screen.getByRole('checkbox'))
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+      fireEvent.change(await screen.findByLabelText('Código de verificación'), { target: { value: '012345' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+      expect(await screen.findByRole('alert')).not.toHaveTextContent('Private upstream details')
+      expect(onJoined).not.toHaveBeenCalled()
+      expect(savePlayerSession).not.toHaveBeenCalled()
+      expect(screen.getByLabelText('Código de verificación')).toHaveValue('012345')
+      expect(publicApi.requestEmailCode).toHaveBeenCalledOnce()
+    },
+  )
+
+  it.each([409, 503, 429])('honors pending retryAfter on %s and retries the same verified code', async (status) => {
+    vi.useFakeTimers()
+    vi.mocked(publicApi.resumeEmailRegistration).mockResolvedValue({
+      ok: true, challengeId: 'verified-code', emailMasked: 'a***@club.test',
+      expiresAt: new Date(Date.now() + 600_000).toISOString(),
+      resendAvailableAt: new Date(Date.now() + 60_000).toISOString(),
+    })
+    vi.mocked(publicApi.join).mockRejectedValueOnce(new PublicApiError('private', status, 'KivlyRegistrationPending', 10))
+    const onJoined = vi.fn()
+    render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, loyalty }} onJoined={onJoined} />)
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'ana@club.test' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' })) })
+    expect(screen.getByRole('alert')).toHaveTextContent('mismo código verificado')
+    expect(screen.getByRole('button', { name: 'Verificar y empezar' })).toBeDisabled()
+    expect(screen.getByText('Puedes reintentar con el mismo código en: 10s')).toBeInTheDocument()
+    fireEvent.submit(screen.getByLabelText('Código de verificación').closest('form')!)
+    expect(publicApi.join).toHaveBeenCalledOnce()
+    await act(async () => { vi.advanceTimersByTime(9_000) })
+    expect(screen.getByRole('button', { name: 'Verificar y empezar' })).toBeDisabled()
+    await act(async () => { vi.advanceTimersByTime(1_000) })
+    expect(screen.getByRole('button', { name: 'Verificar y empezar' })).toBeEnabled()
+    expect(screen.getByLabelText('Código de verificación')).toHaveValue('012345')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' })) })
+    expect(publicApi.join).toHaveBeenLastCalledWith({ gameId: 'ABC123', challengeId: 'verified-code', code: '012345' })
+    expect(onJoined).toHaveBeenCalledWith('token')
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['KivlyRegistrationPending', 'same verified code'],
+    ['KivlyIdentityConflict', 'different club profiles'],
+    ['KivlyIdentityReviewRequired', 'organizer must verify your identity'],
+    ['KivlyAlreadyPlayed', 'cannot play again'],
+    ['KivlyDuplicateParticipation', 'Duplicate historical participations'],
+  ])('localizes %s in English', async (code, message) => {
+    vi.mocked(publicApi.resumeEmailRegistration).mockRejectedValueOnce(new PublicApiError('private', 409, code))
+    render(<ParticipantLanguageProvider>
+      <ParticipantLanguageSelector />
+      <JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />
+    </ParticipantLanguageProvider>)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma' }), { target: { value: 'en' } })
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'ana@club.test' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continue' })) })
+    expect(screen.getByRole('alert')).toHaveTextContent(message)
+  })
+})
+
+describe('participant prize promotion', () => {
+  it('shows validation and ranking before registration fields, never the raffle', async () => {
+    render(<>
+      <ParticipantPrizePromo catalog={catalog} stickers />
+      <JoinForm gameId="ABC123" gameMeta={{ ...meta, prizeCatalog: catalog }} onJoined={vi.fn()} />
+    </>)
+    expect(screen.getByRole('img', { name: 'Mochila' })).toHaveAttribute('src', '/prizes/backpack.png')
+    expect(screen.getByRole('img', { name: 'Auriculares' })).toHaveAttribute('src', '/prizes/headphones.png')
+    expect(screen.queryByText('Sorteo secreto')).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Sorteo secreto' })).not.toBeInTheDocument()
+    const heading = screen.getByLabelText('Premios en juego')
+    expect(heading.compareDocumentPosition(screen.getByLabelText('Email *')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(heading).toHaveClass('-mb-8', 'items-start')
+    expect(screen.getByText(prizeText('PREMIO: Mochila')).closest('.rounded-full')).toHaveClass('self-start', 'h-16', 'border-primary')
+    expect(screen.queryByText('0/20')).not.toBeInTheDocument()
+  })
+
+  it('keeps text-only prizes and hides slots with zero availability', async () => {
+    render(<ParticipantPrizePromo catalog={{
+      validation: { name: 'Sin existencias', limit: 0, imageUrl: '/out.png' },
+      ranking: { name: 'Entrada', limit: null, topX: 3 },
+    }} stickers />)
+    expect(screen.getByText(prizeText('PREMIO TOP 3: Entrada'))).toBeInTheDocument()
+    expect(screen.queryByText('Sin existencias')).not.toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
+
+  it('does not add empty promotion panels for legacy games', async () => {
+    render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+    expect(screen.queryByRole('heading', { name: 'Premios en juego' })).not.toBeInTheDocument()
+  })
+
+  it('translates promotional labels without translating prize names or resetting fields', async () => {
+    render(
+      <ParticipantLanguageProvider>
+        <ParticipantLanguageSelector />
+        <ParticipantPrizePromo catalog={catalog} stickers />
+        <JoinForm gameId="ABC123" gameMeta={{ ...meta, prizeCatalog: catalog }} onJoined={vi.fn()} />
+      </ParticipantLanguageProvider>
+    )
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
+    expect(screen.getByLabelText('Prizes to play for')).toBeInTheDocument()
+    expect(screen.getByText(prizeText('PRIZE: Mochila'))).toBeInTheDocument()
+    expect(screen.getByText(prizeText('TOP PRIZE 3: Auriculares'))).toBeInTheDocument()
+    expect(screen.getByLabelText('Email *')).toHaveValue('player@example.com')
+  })
+})
+
+describe('participant registration fields', () => {
+  it.each(Array.from({ length: 4 }, (_, mask) => ({
+    email: Boolean(mask & 1), phone: Boolean(mask & 2),
+  })))('always requires email and phone despite legacy flags: %o', async ({ email, phone }) => {
+    const onJoined = vi.fn()
+    render(<JoinForm gameId="ABC123" gameMeta={{
+      ...meta, participantFields: {
+        email: { required: email }, phone: { required: phone },
+      },
+    }} onJoined={onJoined} />)
+    const emailInput = screen.getByLabelText('Email *')
+    expect(emailInput).toBeRequired()
+    fireEvent.change(emailInput, { target: { value: 'player@example.com' } })
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+    const phoneInput = screen.getByLabelText('Teléfono *')
+    expect(phoneInput).toBeRequired()
+    expect(phoneInput).toHaveAttribute('type', 'tel')
+    fireEvent.change(phoneInput, { target: { value: '+34 600123456' } })
+    expect(screen.queryByLabelText('Instagram *')).not.toBeInTheDocument()
+    const usernameInput = screen.getByLabelText('Nombre completo *')
+    expect(usernameInput).toBeRequired()
+    fireEvent.change(usernameInput, { target: { value: 'Player' } })
+    fireEvent.click(screen.getByRole('checkbox'))
+    expect(usernameInput).toHaveAttribute('autocomplete', 'name')
+    expect(usernameInput.compareDocumentPosition(emailInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    const registration = {
+      gameId: 'ABC123', consent: true,
+      username: 'Player',
+      email: 'player@example.com',
+      phone: '+34 600123456',
+    }
+    await screen.findByLabelText('Código de verificación')
+    expect(publicApi.requestEmailCode).toHaveBeenCalledWith({ ...registration, language: 'es' })
+    expect(publicApi.join).not.toHaveBeenCalled()
+    expect(savePlayerSession).not.toHaveBeenCalled()
+    expect(onJoined).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+    await waitFor(() => expect(onJoined).toHaveBeenCalledWith('token'))
+    expect(publicApi.join).toHaveBeenCalledWith({ gameId: 'ABC123', challengeId: 'challenge-1', code: '012345' })
+  })
+
+  async function continueToDetails(email = 'player@example.com') {
+    const emailInput = screen.queryByLabelText('Email *') as HTMLInputElement | null
+    if (emailInput) {
+      if (!emailInput.value) fireEvent.change(emailInput, { target: { value: email } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Continuar|Continue/ })) })
+    }
+  }
+
+  async function startVerification() {
+    await continueToDetails()
+    await fillFullName()
+    if (!screen.getAllByRole('checkbox')[0].matches(':checked')) fireEvent.click(screen.getAllByRole('checkbox')[0])
+    fireEvent.click(screen.getByRole('button', { name: /Enviar código|Send code/ }))
+    await act(async () => {})
+    return screen.getByLabelText(/Código de verificación|Verification code/)
+  }
+
+  async function fillFullName() {
+    await continueToDetails()
+    const input = screen.queryByLabelText(/^(Nombre completo|Full name) \*$/) as HTMLInputElement | null
+    if (input && !input.value) fireEvent.change(input, { target: { value: 'Player' } })
+    const phone = screen.queryByLabelText(/^(Teléfono|Phone) \*$/) as HTMLInputElement | null
+    if (phone && !phone.value) fireEvent.change(phone, { target: { value: '+34 612345678' } })
+  }
+
+  describe('required username', () => {
+    it.each([
+      { email: false, phone: false }, { email: false, phone: true },
+      { email: true, phone: false }, { email: true, phone: true },
+    ])('requires username before joining with contact configuration %o', async ({ email, phone }) => {
+      render(<JoinForm gameId="ABC123" gameMeta={{
+        ...meta, participantFields: {
+          email: { required: email }, phone: { required: phone },
+        },
+      }} onJoined={vi.fn()} />)
+      fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+      fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '+34123456789' } })
+      const input = screen.getByLabelText('Nombre completo *')
+      expect(input).toHaveValue('')
+      fireEvent.change(input, { target: { value: '  ' } })
+      fireEvent.click(screen.getByRole('checkbox'))
+      fireEvent.submit(input.closest('form')!)
+      expect(screen.getByRole('alert')).toHaveTextContent('El nombre completo es obligatorio.')
+      expect(publicApi.join).not.toHaveBeenCalled()
+      expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    })
+
+    it('binds the trimmed name to the challenge, resends it, and verifies without resubmitting identity fields', async () => {
+      vi.useFakeTimers()
+      const onJoined = vi.fn()
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={onJoined} />)
+      fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+      fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: '  Ana 🌟  ' } })
+      await startVerification()
+      const registration = {
+        gameId: 'ABC123', email: 'player@example.com', username: 'Ana 🌟', consent: true, language: 'es',
+        phone: '+34 612345678',
+      }
+      expect(publicApi.requestEmailCode).toHaveBeenCalledWith(registration)
+      expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
+      await act(async () => { vi.advanceTimersByTime(60_000) })
+      fireEvent.click(screen.getByRole('button', { name: 'Reenviar código' }))
+      await act(async () => {})
+      expect(publicApi.requestEmailCode).toHaveBeenCalledTimes(2)
+      expect(publicApi.requestEmailCode).toHaveBeenLastCalledWith(registration)
+      fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+      await act(async () => {})
+      expect(onJoined).toHaveBeenCalledWith('token')
+      expect(publicApi.join).toHaveBeenCalledWith({ gameId: 'ABC123', challengeId: 'challenge-1', code: '012345' })
+      expect(publicApi.uploadParticipantPhoto).not.toHaveBeenCalled()
+    })
+
+    it.each(['', '   '])('rejects an empty username explicitly: %j', async (username) => {
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+      const input = screen.getByLabelText('Nombre completo *')
+      fireEvent.change(input, { target: { value: username } })
+      fireEvent.submit(input.closest('form')!)
+      expect(screen.getByRole('alert')).toHaveTextContent('El nombre completo es obligatorio.')
+      expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    })
+
+    it('counts Unicode characters rather than UTF-16 units at the name length boundary', async () => {
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+      fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: '🌟'.repeat(100) } })
+      await startVerification()
+      expect(publicApi.requestEmailCode).toHaveBeenCalledWith(expect.objectContaining({ username: '🌟'.repeat(100) }))
+    })
+
+    it.each(['a'.repeat(101), 'Ana\u0007', 'Ana\u007f', 'Ana\u0085B'])('rejects invalid names before requesting a challenge', async (username) => {
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+      fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: username } })
+      fireEvent.click(screen.getByRole('checkbox'))
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+      expect(screen.getByRole('alert')).toHaveTextContent('Usa un nombre completo de hasta 100 caracteres sin caracteres de control.')
+      expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    })
+
+    it('translates the required field and server validation error', async () => {
+      vi.mocked(publicApi.requestEmailCode).mockRejectedValueOnce(new PublicApiError('invalid', 400, 'invalid_username'))
+      render(<ParticipantLanguageProvider>
+        <ParticipantLanguageSelector />
+        <JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />
+      </ParticipantLanguageProvider>)
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
+      fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continue' })) })
+      expect(screen.getByLabelText('Full name *')).toBeRequired()
+      await fillFullName()
+      fireEvent.click(screen.getByRole('checkbox'))
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('Use a full name of up to 100 characters without control characters.')
+    })
+  })
+
+  describe('optional participant photo', () => {
+    const photoMeta: PublicGameResponse = { ...meta, participantFields: { profilePhoto: { enabled: true } } }
+    const noRequiredFields = {
+      ...meta,
+      participantFields: {
+        email: { required: false },
+        phone: { required: false },
+        profilePhoto: { enabled: true },
+      },
+    }
+
+    it('hides the photo picker unless the game asks for it', async () => {
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      await fillFullName()
+      expect(screen.queryByLabelText('Foto de perfil (opcional)')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Elegir foto de perfil' })).not.toBeInTheDocument()
+    })
+
+    it('opens the file picker from the avatar and releases replaced previews', async () => {
+      const { unmount } = render(<JoinForm gameId="ABC123" gameMeta={photoMeta} onJoined={vi.fn()} />)
+      await fillFullName()
+      const input = screen.getByLabelText('Foto de perfil (opcional)')
+      const pick = vi.spyOn(input, 'click')
+      fireEvent.click(screen.getByRole('button', { name: 'Elegir foto de perfil' }))
+      expect(pick).toHaveBeenCalledOnce()
+      expect(screen.queryByAltText('Vista previa de la foto de perfil')).not.toBeInTheDocument()
+      const file = new File(['photo'], 'profile.png', { type: 'image/png' })
+      fireEvent.change(input, { target: { files: [file] } })
+      expect(screen.getByAltText('Vista previa de la foto de perfil')).toHaveAttribute('src', 'blob:profile-preview')
+      expect(URL.createObjectURL).toHaveBeenCalledWith(file)
+      fireEvent.change(input, { target: { files: [new File(['other'], 'other.webp', { type: 'image/webp' })] } })
+      expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1)
+      unmount()
+      expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2)
+    })
+
+    it.each([
+      new File(['invalid'], 'profile.gif', { type: 'image/gif' }),
+      new File([], 'empty.png', { type: 'image/png' }),
+      new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' }),
+    ])('rejects invalid photo files without keeping a preview: $name', async (file) => {
+      render(<JoinForm gameId="ABC123" gameMeta={photoMeta} onJoined={vi.fn()} />)
+      await fillFullName()
+      fireEvent.change(screen.getByLabelText('Foto de perfil (opcional)'), { target: { files: [file] } })
+      expect(screen.getByRole('alert')).toHaveTextContent('Usa una imagen JPG, PNG o WebP de hasta 5 MB.')
+      expect(screen.queryByAltText('Vista previa de la foto de perfil')).not.toBeInTheDocument()
+      expect(URL.createObjectURL).not.toHaveBeenCalled()
+    })
+
+    it('uploads a selected photo before saving the player session', async () => {
+      const onJoined = vi.fn()
+      const photo = new File([new Uint8Array([1, 2, 3])], 'profile.png', { type: 'image/png' })
+      vi.mocked(publicApi.uploadParticipantPhoto).mockResolvedValueOnce('https://photo.example/profile.png')
+      render(<JoinForm gameId="ABC123" gameMeta={noRequiredFields} onJoined={onJoined} />)
+
+      await fillFullName()
+      fireEvent.change(screen.getByLabelText('Foto de perfil (opcional)'), { target: { files: [photo] } })
+      await startVerification()
+      fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+
+      await waitFor(() => expect(onJoined).toHaveBeenCalledWith('token'))
+      expect(publicApi.uploadParticipantPhoto).toHaveBeenCalledWith(photo, 'token')
+      expect(savePlayerSession).toHaveBeenCalledWith('ABC123', 'token', {
+        playerId: 1,
+        displayName: 'Jugador',
+        validated: false,
+        profilePicUrl: 'https://photo.example/profile.png',
+      })
+    })
+
+    it('continues without the photo and reports the generic avatar if upload fails', async () => {
+      const onJoined = vi.fn()
+      const photo = new File([new Uint8Array([1, 2, 3])], 'profile.png', { type: 'image/png' })
+      vi.mocked(publicApi.uploadParticipantPhoto).mockRejectedValueOnce(new Error('network failure'))
+      render(<JoinForm gameId="ABC123" gameMeta={noRequiredFields} onJoined={onJoined} />)
+
+      await fillFullName()
+      fireEvent.change(screen.getByLabelText('Foto de perfil (opcional)'), { target: { files: [photo] } })
+      await startVerification()
+      fireEvent.change(screen.getByLabelText('Código de verificación'), { target: { value: '012345' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+
+      await waitFor(() => expect(onJoined).toHaveBeenCalledWith('token', true))
+      expect(savePlayerSession).toHaveBeenCalledWith('ABC123', 'token', {
+        playerId: 1,
+        displayName: 'Jugador',
+        validated: false,
+      })
+    })
+  })
+
+  describe('email verification', () => {
+    it.each([
+      ['InvalidJson', 'Unable to submit registration. Check your details and try again.'],
+      ['ConsentRequired', 'You must accept the privacy policy.'],
+      ['EmailNotRequested', 'The form configuration has changed. Reload the page to register.'],
+      ['InvalidLanguage', 'Unable to submit registration. Check your details and try again.'],
+      ['InvalidGameId', 'Game not found. Check your participation link.'],
+      ['GameNotFound', 'Game not found. Check your participation link.'],
+      ['GameInactive', 'The game is not active. Ask the event team.'],
+      ['web_join_disabled', 'Web registration is unavailable for this game. Ask the event team.'],
+      ['unsupported_game_type', 'Web registration is unavailable for this game. Ask the event team.'],
+      ['missing_email', 'Email is required.'],
+      ['missing_username', 'Full name is required.'],
+      ['invalid_email', 'Enter a valid email address.'],
+      ['missing_phone', 'Phone number is required.'],
+      ['invalid_phone', 'Enter a valid phone number.'],
+      ['InternalError', 'Unable to complete registration. Please try again later.'],
+      ['UnknownFailure', 'Unable to complete registration. Please try again later.'],
+    ])('localizes request validation failure %s without exposing server text', async (errorCode, message) => {
+      vi.mocked(publicApi.requestEmailCode).mockRejectedValueOnce(new PublicApiError('HTTP 500 / raw server details', 500, errorCode))
+      render(<ParticipantLanguageProvider><ParticipantLanguageSelector />
+        <JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />
+      </ParticipantLanguageProvider>)
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
+      await fillFullName()
+      fireEvent.click(screen.getByRole('checkbox'))
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(message)
+      expect(publicApi.join).not.toHaveBeenCalled()
+      expect(savePlayerSession).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: /Volver|Back/ }))
+      expect(screen.getByLabelText('Email *')).toHaveValue('player@example.com')
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Continuar|Continue/ })) })
+      expect(screen.getByRole('checkbox')).toBeChecked()
+    })
+
+    it.each([
+      new PublicApiError('HTTP 500', 500),
+      new Error('Failed to fetch'),
+    ])('uses a friendly Spanish fallback for unclassified failures', async (error) => {
+      vi.mocked(publicApi.requestEmailCode).mockRejectedValueOnce(error)
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      await fillFullName()
+      fireEvent.click(screen.getByRole('checkbox'))
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo completar el registro. Inténtalo de nuevo más tarde.')
+    })
+
+    it('localizes capacity errors from finalization without creating a session', async () => {
+      vi.mocked(publicApi.join).mockRejectedValueOnce(new PublicApiError('player_limit_reached', 409, 'player_limit_reached'))
+      render(<ParticipantLanguageProvider><ParticipantLanguageSelector />
+        <JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />
+      </ParticipantLanguageProvider>)
+      const input = await startVerification()
+      fireEvent.change(input, { target: { value: '012345' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('El juego ha alcanzado el límite de participantes.')
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
+      expect(screen.getByRole('alert')).toHaveTextContent('The game has reached its participant limit. Ask the event team.')
+      expect(savePlayerSession).not.toHaveBeenCalled()
+    })
+
+    it('requires consent before requesting a code for legacy defaults', async () => {
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      await fillFullName()
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+      expect(screen.getByRole('alert')).toHaveTextContent('Debes aceptar')
+      expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    })
+
+    it('keeps wrong codes pending and saves only after a successful retry', async () => {
+      const onJoined = vi.fn()
+      const storage = vi.spyOn(Storage.prototype, 'setItem')
+      vi.mocked(publicApi.join).mockRejectedValueOnce(new PublicApiError('untranslated', 400, 'InvalidVerificationCode'))
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={onJoined} />)
+      const input = await startVerification()
+      expect(input).toHaveAttribute('type', 'text')
+      expect(input).toHaveAttribute('inputmode', 'numeric')
+      expect(input).toHaveAttribute('maxlength', '6')
+      expect(input).toHaveAttribute('pattern', '[0-9]{6}')
+      expect(input).toHaveAttribute('autocomplete', 'one-time-code')
+      fireEvent.change(input, { target: { value: '000001' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+      await screen.findByText('El código no es correcto. Inténtalo de nuevo.')
+      expect(savePlayerSession).not.toHaveBeenCalled()
+      expect(onJoined).not.toHaveBeenCalled()
+      expect(storage).not.toHaveBeenCalled()
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+      fireEvent.change(input, { target: { value: '000002' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+      await waitFor(() => expect(savePlayerSession).toHaveBeenCalledWith('ABC123', 'token', expect.any(Object)))
+      expect(onJoined).toHaveBeenCalledOnce()
+    })
+
+    it('accepts pasted digits without losing leading zeros and rejects incomplete codes', async () => {
+      const user = userEvent.setup()
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      const input = await startVerification()
+      fireEvent.change(input, { target: { value: '012' } })
+      fireEvent.submit(input.closest('form')!)
+      expect(screen.getByRole('alert')).toHaveTextContent('6 dígitos')
+      expect(publicApi.join).not.toHaveBeenCalled()
+      await user.clear(input)
+      await user.paste('001234')
+      expect(input).toHaveValue('001234')
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+      await waitFor(() => expect(publicApi.join).toHaveBeenCalledWith({
+        gameId: 'ABC123', challengeId: 'challenge-1', code: '001234',
+      }))
+    })
+
+    it('resends only after server cooldown using captured fields and replaces the challenge', async () => {
+      vi.useFakeTimers()
+      render(<JoinForm gameId="ABC123" gameMeta={{ ...meta, participantFields: {
+        email: { required: true }, phone: { required: true },
+      } }} onJoined={vi.fn()} />)
+      await continueToDetails()
+      fireEvent.change(screen.getByLabelText('Teléfono *'), { target: { value: '+34123456789' } })
+      const input = await startVerification()
+      expect(screen.queryByLabelText('Email *')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Instagram *')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Teléfono (opcional)')).not.toBeInTheDocument()
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+      expect(screen.queryByText('Regístrate para jugar desde tu móvil')).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Política de privacidad' })).not.toBeInTheDocument()
+      fireEvent.change(input, { target: { value: '123456' } })
+      expect(screen.getByRole('button', { name: /Reenviar código/ })).toBeDisabled()
+      await act(async () => { vi.advanceTimersByTime(59_000) })
+      expect(screen.getByRole('button', { name: /Reenviar código/ })).toBeDisabled()
+      await act(async () => { vi.advanceTimersByTime(1_000) })
+      expect(screen.getByRole('button', { name: /Reenviar código/ })).toBeEnabled()
+      vi.mocked(publicApi.requestEmailCode).mockResolvedValueOnce({
+        ok: true, challengeId: 'challenge-2', emailMasked: 'p***@example.com',
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        resendAvailableAt: new Date(Date.now() + 60_000).toISOString(),
+      })
+      fireEvent.click(screen.getByRole('button', { name: /Reenviar código/ }))
+      await act(async () => {})
+      expect(publicApi.requestEmailCode).toHaveBeenLastCalledWith({
+        gameId: 'ABC123', email: 'player@example.com', username: 'Player',
+        phone: '+34 123456789', consent: true, language: 'es',
+      })
+      expect(input).toHaveValue('')
+      expect(screen.getByRole('button', { name: /Reenviar código/ })).toBeDisabled()
+      fireEvent.change(input, { target: { value: '012345' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+      await act(async () => {})
+      expect(publicApi.join).toHaveBeenCalledWith({ gameId: 'ABC123', challengeId: 'challenge-2', code: '012345' })
+    })
+
+    it('invalidates the old challenge when changing email and preserves the remaining draft', async () => {
+      vi.useFakeTimers()
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      await startVerification()
+      fireEvent.click(screen.getByRole('button', { name: 'Cambiar email' }))
+      expect(screen.queryByLabelText('Código de verificación')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Email *')).toHaveValue('player@example.com')
+      expect(screen.getByLabelText('Email *')).toBeEnabled()
+      fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'new@example.com' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+      expect(screen.getByLabelText('Nombre completo *')).toHaveValue('Player')
+      expect(screen.getByRole('checkbox')).toBeChecked()
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+      await act(async () => {})
+      expect(publicApi.requestEmailCode).toHaveBeenLastCalledWith({
+        gameId: 'ABC123', email: 'new@example.com', username: 'Player', consent: true, language: 'es',
+        phone: '+34 612345678',
+      })
+      expect(publicApi.requestEmailCode).toHaveBeenCalledTimes(2)
+      expect(publicApi.join).not.toHaveBeenCalled()
+      expect(savePlayerSession).not.toHaveBeenCalled()
+    })
+
+    it('expires according to the server timestamp and allows resending or editing', async () => {
+      vi.useFakeTimers()
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      const input = await startVerification()
+      await act(async () => { vi.advanceTimersByTime(600_000) })
+      expect(input).toBeDisabled()
+      expect(screen.getByText('El código ha caducado. Solicita uno nuevo.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Verificar y empezar' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Reenviar código' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Cambiar datos' })).toBeEnabled()
+      expect(publicApi.join).not.toHaveBeenCalled()
+    })
+
+    it.each(['VerificationRequired', 'VerificationExpired', 'VerificationAttemptsExceeded', 'VerificationSuperseded', 'VerificationUsed'])(
+      'blocks final join after %s but allows requesting a new code', async (errorCode) => {
+        vi.mocked(publicApi.join).mockRejectedValueOnce(new PublicApiError('raw server text', 400, errorCode))
+        render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+        const input = await startVerification()
+        fireEvent.change(input, { target: { value: '123456' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Verificar y empezar' })).toBeDisabled())
+        expect(screen.getByRole('alert')).not.toHaveTextContent('raw server text')
+        expect(input).toBeDisabled()
+        expect(savePlayerSession).not.toHaveBeenCalled()
+        expect(screen.getByRole('button', { name: 'Cambiar datos' })).toBeEnabled()
+      },
+    )
+
+    it.each([
+      ['EmailDeliveryFailed', 'Unable to send the email. Try again.'],
+      ['VerificationUnavailable', 'Email verification is unavailable. Try again later.'],
+      ['EmailRateLimited', 'Too many requests. Wait before requesting another code.'],
+    ])('localizes %s and sends the selected language', async (errorCode, message) => {
+      vi.mocked(publicApi.requestEmailCode).mockRejectedValueOnce(new PublicApiError('raw server text', 503, errorCode))
+      render(<ParticipantLanguageProvider><ParticipantLanguageSelector />
+        <JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />
+      </ParticipantLanguageProvider>)
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
+      await fillFullName()
+      fireEvent.click(screen.getByRole('checkbox'))
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(message)
+      expect(publicApi.requestEmailCode).toHaveBeenCalledWith({
+        gameId: 'ABC123', email: 'player@example.com', username: 'Player', consent: true, language: 'en',
+        phone: '+34 612345678',
+      })
+      expect(publicApi.join).not.toHaveBeenCalled()
+    })
+
+    it('translates a pending challenge and its error without resetting the code', async () => {
+      vi.mocked(publicApi.join).mockRejectedValueOnce(new PublicApiError('raw', 400, 'InvalidVerificationCode'))
+      render(<ParticipantLanguageProvider><ParticipantLanguageSelector />
+        <JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />
+      </ParticipantLanguageProvider>)
+      const input = await startVerification()
+      fireEvent.change(input, { target: { value: '012345' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Verificar y empezar' }))
+      await screen.findByRole('alert')
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
+      expect(screen.getByLabelText('Verification code')).toHaveValue('012345')
+      expect(screen.getByRole('status')).toHaveTextContent('Code sent to: p***@example.com')
+      expect(screen.getByRole('alert')).toHaveTextContent('The code is incorrect. Try again.')
+      expect(screen.getByRole('button', { name: 'Verify and start' })).toBeEnabled()
+      expect(publicApi.requestEmailCode).toHaveBeenCalledOnce()
+    })
+
+    it('honors rate-limit retryAfter even before a challenge exists', async () => {
+      vi.useFakeTimers()
+      vi.mocked(publicApi.requestEmailCode).mockRejectedValueOnce(new PublicApiError('raw', 429, 'EmailRateLimited', 90))
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+      await fillFullName()
+      fireEvent.click(screen.getByRole('checkbox'))
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+      await act(async () => {})
+      expect(screen.getByRole('button', { name: 'Enviar código' })).toBeDisabled()
+      await act(async () => { vi.advanceTimersByTime(89_000) })
+      expect(screen.getByRole('button', { name: 'Enviar código' })).toBeDisabled()
+      await act(async () => { vi.advanceTimersByTime(1_000) })
+      expect(screen.getByRole('button', { name: 'Enviar código' })).toBeEnabled()
+      expect(publicApi.join).not.toHaveBeenCalled()
+    })
+
+    it('prevents duplicate requests while delivery is pending', async () => {
+      let resolve!: (value: Awaited<ReturnType<typeof publicApi.requestEmailCode>>) => void
+      vi.mocked(publicApi.requestEmailCode).mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+      const onJoined = vi.fn()
+      render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={onJoined} />)
+      await fillFullName()
+      fireEvent.click(screen.getByRole('checkbox'))
+      const form = screen.getByLabelText('Nombre completo *').closest('form')!
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+      expect(publicApi.requestEmailCode).toHaveBeenCalledOnce()
+      expect(publicApi.join).not.toHaveBeenCalled()
+      expect(savePlayerSession).not.toHaveBeenCalled()
+      expect(onJoined).not.toHaveBeenCalled()
+      await act(async () => resolve({
+        ok: true, challengeId: 'pending-challenge', emailMasked: 'p***@example.com',
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        resendAvailableAt: new Date(Date.now() + 60_000).toISOString(),
+      }))
+      expect(screen.getByLabelText('Código de verificación')).toBeInTheDocument()
+    })
+  })
+
+  it('keeps email enabled by default, requires a username, and never requests Instagram', async () => {
+    render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+    expect(screen.getByLabelText('Email *')).toBeRequired()
+    expect(screen.queryByLabelText('Nombre completo *')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continuar' })).toBeEnabled()
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+    expect(screen.getByLabelText('Nombre completo *')).toBeRequired()
+    expect(screen.queryByLabelText('Instagram *')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('textbox')).toHaveLength(2)
+  })
+
+  it('does not allow legacy settings to disable email verification', async () => {
+    render(<JoinForm gameId="ABC123" gameMeta={{
+      ...meta, participantFields: { email: { required: false } },
+    }} onJoined={vi.fn()} />)
+    fireEvent.submit(screen.getByLabelText('Email *').closest('form')!)
+    expect(screen.getByRole('alert')).toHaveTextContent('El email es obligatorio.')
+    expect(publicApi.join).not.toHaveBeenCalled()
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+  })
+
+  it('rejects a whitespace-only phone despite legacy optional settings', async () => {
+    render(<JoinForm gameId="ABC123" gameMeta={{
+      ...meta, participantFields: { email: { required: false }, phone: { required: false, enabled: true } },
+    }} onJoined={vi.fn()} />)
+    await continueToDetails()
+    const input = screen.getByLabelText('Teléfono *')
+    fireEvent.change(input, { target: { value: '   ' } })
+    await fillFullName()
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('El teléfono es obligatorio.')
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    expect(publicApi.join).not.toHaveBeenCalled()
+  })
+
+  it('requires phone despite explicit legacy hidden setting', async () => {
+    render(<JoinForm gameId="ABC123" gameMeta={{
+      ...meta, participantFields: { phone: { required: true, enabled: false } },
+    }} onJoined={vi.fn()} />)
+    expect(screen.queryByLabelText('Teléfono (opcional)')).not.toBeInTheDocument()
+    await startVerification()
+    expect(publicApi.requestEmailCode).toHaveBeenCalledWith({
+      gameId: 'ABC123', email: 'player@example.com', username: 'Player', consent: true, language: 'es',
+      phone: '+34 612345678',
+    })
+  })
+
+  it('validates email locally before moving to the details step', async () => {
+    render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'not-an-email' } })
+    fireEvent.submit(screen.getByLabelText('Email *').closest('form')!)
+    expect(screen.getByRole('alert')).toHaveTextContent('Introduce un email válido.')
+    expect(screen.getByLabelText('Email *')).toBeInTheDocument()
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+    expect(publicApi.join).not.toHaveBeenCalled()
+  })
+
+  it('preserves the form draft when returning from details to email', async () => {
+    render(<JoinForm gameId="ABC123" gameMeta={meta} onJoined={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('Email *'), { target: { value: 'player@example.com' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+    fireEvent.change(screen.getByLabelText('Nombre completo *'), { target: { value: 'Player' } })
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
+    expect(screen.getByLabelText('Email *')).toHaveValue('player@example.com')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continuar' })) })
+    expect(screen.getByLabelText('Nombre completo *')).toHaveValue('Player')
+    expect(screen.getByRole('checkbox')).toBeChecked()
+    expect(publicApi.requestEmailCode).not.toHaveBeenCalled()
+  })
+})

@@ -1,0 +1,194 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import jsQR from 'jsqr'
+import { ThemeProvider } from '../theme'
+import { getGameById } from '../../games'
+import { publicApi, type PublicGameResponse } from '../../api/publicApi'
+import type { GamePrize } from '../prizes'
+import PrizePresentation from '../widgets/PrizePresentation'
+
+type ScanStatus = 'idle' | 'scanning' | 'redeeming' | 'ok' | 'already' | 'error'
+
+const PRIZE_LABEL: Record<string, string> = {
+  validation: 'Premio por pareja',
+  raffle: 'Premio del sorteo',
+  ranking: 'Premio del ranking',
+  award: 'Premio STAND',
+}
+
+export default function ValidatorShell() {
+  const { gameId = '' } = useParams()
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const busyRef = useRef(false)
+  const [status, setStatus] = useState<ScanStatus>('idle')
+  const [message, setMessage] = useState<string | null>(null)
+  const [prize, setPrize] = useState<GamePrize | null>(null)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [gameMeta, setGameMeta] = useState<PublicGameResponse | null>(null)
+  const currentGameMeta = gameMeta?.gameId === gameId ? gameMeta : null
+  const game = currentGameMeta ? getGameById(currentGameMeta.gameType) : undefined
+  const logo = currentGameMeta
+    ? currentGameMeta.formLogoUrl || currentGameMeta.clientLogoUrl || game?.assets?.logo
+    : undefined
+
+  useEffect(() => {
+    let cancelled = false
+    setGameMeta(null)
+    if (gameId) {
+      void publicApi.getGame(gameId).then((meta) => {
+        if (!cancelled && meta.ok && meta.gameId === gameId) setGameMeta(meta)
+      }).catch(() => {
+        if (!cancelled) setGameMeta(null)
+      })
+    }
+    return () => { cancelled = true }
+  }, [gameId])
+
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+  }, [])
+
+  const redeemToken = useCallback(async (raw: string) => {
+    const token = raw.trim()
+    if (!token || busyRef.current) return
+    busyRef.current = true
+    setStatus('redeeming')
+    setMessage(null)
+    setPrize(null)
+    try {
+      const res = await publicApi.redeem(token, gameId || undefined)
+      setPrize(res.prize ?? null)
+      setStatus('ok')
+      const kindLabel = PRIZE_LABEL[res.kind] || res.kind
+      setMessage(`${kindLabel} entregado${res.label ? ` a ${res.label}` : ''}.`)
+    } catch (e) {
+      const err = e as Error & { status?: number }
+      if (err.message === 'QuizRequired') {
+        setStatus('error')
+        setMessage('El participante debe completar el cuestionario antes de recibir el premio.')
+      } else if (err.status === 409 || err.message === 'AlreadyDelivered') {
+        setStatus('already')
+        setMessage('Este premio ya se había entregado.')
+      } else {
+        setStatus('error')
+        setMessage(err.message || 'No se pudo validar el QR')
+      }
+    } finally {
+      busyRef.current = false
+    }
+  }, [gameId])
+
+  const startScan = useCallback(async () => {
+    stopCamera()
+    setCameraError(null)
+    setStatus('scanning')
+    setMessage(null)
+    setPrize(null)
+    busyRef.current = false
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      })
+      streamRef.current = stream
+      const video = videoRef.current
+      if (!video) return
+      video.srcObject = stream
+      await video.play()
+    } catch {
+      setCameraError('No se pudo abrir la cámara. Revisa permisos.')
+      setStatus('idle')
+    }
+  }, [stopCamera])
+
+  useEffect(() => {
+    void startScan()
+    return () => stopCamera()
+  }, [gameId, startScan, stopCamera])
+
+  useEffect(() => {
+    if (status !== 'scanning') return
+    let raf = 0
+    const tick = () => {
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      if (video && canvas && video.readyState >= 2 && !busyRef.current) {
+        const w = video.videoWidth
+        const h = video.videoHeight
+        if (w && h) {
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, w, h)
+            const image = ctx.getImageData(0, 0, w, h)
+            const code = jsQR(image.data, w, h, { inversionAttempts: 'dontInvert' })
+            if (code?.data) {
+              stopCamera()
+              void redeemToken(code.data)
+              return
+            }
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [status, redeemToken, stopCamera])
+
+  return (
+    <ThemeProvider game={game ?? null} appearance={currentGameMeta?.formConfig?.appearance ?? currentGameMeta?.appearance}>
+      <div className="validator-shell play-shell bg-club text-textMain font-sans">
+        <div className="validator-content play-card card mx-auto max-w-md w-full space-y-4">
+          {logo && (
+            <img
+              src={logo}
+              alt={currentGameMeta?.formLogoUrl || currentGameMeta?.clientLogoUrl ? 'Logo del cliente' : game?.name}
+              className="play-logo mx-auto w-auto max-w-full object-contain"
+            />
+          )}
+          <h1 className="text-xl font-bold text-center">Validador de premios</h1>
+
+          <div className="validator-frame relative overflow-hidden rounded-xl aspect-[3/4]">
+            <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted />
+            <canvas ref={canvasRef} className="hidden" />
+            {(status === 'redeeming' || status === 'ok' || status === 'already' || status === 'error') && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-4 text-center">
+                <div className="space-y-2">
+                  {status === 'redeeming' && <p className="text-textSub">Validando...</p>}
+                  {status === 'ok' && (
+                    <>
+                      <PrizePresentation prize={prize ?? undefined} />
+                      <p className="text-green-300 font-semibold">{message}</p>
+                    </>
+                  )}
+                  {status === 'already' && <p className="text-amber-300 font-semibold">{message}</p>}
+                  {status === 'error' && <p className="text-red-300 font-semibold">{message}</p>}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {cameraError && <p className="text-sm text-red-300 text-center">{cameraError}</p>}
+          {status === 'scanning' && (
+            <p className="text-sm text-textSub text-center">Apunta al QR del premio del jugador</p>
+          )}
+
+          {(status === 'ok' || status === 'already' || status === 'error' || status === 'idle') && (
+            <button
+              type="button"
+              onClick={() => void startScan()}
+              className="validator-action w-full rounded-md py-3 font-semibold"
+            >
+              Escanear otro
+            </button>
+          )}
+        </div>
+      </div>
+    </ThemeProvider>
+  )
+}

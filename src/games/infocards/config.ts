@@ -1,5 +1,4 @@
 import type { GameDefinition } from '../../core/types'
-import InfocardsGameScreen from './GameScreen'
 import InfocardsGameConfig from './GameConfig'
 
 export const infocardsDefinition: GameDefinition = {
@@ -21,7 +20,6 @@ export const infocardsDefinition: GameDefinition = {
     logo: '/images/infocards-logo.png',
     standLogo: '/images/logo-stand-footer.png',
   },
-  GameScreen: InfocardsGameScreen,
   showRanking: false,
   GameConfigComponent: InfocardsGameConfig,
 }

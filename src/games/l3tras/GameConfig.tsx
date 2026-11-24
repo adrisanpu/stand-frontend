@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
+import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import SaveButton from '../../core/ui/SaveButton'
+import { localizeOperatorMessage } from '../operatorText'
+import { useMechanicsDraft } from '../useMechanicsDraft'
 
 interface GameDataResponse {
   ok: boolean
@@ -36,92 +41,115 @@ const DEFAULT_SETTINGS: L3trasSettings = {
   validationTimeLimitSeconds: DEFAULT_VALIDATION_TIME_LIMIT_SECONDS,
 }
 
-export default function L3trasGameConfig({ gameId, settings, onChange }: GameConfigProps) {
+export default function L3trasGameConfig({ gameId, settings, settingsLoaded, onChange, onDraftChange, registerSave }: GameConfigProps) {
+  const { t } = useOperatorLanguage()
   const [objectiveWord, setObjectiveWord] = useState<string>(
-    (settings as L3trasSettings | null)?.objectiveWord || DEFAULT_SETTINGS.objectiveWord
+    (settings as L3trasSettings | null)?.objectiveWord ?? DEFAULT_SETTINGS.objectiveWord
   )
   const [validationTimeLimitSeconds, setValidationTimeLimitSeconds] = useState<number>(() =>
-    normalizeValidationTimeLimitSeconds(
-      (settings as L3trasSettings | null)?.validationTimeLimitSeconds,
-    ),
+    settings?.validationTimeLimitSeconds === undefined ? DEFAULT_VALIDATION_TIME_LIMIT_SECONDS : Number(settings.validationTimeLimitSeconds),
   )
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [saveMessage, setSaveMessage] = useState<string>('')
+  const [loaded, setLoaded] = useState(settingsLoaded || !gameId)
+  const [loadError, setLoadError] = useState('')
+  useMechanicsDraft(loaded ? { objectiveWord, validationTimeLimitSeconds } : null, onDraftChange)
 
   useEffect(() => {
     if (settings) {
       const s = settings as L3trasSettings
-      setObjectiveWord((s.objectiveWord || DEFAULT_SETTINGS.objectiveWord).toUpperCase())
-      setValidationTimeLimitSeconds(normalizeValidationTimeLimitSeconds(s.validationTimeLimitSeconds))
+      setObjectiveWord((s.objectiveWord ?? DEFAULT_SETTINGS.objectiveWord).toUpperCase())
+      setValidationTimeLimitSeconds(s.validationTimeLimitSeconds === undefined ? DEFAULT_VALIDATION_TIME_LIMIT_SECONDS : Number(s.validationTimeLimitSeconds))
     }
   }, [settings])
 
   useEffect(() => {
-    if (!gameId) return
+    if (!gameId || settingsLoaded) return
     let cancelled = false
+    setLoaded(false)
+    setLoadError('')
     ;(async () => {
       try {
         const data = await api.get<GameDataResponse>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
-        if (cancelled || !data.ok) return
+        if (cancelled) return
+        if (!data.ok) throw new Error('No se pudo cargar la configuración.')
         const backend = data.settings?.l3tras
         if (backend?.objectiveWord) {
           setObjectiveWord(backend.objectiveWord.toUpperCase())
         }
         if (backend?.validationTimeLimitSeconds != null) {
-          setValidationTimeLimitSeconds(normalizeValidationTimeLimitSeconds(backend.validationTimeLimitSeconds))
+          setValidationTimeLimitSeconds(Number(backend.validationTimeLimitSeconds))
         }
-      } catch {
-        // ignore
+        setLoaded(true)
+      } catch (cause) {
+        if (!cancelled) setLoadError(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración.')
       }
     })()
     return () => { cancelled = true }
-  }, [gameId])
+  }, [gameId, settingsLoaded])
 
   const handleObjectiveWordChange = (value: string) => {
     const cleaned = value.replace(/[^A-Za-z]/g, '').toUpperCase()
     setObjectiveWord(cleaned)
   }
 
-  const handleSave = async () => {
-    if (!objectiveWord || objectiveWord.length === 0) {
-      alert('La palabra objetivo no puede estar vacía')
-      return
-    }
+  const validate = () => {
+    if (!loaded) return loadError || t('Cargando configuración...', 'Loading configuration...')
+    if (!objectiveWord) return t('La palabra objetivo no puede estar vacía', 'The target word cannot be empty')
+    return null
+  }
 
+  const persist = async () => {
+    const invalid = validate()
+    if (invalid) throw new Error(invalid)
     const newSettings: L3trasSettings = {
       objectiveWord: objectiveWord.toUpperCase(),
       validationTimeLimitSeconds: normalizeValidationTimeLimitSeconds(validationTimeLimitSeconds),
     }
+    if (gameId) {
+      await api.put('/v1/game', {
+        gameId,
+        settings: {
+          l3tras: {
+            objectiveWord: newSettings.objectiveWord,
+            validationTimeLimitSeconds: newSettings.validationTimeLimitSeconds,
+          },
+        },
+      })
+    }
     onChange(newSettings)
+  }
+
+  const embedded = useGameConfigSaveRegistration(registerSave, { validate, save: persist })
+
+  const handleSave = async () => {
+    const invalid = validate()
+    if (invalid) {
+      alert(invalid)
+      return
+    }
     setSaveStatus('idle')
     setSaveMessage('')
 
     if (gameId) {
       setSaveStatus('saving')
-      setSaveMessage('Guardando...')
+      setSaveMessage(t('Guardando...', 'Saving...'))
       try {
-        await api.put('/v1/game', {
-          gameId,
-          settings: {
-            l3tras: {
-              objectiveWord: newSettings.objectiveWord,
-              validationTimeLimitSeconds: newSettings.validationTimeLimitSeconds,
-            },
-          },
-        })
+        await persist()
         setSaveStatus('success')
-        setSaveMessage('Configuración guardada correctamente.')
+        setSaveMessage(t('Configuración guardada correctamente.', 'Configuration saved successfully.'))
         setTimeout(() => {
           setSaveStatus('idle')
           setSaveMessage('')
         }, 3000)
       } catch (e: unknown) {
         setSaveStatus('error')
-        setSaveMessage(e instanceof Error ? e.message : 'Error al guardar en el servidor')
+        setSaveMessage(saveErrorMessage(e, t('Error al guardar en el servidor', 'Error saving to the server')))
       }
     } else {
+      await persist()
       setSaveStatus('success')
-      setSaveMessage('Configuración guardada.')
+      setSaveMessage(t('Configuración guardada.', 'Configuration saved.'))
       setTimeout(() => {
         setSaveStatus('idle')
         setSaveMessage('')
@@ -131,64 +159,63 @@ export default function L3trasGameConfig({ gameId, settings, onChange }: GameCon
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <div>
+      {loadError && <p role="alert">{loadError}</p>}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="min-w-0 flex flex-col">
           <div className="mb-2 flex items-center gap-2">
-            <label className="block text-sm font-medium text-gray-300">
-              Palabra objetivo
+            <label htmlFor="l3tras-objective-word" className="block text-sm font-medium text-gray-300">
+              {t('Palabra objetivo', 'Target word')}
             </label>
             <span className="group relative inline-flex">
               <button
                 type="button"
-                aria-label="Información sobre palabra objetivo"
+                aria-label={t('Información sobre palabra objetivo', 'Information about the target word')}
                 className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25 text-[10px] font-semibold text-gray-300/90"
               >
                 i
               </button>
               <span className="pointer-events-none absolute left-1/2 top-0 z-20 hidden w-64 -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-lg border border-white/15 bg-[rgba(17,24,39,0.98)] p-2 text-xs text-gray-200 shadow-lg group-hover:block">
-                Solo letras A-Z; se guardan en mayusculas.
+                {t('Solo letras A-Z; se guardan en mayúsculas.', 'Letters A-Z only; saved in uppercase.')}
               </span>
             </span>
           </div>
           <input
+            id="l3tras-objective-word"
             type="text"
             value={objectiveWord}
             onChange={(e) => handleObjectiveWordChange(e.target.value)}
             placeholder="STAND"
-            className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none uppercase"
+            className="mt-auto w-full min-w-0 h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none uppercase"
           />
         </div>
 
-        <div>
+        <div className="min-w-0 flex flex-col">
           <div className="mb-2 flex items-center gap-2">
-            <label className="block text-sm font-medium text-gray-300">
-              Tiempo para completar la palabra (segundos)
+            <label htmlFor="l3tras-time-limit" className="block text-sm font-medium text-gray-300">
+              {t('Tiempo para completar la palabra (segundos)', 'Time to complete the word (seconds)')}
             </label>
             <span className="group relative inline-flex">
               <button
                 type="button"
-                aria-label="Información sobre tiempo de validación"
+                aria-label={t('Información sobre tiempo de validación', 'Information about the validation time')}
                 className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25 text-[10px] font-semibold text-gray-300/90"
               >
                 i
               </button>
               <span className="pointer-events-none absolute left-1/2 top-0 z-20 hidden w-72 -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-lg border border-white/15 bg-[rgba(17,24,39,0.98)] p-2 text-xs text-gray-200 shadow-lg group-hover:block">
-                Cuenta desde el primer codigo valido. Por defecto 60 s; entre {MIN_VALIDATION_TIME_LIMIT_SECONDS} y {MAX_VALIDATION_TIME_LIMIT_SECONDS} s. Si se agota, el grupo vuelve a empezar.
+                {t(`Cuenta desde el primer código válido. Por defecto 60 s; entre ${MIN_VALIDATION_TIME_LIMIT_SECONDS} y ${MAX_VALIDATION_TIME_LIMIT_SECONDS} s. Si se agota, el grupo vuelve a empezar.`, `Starts with the first valid code. Default is 60 s; between ${MIN_VALIDATION_TIME_LIMIT_SECONDS} and ${MAX_VALIDATION_TIME_LIMIT_SECONDS} s. If time runs out, the group starts over.`)}
               </span>
             </span>
           </div>
           <input
+            id="l3tras-time-limit"
             type="number"
             min={MIN_VALIDATION_TIME_LIMIT_SECONDS}
             max={MAX_VALIDATION_TIME_LIMIT_SECONDS}
             step={1}
-            value={validationTimeLimitSeconds}
-            onChange={(e) =>
-              setValidationTimeLimitSeconds(
-                normalizeValidationTimeLimitSeconds(e.target.value === '' ? NaN : Number(e.target.value)),
-              )
-            }
-            className="w-full h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
+            value={Number.isFinite(validationTimeLimitSeconds) ? validationTimeLimitSeconds : ''}
+            onChange={(e) => setValidationTimeLimitSeconds(e.target.value === '' ? NaN : Number(e.target.value))}
+            className="mt-auto w-full min-w-0 h-11 px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none"
           />
         </div>
       </div>
@@ -197,17 +224,19 @@ export default function L3trasGameConfig({ gameId, settings, onChange }: GameCon
         <p
           className={`text-sm ${saveStatus === 'error' ? 'text-red-400' : saveStatus === 'saving' ? 'text-gray-400' : 'text-[#10B981]'}`}
         >
-          {saveMessage}
+          {localizeOperatorMessage(saveMessage, t)}
         </p>
       )}
 
-      <button
-        onClick={() => void handleSave()}
-        disabled={saveStatus === 'saving'}
-        className="w-full p-3 rounded-xl bg-[rgba(16,185,129,0.2)] border border-[rgba(16,185,129,0.3)] hover:bg-[rgba(16,185,129,0.3)] transition-colors font-medium disabled:opacity-50"
-      >
-        Guardar configuración
-      </button>
+      {!embedded && (
+        <SaveButton
+          onClick={() => void handleSave()}
+          disabled={saveStatus === 'saving'}
+          className="w-full"
+        >
+          {t('Guardar configuración', 'Save configuration')}
+        </SaveButton>
+      )}
     </div>
   )
 }

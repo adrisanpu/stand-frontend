@@ -1,0 +1,72 @@
+.t1mer-clock {
+  width: min(100%, 22rem);
+  margin-inline: auto;
+  container-type: inline-size;
+  perspective: 700px;
+}
+
+.t1mer-clock__case {
+  padding: clamp(0.55rem, 3vw, 0.8rem);
+  border: 1px solid #444;
+  border-radius: 0.55rem;
+  background: linear-gradient(165deg, #454545 0%, #171717 12%, #090909 72%, #262626 100%);
+  box-shadow: 0 0.3rem 0 #111, 0 0.6rem 1.2rem rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  transform: rotateX(3deg);
+  animation: t1mer-clock-enter 550ms ease-out both;
+}
+
+.t1mer-clock__screen {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 4.8rem;
+  overflow: hidden;
+  border: 1px solid #181818;
+  border-radius: 0.2rem;
+  background: linear-gradient(155deg, #101010, #030303 55%, #0c0808);
+  box-shadow: inset 0 0.2rem 0.6rem #000, inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.t1mer-clock__screen::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.07), transparent 38%);
+}
+
+.t1mer-clock__digits {
+  margin: 0;
+  color: #ff3030;
+  font-size: clamp(1rem, 13cqw, 3.25rem);
+  line-height: 1.25;
+  white-space: nowrap;
+  text-shadow: 0 0 0.25rem rgba(255, 30, 30, 0.65), 0 0 0.9rem rgba(255, 0, 0, 0.25);
+}
+
+.t1mer-clock__digits--counting span {
+  display: inline-block;
+  animation: t1mer-clock-count 1.4s ease-in-out infinite;
+}
+
+.t1mer-clock__digits--counting span:nth-child(2n) { animation-delay: -0.35s; }
+.t1mer-clock__digits--counting span:nth-child(3n) { animation-delay: -0.7s; }
+.t1mer-clock__digits--counting span:nth-child(4n) { animation-delay: -1.05s; }
+
+@keyframes t1mer-clock-count {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes t1mer-clock-enter {
+  from { opacity: 0; transform: translateY(0.5rem) rotateX(-8deg); }
+  to { opacity: 1; transform: translateY(0) rotateX(3deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t1mer-clock__case,
+  .t1mer-clock__digits--counting span {
+    animation: none;
+  }
+}

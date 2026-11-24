@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
+import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import SaveButton from '../../core/ui/SaveButton'
+import { localizeOperatorMessage } from '../operatorText'
+import { useMechanicsDraft } from '../useMechanicsDraft'
 
 type ImpostorSettings = {
   maxPlayers?: number
@@ -15,11 +20,13 @@ type GameDataResponse = {
 
 const DEFAULT_WORDS = ['playa', 'montana', 'pizza', 'cine', 'futbol', 'musica']
 
-export default function ImpostorGameConfig({ gameId, settings, onChange }: GameConfigProps) {
+export default function ImpostorGameConfig({ gameId, settings, settingsLoaded, onChange, onDraftChange, registerSave }: GameConfigProps) {
+  const { t } = useOperatorLanguage()
   const s = (settings || {}) as ImpostorSettings
   const [maxPlayers, setMaxPlayers] = useState<number>(s.maxPlayers ?? 8)
-  const [wordsText, setWordsText] = useState<string>((s.words && s.words.length ? s.words : DEFAULT_WORDS).join('\n'))
+  const [wordsText, setWordsText] = useState<string>((s.words ?? DEFAULT_WORDS).join('\n'))
   const [status, setStatus] = useState<string>('')
+  const [loaded, setLoaded] = useState(settingsLoaded || !gameId)
   const normalizedWords = useMemo(
     () =>
       wordsText
@@ -28,66 +35,78 @@ export default function ImpostorGameConfig({ gameId, settings, onChange }: GameC
         .filter(Boolean),
     [wordsText],
   )
+  useMechanicsDraft(loaded ? { maxPlayers, words: normalizedWords } : null, onDraftChange)
 
   useEffect(() => {
-    if (!gameId) return
+    if (!gameId || settingsLoaded) return
     let cancelled = false
+    setLoaded(false)
     ;(async () => {
       try {
         const data = await api.get<GameDataResponse>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
-        if (cancelled || !data.ok) return
+        if (cancelled) return
+        if (!data.ok) throw new Error('No se pudo cargar la configuración.')
         const max = data.settings?.impostor?.maxPlayers ?? data.game?.maxPlayers
         const words = data.settings?.impostor?.words
-        if (typeof max === 'number') setMaxPlayers(Math.max(3, Math.min(25, Math.floor(max))))
-        if (words?.length) setWordsText(words.join('\n'))
-      } catch {
-        // keep local defaults
+        if (typeof max === 'number') setMaxPlayers(max)
+        if (words) setWordsText(words.join('\n'))
+        setLoaded(true)
+      } catch (cause) {
+        if (!cancelled) setStatus(cause instanceof Error ? cause.message : 'No se pudo cargar la configuración.')
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [gameId])
+  }, [gameId, settingsLoaded])
 
-  const save = async () => {
+  const validate = () => !loaded ? t('La configuración no está disponible.', 'Settings are unavailable.') : null
+
+  const persist = async () => {
+    const invalid = validate()
+    if (invalid) throw new Error(invalid)
     const payload: ImpostorSettings = {
       maxPlayers: Math.max(3, Math.min(25, Math.floor(maxPlayers))),
       words: normalizedWords.length ? normalizedWords : DEFAULT_WORDS,
     }
+    if (gameId) await api.put('/v1/game', { gameId, settings: { impostor: payload } })
     onChange(payload)
-    if (!gameId) {
-      setStatus('Configuración guardada.')
-      return
-    }
-    setStatus('Guardando...')
+  }
+
+  const embedded = useGameConfigSaveRegistration(registerSave, { validate, save: persist })
+
+  const save = async () => {
+    if (gameId) setStatus(t('Guardando...', 'Saving...'))
     try {
-      await api.put('/v1/game', { gameId, settings: { impostor: payload } })
-      setStatus('Configuración guardada correctamente.')
+      await persist()
+      setStatus(gameId ? t('Configuración guardada correctamente.', 'Configuration saved successfully.') : t('Configuración guardada.', 'Configuration saved.'))
     } catch (e: unknown) {
-      setStatus(e instanceof Error ? e.message : 'No se pudo guardar la configuración.')
+      setStatus(saveErrorMessage(e, t('No se pudo guardar la configuración.', 'Could not save the configuration.')))
     }
   }
 
   return (
     <div className="space-y-5">
-      <div>
-        <label htmlFor="impostor-max-players" className="block text-sm text-gray-300 mb-2">
-          Jugadores máximos (3-25)
-        </label>
-        <input
-          id="impostor-max-players"
-          type="number"
-          min={3}
-          max={25}
-          value={maxPlayers}
-          onChange={(e) => setMaxPlayers(Number(e.target.value))}
-          className="w-full h-11 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 outline-none focus:border-white/20"
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="min-w-0">
+          <label htmlFor="impostor-max-players" className="block text-sm text-gray-300 mb-2">
+            {t('Jugadores máximos (3-25)', 'Maximum players (3-25)')}
+          </label>
+          <input
+            id="impostor-max-players"
+            type="number"
+            min={3}
+            max={25}
+            value={maxPlayers}
+            onChange={(e) => setMaxPlayers(Number(e.target.value))}
+            className="w-full h-11 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 px-3 outline-none focus:border-white/20"
+          />
+        </div>
       </div>
 
       <div>
         <label htmlFor="impostor-words" className="block text-sm text-gray-300 mb-2">
-          Palabras (una por línea)
+          {t('Palabras (una por línea)', 'Words (one per line)')}
         </label>
         <textarea
           id="impostor-words"
@@ -98,14 +117,16 @@ export default function ImpostorGameConfig({ gameId, settings, onChange }: GameC
         />
       </div>
 
-      {status && <p className="text-sm text-gray-300">{status}</p>}
-      <button
-        type="button"
-        onClick={save}
-        className="w-full p-3 rounded-xl bg-[rgba(124,58,237,0.25)] border border-[rgba(124,58,237,0.45)] hover:bg-[rgba(124,58,237,0.35)] transition-colors font-medium"
-      >
-        Guardar configuración
-      </button>
+      {status && <p className="text-sm text-gray-300">{localizeOperatorMessage(status, t)}</p>}
+      {!embedded && (
+        <SaveButton
+          type="button"
+          onClick={save}
+          className="w-full"
+        >
+          {t('Guardar configuración', 'Save configuration')}
+        </SaveButton>
+      )}
     </div>
   )
 }

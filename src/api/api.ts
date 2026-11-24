@@ -49,9 +49,31 @@ async function request<T>(
   }
 
   if (!response.ok) {
+    if (/^\/v1\/(?:game\/)?kivly(?:[/?]|$)/.test(endpoint)) {
+      const responseText = await response.text()
+      let code: string | undefined
+      try {
+        const payload: unknown = JSON.parse(responseText)
+        if (typeof payload === 'object' && payload !== null
+          && 'error' in payload && typeof payload.error === 'string') {
+          code = payload.error
+        }
+      } catch {
+        // Kivly responses may be non-JSON; retain only the HTTP status in that case.
+      }
+      throw Object.assign(new Error(`Kivly API error: ${response.status}`), {
+        status: response.status, code,
+      })
+    }
     let errorText = await response.text()
+    let code: string | undefined
     try {
-      errorText = JSON.stringify(JSON.parse(errorText))
+      const payload: unknown = JSON.parse(errorText)
+      if (typeof payload === 'object' && payload !== null
+        && 'error' in payload && typeof payload.error === 'string') {
+        code = payload.error
+      }
+      errorText = JSON.stringify(payload)
     } catch {
       // Keep plain-text error responses as-is.
     }
@@ -69,9 +91,9 @@ async function request<T>(
     })
     
     // Include status code in error for 401 handling
-    const error = new Error(`API error: ${response.status} ${errorText}`)
-    ;(error as any).status = response.status
-    throw error
+    throw Object.assign(new Error(`API error: ${response.status} ${errorText}`), {
+      status: response.status, code,
+    })
   }
 
   // Handle empty responses

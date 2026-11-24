@@ -1,0 +1,121 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import jsQR from 'jsqr'
+import { publicApi } from '../../api/publicApi'
+import ValidatorShell from './ValidatorShell'
+
+vi.mock('jsqr', () => ({ default: vi.fn() }))
+vi.mock('../../api/publicApi', () => ({ publicApi: { getGame: vi.fn(), redeem: vi.fn() } }))
+
+const stop = vi.fn()
+
+beforeEach(() => {
+  vi.mocked(jsQR).mockReset()
+  vi.mocked(publicApi.getGame).mockReset()
+  vi.mocked(publicApi.getGame).mockResolvedValue({
+    ok: true, gameId: 'ABC123', gameType: 'EMPAREJA2', isActive: true,
+    playerCount: 0, validatedCount: 0, recentPairs: [], joinUrl: '',
+  })
+  vi.mocked(publicApi.redeem).mockReset()
+  stop.mockClear()
+  vi.stubGlobal('navigator', {
+    mediaDevices: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop }] }) },
+  })
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
+  vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(2)
+  vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(1)
+  vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(1)
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(vi.fn().mockReturnValue({
+    drawImage: vi.fn(),
+    getImageData: () => ({ data: new Uint8ClampedArray(4), width: 1, height: 1, colorSpace: 'srgb' }),
+  }))
+  vi.mocked(jsQR).mockReturnValue({ data: 'prize-token' } as ReturnType<typeof jsQR>)
+})
+
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+function renderValidator() {
+  return render(
+    <MemoryRouter initialEntries={['/validator/ABC123']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Routes><Route path="/validator/:gameId" element={<ValidatorShell />} /></Routes>
+    </MemoryRouter>,
+  )
+}
+
+it('scans and redeems prizes without restricting the event in the general validator', async () => {
+  vi.mocked(publicApi.redeem).mockResolvedValue({
+    ok: true, gameId: 'OTHER', playerId: 1, kind: 'award', delivered: true, label: 'adri',
+  })
+  render(
+    <MemoryRouter initialEntries={['/redeem']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Routes><Route path="/redeem" element={<ValidatorShell />} /></Routes>
+    </MemoryRouter>,
+  )
+  expect(await screen.findByText('Premio STAND entregado a adri.')).toBeInTheDocument()
+  expect(publicApi.redeem).toHaveBeenCalledWith('prize-token', undefined)
+  expect(publicApi.getGame).not.toHaveBeenCalled()
+  expect(stop).toHaveBeenCalled()
+})
+
+it('shows the redeemed prize image and name above the delivery confirmation and clears them on rescan', async () => {
+  vi.mocked(publicApi.redeem).mockResolvedValue({
+    ok: true, gameId: 'ABC123', playerId: 1, kind: 'ranking', delivered: true, label: 'adri',
+    prize: { name: 'Consola', limit: 3, imageUrl: '/console.png' },
+  })
+  renderValidator()
+  const message = await screen.findByText('Premio del ranking entregado a adri.')
+  const image = screen.getByRole('img', { name: 'Consola' })
+  expect(image).toHaveAttribute('src', '/console.png')
+  expect(screen.getByText('Consola').parentElement?.nextElementSibling).toBe(message)
+  expect(publicApi.redeem).toHaveBeenCalledWith('prize-token', 'ABC123')
+  expect(stop).toHaveBeenCalled()
+
+  vi.mocked(jsQR).mockReturnValue(null)
+  fireEvent.click(screen.getByRole('button', { name: 'Escanear otro' }))
+  await waitFor(() => expect(screen.queryByText('Consola')).not.toBeInTheDocument())
+  expect(screen.queryByRole('img', { name: 'Consola' })).not.toBeInTheDocument()
+})
+
+it('keeps legacy delivery confirmations working without catalog details', async () => {
+  vi.mocked(publicApi.redeem).mockResolvedValue({
+    ok: true, gameId: 'ABC123', playerId: 1, kind: 'validation', delivered: true, label: 'adri',
+  })
+  renderValidator()
+  expect(await screen.findByText('Premio por pareja entregado a adri.')).toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: 'Consola' })).not.toBeInTheDocument()
+})
+
+it('does not show a prize when redemption fails', async () => {
+  vi.mocked(publicApi.redeem).mockRejectedValue(Object.assign(new Error('AlreadyDelivered'), { status: 409 }))
+  renderValidator()
+  expect(await screen.findByText('Este premio ya se había entregado.')).toBeInTheDocument()
+  expect(screen.queryByRole('img', { name: 'Consola' })).not.toBeInTheDocument()
+})
+
+it('does not mistake a required survey for an already collected prize', async () => {
+  vi.mocked(publicApi.redeem).mockRejectedValue(Object.assign(new Error('QuizRequired'), { status: 409 }))
+  renderValidator()
+  expect(await screen.findByText('El participante debe completar el cuestionario antes de recibir el premio.')).toBeInTheDocument()
+  expect(screen.queryByText('Este premio ya se había entregado.')).not.toBeInTheDocument()
+})
+
+it('uses the game participant colors and configured logo', async () => {
+  vi.mocked(publicApi.getGame).mockResolvedValue({
+    ok: true, gameId: 'ABC123', gameType: 'EMPAREJA2', isActive: true,
+    playerCount: 0, validatedCount: 0, recentPairs: [], joinUrl: '',
+    formLogoUrl: 'https://assets.example.test/event-logo.png',
+    appearance: { themeMode: 'dark', colors: { primary: '#123456', accent: '#654321' } },
+  })
+  renderValidator()
+
+  expect(await screen.findByRole('img', { name: 'Logo del cliente' })).toHaveAttribute(
+    'src', 'https://assets.example.test/event-logo.png',
+  )
+  await waitFor(() => expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('#123456'))
+  expect(document.documentElement.style.getPropertyValue('--color-accent')).toBe('#654321')
+})

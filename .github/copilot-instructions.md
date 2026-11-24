@@ -43,3 +43,21 @@ Adapted from https://github.com/DietrichGebert/ponytail/. Licensed under MIT; se
 - Auth tokens use `sessionStorage`; game selection (`gameId`, `gameName`, `gameType`) and operator preferences use `localStorage`.
 - Check `docs/new-game-playbook.md` when adding a game and `docs/operator-game-ui.md` for operator game layout and validation conventions.
 - Do not assume backend behavior from frontend types. Backend implementation and its validation are outside this repository.
+
+## Kivly integration development
+
+Before implementing or changing frontend behavior for Kivly, read the
+[Kivly integration skill](../../stand-backend/.github/kivly-integrations/SKILL.md)
+and the package references relevant to the task. Use its bundled
+[OpenAPI contract](../../stand-backend/.github/kivly-integrations/references/openapi.json)
+as the source of truth for upstream operations and schemas. From the frontend
+directory, use
+`python ../stand-backend/.github/kivly-integrations/scripts/inspect_api.py search <term>`
+and `python ../stand-backend/.github/kivly-integrations/scripts/inspect_api.py operation METHOD /api/v1/path`
+to find and inspect operations instead of guessing.
+Also consult the backend's
+[Kivly connection contract](../../stand-backend/docs/KIVLY_CONNECTION.md) and
+[integration behavior](../../stand-backend/docs/KIVLY_INTEGRATION.md) when
+working with application-facing endpoints or participant flows. Keep frontend
+types and behavior aligned with those contracts, and do not infer upstream API
+behavior from frontend types.

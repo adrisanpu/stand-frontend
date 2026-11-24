@@ -38,8 +38,8 @@ If you cannot name an existing game to copy from, stop and review current game f
 
 Create `src/games/<id>/` with:
 
-- `index.ts` exporting `GameDefinition`
-- `GameScreen.tsx` for runtime gameplay UI
+- `config.ts` exporting `GameDefinition`
+- `ParticipantPlay.tsx` for mobile gameplay UI
 - `GameConfig.tsx` for operator configuration
 
 Use existing games as source templates instead of creating brand-new patterns.
@@ -48,7 +48,8 @@ Use existing games as source templates instead of creating brand-new patterns.
 
 - Add the new definition to `src/games/index.ts`
 - Ensure `id`, `type`, colors, and components are exported correctly
-- Confirm routing continues to flow through `AppShell` (no standalone route)
+- Connect gameplay through `ParticipantShell` at `/play/:gameId`, not `AppShell`
+- Add a safe, non-interactive sample to `GamePlayPreview.tsx`
 
 ## 3.3 Add type-to-id normalization
 
@@ -57,29 +58,24 @@ Use existing games as source templates instead of creating brand-new patterns.
 
 ## 3.4 Follow shared UI/layout tokens
 
-- Reuse layout constants from `src/core/ui/gameScreenLayout.ts`
-- Reuse validation copy from `src/core/ui/gameValidationCopy.ts`
-- Keep orientation handling in `AppShell` (do not create custom rotation logic)
-- Keep game colors via CSS variables (`--game-primary`, `--game-accent`)
+- Reuse participant validation and localization patterns from existing mobile experiences
+- Keep Home orientation handling in `AppShell` and the shared canvas
+- Keep game colors via CSS variables (`--color-primary`, `--color-accent`)
 
 For detailed spacing/grid rules, follow `docs/operator-game-ui.md`.
 
-### 3.4.1 Mandatory GameScreen layout skeleton (do not improvise)
+### 3.4.1 Home is a canvas, not a game screen
 
-Every new `GameScreen` must reuse the same structural layout as existing games:
-
-- Landscape must be **3 columns**:
-  - Left: `GameLandscapeInfoColumn` with logo + instructions + QR/context.
-  - Center: main game panel using `GAME_LANDSCAPE_CENTER_CARD`.
-  - Right: `sidebarElement` passed by `AppShell` (players, raffle, avatar, ranking when applicable).
-- Landscape grid must use `GAME_LANDSCAPE_THREE_COL_GRID` from `src/core/ui/gameScreenLayout.ts`.
-- Portrait must include the QR + instructions block using `GAME_PORTRAIT_QR_INSTRUCTIONS_GRID`.
-- Do not create custom grids when shared tokens/components already exist.
-- Do not render shell widgets manually inside game center content; keep them in `sidebarElement`.
+- `HomeCanvas` renders saved landscape/portrait compositions for every game.
+- Do not register game engines, fixed columns, or injected sidebars on the stand.
+- Keep QR, logo, players, ranking, raffle, and text inside editable, non-overlapping boxes.
+- New games start with empty compositions; absent legacy configuration receives a shared initial composition.
+- Canvas persistence and revision are independent of questionnaire/form revisions.
 
 ## 3.5 Keep integration lean
 
-- Use the shared `api` singleton from `src/api/api.ts`
+- Operator settings use the shared `api` singleton from `src/api/api.ts`
+- Mobile gameplay uses `src/api/publicApi.ts` and participant tokens, not operator endpoints
 - Do not use direct `fetch`/`axios`
 - Keep auth handling unchanged (`idToken` from `sessionStorage`)
 - Reuse feature gates through `getFeaturesByPlan(plan)` if the game has gated features
@@ -104,7 +100,6 @@ These are intentionally small. Copy from an existing game and only adjust what i
 
 ```ts
 import type { GameDefinition } from '../../core/types';
-import { GameScreen } from './GameScreen';
 import { GameConfig } from './GameConfig';
 
 export const mygame1: GameDefinition = {
@@ -113,43 +108,48 @@ export const mygame1: GameDefinition = {
   colors: {
     primary: '#6366F1',
     accent: '#A78BFA',
+    background: '#0B0A12',
+    surface: 'rgba(255,255,255,0.04)',
+    textMain: '#EAEAF2',
+    textSub: '#9AA0A6',
   },
-  GameScreen,
-  GameConfig,
+  GameConfigComponent: GameConfig,
 };
 ```
 
-### 5.2 `src/games/<id>/GameScreen.tsx`
+### 5.2 `src/games/<id>/ParticipantPlay.tsx`
 
-```tsx
-import type { GameScreenProps } from '../../core/types';
-
-export function GameScreen({ gameId, gameName }: GameScreenProps) {
-  return (
-    <section className="card p-6">
-      <h2 className="text-xl font-semibold">{gameName}</h2>
-      <p className="text-sm opacity-80">Game ID: {gameId}</p>
-    </section>
-  );
-}
-```
+Copy the closest existing participant experience and connect it in `ParticipantShell`.
+Obtain assignment/configuration through authenticated participant contracts. Keep
+time, scoring, rewards, and private-answer evaluation authoritative on the server.
+Handle reload/resume, retry, duplicate submission, and inactive events explicitly.
+Do not expose another participant's private answers in the assignment.
 
 ### 5.3 `src/games/<id>/GameConfig.tsx`
 
+The shared **Configurar juego** modal owns the only save button (**Guardar y aplicar cambios**). Config components
+must register their save handler via `registerSave` (use `useGameConfigSaveRegistration`) and hide their own save
+button when embedded. `validate` runs before anything is persisted; `save` must reject on failure and call
+`onChange` only after persisting. `access` is the current (unsaved) mode/access draft.
+
 ```tsx
 import type { GameConfigProps } from '../../core/types';
+import { useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave';
 
-export function GameConfig({ config, onChange }: GameConfigProps) {
+export function GameConfig({ gameId, settings, onChange, registerSave }: GameConfigProps) {
+  const [value, setValue] = useState(settings?.value ?? '');
+  const persist = async () => {
+    await api.put('/v1/game', { gameId, settings: { mygame: { value } } });
+    onChange({ value });
+  };
+  const embedded = useGameConfigSaveRegistration(registerSave, {
+    validate: () => (value ? null : 'El valor es obligatorio'),
+    save: persist,
+  });
   return (
     <section className="space-y-4">
-      <h3 className="text-lg font-semibold">Game settings</h3>
-      <button
-        type="button"
-        className="rounded-xl border border-white/10 px-4 py-2"
-        onClick={() => onChange({ ...config })}
-      >
-        Save
-      </button>
+      <input value={value} onChange={(e) => setValue(e.target.value)} />
+      {!embedded && <button type="button" onClick={() => void persist()}>Guardar configuración</button>}
     </section>
   );
 }
@@ -161,7 +161,7 @@ export function GameConfig({ config, onChange }: GameConfigProps) {
   - `id` and `name` UPPERCASE (same string), module folder lowercase, `gameTypeMap` updated
 - Visual consistency:
   - Portrait and landscape both render correctly
-  - Shared spacing/grid tokens are used
+  - Home uses the shared canvas renderer; mobile uses responsive participant UI
   - Validation copy/buttons follow shared conventions
 - Data/API:
   - Uses shared `api` singleton and expected backend endpoints
@@ -171,7 +171,7 @@ export function GameConfig({ config, onChange }: GameConfigProps) {
 
 ## 7) Common mistakes to avoid
 
-- Creating custom layout grids when shared tokens already exist
+- Reintroducing stand-screen gameplay or a second Home layout system
 - Hardcoding colors in components instead of CSS vars
 - Adding new backend top-level attributes instead of `type.<GAME_TYPE>`
 - Using direct HTTP client code outside `api.ts`

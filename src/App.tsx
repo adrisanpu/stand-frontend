@@ -1,15 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
-import AppShell from './core/shell/AppShell'
+import AdminShell from './core/admin/AdminShell'
+import GameHomeEntry from './core/admin/GameHomeEntry'
 import Login from './pages/Login'
-import AuthStart from './auth/AuthStart'
-import AuthCallback from './auth/AuthCallback'
 import Logout from './auth/Logout'
 import BillingSuccess from './pages/BillingSuccess'
 import BillingCancel from './pages/BillingCancel'
 import BillingCheckout from './pages/BillingCheckout'
+import GamePreviewPage from './pages/GamePreviewPage'
 import InputDebugOverlay from './core/input/InputDebugOverlay'
+import ParticipantShell from './core/participant/ParticipantShell'
+import ValidatorShell from './core/validator/ValidatorShell'
 
 function RootRedirect() {
   const { isAuthenticated, isInitializing } = useAuth()
@@ -21,17 +23,16 @@ function RootRedirect() {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
-  return <Navigate to="/home" replace />
+  return <Navigate to="/admin/games" replace />
 }
 
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/auth/start" element={<AuthStart />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/logout" element={<Logout />} />
       <Route path="/billing/checkout" element={<BillingCheckout />} />
+      <Route path="/preview/:gameType" element={<GamePreviewPage />} />
       <Route
         path="/billing/success"
         element={
@@ -48,11 +49,19 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/play/:gameId" element={<ParticipantShell />} />
+      <Route path="/display/:gameId" element={<Navigate to="/home" replace />} />
+      <Route path="/redeem" element={<ValidatorShell />} />
+      <Route path="/redeem/:gameId" element={<ValidatorShell />} />
+      <Route
+        path="/admin/*"
+        element={<ProtectedRoute><AdminShell /></ProtectedRoute>}
+      />
       <Route
         path="/home/*"
         element={
           <ProtectedRoute>
-            <AppShell />
+            <GameHomeEntry />
           </ProtectedRoute>
         }
       />

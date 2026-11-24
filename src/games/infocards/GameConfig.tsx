@@ -1,6 +1,12 @@
+import IconButton from '../../core/ui/IconButton'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { GameConfigProps } from '../../core/types'
 import { api } from '../../api/api'
+import { saveErrorMessage, useGameConfigSaveRegistration } from '../../core/settings/gameConfigSave'
+import { useOperatorLanguage } from '../../core/shell/operatorLanguage'
+import SaveButton from '../../core/ui/SaveButton'
+import { localizeOperatorMessage } from '../operatorText'
+import { useMechanicsDraft } from '../useMechanicsDraft'
 
 type InfoCard = {
   id: string
@@ -35,7 +41,6 @@ type ProcessResponse = {
   ok: boolean
   gameId: string
   cards: InfoCard[]
-  quizGenerated: boolean
 }
 
 type PutResponse = {
@@ -55,11 +60,16 @@ const LAYOUT_OPTIONS: { value: CardLayoutPosition; label: string }[] = [
   { value: 'bottom', label: 'Abajo' },
 ]
 
-export default function InfocardsGameConfig({ gameId, settings = {}, onChange }: GameConfigProps) {
+export default function InfocardsGameConfig({ gameId, settings = {}, onChange, onDraftChange, registerSave, readOnly = false, onBusyChange, onDirtyChange }: GameConfigProps) {
+  const { t } = useOperatorLanguage()
   // Section A — current cards
   const [cards, setCards] = useState<InfoCard[]>([])
   const [loadingCards, setLoadingCards] = useState(true)
+  const [cardsLoadError, setCardsLoadError] = useState('')
   const [cardsDirty, setCardsDirty] = useState(false)
+  const savedCardLayouts = settings?.cardLayouts as Record<string, CardLayoutPosition> | undefined
+  const [cardLayouts, setCardLayouts] = useState<Record<string, CardLayoutPosition>>(savedCardLayouts ?? {})
+  const [layoutsDirty, setLayoutsDirty] = useState(false)
   const [saveStatus, setSaveStatus] = useState<Status>('idle')
   const [saveMessage, setSaveMessage] = useState('')
   const [mediaUploadingCardId, setMediaUploadingCardId] = useState<string | null>(null)
@@ -69,16 +79,20 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
   const [text, setText] = useState('')
   const [pdfFiles, setPdfFiles] = useState<File[]>([])
   const [numCards, setNumCards] = useState(6)
-  const [generateQuiz, setGenerateQuiz] = useState(false)
-  const [numQuestions, setNumQuestions] = useState(3)
-  const [numOptions, setNumOptions] = useState(3)
-  const [useEmojis, setUseEmojis] = useState(false)
   const [aiStatus, setAiStatus] = useState<Status>('idle')
   const [aiMessage, setAiMessage] = useState('')
 
   // Participation / sorteo (no validación, mensaje al completar quiz)
   const [requiresValidation, setRequiresValidation] = useState(false)
   const [quizCompletedMessage, setQuizCompletedMessage] = useState('')
+  useMechanicsDraft(loadingCards || cardsLoadError ? null : {
+    cards: cards.map(card => ({
+      ...card,
+      imageUrl: card._localImagePreview ?? card.imageUrl,
+      videoUrl: card._localVideoPreview ?? card.videoUrl,
+    })),
+    cardLayouts, requiresValidation, quizCompletedMessage,
+  }, onDraftChange)
 
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
@@ -89,17 +103,20 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
   const fetchCards = useCallback(async () => {
     if (!gameId) return
     setLoadingCards(true)
+    setCardsLoadError('')
     try {
       const data = await api.get<GetResponse>(`/v1/game/infocards?gameId=${encodeURIComponent(gameId)}`)
-      const sorted = (data.cards || []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      if (!data.ok || data.gameId !== gameId || !Array.isArray(data.cards)) throw new Error('Invalid INFOCARDS response')
+      const sorted = data.cards.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       setCards(sorted)
       setCardsDirty(false)
       setAiExpanded(sorted.length === 0)
       setRequiresValidation(data.requiresValidation ?? false)
       setQuizCompletedMessage(data.quizCompletedMessage ?? '')
-    } catch {
+    } catch (err) {
       setCards([])
       setAiExpanded(true)
+      setCardsLoadError(saveErrorMessage(err, 'No se pudieron cargar las tarjetas.'))
     } finally {
       setLoadingCards(false)
     }
@@ -109,15 +126,21 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
     fetchCards()
   }, [fetchCards])
 
+  useEffect(() => {
+    setCardLayouts(savedCardLayouts ?? {})
+    setLayoutsDirty(false)
+  }, [savedCardLayouts])
+
   // ===== Per-card media upload =====
 
   const handleMediaClick = (cardId: string) => {
-    if (mediaUploadingCardId) return
+    if (readOnly || mediaUploadingCardId) return
     mediaInputCardIdRef.current = cardId
     mediaInputRef.current?.click()
   }
 
   const handleMediaChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (readOnly) return
     const file = e.target.files?.[0]
     if (!file || !mediaInputCardIdRef.current) return
 
@@ -139,7 +162,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
       })
 
       if (!uploadRes.ok || !uploadRes.uploadUrls?.[0]) {
-        throw new Error('No se pudo obtener URL de subida.')
+        throw new Error(t('No se pudo obtener URL de subida.', 'Could not get an upload URL.'))
       }
 
       const { key, url, fields } = uploadRes.uploadUrls[0]
@@ -158,7 +181,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
       setCardsDirty(true)
     } catch (err) {
       setSaveStatus('error')
-      setSaveMessage(err instanceof Error ? err.message : 'Error al subir archivo.')
+      setSaveMessage(err instanceof Error ? err.message : t('Error al subir archivo.', 'Error uploading file.'))
     } finally {
       setMediaUploadingCardId(null)
     }
@@ -173,11 +196,28 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
     setCardsDirty(true)
   }
 
-  const handleSaveCards = async () => {
-    if (!gameId) return
-    setSaveStatus('uploading')
-    setSaveMessage('Guardando...')
-    try {
+  const isAiLoading = aiStatus === 'uploading' || aiStatus === 'processing'
+  const isSaving = saveStatus === 'uploading'
+  useEffect(() => {
+    onBusyChange?.(!!mediaUploadingCardId || isAiLoading)
+  }, [mediaUploadingCardId, isAiLoading, onBusyChange])
+  useEffect(() => {
+    if (cardsDirty || layoutsDirty) onDirtyChange?.(true)
+  }, [cardsDirty, layoutsDirty, onDirtyChange])
+
+  const validate = () => {
+    if (readOnly) return t('Esta partida es de solo lectura.', 'This event is read only.')
+    if (mediaUploadingCardId) return t('Espera a que termine la subida del archivo.', 'Wait for the file upload to finish.')
+    if (isAiLoading) return t('Espera a que termine la generación con IA.', 'Wait for AI generation to finish.')
+    if (loadingCards && gameId) return t('Las tarjetas aún se están cargando.', 'The cards are still loading.')
+    if (cardsLoadError) return cardsLoadError
+    return null
+  }
+
+  const persist = async () => {
+    const invalid = validate()
+    if (invalid) throw new Error(invalid)
+    if ((cardsDirty || layoutsDirty) && gameId) {
       // Strip ephemeral/computed fields before sending
       const cardsToSave = cards.map(({ _localImagePreview, _localVideoPreview, imageUrl, videoUrl, ...rest }) => rest)
       const res = await api.put<PutResponse>('/v1/game/infocards', {
@@ -185,15 +225,28 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
         cards: cardsToSave,
         requiresValidation,
         quizCompletedMessage: quizCompletedMessage.trim(),
+        cardLayouts,
       })
-      if (!res.ok) throw new Error('No se pudieron guardar las tarjetas.')
-      setSaveStatus('done')
-      setSaveMessage('Guardado correctamente.')
+      if (!res?.ok) throw new Error(t('No se pudieron guardar las tarjetas.', 'Could not save the cards.'))
       await fetchCards()
-      onChange({ ...settings, refreshGameScreen: true })
+    }
+    setLayoutsDirty(false)
+    onChange({ ...settings, cardLayouts })
+  }
+
+  const embedded = useGameConfigSaveRegistration(registerSave, { validate, save: persist })
+
+  const handleSaveCards = async () => {
+    if (!gameId) return
+    setSaveStatus('uploading')
+    setSaveMessage(t('Guardando...', 'Saving...'))
+    try {
+      await persist()
+      setSaveStatus('done')
+      setSaveMessage(t('Guardado correctamente.', 'Saved successfully.'))
     } catch (err) {
       setSaveStatus('error')
-      setSaveMessage(err instanceof Error ? err.message : 'Error al guardar.')
+      setSaveMessage(saveErrorMessage(err, t('Error al guardar.', 'Error saving.')))
     }
   }
 
@@ -209,15 +262,15 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
   }
 
   const handleGenerate = async () => {
-    if (!gameId) return
+    if (!gameId || readOnly) return
     if (!text.trim() && pdfFiles.length === 0) {
       setAiStatus('error')
-      setAiMessage('Añade texto o un PDF antes de generar.')
+      setAiMessage(t('Añade texto o un PDF antes de generar.', 'Add text or a PDF before generating.'))
       return
     }
 
     setAiStatus('uploading')
-    setAiMessage('Subiendo archivos...')
+    setAiMessage(t('Subiendo archivos...', 'Uploading files...'))
 
     let fileKeys: string[] = []
 
@@ -229,7 +282,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
         })
 
         if (!uploadRes.ok || !uploadRes.uploadUrls) {
-          throw new Error('No se pudieron obtener las URLs de subida.')
+          throw new Error(t('No se pudieron obtener las URLs de subida.', 'Could not get upload URLs.'))
         }
 
         await Promise.all(
@@ -246,40 +299,37 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
       }
 
       setAiStatus('processing')
-      setAiMessage('Procesando con IA...')
+      setAiMessage(t('Procesando con IA...', 'Processing with AI...'))
 
       const processRes = await api.post<ProcessResponse>('/v1/game/infocards/process', {
         gameId,
         text: text.trim() || undefined,
         fileKeys: fileKeys.length > 0 ? fileKeys : undefined,
         numCards,
-        generateQuiz,
-        ...(generateQuiz ? { numQuestions, numOptions, useEmojis } : {}),
       })
 
-      if (!processRes.ok) throw new Error('El procesamiento no se completó correctamente.')
+      if (!processRes.ok) throw new Error(t('El procesamiento no se completó correctamente.', 'Processing did not complete successfully.'))
 
       const newCards = (processRes.cards || []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       setCards(newCards)
       setCardsDirty(false)
       setAiStatus('done')
-      setAiMessage(`Listo. Se generaron ${newCards.length} tarjetas.${processRes.quizGenerated ? ' Quiz generado.' : ''}`)
+      setAiMessage(t(`Listo. Se generaron ${newCards.length} tarjetas.`, `Done. ${newCards.length} cards generated.`))
       setAiExpanded(false)
       onChange({ ...settings, processed: true, cardsCount: newCards.length, close: true })
     } catch (err) {
       setAiStatus('error')
-      setAiMessage(err instanceof Error ? err.message : 'Error desconocido.')
+      setAiMessage(err instanceof Error ? err.message : t('Error desconocido.', 'Unknown error.'))
+    } finally {
+      onBusyChange?.(false)
     }
   }
 
-  const isAiLoading = aiStatus === 'uploading' || aiStatus === 'processing'
-  const isSaving = saveStatus === 'uploading'
-
-  const getCardLayout = (cardId: string): CardLayoutPosition =>
-    (settings?.cardLayouts?.[cardId] as CardLayoutPosition) ?? 'top'
+  const getCardLayout = (cardId: string): CardLayoutPosition => cardLayouts[cardId] ?? 'top'
 
   const handleLayoutChangeForCard = (cardId: string, position: CardLayoutPosition) => {
-    onChange({ ...settings, cardLayouts: { ...(settings?.cardLayouts || {}), [cardId]: position } })
+    setCardLayouts(prev => ({ ...prev, [cardId]: position }))
+    setLayoutsDirty(true)
   }
 
   const renderImageSlot = (card: InfoCard, className: string) => {
@@ -297,15 +347,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
             className="w-full h-full object-cover rounded-lg"
             aria-label={card.title}
           />
-          <button
-            onClick={() => handleRemoveMedia(card.id, 'video')}
-            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-600 transition-colors"
-            aria-label="Eliminar vídeo"
-          >
-            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <IconButton icon="remove" label={t('Eliminar vídeo', 'Delete video')} onClick={() => handleRemoveMedia(card.id, 'video')} className="absolute -top-1.5 -right-1.5" />
         </div>
       )
     }
@@ -314,6 +356,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
       const posX = card.imagePositionX ?? 50
       const posY = card.imagePositionY ?? 50
       const handleFocalPointerDown = (e: React.PointerEvent) => {
+        if (readOnly) return
         e.preventDefault()
         draggingFocalCardIdRef.current = card.id
         document.addEventListener('pointermove', focalMoveHandlerRef.current)
@@ -334,20 +377,12 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
           <div
             role="button"
             tabIndex={0}
-            aria-label="Ajustar encuadre de la imagen"
+            aria-label={t('Ajustar encuadre de la imagen', 'Adjust image framing')}
             className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-white/20 shadow cursor-grab active:cursor-grabbing touch-none"
             style={{ left: `${posX}%`, top: `${posY}%` }}
             onPointerDown={handleFocalPointerDown}
           />
-          <button
-            onClick={() => handleRemoveMedia(card.id, 'image')}
-            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-600 transition-colors"
-            aria-label="Eliminar imagen"
-          >
-            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <IconButton icon="remove" label={t('Eliminar imagen', 'Delete image')} onClick={() => handleRemoveMedia(card.id, 'image')} className="absolute -top-1.5 -right-1.5" />
         </div>
       )
     }
@@ -356,7 +391,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
       <button
         onClick={() => handleMediaClick(card.id)}
         disabled={!!mediaUploadingCardId}
-        className={`rounded-lg border-2 border-dashed border-white/15 flex flex-col items-center justify-center gap-1 hover:border-white/30 transition-colors disabled:opacity-40 flex-shrink-0 ${className}`}
+        className={`rounded-lg border-2 border-dashed border-primary/30 flex flex-col items-center justify-center gap-1 hover:border-primary/30 transition-colors disabled:opacity-40 flex-shrink-0 ${className}`}
       >
         {isUploadingThisCard ? (
           <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
@@ -365,7 +400,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <span className="text-[10px] text-gray-600">Imagen / Vídeo</span>
+            <span className="text-[10px] text-gray-600">{t('Imagen / Vídeo', 'Image / Video')}</span>
           </>
         )}
       </button>
@@ -412,14 +447,14 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
       <div>
         <button
           onClick={() => setAiExpanded(v => !v)}
-          className="flex items-center justify-between w-full text-left mb-1 p-2 rounded-lg hover:bg-white/5 transition-colors"
+          className="flex items-center justify-between w-full text-left mb-1 p-2 rounded-lg hover:bg-primary/10 transition-colors"
           aria-expanded={aiExpanded}
         >
           <span className="flex items-center gap-2 text-sm font-medium text-gray-300">
             <svg className="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
               <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
             </svg>
-            IA
+            {t('IA', 'AI')}
           </span>
           <svg
             className={`w-4 h-4 text-gray-400 transition-transform ${aiExpanded ? 'rotate-180' : ''}`}
@@ -431,11 +466,11 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
 
         {aiExpanded && (
           <div className="mt-3 p-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 space-y-3">
-            {/* Fila 1: Nº tarjetas, Generar quiz, y si checked: Nº preguntas, Nº respuestas, Emoticonos */}
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="min-w-[100px]">
-                <label className="block text-xs font-medium text-gray-400 mb-1">Nº de tarjetas</label>
+            <div className="grid grid-cols-1 items-end gap-3">
+              <div className="min-w-0">
+                <label htmlFor="infocards-num-cards" className="block text-xs font-medium text-gray-400 mb-1">{t('Nº de tarjetas', 'Number of cards')}</label>
                 <select
+                  id="infocards-num-cards"
                   value={numCards}
                   onChange={e => setNumCards(Number(e.target.value))}
                   disabled={isAiLoading}
@@ -446,66 +481,16 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
                   ))}
                 </select>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer select-none h-10 items-center pb-0.5">
-                <input
-                  type="checkbox"
-                  checked={generateQuiz}
-                  onChange={e => setGenerateQuiz(e.target.checked)}
-                  disabled={isAiLoading}
-                  className="rounded border-white/20 bg-[rgba(255,255,255,0.05)] text-indigo-500 focus:ring-white/20 disabled:opacity-50"
-                />
-                <span className="text-sm text-gray-300 whitespace-nowrap">Generar Quiz</span>
-              </label>
-              {generateQuiz && (
-                <>
-                  <div className="min-w-[100px]">
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Nº preguntas</label>
-                    <select
-                      value={numQuestions}
-                      onChange={e => setNumQuestions(Number(e.target.value))}
-                      disabled={isAiLoading}
-                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none disabled:opacity-50"
-                    >
-                      {[1, 2, 3, 4, 5].map(n => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="min-w-[100px]">
-                    <label className="block text-xs font-medium text-gray-400 mb-1">Nº respuestas</label>
-                    <select
-                      value={numOptions}
-                      onChange={e => setNumOptions(Number(e.target.value))}
-                      disabled={isAiLoading}
-                      className="w-full h-10 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none disabled:opacity-50"
-                    >
-                      {[2, 3, 4].map(n => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer select-none h-10 items-center pb-0.5">
-                    <input
-                      type="checkbox"
-                      checked={useEmojis}
-                      onChange={e => setUseEmojis(e.target.checked)}
-                      disabled={isAiLoading}
-                      className="rounded border-white/20 bg-[rgba(255,255,255,0.05)] text-indigo-500 focus:ring-white/20 disabled:opacity-50"
-                    />
-                    <span className="text-sm text-gray-300 whitespace-nowrap">Emojis</span>
-                  </label>
-                </>
-              )}
             </div>
 
             {/* Fila 2: Textarea 70% + Zona PDF 30% */}
             <div className="flex gap-3 min-h-[120px]">
               <div className="flex-[0_0_70%] min-w-0">
-                <label className="block text-xs font-medium text-gray-400 mb-1">Descripción de tu producto o servicio</label>
+                <label className="block text-xs font-medium text-gray-400 mb-1">{t('Descripción de tu producto o servicio', 'Description of your product or service')}</label>
                 <textarea
                   value={text}
                   onChange={e => setText(e.target.value)}
-                  placeholder="Describe tu producto, servicio o marca aquí..."
+                  placeholder={t('Describe tu producto, servicio o marca aquí...', 'Describe your product, service, or brand here...')}
                   rows={4}
                   disabled={isAiLoading}
                   className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none resize-none disabled:opacity-50 placeholder-gray-500"
@@ -513,13 +498,14 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
               </div>
               <div
                 role="button"
-                tabIndex={0}
-                onClick={() => !isAiLoading && pdfInputRef.current?.click()}
-                onKeyDown={e => e.key === 'Enter' && !isAiLoading && pdfInputRef.current?.click()}
+                tabIndex={readOnly ? -1 : 0}
+                aria-disabled={readOnly || isAiLoading}
+                onClick={() => !readOnly && !isAiLoading && pdfInputRef.current?.click()}
+                onKeyDown={e => e.key === 'Enter' && !readOnly && !isAiLoading && pdfInputRef.current?.click()}
                 onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
                 onDrop={e => {
                   e.preventDefault()
-                  if (isAiLoading) return
+                  if (readOnly || isAiLoading) return
                   const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf')
                   if (files.length) {
                     setPdfFiles(prev => {
@@ -533,7 +519,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
                 <svg className="w-6 h-6 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <span className="text-xs text-gray-400 text-center">Arrastra PDF aquí o clic</span>
+                <span className="text-xs text-gray-400 text-center">{t('Arrastra PDF aquí o clic', 'Drag a PDF here or click')}</span>
                 <input
                   ref={pdfInputRef}
                   type="file"
@@ -551,16 +537,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
                 {pdfFiles.map((f, idx) => (
                   <li key={idx} className="flex items-center justify-between rounded-lg px-3 py-2 bg-white/5 text-sm">
                     <span className="truncate text-gray-400 mr-2">{f.name}</span>
-                    <button
-                      onClick={() => setPdfFiles(prev => prev.filter((_, i) => i !== idx))}
-                      disabled={isAiLoading}
-                      className="text-gray-500 hover:text-red-400 transition-colors flex-shrink-0 disabled:opacity-50"
-                      aria-label={`Eliminar ${f.name}`}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                    <IconButton icon="remove" label={t(`Eliminar ${f.name}`, `Remove ${f.name}`)} onClick={() => setPdfFiles(prev => prev.filter((_, i) => i !== idx))} disabled={isAiLoading} />
                   </li>
                 ))}
               </ul>
@@ -572,7 +549,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.834-1.964-.834-2.732 0L4.07 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
                 <p className="text-xs text-amber-400">
-                  Reemplazará las {cards.length} tarjetas actuales.
+                  {t(`Reemplazará las ${cards.length} tarjetas actuales.`, `This will replace the ${cards.length} current cards.`)}
                 </p>
               </div>
             )}
@@ -588,17 +565,16 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
                 {isAiLoading && (
                   <span className="inline-block w-3 h-3 rounded-full bg-current animate-pulse mr-2 align-middle" />
                 )}
-                {aiMessage}
+                {localizeOperatorMessage(aiMessage, t)}
               </div>
             )}
 
             <button
               onClick={handleGenerate}
               disabled={isAiLoading || (!text.trim() && pdfFiles.length === 0)}
-              className="w-full py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: '#6366F1', color: '#fff' }}
+              className="w-full py-2.5 rounded-xl bg-primary/20 border border-primary/30 hover:bg-primary/30 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isAiLoading ? (aiStatus === 'uploading' ? 'Subiendo...' : 'Procesando...') : 'Generar tarjetas'}
+              {isAiLoading ? (aiStatus === 'uploading' ? t('Subiendo...', 'Uploading...') : t('Procesando...', 'Processing...')) : t('Generar tarjetas', 'Generate cards')}
             </button>
           </div>
         )}
@@ -609,7 +585,7 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
 
       {/* ===== SECTION: Participación y sorteo ===== */}
       <div>
-        <h3 className="text-lg font-semibold mb-3">Participación y sorteo</h3>
+        <h3 className="text-lg font-semibold mb-3">{t('Participación y sorteo', 'Participation and raffle')}</h3>
         <div className="space-y-3 p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input
@@ -621,20 +597,20 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
               }}
               className="rounded border-white/20 bg-[rgba(255,255,255,0.05)] text-indigo-500 focus:ring-white/20"
             />
-            <span className="text-sm text-gray-300">No requiere validación (solo quiz para participar)</span>
+            <span className="text-sm text-gray-300">{t('No requiere validación (solo cuestionario para participar)', 'No validation required (questionnaire only to participate)')}</span>
           </label>
           <p className="text-xs text-gray-500">
-            Si está activado, los jugadores no reciben código de validación; al completar el quiz se les envía el mensaje de abajo.
+            {t('Si está activado, los jugadores no reciben código de validación; al completar el cuestionario se les envía el mensaje de abajo.', 'When enabled, players do not receive a validation code; when they complete the questionnaire, they receive the message below.')}
           </p>
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">Mensaje al completar el quiz</label>
+            <label className="block text-xs font-medium text-gray-400 mb-1">{t('Mensaje al completar el cuestionario', 'Message after completing the questionnaire')}</label>
             <textarea
               value={quizCompletedMessage}
               onChange={e => {
                 setQuizCompletedMessage(e.target.value)
                 setCardsDirty(true)
               }}
-              placeholder="¡Gracias! Ya estás participando en el sorteo."
+              placeholder={t('¡Gracias! Ya estás participando en el sorteo.', 'Thank you! You are now entered in the raffle.')}
               rows={2}
               className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-sm focus:border-white/20 focus:outline-none resize-none placeholder-gray-500"
             />
@@ -647,12 +623,13 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
 
       {/* ===== SECTION B: Vista previa (tarjetas actuales) ===== */}
       <div>
-        <h3 className="text-lg font-semibold mb-3">Vista previa</h3>
+        <h3 className="text-lg font-semibold mb-3">{t('Vista previa', 'Preview')}</h3>
 
+        {cardsLoadError && <p role="alert" className="mb-3 text-sm text-red-400">{cardsLoadError}</p>}
         {loadingCards ? (
-          <p className="text-sm text-gray-400 animate-pulse">Cargando tarjetas...</p>
+          <p className="text-sm text-gray-400 animate-pulse">{t('Cargando tarjetas...', 'Loading cards...')}</p>
         ) : cards.length === 0 ? (
-          <p className="text-sm text-gray-500">Aún no hay tarjetas. Despliega IA arriba para generarlas.</p>
+          <p className="text-sm text-gray-500">{t('Aún no hay tarjetas. Despliega IA arriba para generarlas.', 'There are no cards yet. Expand AI above to generate them.')}</p>
         ) : (
           <div className="space-y-3">
             {cards.map(card => {
@@ -662,13 +639,13 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
                   <input
                     value={card.title}
                     onChange={e => updateCardTitle(card.id, e.target.value)}
-                    placeholder="Título"
+                    placeholder={t('Título', 'Title')}
                     className="w-full px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm font-semibold text-textMain focus:border-white/20 focus:outline-none placeholder-gray-500"
                   />
                   <textarea
                     value={card.body}
                     onChange={e => updateCardBody(card.id, e.target.value)}
-                    placeholder="Cuerpo de la tarjeta"
+                    placeholder={t('Cuerpo de la tarjeta', 'Card body')}
                     rows={2}
                     className="w-full px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-xs text-textSub leading-relaxed focus:border-white/20 focus:outline-none resize-none placeholder-gray-500"
                   />
@@ -682,14 +659,14 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="text-xs text-gray-500">Layout:</label>
+                    <label className="text-xs text-gray-500">{t('Layout:', 'Layout:')}</label>
                     <select
                       value={layout}
                       onChange={e => handleLayoutChangeForCard(card.id, e.target.value as CardLayoutPosition)}
                       className="h-9 px-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-gray-200 text-xs focus:border-white/20 focus:outline-none"
                     >
                       {LAYOUT_OPTIONS.map(({ value, label }) => (
-                        <option key={value} value={value}>{label}</option>
+                        <option key={value} value={value}>{t(label, value === 'top' ? 'Top' : value === 'left' ? 'Left' : value === 'right' ? 'Right' : 'Bottom')}</option>
                       ))}
                     </select>
                   </div>
@@ -733,19 +710,18 @@ export default function InfocardsGameConfig({ gameId, settings = {}, onChange }:
               : 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20'
           }`}>
             {isSaving && <span className="inline-block w-3 h-3 rounded-full bg-current animate-pulse mr-2 align-middle" />}
-            {saveMessage}
+            {localizeOperatorMessage(saveMessage, t)}
           </div>
         )}
 
-        {cardsDirty && !loadingCards && (
-          <button
+        {!embedded && (cardsDirty || layoutsDirty) && !loadingCards && (
+          <SaveButton
             onClick={handleSaveCards}
             disabled={isSaving}
-            className="mt-3 w-full py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: '#6366F1', color: '#fff' }}
+            className="mt-3 w-full"
           >
-            {isSaving ? 'Guardando...' : 'Guardar cambios'}
-          </button>
+            {isSaving ? t('Guardando...', 'Saving...') : t('Guardar cambios', 'Save changes')}
+          </SaveButton>
         )}
       </div>
 

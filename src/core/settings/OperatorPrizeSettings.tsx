@@ -1,19 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import SaveButton from '../ui/SaveButton'
 import type { GameDefinition } from '../types'
+import type { GamePrize, PrizeCatalog, PrizeSlot } from '../prizes'
 import type { Plan } from '../../auth/featureFlags'
 import { getFeaturesByPlan } from '../../auth/featureFlags'
-import { api } from '../../api/api'
 import {
-  getOperatorPrizeSlotVisibility,
-  readMaxPrizeValidation,
-  readMaxPrizeRanking,
-  readMaxPrizeRaffle,
+  fetchPrizeGame, savePrizeCatalog,
+} from '../../api/prizeMedia'
+import { fetchSharedPrizeCatalog, type SharedPrize } from '../../api/sharedPrizeCatalog'
+import { prizeInventoryApi, type PrizeInventory } from '../../api/prizeInventory'
+import { useOperatorLanguage } from '../shell/operatorLanguage'
+import {
+  getOperatorPrizeSlotVisibility, readMaxPrizeValidation, readMaxPrizeRanking, readMaxPrizeRaffle,
 } from './operatorPrizeSlots'
-
-interface Empareja2GameResponse {
-  ok: boolean
-  settings?: { empareja2?: { maxValidations?: number } }
-}
+import StackPrizeSettings from './StackPrizeSettings'
+import NativePrizeRuleEditor, { type NativePrizeDraft } from './NativePrizeRuleEditor'
 
 type Props = {
   gameId: string
@@ -21,343 +23,308 @@ type Props = {
   settings: Record<string, unknown> | null
   plan: Plan | null | undefined
   onPersist: (patch: Record<string, unknown>) => void
+  onSavingChange?: (saving: boolean) => void
+  onDirtyChange?: (dirty: boolean) => void
+  onReadyChange?: (ready: boolean) => void
+  editConditions?: boolean
+  readOnly?: boolean
+  conditionsHeaderAside?: ReactNode
+}
+type Draft = NativePrizeDraft
+const slotNames = ['validation', 'ranking', 'raffle'] as const
+const nameKeys = { validation: 'prizeValidation', ranking: 'prizeTopX', raffle: 'prizeRaffle' } as const
+const limitKeys = { validation: 'maxPrizeValidation', ranking: 'maxPrizeRanking', raffle: 'maxPrizeRaffle' } as const
+const inputClass = 'w-full h-9 px-2.5 rounded-lg bg-[rgba(255,255,255,0.05)] border border-white/10 text-sm focus:border-white/20 focus:outline-none min-w-0'
+const labelClass = 'mb-1 block text-[11px] font-medium text-gray-400'
+
+function draftsFrom(catalog: PrizeCatalog): Record<PrizeSlot, Draft> {
+  return Object.fromEntries(slotNames.map(slot => {
+    const prize = catalog[slot]
+    return [slot, {
+      name: prize?.name ?? '', limit: prize?.limit == null ? '' : String(prize.limit),
+      topX: String(prize?.topX ?? 3), imageKey: prize?.imageKey ?? null,
+      imageUrl: prize?.imageUrl ?? null, sharedPrizeId: prize?.sharedPrizeId ?? '',
+    }]
+  })) as Record<PrizeSlot, Draft>
 }
 
-function readString(s: Record<string, unknown> | null, key: string): string {
-  if (!s) return ''
-  const v = s[key]
-  return typeof v === 'string' ? v : ''
-}
-
-function readTopX(s: Record<string, unknown> | null): string {
-  if (!s) return '3'
-  const v = s.topX
-  if (typeof v === 'number' && v >= 1) return String(v)
-  return '3'
-}
-
-const inputClass =
-  'w-full h-11 px-3 sm:px-4 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none min-w-0'
-const inputLimitClass =
-  'w-full h-11 px-3 rounded-xl bg-[rgba(255,255,255,0.05)] border border-white/10 text-base focus:border-white/20 focus:outline-none sm:text-center'
-const colHeaderClass = 'text-xs font-medium text-gray-400'
-
-const PRIZE_NAME_PLACEHOLDER = '🎁 Nombre del premio'
-
-function PrizeLimitRow({
-  textValue,
-  onTextChange,
-  limitValue,
-  onLimitChange,
-  textPlaceholder = PRIZE_NAME_PLACEHOLDER,
-  limitPlaceholder = '∞',
-  showColumnHeaders = false,
-}: {
-  textValue: string
-  onTextChange: (v: string) => void
-  limitValue: string
-  onLimitChange: (v: string) => void
-  textPlaceholder?: string
-  limitPlaceholder?: string
-  showColumnHeaders?: boolean
-}) {
-  return (
-    <div className="space-y-2">
-      {showColumnHeaders && (
-        <div className="hidden sm:grid sm:grid-cols-[minmax(0,1fr)_5.75rem] gap-3">
-          <span className={colHeaderClass}>Premio</span>
-          <span className={`${colHeaderClass} text-center`}>Límite</span>
-        </div>
-      )}
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_5.75rem] gap-2 sm:gap-3 items-end">
-        <input
-          type="text"
-          value={textValue}
-          onChange={(e) => onTextChange(e.target.value)}
-          placeholder={textPlaceholder}
-          className={inputClass}
-          aria-label="Premio"
-        />
-        <input
-          type="number"
-          min={0}
-          step={1}
-          value={limitValue}
-          onChange={(e) => onLimitChange(e.target.value)}
-          placeholder={limitPlaceholder}
-          className={inputLimitClass}
-          aria-label="Límite"
-        />
-      </div>
-    </div>
-  )
-}
-
-function RankingPrizeRow({
-  nameValue,
-  onNameChange,
-  topXValue,
-  onTopXChange,
-  limitValue,
-  onLimitChange,
-}: {
-  nameValue: string
-  onNameChange: (v: string) => void
-  topXValue: string
-  onTopXChange: (v: string) => void
-  limitValue: string
-  onLimitChange: (v: string) => void
-}) {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_4.75rem_5.75rem] gap-x-3 gap-y-2 items-end">
-      <div className="min-w-0">
-        <label className="mb-1 block text-xs font-medium text-gray-400" htmlFor="op-ranking-prize-name">
-          Premio
-        </label>
-        <input
-          id="op-ranking-prize-name"
-          type="text"
-          value={nameValue}
-          onChange={(e) => onNameChange(e.target.value)}
-          placeholder={PRIZE_NAME_PLACEHOLDER}
-          className={inputClass}
-        />
-      </div>
-      <div className="min-w-0 sm:max-w-[4.75rem]">
-        <label className="mb-1 block text-xs font-medium text-gray-400" htmlFor="op-ranking-topx">
-          Top X
-        </label>
-        <input
-          id="op-ranking-topx"
-          type="number"
-          min={1}
-          max={100}
-          step={1}
-          value={topXValue}
-          onChange={(e) => onTopXChange(e.target.value)}
-          placeholder="3"
-          className={inputLimitClass}
-        />
-      </div>
-      <div className="min-w-0 sm:max-w-[5.75rem]">
-        <label className="mb-1 block text-xs font-medium text-gray-400" htmlFor="op-ranking-limit">
-          Límite
-        </label>
-        <input
-          id="op-ranking-limit"
-          type="number"
-          min={0}
-          step={1}
-          value={limitValue}
-          onChange={(e) => onLimitChange(e.target.value)}
-          placeholder="∞"
-          className={inputLimitClass}
-        />
-      </div>
-    </div>
-  )
-}
-
-export default function OperatorPrizeSettings({
-  gameId,
-  gameDefinition,
-  settings,
-  plan,
-  onPersist,
-}: Props) {
-  const features = getFeaturesByPlan(plan)
-  const slots = getOperatorPrizeSlotVisibility(gameDefinition, features)
-
-  const [prizeRaffleInput, setPrizeRaffleInput] = useState(() => readString(settings, 'prizeRaffle'))
-  const [prizeValidationInput, setPrizeValidationInput] = useState(() => readString(settings, 'prizeValidation'))
-  const [prizeTopXInput, setPrizeTopXInput] = useState(() => readString(settings, 'prizeTopX'))
-  const [topXInput, setTopXInput] = useState(() => readTopX(settings))
-  const [maxPrizeValidationInput, setMaxPrizeValidationInput] = useState(() => {
-    const m = readMaxPrizeValidation(settings)
-    return m != null ? String(m) : ''
-  })
-  const [maxPrizeRankingInput, setMaxPrizeRankingInput] = useState(() => {
-    const m = readMaxPrizeRanking(settings)
-    return m != null ? String(m) : ''
-  })
-  const [maxPrizeRaffleInput, setMaxPrizeRaffleInput] = useState(() => {
-    const m = readMaxPrizeRaffle(settings)
-    return m != null ? String(m) : ''
-  })
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
-  const [saveMessage, setSaveMessage] = useState('')
-
-  useEffect(() => {
-    setPrizeRaffleInput(readString(settings, 'prizeRaffle'))
-    setPrizeValidationInput(readString(settings, 'prizeValidation'))
-    setPrizeTopXInput(readString(settings, 'prizeTopX'))
-    setTopXInput(readTopX(settings))
-    const mv = readMaxPrizeValidation(settings)
-    setMaxPrizeValidationInput(mv != null ? String(mv) : '')
-    const mr = readMaxPrizeRanking(settings)
-    setMaxPrizeRankingInput(mr != null ? String(mr) : '')
-    const mf = readMaxPrizeRaffle(settings)
-    setMaxPrizeRaffleInput(mf != null ? String(mf) : '')
-  }, [settings])
-
-  useEffect(() => {
-    if (gameDefinition.id !== 'EMPAREJA2' || !gameId) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const data = await api.get<Empareja2GameResponse>(`/v1/game?gameId=${encodeURIComponent(gameId)}`)
-        if (cancelled || !data.ok) return
-        const m = data.settings?.empareja2?.maxValidations
-        if (typeof m === 'number' && m >= 0) {
-          setMaxPrizeValidationInput(String(m))
-        }
-      } catch {
-        // keep localStorage-driven value
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [gameId, gameDefinition.id])
-
-  const parseOptionalMax = (trimmed: string): number | undefined =>
-    trimmed === '' ? undefined : Math.max(0, Math.floor(Number(trimmed)) || 0)
-
-  const handleSave = async () => {
-    const patch: Record<string, unknown> = {}
-
-    if (slots.validation) {
-      patch.prizeValidation = prizeValidationInput.trim() || undefined
-      patch.maxPrizeValidation = parseOptionalMax(maxPrizeValidationInput.trim())
-      patch.maxValidations = undefined
-    }
-    if (slots.ranking) {
-      const topX = Math.max(1, Math.min(100, Math.floor(Number(topXInput)) || 1))
-      patch.topX = topX
-      patch.prizeTopX = prizeTopXInput.trim() || undefined
-      patch.maxPrizeRanking = parseOptionalMax(maxPrizeRankingInput.trim())
-    }
-    if (slots.raffle) {
-      patch.prizeRaffle = prizeRaffleInput.trim() || undefined
-      patch.maxPrizeRaffle = parseOptionalMax(maxPrizeRaffleInput.trim())
-    }
-
-    const maxPrizeValidation = patch.maxPrizeValidation as number | undefined
-
-    setSaveStatus('idle')
-    setSaveMessage('')
-
-    const runPersist = () => {
-      onPersist(patch)
-      setSaveStatus('success')
-      setSaveMessage('Guardado.')
-      setTimeout(() => {
-        setSaveStatus('idle')
-        setSaveMessage('')
-      }, 2500)
-    }
-
-    if (gameDefinition.id === 'EMPAREJA2' && gameId && slots.validation) {
-      setSaveStatus('saving')
-      setSaveMessage('Guardando...')
-      try {
-        if (maxPrizeValidation !== undefined) {
-          await api.put('/v1/game', {
-            gameId,
-            settings: {
-              empareja2: { maxValidations: maxPrizeValidation },
-            },
-          })
-        }
-        runPersist()
-      } catch (e: unknown) {
-        setSaveStatus('error')
-        setSaveMessage(e instanceof Error ? e.message : 'Error al guardar en el servidor')
-      }
-    } else {
-      runPersist()
+function legacyCatalog(settings: Props['settings'], slots: Record<PrizeSlot, boolean>): PrizeCatalog {
+  const limits = {
+    validation: readMaxPrizeValidation(settings),
+    ranking: readMaxPrizeRanking(settings),
+    raffle: readMaxPrizeRaffle(settings),
+  }
+  const catalog: PrizeCatalog = {}
+  for (const slot of slotNames) {
+    if (!slots[slot]) continue
+    const name = settings?.[nameKeys[slot]]
+    catalog[slot] = {
+      name: typeof name === 'string' ? name : '',
+      limit: limits[slot] ?? null,
+      ...(slot === 'ranking' ? { topX: typeof settings?.topX === 'number' ? settings.topX : 3 } : {}),
     }
   }
+  return catalog
+}
 
-  const noSlots = !slots.validation && !slots.ranking && !slots.raffle
+function validInteger(value: string, min: number, max = Number.MAX_SAFE_INTEGER): boolean {
+  return /^\d+$/.test(value.trim()) && Number.isSafeInteger(Number(value)) && Number(value) >= min && Number(value) <= max
+}
 
+export default function OperatorPrizeSettings(props: Props) {
+  return props.gameDefinition.id === 'STACK'
+    ? <StackPrizeSettings gameId={props.gameId} raffles={getFeaturesByPlan(props.plan).raffles}
+        onPersist={props.onPersist} onSavingChange={props.onSavingChange} onDirtyChange={props.onDirtyChange} />
+    : <LegacyPrizeSettings {...props} />
+}
+
+export function LegacyPrizeSettings({
+  gameId, gameDefinition, settings, plan, onPersist, onSavingChange, onDirtyChange, onReadyChange,
+  editConditions = false, readOnly = false, conditionsHeaderAside,
+}: Props) {
+  const { t } = useOperatorLanguage()
+  const slots = getOperatorPrizeSlotVisibility(gameDefinition, getFeaturesByPlan(plan))
+  const [catalog, setCatalog] = useState<PrizeCatalog>({})
+  const [sharedCatalog, setSharedCatalog] = useState<SharedPrize[]>([])
+  const [inventory, setInventory] = useState<PrizeInventory | null>(null)
+  const [drafts, setDrafts] = useState(() => draftsFrom(legacyCatalog(settings, slots)))
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const [numberErrors, setNumberErrors] = useState<Partial<Record<PrizeSlot, boolean>>>({})
+  const [saveError, setSaveError] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [refreshWarning, setRefreshWarning] = useState(false)
+  const [cacheWarning, setCacheWarning] = useState(false)
+  const [nativeRulesValid, setNativeRulesValid] = useState(true)
+  const savingRef = useRef(false)
+  const latest = useRef({ settings, slots, onSavingChange })
+  latest.current = { settings, slots, onSavingChange }
+  const alive = useRef(true)
+  const readyCallback = useRef(onReadyChange)
+  readyCallback.current = onReadyChange
+  const dirty = JSON.stringify(drafts) !== JSON.stringify(draftsFrom(catalog))
+  useEffect(() => {
+    readyCallback.current?.(!loading && !loadError && !saving && !saveError && !refreshWarning
+      && !dirty && nativeRulesValid && !Object.values(numberErrors).some(Boolean))
+  }, [loading, loadError, saving, saveError, refreshWarning, numberErrors, dirty, nativeRulesValid])
+
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+      latest.current.onSavingChange?.(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setLoadError(false)
+    setSaved(false)
+    Promise.all([fetchSharedPrizeCatalog(), prizeInventoryApi.get()]).then(([shared, balances]) => {
+      if (cancelled) return null
+      setSharedCatalog(shared.catalog)
+      setInventory(balances)
+      return fetchPrizeGame(gameId)
+    }).then(data => {
+      if (!data) return
+      if (cancelled) return
+      if (!data.ok) throw new Error('Load failed')
+      const hasCatalog = Object.prototype.hasOwnProperty.call(data, 'prizeCatalog')
+      const next = hasCatalog ? data.prizeCatalog ?? {} : legacyCatalog(latest.current.settings, latest.current.slots)
+      if (!hasCatalog && gameDefinition.id === 'EMPAREJA2' && next.validation) {
+        const max = data.settings?.empareja2?.maxValidations
+        if (typeof max === 'number' && max >= 0) next.validation.limit = max
+      }
+      setCatalog(next)
+      setDrafts(draftsFrom(next))
+    }).catch(() => {
+      if (!cancelled) setLoadError(true)
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [gameId, gameDefinition.id, loadAttempt])
+
+  const changeDraft = (slot: PrizeSlot, patch: Partial<Draft>) => {
+    setDrafts(current => ({ ...current, [slot]: { ...current[slot], ...patch } }))
+    setSaved(false)
+    onDirtyChange?.(true)
+  }
+
+  const handleSave = async () => {
+    if (readOnly || savingRef.current || loading || loadError || refreshWarning || !nativeRulesValid) return
+    const invalid: Partial<Record<PrizeSlot, boolean>> = {}
+    for (const slot of slotNames) {
+      if (!slots[slot]) continue
+      const draft = drafts[slot]
+      if ((draft.limit.trim() !== '' && !validInteger(draft.limit, 0))
+        || (slot === 'ranking' && !validInteger(draft.topX, 1, 100))) invalid[slot] = true
+    }
+    setNumberErrors(invalid)
+    setSaveError('')
+    setSaved(false)
+    setRefreshWarning(false)
+    setCacheWarning(false)
+    if (Object.keys(invalid).length) return
+    savingRef.current = true
+    setSaving(true)
+    latest.current.onSavingChange?.(true)
+    let persisted: PrizeCatalog | undefined
+    try {
+      const next = { ...catalog }
+      for (const slot of slotNames) {
+        if (!slots[slot]) continue
+        const draft = drafts[slot]
+        const prize: GamePrize = {
+          name: draft.name.trim(), limit: draft.limit.trim() === '' ? null : Number(draft.limit),
+          sharedPrizeId: draft.sharedPrizeId || undefined, imageKey: draft.imageKey,
+          imageUrl: draft.imageUrl,
+          ...(slot === 'ranking' ? { topX: Number(draft.topX) } : {}),
+        }
+        next[slot] = prize
+      }
+      await savePrizeCatalog(gameId, next, !editConditions)
+      persisted = next
+    } catch (error) {
+      setSaveError(error instanceof Error && error.message ? error.message : 'unknown')
+    }
+    if (persisted) {
+      // A failed URL refresh must not turn a confirmed write into a reported save failure.
+      let display = persisted
+      let refreshedCatalog = false
+      try {
+        const refreshed = await fetchPrizeGame(gameId)
+        if (!refreshed.ok || !Object.prototype.hasOwnProperty.call(refreshed, 'prizeCatalog')) throw new Error('Refresh failed')
+        display = refreshed.prizeCatalog ?? {}
+        refreshedCatalog = true
+      } catch {
+        setRefreshWarning(true)
+      }
+      setCatalog(display)
+      setDrafts(draftsFrom(display))
+      const cacheCatalog: PrizeCatalog = {}
+      for (const slot of slotNames) {
+        const prize = display[slot]
+        if (prize) cacheCatalog[slot] = { ...prize }
+      }
+      // Upload keys may be promoted on commit; only publish keys read back from the server.
+      const patch: Record<string, unknown> = refreshedCatalog ? { prizeCatalog: cacheCatalog } : {}
+      for (const slot of slotNames) {
+        if (!slots[slot]) continue
+        const prize = display[slot]
+        patch[nameKeys[slot]] = prize?.name || undefined
+        patch[limitKeys[slot]] = prize?.limit ?? undefined
+        if (slot === 'ranking') patch.topX = prize?.topX ?? 3
+        if (slot === 'validation') patch.maxValidations = undefined
+      }
+      setSaved(true)
+      onDirtyChange?.(false)
+      try {
+        onPersist(patch)
+      } catch {
+        setCacheWarning(true)
+      }
+    }
+    savingRef.current = false
+    setSaving(false)
+    latest.current.onSavingChange?.(false)
+  }
+
+  const noSlots = !slotNames.some(slot => slots[slot])
   return (
-    <div className="space-y-6">
-      {noSlots && (
-        <p className="text-sm text-amber-200/90 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-          No hay premios configurables para este juego con tu plan actual (p. ej. el sorteo requiere plan Event 24h).
-        </p>
-      )}
-
-      <div className="space-y-5">
-        {slots.validation && (
-          <div className="space-y-2 border-b border-white/10 pb-4">
-            <h3 className="text-sm font-medium text-gray-300">Validación / participación</h3>
-            <PrizeLimitRow
-              showColumnHeaders
-              textValue={prizeValidationInput}
-              onTextChange={setPrizeValidationInput}
-              limitValue={maxPrizeValidationInput}
-              onLimitChange={setMaxPrizeValidationInput}
-              limitPlaceholder="∞"
-            />
-          </div>
-        )}
-
-        {slots.ranking && (
-          <div className="space-y-2 border-b border-white/10 pb-4">
-            <h3 className="text-sm font-medium text-gray-300">Ranking</h3>
-            <RankingPrizeRow
-              nameValue={prizeTopXInput}
-              onNameChange={setPrizeTopXInput}
-              topXValue={topXInput}
-              onTopXChange={setTopXInput}
-              limitValue={maxPrizeRankingInput}
-              onLimitChange={setMaxPrizeRankingInput}
-            />
-          </div>
-        )}
-
-        {slots.raffle && (
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-gray-300">Sorteo</h3>
-            <PrizeLimitRow
-              showColumnHeaders
-              textValue={prizeRaffleInput}
-              onTextChange={setPrizeRaffleInput}
-              limitValue={maxPrizeRaffleInput}
-              onLimitChange={setMaxPrizeRaffleInput}
-              limitPlaceholder="∞"
-            />
-          </div>
-        )}
-      </div>
-
-      {saveStatus !== 'idle' && (
-        <div
-          className={`rounded-xl px-4 py-3 text-sm border ${
-            saveStatus === 'error'
-              ? 'bg-red-500/20 text-red-300 border-red-500/30'
-              : saveStatus === 'success'
-                ? 'bg-green-500/20 text-green-300 border-green-500/30'
-                : 'bg-[rgba(176,38,255,0.15)] text-neonMagenta border-[rgba(176,38,255,0.3)]'
-          }`}
-        >
-          {saveStatus === 'saving' && (
-            <span className="inline-block w-3 h-3 rounded-full bg-current animate-pulse mr-2 align-middle" />
-          )}
-          {saveMessage}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={saveStatus === 'saving' || noSlots}
-        className="w-full p-3 rounded-xl bg-[rgba(176,38,255,0.2)] border border-[rgba(176,38,255,0.3)] hover:bg-[rgba(176,38,255,0.3)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {saveStatus === 'saving' ? 'Guardando...' : 'Guardar'}
-      </button>
+    <div className="space-y-3">
+      {noSlots && <p>{t('No hay premios configurables para este juego con tu plan actual.', 'No prizes can be configured for this game on your current plan.')}</p>}
+      {loading && <p role="status">{t('Cargando premios...', 'Loading prizes...')}</p>}
+      {loadError && <div role="alert">
+        <p>{t('No se pudieron cargar los premios. Reintenta antes de guardar.', 'Prizes could not be loaded. Retry before saving.')}</p>
+        <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>{t('Reintentar', 'Retry')}</button>
+      </div>}
+      {!loading && !loadError && sharedCatalog.length === 0 && <p className="text-sm text-textSub">
+        {t('Añade premios en Administración > Premios antes de asignarlos a esta partida.', 'Add prizes in Administration > Prizes before assigning them to this event.')}
+        {' '}<Link className="underline" to="/admin/prizes">{t('Abrir catálogo', 'Open catalog')}</Link>
+      </p>}
+      <fieldset disabled={readOnly || loading || loadError || saving || refreshWarning} className="space-y-2 min-w-0">
+        {editConditions ? !loading && !loadError && <NativePrizeRuleEditor slots={slots} drafts={drafts}
+          available={sharedCatalog} inventory={inventory} errors={numberErrors} onChange={changeDraft}
+          headerAside={conditionsHeaderAside}
+          onValidityChange={setNativeRulesValid}
+          onMove={(from, to) => {
+            setDrafts(current => ({ ...current, [to]: { ...current[from] },
+              [from]: { name: '', limit: '', topX: '3', imageKey: null, imageUrl: null, sharedPrizeId: '' } }))
+            setSaved(false)
+            onDirtyChange?.(true)
+          }} /> : slotNames.filter(slot => slots[slot]).map(slot => {
+          const draft = drafts[slot]
+          const balance = inventory?.catalog.find(prize => prize.id === draft.sharedPrizeId)?.inventory
+          const reservation = inventory?.catalog.find(prize => prize.id === draft.sharedPrizeId)?.reservation
+          const title = slot === 'validation' ? t('Validación / participación', 'Validation / participation')
+            : slot === 'ranking' ? t('Ranking', 'Ranking') : t('Sorteo', 'Raffle')
+          const id = `op-prize-${slot}`
+          return (
+            <section key={slot} aria-labelledby={`${id}-title`} className="space-y-1.5 rounded-lg border border-white/10 p-2.5">
+              <h3 id={`${id}-title`} className="text-xs font-semibold text-gray-300">{title}</h3>
+              <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1.5fr)_minmax(8rem,0.45fr)]">
+                <div className="min-w-0">
+                  <label className={labelClass} htmlFor={`${id}-shared-prize`}>{t('Premio compartido', 'Shared prize')}</label>
+                  <div className="flex min-w-0 items-center gap-2">
+                    {draft.imageUrl && <img src={draft.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-md object-contain" />}
+                    <select id={`${id}-shared-prize`} className={inputClass} value={draft.sharedPrizeId}
+                      onChange={event => {
+                        const selected = sharedCatalog.find(prize => prize.id === event.target.value)
+                        changeDraft(slot, {
+                          sharedPrizeId: selected?.id ?? '', name: selected?.name ?? '',
+                          imageKey: selected?.imageKey ?? null, imageUrl: selected?.imageUrl ?? null,
+                        })
+                      }}>
+                      <option value="">{t('Sin premio asignado', 'No prize assigned')}</option>
+                      {sharedCatalog.map(prize => <option key={prize.id} value={prize.id}>{prize.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <label className={labelClass} htmlFor={`${id}-limit`}>{t('Substock reservado', 'Reserved sub-stock')}</label>
+                  <input id={`${id}-limit`} className={inputClass} inputMode="numeric" placeholder={t('Sin reserva', 'No reservation')} value={draft.limit}
+                    aria-invalid={!!numberErrors[slot]} aria-describedby={numberErrors[slot] ? `${id}-number-error` : undefined}
+                    onChange={event => changeDraft(slot, { limit: event.target.value })} />
+                </div>
+                <p className="text-[11px] text-textSub">{t('Reserva exclusiva de esta partida. El stock general es la suma de todos los substocks. Vacío no reserva unidades.',
+                  'Exclusive reservation for this event. General stock is the sum of all sub-stocks. Blank reserves no units.')}</p>
+                {draft.sharedPrizeId && <p className="text-xs text-textSub">{t('Disponible general', 'General available')}: {
+                  reservation ? reservation.available ?? t('Define los substocks', 'Set sub-stocks')
+                    : balance?.initialized ? balance.available : t('Sin reserva', 'No reservation')
+                }</p>}
+                {draft.limit.trim() === '0' && <p className="text-xs text-amber-300">{t('Límite por evento: 0. Esta partida no repartirá este premio.',
+                  'Event cap: 0. This event will not award this prize.')}</p>}
+                {draft.sharedPrizeId && draft.limit.trim() === '' && <p className="text-xs text-amber-300">{t('Define el substock para repartir este premio.',
+                  'Set the sub-stock to award this prize.')}</p>}
+              </div>
+              {slot === 'ranking' && editConditions && <label className="block text-sm">
+                {t('Puestos premiados (top)', 'Rewarded positions (top)')}
+                <input type="number" min={1} max={100} className={inputClass} value={draft.topX}
+                  onChange={event => changeDraft(slot, { topX: event.target.value })} />
+              </label>}
+              {slot === 'ranking' && !editConditions && <p className="text-[11px] text-textSub">{t(
+                'La condición top se edita en Configurar partida > Condiciones.',
+                'Edit the top condition under Event settings > Conditions.',
+              )}</p>}
+              {numberErrors[slot] && <p id={`${id}-number-error`} role="alert" className="text-sm text-red-300">
+                {t('El límite debe ser un entero ≥ 0 o vacío (sin reserva). Top X debe ser un entero entre 1 y 100.', 'Limit must be a whole number ≥ 0 or empty (no reservation). Top X must be a whole number from 1 to 100.')}
+              </p>}
+            </section>
+          )
+        })}
+      </fieldset>
+      {saveError && <p role="alert" className="text-red-300">{t('No se han guardado los cambios. Reintenta.', 'Changes were not saved. Please retry.')} {saveError !== 'unknown' ? saveError : ''}</p>}
+      {saved && <p role="status" className="text-green-300">{t('Guardado.', 'Saved.')}</p>}
+      {refreshWarning && <p role="status">{t('Los premios se guardaron en el servidor, pero no se pudo actualizar la vista. Se conserva la vista previa; vuelve a abrir para refrescar antes de guardar de nuevo.', 'Prizes were saved on the server, but the display could not be refreshed. The preview is retained; reopen to refresh before saving again.')}</p>}
+      {cacheWarning && <p role="status">{t('Los premios se guardaron en el servidor, pero no se pudo actualizar la caché local. Vuelve a abrir la partida para refrescar.', 'Prizes were saved on the server, but the local cache could not be updated. Reopen the game to refresh.')}</p>}
+      {!readOnly && <SaveButton onClick={() => void handleSave()} disabled={loading || loadError || saving || refreshWarning || noSlots || !nativeRulesValid}
+        className="w-full">
+        {saving ? t('Guardando...', 'Saving...') : t('Guardar', 'Save')}
+      </SaveButton>}
     </div>
   )
 }

@@ -15,7 +15,7 @@ export default {
         surface: 'var(--color-surface, rgba(255,255,255,0.04))',
         bgDark: '#0B0A12',
         // Primary and accent colors using CSS variables
-        primary: 'var(--color-primary, #B026FF)',
+        primary: 'rgba(var(--color-primary-rgb, 176,38,255), <alpha-value>)',
         accent: 'var(--color-accent, #22D3EE)',
       },
       boxShadow: {

@@ -1,5 +1,4 @@
 import type { GameDefinition } from '../../core/types'
-import CupidoGameScreen from './GameScreen'
 
 export const cupidoDefinition: GameDefinition = {
   id: 'CUPIDO',
@@ -21,6 +20,5 @@ export const cupidoDefinition: GameDefinition = {
     clientLogo: '/client-logo.png',
     standLogo: '/images/logo-stand-footer.png',
   },
-  GameScreen: CupidoGameScreen,
   showRanking: false,
 }
