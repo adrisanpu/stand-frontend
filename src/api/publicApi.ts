@@ -1,4 +1,5 @@
 import type { StackConfig, StackPlacement } from '../games/stack/stackLogic'
+import type { BasketConfig, BasketShot } from '../games/basket/basketLogic'
 import type { ParticipantAppearance } from '../core/theme/appearance'
 import type { FormConfig } from '../core/formConfig'
 import type { GamePrize, PrizeCatalog } from '../core/prizes'
@@ -96,10 +97,13 @@ export type PublicGameResponse = {
   recentPairs: Array<{ label: string; characterNames: string[]; validatedAt: string }>
   ranking?: PublicRankingEntry[]
   stackConfig?: StackConfig
+  basketConfig?: BasketConfig
   rulet4Config?: Rulet4Settings
   kivlyReward?: { name: string }
   stackStartSnapshot?: boolean
   stackFinishSupported?: boolean
+  basketStartSnapshot?: boolean
+  basketFinishSupported?: boolean
   stackPrizeState?: 'open' | 'closing' | 'closed'
   stackPrizeRules?: import('./stackPrizes').StackPrizePromotion[]
   stackAutoCloseAt?: number
@@ -146,6 +150,28 @@ export type StackAssignment = {
   attempt: StackAttempt | null
   score?: number
   rank?: number | null
+}
+
+export type BasketAttempt = {
+  attemptId: string
+  status: 'started' | 'finished' | 'expired'
+  startedAt: string
+  configVersion: '1'
+  configSnapshot: BasketConfig
+  expiresAt: string
+  serverNow: string
+  finishedAt?: string
+}
+
+export type BasketAssignment = {
+  gameType: 'BASKET'
+  playerId: number
+  displayName?: string
+  profilePicUrl?: string | null
+  attempt: BasketAttempt | null
+  score?: number
+  rank?: number | null
+  scoreUpdatedAt?: string
 }
 
 export type KivlyCompletionReward = {
@@ -219,10 +245,40 @@ export function isMobileAssignment(assignment: PlayerAssignment | null): assignm
     && ['L3TRAS', 'SEMAFORO', 'CUPIDO', 'INFOCARDS'].includes(assignment.gameType) && 'play' in assignment)
 }
 
-export type PlayerAssignment = Empareja2Assignment | T1merAssignment | StackAssignment | ImpostorAssignment | Rulet4Assignment | MobileAssignment
+export type PlayerAssignment = Empareja2Assignment | T1merAssignment | StackAssignment | BasketAssignment | ImpostorAssignment | Rulet4Assignment | MobileAssignment
 
 export function isStackAssignment(assignment: PlayerAssignment): assignment is StackAssignment {
   return 'gameType' in assignment && assignment.gameType === 'STACK'
+}
+
+export function isBasketAssignment(assignment: PlayerAssignment | null): assignment is BasketAssignment {
+  return Boolean(assignment && 'gameType' in assignment && assignment.gameType === 'BASKET')
+}
+
+export type BasketStartResponse = {
+  ok: true
+  gameId: string
+  playerId: number
+  attemptId: string
+  status: 'started'
+  configVersion: '1'
+  startedAt: string
+  serverNow: string
+  expiresAt: string
+  configSnapshot: BasketConfig
+}
+
+export type BasketFinishResponse = {
+  ok: true
+  gameId: string
+  playerId: number
+  attemptId: string
+  status: 'finished'
+  configVersion: '1'
+  score: number
+  rank: number | null
+  scoreUpdatedAt: string
+  finishedAt: string
 }
 
 export type StackStartResponse = {
@@ -478,6 +534,18 @@ export const publicApi = {
     publicRequest<StackStartResponse>('/v1/public/score', {
       method: 'POST',
       body: JSON.stringify({ ...body, action: 'start' }),
+    }),
+
+  startBasketAttempt: (body: { gameId: string; playerToken: string; attemptId: string }) =>
+    publicRequest<BasketStartResponse>('/v1/public/score', {
+      method: 'POST',
+      body: JSON.stringify({ ...body, action: 'start' }),
+    }),
+
+  finishBasketAttempt: (body: { gameId: string; playerToken: string; attemptId: string; shots: readonly BasketShot[] }) =>
+    publicRequest<BasketFinishResponse>('/v1/public/score', {
+      method: 'POST',
+      body: JSON.stringify({ ...body, action: 'finish' }),
     }),
 
   finishStackAttempt: (body: { gameId: string; playerToken: string; attemptId: string; placements: readonly StackPlacement[] }) =>

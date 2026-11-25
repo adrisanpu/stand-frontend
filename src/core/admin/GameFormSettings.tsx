@@ -17,6 +17,7 @@ import { OPTIONAL_REGISTRATION_FIELDS, resolveParticipantFields } from '../lib/p
 import IconButton from '../ui/IconButton'
 import SaveButton from '../ui/SaveButton'
 import MediaPicker from '../ui/MediaPicker'
+import ConfigurationActions from '../ui/ConfigurationActions'
 
 export default function GameFormSettings({ gameId, gameName, readOnly = false, section, prizeCatalog, onDirtyChange, onBusyChange, onReadyChange, onSectionDirtyChange, onFrameChange }: {
   gameId: string
@@ -170,8 +171,10 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
     {busy && <p role="status">{t('Cargando formulario…', 'Loading form…')}</p>}
     {error && <p role="alert">{error}</p>}
     <div className="flex justify-end">
+      <ConfigurationActions>
       <IconButton icon="reload" className="!h-11 !w-11" label={t('Recargar formulario', 'Reload form')} disabled={busy}
         onClick={() => setReload(value => value + 1)} />
+      </ConfigurationActions>
     </div>
   </div>
 
@@ -202,6 +205,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
       {section === 'appearance' && error && <p role="alert">{error}</p>}
       {section === 'appearance' && status && <p role="status">{status}</p>}
       <HomeCanvasEditor gameId={gameId} gameName={gameName ?? gameId} appearance={config.appearance}
+        actionsActive={section === 'appearance'}
         logoSrc={imageUrl('logo')} advanced={features.advancedCustomization}
         readOnly={readOnly || confirmed.readOnly || uncertain} onDirtyChange={setCanvasDirty}
         onReadyChange={ready => {
@@ -373,6 +377,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-current/15 pt-4">
           {dirty && <p className="text-xs">{t('Cambios sin guardar', 'Unsaved changes')}</p>}
           <div className="ml-auto flex gap-2">
+            <ConfigurationActions>
             {(!section || section === 'questionnaire') && <IconButton icon="download" className="!h-11 !w-11"
               label={t('Exportar respuestas', 'Export answers')} disabled={busy || !features.exportResults}
               onClick={() => void run(async () => {
@@ -389,6 +394,7 @@ export default function GameFormSettings({ gameId, gameName, readOnly = false, s
             <SaveButton iconOnly disabled={disabled || !dirty} onClick={save}>
               {section === 'questionnaire' ? t('Guardar cuestionario', 'Save questionnaire') : t('Guardar formulario', 'Save form')}
             </SaveButton>
+            </ConfigurationActions>
           </div>
         </div>
         {discardReload && <div role="alertdialog" aria-label={t('Recargar formulario', 'Reload form')} className="space-y-3 rounded-xl border border-current/20 p-4">

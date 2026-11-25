@@ -3,7 +3,7 @@ import IconButton, { iconPaths } from './IconButton'
 export default function MediaPicker({ selectLabel, uploadLabel, libraryLabel, emptyLabel, value, options, accept, hint, onSelect, onUpload, onOpenLibrary }: {
   selectLabel: string
   uploadLabel: string
-  libraryLabel: string
+  libraryLabel?: string
   emptyLabel: string
   value: string
   options: { value: string; label: string }[]
@@ -11,7 +11,7 @@ export default function MediaPicker({ selectLabel, uploadLabel, libraryLabel, em
   hint?: string
   onSelect: (value: string) => void
   onUpload: (file: File) => void
-  onOpenLibrary: () => void
+  onOpenLibrary?: () => void
 }) {
   return <div className="space-y-1">
     <div className="flex items-center gap-2">
@@ -20,7 +20,7 @@ export default function MediaPicker({ selectLabel, uploadLabel, libraryLabel, em
         <option value="">{emptyLabel}</option>
         {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
-      <IconButton icon="library" label={libraryLabel} onClick={onOpenLibrary} />
+      {libraryLabel && onOpenLibrary && <IconButton icon="library" label={libraryLabel} onClick={onOpenLibrary} />}
       <label title={uploadLabel} className="relative inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-primary/40 bg-primary/20 text-textSub transition-colors hover:bg-primary/30 hover:text-textMain focus-within:outline focus-within:outline-2 focus-within:outline-primary [&:has(input:disabled)]:cursor-not-allowed [&:has(input:disabled)]:opacity-50">
         <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
           <path strokeLinecap="round" strokeLinejoin="round" d={iconPaths.upload} />

@@ -1,4 +1,5 @@
 import IconButton from '../ui/IconButton'
+import ConfigurationActions from '../ui/ConfigurationActions'
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../../api/api'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
@@ -344,8 +345,8 @@ export default function Raffle({ onBack, onClose, gameId, gameType, onVisibility
       </div>
       {visibilitySaving && <p role="status" className="text-sm text-textSub">{t('Guardando...', 'Saving...')}</p>}
       {visibilityError && <p role="alert" className="text-sm text-red-400">{visibilityError}</p>}
-      {visibilityError && !homeVisibility && <div className="flex justify-end"><IconButton icon="reload" label={t('Reintentar carga', 'Retry loading')}
-        onClick={() => setVisibilityLoadVersion((version) => version + 1)} /></div>}
+      {visibilityError && !homeVisibility && <div className="flex justify-end"><ConfigurationActions><IconButton icon="reload" label={t('Reintentar carga', 'Retry loading')}
+        onClick={() => setVisibilityLoadVersion((version) => version + 1)} /></ConfigurationActions></div>}
     </section>
 
     <section aria-labelledby="raffle-manual-title" className={section}>

@@ -10,6 +10,7 @@ export const GAME_ACCESS_CAPABILITIES: Record<string, {
   EMPAREJA2: { playModes: ['mobile'], joinChannels: ['web'] },
   T1MER: { playModes: ['mobile'], joinChannels: ['web'] },
   STACK: { playModes: ['mobile'], joinChannels: ['web'] },
+  BASKET: { playModes: ['mobile'], joinChannels: ['web'] },
   L3TRAS: { playModes: ['mobile'], joinChannels: ['web'] },
   RULET4: { playModes: ['mobile'], joinChannels: ['web'] },
   CUPIDO: { playModes: ['mobile'], joinChannels: ['web'] },

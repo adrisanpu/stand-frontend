@@ -9,6 +9,7 @@ import { L3trasPlayView } from '../../games/l3tras/ParticipantPlay'
 import { PairPlayView } from '../../games/semaforo/ParticipantPlay'
 import { InfocardsPlayView } from '../../games/infocards/ParticipantPlay'
 import { ImpostorRound } from '../../games/impostor/ParticipantPlay'
+import BasketLocalPreview from '../../games/basket/LocalPreview'
 import type { ImpostorParticipantState } from '../../api/publicApi'
 import { mobileActionClass } from '../participant/useMobilePlay'
 import { localPairAnswer, localPairQuestions, useLocalMobilePreview, type PreviewSettings } from './localMobilePreview'
@@ -24,7 +25,7 @@ export function previewConfigurationError(gameType: string, settings: PreviewSet
   const integer = (value: unknown, min: number, max: number) =>
     typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
   switch (gameType) {
-    case 'T1MER': case 'SEMAFORO': return null
+    case 'T1MER': case 'SEMAFORO': case 'BASKET': return null
     case 'STACK': return isStackConfig(settings) ? null : t('Revisa la configuración de STACK antes de probar.', 'Check the STACK settings before playing.')
     case 'RULET4': return isRulet4Config(settings) ? null : t('Revisa los paneles y pesos de RULET4 antes de probar.', 'Check the RULET4 panels and weights before playing.')
     case 'L3TRAS':
@@ -265,6 +266,7 @@ export default function PlayableGamePreview({ gameType, settings, gameId, conten
     case 'SEMAFORO': return <SemaforoPreview settings={settings} gameId={gameId} content={content} />
     case 'EMPAREJA2': return <PairPreview settings={settings} />
     case 'IMPOSTOR': return <ImpostorPreview settings={settings} />
+    case 'BASKET': return <BasketLocalPreview />
     default: return null
   }
 }

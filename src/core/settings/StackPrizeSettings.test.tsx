@@ -59,6 +59,11 @@ function mount() {
   render(<StackPrizeSettings gameId="ABC123" raffles onPersist={onPersist} />)
   return { onPersist }
 }
+function mountBasket() {
+  const onPersist = vi.fn()
+  render(<StackPrizeSettings gameId="ABC123" raffles basket onPersist={onPersist} />)
+  return { onPersist }
+}
 const save = () => fireEvent.click(screen.getByRole('button', { name: 'Guardar premios' }))
 async function openCreate(source: 'stand' | 'kivly' = 'stand') {
   fireEvent.click(await screen.findByRole('button', { name: '+ CREAR' }))
@@ -93,6 +98,17 @@ it('does not expose a delivery-channel selector and saves Wallet as the legacy d
   save()
   await waitFor(() => expect(stackPrizeApi.save).toHaveBeenCalledWith('ABC123',
     expect.objectContaining({ deliveryChannel: 'wallet' })))
+})
+
+it('keeps BASKET prize catalog on Stand inventory and never requests Kivly', async () => {
+  mountBasket()
+  await screen.findByRole('article', { name: 'Pizza' })
+  expect(kivlyApi.getAccountConnection).not.toHaveBeenCalled()
+  expect(kivlyApi.listRewards).not.toHaveBeenCalled()
+  expect(screen.queryByRole('article', { name: 'Coffee' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '+ CREAR' }))
+  expect(screen.queryByLabelText('Origen del premio')).not.toBeInTheDocument()
+  expect(screen.queryByRole('option', { name: 'Kivly' })).not.toBeInTheDocument()
 })
 
 it('saves blank event caps as null without editing shared availability', async () => {

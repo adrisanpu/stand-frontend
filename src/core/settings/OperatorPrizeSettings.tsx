@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import SaveButton from '../ui/SaveButton'
+import ConfigurationActions from '../ui/ConfigurationActions'
 import type { GameDefinition } from '../types'
 import type { GamePrize, PrizeCatalog, PrizeSlot } from '../prizes'
 import type { Plan } from '../../auth/featureFlags'
@@ -72,8 +73,9 @@ function validInteger(value: string, min: number, max = Number.MAX_SAFE_INTEGER)
 }
 
 export default function OperatorPrizeSettings(props: Props) {
-  return props.gameDefinition.id === 'STACK'
+  return ['STACK', 'BASKET'].includes(props.gameDefinition.id)
     ? <StackPrizeSettings gameId={props.gameId} raffles={getFeaturesByPlan(props.plan).raffles}
+        basket={props.gameDefinition.id === 'BASKET'}
         onPersist={props.onPersist} onSavingChange={props.onSavingChange} onDirtyChange={props.onDirtyChange} />
     : <LegacyPrizeSettings {...props} />
 }
@@ -321,10 +323,10 @@ export function LegacyPrizeSettings({
       {saved && <p role="status" className="text-green-300">{t('Guardado.', 'Saved.')}</p>}
       {refreshWarning && <p role="status">{t('Los premios se guardaron en el servidor, pero no se pudo actualizar la vista. Se conserva la vista previa; vuelve a abrir para refrescar antes de guardar de nuevo.', 'Prizes were saved on the server, but the display could not be refreshed. The preview is retained; reopen to refresh before saving again.')}</p>}
       {cacheWarning && <p role="status">{t('Los premios se guardaron en el servidor, pero no se pudo actualizar la caché local. Vuelve a abrir la partida para refrescar.', 'Prizes were saved on the server, but the local cache could not be updated. Reopen the game to refresh.')}</p>}
-      {!readOnly && <SaveButton onClick={() => void handleSave()} disabled={loading || loadError || saving || refreshWarning || noSlots || !nativeRulesValid}
-        className="w-full">
+      {!readOnly && <ConfigurationActions><SaveButton iconOnly={editConditions} onClick={() => void handleSave()} disabled={loading || loadError || saving || refreshWarning || noSlots || !nativeRulesValid}
+        className={editConditions ? '' : 'w-full'}>
         {saving ? t('Guardando...', 'Saving...') : t('Guardar', 'Save')}
-      </SaveButton>}
+      </SaveButton></ConfigurationActions>}
     </div>
   )
 }

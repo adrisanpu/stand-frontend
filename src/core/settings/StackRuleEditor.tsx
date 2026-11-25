@@ -7,8 +7,9 @@ const field = 'h-9 min-w-0 rounded-md border border-current/20 bg-surface px-2 t
 const conditions: StackPrizeCondition[] = ['completed', 'top_finish', 'top_final', 'raffle', 'score']
 const operators: StackPrizeScoreOperator[] = ['>', '>=', '=', '<=', '<', 'between']
 
-export function invalidStackRules(rules: StackPrizeRule[]): boolean {
+export function invalidStackRules(rules: StackPrizeRule[], allowedConditions?: readonly StackPrizeCondition[]): boolean {
   return rules.length > 8 || rules.some(rule =>
+    (allowedConditions !== undefined && !allowedConditions.includes(rule.condition)) ||
     rule.groups.length === 0 || rule.groups.some(group => group.allocations.length === 0
       || group.allocations.some(item => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 10))
     || (rule.condition.startsWith('top_') && (!Number.isInteger(rule.topX) || (rule.topX ?? 0) < 1 || (rule.topX ?? 101) > 100))
@@ -19,11 +20,12 @@ export function invalidStackRules(rules: StackPrizeRule[]): boolean {
 
 const interactive = (event: MouseEvent) => !!(event.target as HTMLElement).closest('input,select,button,label')
 
-export default function StackRuleEditor({ rules, catalog, available = catalog, raffles, onChange, onAddPrize, stock, onStockChange, headerAside, autoClose }: {
+export default function StackRuleEditor({ rules, catalog, available = catalog, raffles, allowedConditions, onChange, onAddPrize, stock, onStockChange, headerAside, autoClose }: {
   rules: StackPrizeRule[]
   catalog: StackPrizeItem[]
   available?: StackPrizeItem[]
   raffles: boolean
+  allowedConditions?: readonly StackPrizeCondition[]
   onChange: (rules: StackPrizeRule[]) => void
   onAddPrize?: (ruleIndex: number, groupIndex: number, prizeId: string) => void
   /** Per-event sub-stock drafts by catalog prize id; enables the editable Substock column. */
@@ -50,7 +52,7 @@ export default function StackRuleEditor({ rules, catalog, available = catalog, r
     rules.map((old, i) => i === index ? { ...rule, id: crypto.randomUUID() } : old),
   )
   const addRule = () => {
-    onChange([...rules, { id: crypto.randomUUID(), condition: 'completed', groups: [{ allocations: [] }] }])
+    onChange([...rules, { id: crypto.randomUUID(), condition: allowedConditions?.[0] ?? 'completed', groups: [{ allocations: [] }] }])
     setSelected(rules.length)
   }
   const removeRule = (index: number) => {
@@ -210,7 +212,8 @@ export default function StackRuleEditor({ rules, catalog, available = catalog, r
                     update(index, { ...rule, condition, topX: condition.startsWith('top_') ? 10 : undefined,
                       scoreOperator: condition === 'score' ? '>=' : undefined, scoreValue: undefined, scoreMaxValue: undefined })
                   }}>
-                  {conditions.filter(condition => condition !== 'raffle' || raffles || rule.condition === 'raffle')
+                  {conditions.filter(condition => (allowedConditions === undefined || allowedConditions.includes(condition))
+                    && (condition !== 'raffle' || raffles || rule.condition === 'raffle'))
                     .map(condition => <option key={condition} value={condition}>{label(condition)}</option>)}
                 </select>
               </td>

@@ -12,6 +12,7 @@ import type { GameFormResponse } from '../formConfig'
 vi.mock('../../api/gameForms', () => ({ getGameForm: vi.fn() }))
 
 const scenes = vi.hoisted(() => ({ dispose: vi.fn(), fail: false }))
+const basketScenes = vi.hoisted(() => ({ dispose: vi.fn() }))
 vi.mock('../../games/stack/stackScene', async () => {
   const { StackEngine: Engine } = await import('../../games/stack/stackLogic')
   return {
@@ -28,6 +29,15 @@ vi.mock('../../games/stack/stackScene', async () => {
     },
   }
 })
+vi.mock('../../games/basket/basketScene', () => ({
+  BasketSceneController: class {
+    constructor(_canvas: HTMLCanvasElement) {}
+    setElapsedMs(_elapsed: number) {}
+    setActiveShot(_shot: unknown, _elapsed: number) {}
+    clearShot() {}
+    dispose() { basketScenes.dispose() }
+  },
+}))
 vi.mock('../../games/rulet4/Rulet4Wheel', () => ({
   default: ({ spin, onReadyChange, onComplete }: {
     spin: { id: number } | null; onReadyChange: (ready: boolean) => void; onComplete: (id: number) => void
@@ -117,6 +127,20 @@ describe('isolated playable previews', () => {
     expect(screen.getByRole('button', { name: 'Empezar' })).toBeEnabled()
     view.unmount()
     expect(scenes.dispose).toHaveBeenCalledTimes(2)
+  })
+
+  it('runs the local BASKET preview without official APIs and disposes its scene', () => {
+    vi.spyOn(performance, 'now').mockImplementation(() => Date.now())
+    const view = render(<GamePlayPreview gameType="BASKET" settings={{}} />)
+    expect(previewConfigurationError('BASKET', {})).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Empezar prueba local' }))
+    act(() => vi.advanceTimersByTime(32_100))
+    expect(screen.getByText('Resultado simulado')).toBeInTheDocument()
+    expect(screen.getByText('Prueba local, sin ranking ni premios.')).toBeInTheDocument()
+    reset()
+    expect(basketScenes.dispose).toHaveBeenCalledOnce()
+    view.unmount()
+    expect(basketScenes.dispose).toHaveBeenCalledTimes(2)
   })
 
   it('spins the actual RULET4 segments locally, reports simulation and resets', () => {

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { api } from '../../api/api'
@@ -61,6 +61,45 @@ function mount() {
   render(<MemoryRouter><GameConfigurationDialog gameId="SELECTED" initialSection="configuration" onClose={onClose} /></MemoryRouter>)
   return onClose
 }
+
+it('keeps the settings navigation sticky and shows only the current panel actions at its right', async () => {
+  mount()
+  await screen.findByText('Lienzo sin cambios pendientes')
+  const nav = screen.getByRole('tablist', { name: 'Secciones de configuración' })
+  const toolbar = screen.getByRole('group', { name: 'Acciones de configuración' })
+  expect(nav.parentElement).toHaveClass('sticky')
+  expect(nav.parentElement).toContainElement(toolbar)
+  expect(within(toolbar).getByRole('button', { name: 'Guardar configuración' })).toBeDisabled()
+  expect(screen.getByRole('tabpanel', { name: 'Juego' })).not.toContainElement(toolbar)
+  expect(screen.queryByRole('button', { name: 'Guardar lienzo' })).not.toBeInTheDocument()
+  await waitFor(() => expect(screen.getByRole('tab', { name: 'Home' })).toBeEnabled())
+  fireEvent.click(screen.getByRole('tab', { name: 'Home' }))
+  for (const name of ['Recargar lienzo', 'Descargar snapshot del lienzo', 'Guardar lienzo']) {
+    expect(within(toolbar).getByRole('button', { name })).toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel', { name: 'Home' })).queryByRole('button', { name })).not.toBeInTheDocument()
+  }
+  expect(within(toolbar).getByRole('button', { name: 'Guardar lienzo' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Mover Logo / nombre' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar componente' }))
+  expect(within(toolbar).getByRole('button', { name: 'Guardar lienzo' })).toBeEnabled()
+  fireEvent.click(within(toolbar).getByRole('button', { name: 'Recargar lienzo' }))
+  expect(screen.getByRole('alertdialog', { name: 'Descartar cambios del lienzo' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Seguir editando' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'Registro' }))
+  expect(within(toolbar).getByRole('button', { name: 'Recargar formulario' })).toBeInTheDocument()
+  expect(within(toolbar).getByRole('button', { name: 'Guardar formulario' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Guardar lienzo' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: 'Cuestionario' }))
+  expect(within(toolbar).getByRole('button', { name: 'Exportar respuestas' })).toBeInTheDocument()
+  expect(within(toolbar).getByRole('button', { name: 'Guardar cuestionario' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: 'Premios' }))
+  expect(await within(toolbar).findByRole('button', { name: 'Guardar condiciones' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Exportar respuestas' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: 'Home' }))
+  expect(within(toolbar).getByRole('button', { name: 'Guardar lienzo' })).toBeEnabled()
+  expect(screen.queryByRole('button', { name: 'Guardar condiciones' })).not.toBeInTheDocument()
+})
+
 it.each(['STACK', 'T1MER', 'EMPAREJA2', 'RULET4', 'L3TRAS', 'IMPOSTOR', 'SEMAFORO', 'INFOCARDS'])(
   'uses shared responsive configuration and preview columns for %s', async gameType => {
     snapshot.game.gameType = gameType
@@ -97,7 +136,7 @@ it('keeps form drafts across sections and guards closing until discard is explic
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Home' })).toBeEnabled())
   fireEvent.click(screen.getByRole('tab', { name: 'Home' }))
   await screen.findByRole('combobox', { name: 'Añadir componente' })
-  expect(screen.getByRole('tabpanel', { name: 'Home' })).toHaveTextContent('Lienzo del Home')
+  expect(screen.getByRole('tabpanel', { name: 'Home' })).not.toHaveTextContent('Lienzo del Home')
   expect(screen.queryByText('Aspecto de la partida')).not.toBeInTheDocument()
   expect(screen.queryByText('Imágenes y colores de esta partida')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Guardar aspecto' })).not.toBeInTheDocument()
@@ -161,6 +200,11 @@ it.each(['STACK', 'T1MER'])('shows the add-rule guidance beside the event valida
   const qr = screen.getByRole('img', { name: 'QR validador de premios' })
   expect(qr).toHaveAttribute('data-qr-value', url)
   const addRule = await screen.findByRole('button', { name: 'Añadir regla' })
+  if (gameType === 'T1MER') {
+    const save = within(screen.getByRole('group', { name: 'Acciones de configuración' })).getByRole('button', { name: 'Guardar' })
+    expect(save).toHaveTextContent('')
+    expect(save.querySelector('svg')).toBeInTheDocument()
+  }
   expect(screen.getByText('Cada condición admite un premio por participante. Solo se muestran las condiciones compatibles con este juego.')).toBeInTheDocument()
   expect(addRule.closest('.grid')).toContainElement(link)
   expect(addRule.closest('.grid')).toContainElement(qr)

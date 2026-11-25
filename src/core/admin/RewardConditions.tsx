@@ -7,10 +7,13 @@ import StackRuleEditor, { invalidStackRules } from '../settings/StackRuleEditor'
 import { useOperatorLanguage } from '../shell/operatorLanguage'
 import SaveButton from '../ui/SaveButton'
 import IconButton from '../ui/IconButton'
+import ConfigurationActions from '../ui/ConfigurationActions'
 import { fetchSharedPrizeCatalog } from '../../api/sharedPrizeCatalog'
 import { kivlyApi } from '../../api/kivlyApi'
 import { LegacyPrizeSettings } from '../settings/OperatorPrizeSettings'
 import { getGameById } from '../../games'
+
+const BASKET_PRIZE_CONDITIONS = ['score', 'top_finish', 'top_final'] as const
 
 type Props = {
   data: OperatorGameConfiguration
@@ -22,7 +25,9 @@ type Props = {
 }
 
 export default function RewardConditions(props: Props) {
-  return props.data.game.gameType === 'STACK' ? <StackConditions {...props} /> : <NativeConditions {...props} />
+  return ['STACK', 'BASKET'].includes(props.data.game.gameType)
+    ? <StackConditions {...props} basket={props.data.game.gameType === 'BASKET'} />
+    : <NativeConditions {...props} />
 }
 
 const stockDrafts = (catalog: StackPrizeItem[]) =>
@@ -31,7 +36,7 @@ const validCount = (value: string) => /^\d+$/.test(value.trim()) && Number.isSaf
 const closeDuration = (value: StackPrizeSettingsResponse['autoClose']): StackAutoCloseDuration | null =>
   value ? { hours: value.hours, minutes: value.minutes } : null
 
-function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyChange, onReadyChange }: Props) {
+function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyChange, onReadyChange, basket = false }: Props & { basket?: boolean }) {
   const { t } = useOperatorLanguage()
   const { plan, loading: planLoading, error: planError } = useCurrentUser()
   const [snapshot, setSnapshot] = useState<StackPrizeSettingsResponse | null>(null)
@@ -56,31 +61,32 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
     setSelectionError('')
     void Promise.all([
       stackPrizeApi.get(data.game.gameId), fetchSharedPrizeCatalog(),
-      kivlyApi.getAccountConnection().then(async connection => {
+      (basket ? Promise.resolve({ locationId: null, rewards: [] as Awaited<ReturnType<typeof kivlyApi.listRewards>> })
+        : kivlyApi.getAccountConnection().then(async connection => {
         if (connection.connected && !connection.locationId) throw new Error('Missing Kivly location')
         return {
           locationId: connection.locationId,
           rewards: connection.connected ? await kivlyApi.listRewards(data.game.gameId) : [],
         }
-      }),
+      })),
     ]).then(([result, shared, kivly]) => {
       if (cancelled) return
       if (!result.ok || result.program?.version !== 3 || !result.programRevision)
         throw new Error('Invalid reward conditions response')
       setSnapshot(result)
       const choices: StackPrizeItem[] = [
-        ...result.program.catalog,
+        ...result.program.catalog.filter(item => !basket || item.source === 'stand'),
         ...shared.catalog.filter(prize => !result.program.catalog.some(item => item.sharedPrizeId === prize.id))
           .map((prize): StackPrizeItem => ({
             id: `shared_${prize.id}`, source: 'stand', sharedPrizeId: prize.id, name: prize.name,
             imageKey: prize.imageKey, imageUrl: prize.imageUrl, stockTotal: null,
           })),
-        ...kivly.rewards.filter(reward => !result.program.catalog.some(item =>
+        ...(basket ? [] : kivly.rewards.filter(reward => !result.program.catalog.some(item =>
           item.source === 'kivly' && item.rewardId === reward.id && item.locationId === kivly.locationId))
           .map((reward): StackPrizeItem => ({
             id: `kivly_${reward.id}`, source: 'kivly', rewardId: reward.id,
             locationId: kivly.locationId ?? '', name: reward.name, imageUrl: reward.imageUrl, stockTotal: null,
-          })),
+          }))),
       ]
       setAvailable(choices)
       setCatalog(result.program.catalog)
@@ -94,9 +100,11 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
     return () => { cancelled = true }
     // Language changes must not discard unsaved conditions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.game.gameId, reload])
+  }, [data.game.gameId, reload, basket])
   const save = async () => {
-    if (saving.current || !snapshot?.programRevision || readOnly) return
+    const invalidBasketSource = basket && rules.some(rule => rule.groups.some(group => group.allocations.some(allocation =>
+      catalog.find(item => item.id === allocation.prizeId)?.source !== 'stand')))
+    if (saving.current || !snapshot?.programRevision || readOnly || invalidBasketSource) return
     saving.current = true
     setBusy(true)
     onBusyChange(true)
@@ -160,25 +168,28 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
     || !(autoClose.hours || autoClose.minutes)
     || Math.ceil(Date.now() / 1000) + autoClose.hours * 3600 + autoClose.minutes * 60 + 120 > 253402300799
   ))
+  const allowedConditions = basket ? BASKET_PRIZE_CONDITIONS : undefined
   const markDirty = () => { setDirty(true); onDirtyChange(true); setSaved(false) }
   const readyCallback = useRef(onReadyChange)
   readyCallback.current = onReadyChange
   useEffect(() => {
     readyCallback.current?.(!!snapshot && !busy && !error && !planError && !planLoading
-      && !dirty && !selectionError && !invalidStock && !invalidAutoClose && !invalidStackRules(rules))
-  }, [snapshot, busy, error, planError, planLoading, dirty, selectionError, invalidStock, invalidAutoClose, rules])
+      && !dirty && !selectionError && !invalidStock && !invalidAutoClose && !invalidStackRules(rules, allowedConditions)
+      && !(basket && rules.some(rule => rule.groups.some(group => group.allocations.some(allocation =>
+        catalog.find(item => item.id === allocation.prizeId)?.source !== 'stand')))))
+  }, [snapshot, busy, error, planError, planLoading, dirty, selectionError, invalidStock, invalidAutoClose, rules, allowedConditions, basket, catalog])
   return <div className="space-y-2">
     {planError && <p role="alert">{t('No se pudo consultar el plan. Cierra y vuelve a abrir el panel antes de editar condiciones.',
       'Could not load your plan. Close and reopen the panel before editing conditions.')}</p>}
     {error && <div role="alert" className="space-y-2"><p>{error}</p>
-      <div className="flex justify-end"><IconButton icon="reload" label={t('Recargar condiciones', 'Reload conditions')} disabled={busy} onClick={() => {
+      <div className="flex justify-end"><ConfigurationActions><IconButton icon="reload" label={t('Recargar condiciones', 'Reload conditions')} disabled={busy} onClick={() => {
         if (dirty && !window.confirm(t('Se descartarán los cambios de condiciones sin guardar.', 'Unsaved condition changes will be discarded.'))) return
         setDirty(false)
         setRulesDirty(false)
         onDirtyChange(false)
         setSaved(false)
         setReload(value => value + 1)
-      }} /></div>
+      }} /></ConfigurationActions></div>
     </div>}
     {!snapshot && !error && <p role="status">{t('Cargando condiciones…', 'Loading conditions…')}</p>}
     {snapshot && <>
@@ -188,7 +199,8 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
       )}</p>}
       <fieldset disabled={readOnly || busy || !!error || !!planError || planLoading || snapshot.state !== 'open'}
         className="min-w-0">
-        <StackRuleEditor rules={rules} catalog={catalog} available={available} raffles={getFeaturesByPlan(plan).raffles}
+        <StackRuleEditor rules={rules} catalog={catalog} available={available} raffles={!basket && getFeaturesByPlan(plan).raffles}
+          allowedConditions={allowedConditions}
           headerAside={headerAside}
           autoClose={{ duration: autoClose, savedAt: snapshot.autoClose?.closesAt,
             onChange: value => { setAutoClose(value); setAutoCloseDirty(true); markDirty() } }}
@@ -227,17 +239,26 @@ function StackConditions({ data, readOnly, headerAside, onBusyChange, onDirtyCha
         'Introduce una duración válida: horas enteras y minutos entre 0 y 59, con un total mayor que cero.',
         'Enter a valid duration: whole hours and minutes from 0 to 59, with a total greater than zero.',
       )}</p>}
-      {dirty && invalidStackRules(rules) && <p role="alert">{t(
+      {dirty && invalidStackRules(rules, allowedConditions) && <p role="alert">{t(
         'Revisa las reglas: cada grupo necesita premios, cantidades entre 1 y 10, top entre 1 y 100 y puntuaciones enteras no negativas con un rango válido.',
         'Check the rules: each group needs prizes, quantities from 1 to 10, top from 1 to 100 and non-negative integer scores with a valid range.',
       )}</p>}
+      {basket && dirty && rules.some(rule => rule.groups.some(group => group.allocations.some(allocation =>
+        catalog.find(item => item.id === allocation.prizeId)?.source !== 'stand'))) && <p role="alert">
+        {t('BASKET solo admite premios del inventario de Stand.', 'BASKET only supports prizes from Stand inventory.')}
+      </p>}
       {dirty && invalidStock && <p role="alert">{t('El substock debe ser un número entero mayor o igual que 0.',
         'Sub-stock must be a whole number greater than or equal to 0.')}</p>}
       {saved && <p role="status" className="text-sm text-textSub">{t('Condiciones guardadas. Se conservan los premios ya adjudicados.', 'Conditions saved. Previously awarded prizes are preserved.')}</p>}
       {!readOnly && <div className="flex justify-end">
+        <ConfigurationActions>
         <SaveButton iconOnly
-          disabled={busy || !!error || !!planError || planLoading || !dirty || invalidStackRules(rules) || invalidStock || invalidAutoClose || snapshot.state !== 'open'}
+          disabled={busy || !!error || !!planError || planLoading || !dirty || invalidStackRules(rules, allowedConditions)
+            || (basket && rules.some(rule => rule.groups.some(group => group.allocations.some(allocation =>
+              catalog.find(item => item.id === allocation.prizeId)?.source !== 'stand'))))
+            || invalidStock || invalidAutoClose || snapshot.state !== 'open'}
           onClick={() => void save()}>{t('Guardar condiciones', 'Save conditions')}</SaveButton>
+        </ConfigurationActions>
       </div>}
     </>}
   </div>

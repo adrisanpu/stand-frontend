@@ -21,7 +21,7 @@ export default function T1merParticipantResult({ gameId, time, difference, rank,
   const { t } = useParticipantLanguage()
   const assignment = loadAssignment(gameId)
   const displayName =
-    assignment && 'displayName' in assignment ? assignment.displayName : t('Jugador')
+    assignment && 'displayName' in assignment ? assignment.displayName ?? t('Jugador') : t('Jugador')
   const profilePicUrl =
     assignment && 'profilePicUrl' in assignment ? assignment.profilePicUrl : null
   const scoreMs = Math.round(difference * 1000)

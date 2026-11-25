@@ -76,6 +76,22 @@ it('saves a game-wide automatic close only with a valid final-top duration', asy
   expect(screen.getByText(/se cancelará al guardar/)).toBeInTheDocument()
 })
 
+it('limits BASKET prize rules to Stand inventory, score and ranking without consulting Kivly', async () => {
+  data.game.gameType = 'BASKET'
+  try {
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: 'Añadir regla' }))
+    const condition = screen.getByLabelText('Condición 1')
+    expect(condition).toHaveValue('score')
+    expect(condition.querySelector('option[value="completed"]')).toBeNull()
+    expect(condition.querySelector('option[value="raffle"]')).toBeNull()
+    expect(kivlyApi.getAccountConnection).not.toHaveBeenCalled()
+    expect(kivlyApi.listRewards).not.toHaveBeenCalled()
+  } finally {
+    data.game.gameType = 'STACK'
+  }
+})
+
 it('offers every existing catalog prize and saves selected associations before the new rules', async () => {
   const { onDirtyChange, onBusyChange } = mount()
   fireEvent.click(await screen.findByRole('button', { name: 'Añadir regla' }))

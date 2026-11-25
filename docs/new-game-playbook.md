@@ -185,3 +185,20 @@ A new game is considered complete when:
 - It reuses shell/layout/validation patterns
 - It integrates through existing API and storage conventions
 - It has only necessary code for current scope (no speculative architecture)
+
+## BASKET integration notes
+
+BASKET is a mobile, single-attempt game with a server-issued 30-second start
+snapshot. Keep its replay evidence and fixed physics in `src/games/basket/`;
+the participant sends only timestamped, quantized launch vectors through the
+shared `/v1/public/score` start/finish actions. The client must persist the
+attempt ID and each accepted shot before continuing, resume only the same
+attempt, and use the server snapshot and monotonic elapsed time rather than
+pausing or issuing a replacement attempt after reload.
+
+BASKET reuses the historical `/v1/game/stack/prizes` endpoint and the existing
+`stackPrizeState`, `stackPrizeRules`, and `stackPrizes` response fields. Those
+legacy names are shared for compatibility; BASKET scores and attempts remain
+under its own canonical game type. Its reward editor permits Stand inventory
+only, with `score`, `top_finish`, and `top_final` conditions. Do not expose
+Kivly or editable physics/duration settings for BASKET.

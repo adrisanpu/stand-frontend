@@ -2,6 +2,8 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import GamePreviewPage from './GamePreviewPage'
+import { getGameById } from '../games'
+import { normalizeGameType } from '../core/gameTypeMap'
 
 vi.mock('../core/admin/GamePlayPreview', () => ({
   default: ({ gameType, settings }: { gameType: string; settings?: Record<string, unknown> }) => (
@@ -18,7 +20,14 @@ beforeEach(() => {
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
-it.each(['RULET4', 'T1MER', 'STACK', 'L3TRAS', 'INFOCARDS', 'EMPAREJA2', 'CUPIDO', 'SEMAFORO'])(
+it('resolves BASKET through the real canonical game registry', () => {
+  expect(normalizeGameType(' basket ')).toBe('BASKET')
+  expect(getGameById('BASKET')).toMatchObject({
+    id: 'BASKET', showRanking: true, assets: { logo: '/images/basket-logo.png' },
+  })
+})
+
+it.each(['RULET4', 'T1MER', 'STACK', 'BASKET', 'L3TRAS', 'INFOCARDS', 'EMPAREJA2', 'CUPIDO', 'SEMAFORO'])(
   'makes the %s preview available on a public route',
   (gameType) => {
     render(

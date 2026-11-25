@@ -3,7 +3,7 @@ import { GAME_ACCESS_CAPABILITIES, resolveGameAccess } from './gameAccess'
 import { getJoinUrl } from '../lib/joinUrl'
 
 const fixedAccess = { playMode: 'mobile', joinChannel: 'web' } as const
-const supportedGames = ['EMPAREJA2', 'T1MER', 'STACK', 'L3TRAS', 'RULET4', 'CUPIDO', 'SEMAFORO', 'INFOCARDS', 'IMPOSTOR']
+const supportedGames = ['EMPAREJA2', 'T1MER', 'STACK', 'BASKET', 'L3TRAS', 'RULET4', 'CUPIDO', 'SEMAFORO', 'INFOCARDS', 'IMPOSTOR']
 
 describe('game access compatibility', () => {
   it.each(supportedGames)('%s only supports mobile gameplay and Web participant access', (type) => {
@@ -24,7 +24,7 @@ describe('game access compatibility', () => {
 
   it('does not accept unsupported game types', () => {
     expect(() => resolveGameAccess('UNKNOWN')).toThrow('Juego no compatible')
-    expect(Object.keys(GAME_ACCESS_CAPABILITIES)).toHaveLength(9)
+    expect(Object.keys(GAME_ACCESS_CAPABILITIES)).toHaveLength(10)
   })
 
   it('always directs QR codes to Web participant access', () => {

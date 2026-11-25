@@ -16,6 +16,7 @@ const DEMOS: Record<string, Record<string, unknown> | undefined> = {
   },
   T1MER: {},
   STACK: { ...DEFAULT_STACK_CONFIG },
+  BASKET: {},
   L3TRAS: { objectiveWord: 'STAND', validationTimeLimitSeconds: 60 },
   INFOCARDS: {
     cards: [

@@ -14,6 +14,7 @@ import { homePreviewTheme } from './previewTheme'
 import IconButton, { iconPaths } from '../ui/IconButton'
 import SaveButton from '../ui/SaveButton'
 import MediaPicker from '../ui/MediaPicker'
+import ConfigurationActions from '../ui/ConfigurationActions'
 
 type Props = {
   gameId: string
@@ -22,18 +23,20 @@ type Props = {
   logoSrc?: string | null
   readOnly?: boolean
   advanced: boolean
+  actionsActive?: boolean
   onDirtyChange?: (dirty: boolean) => void
   onBusyChange?: (busy: boolean) => void
   onReadyChange?: (ready: boolean) => void
   onPreviewChange?: (config: HomeCanvasConfig, orientation: HomeOrientation, urls: Record<HomeOrientation, string | null>) => void
 }
 
-function StyleControls<T extends HomeStyle>({ value, inherited, onChange, advanced, canvas = false, onInvalid }: {
+function StyleControls<T extends HomeStyle>({ value, inherited, onChange, advanced, canvas = false, backgroundOnly = false, onInvalid }: {
   value: T
   inherited: HomeStyle
   onChange: (value: T) => void
   advanced: boolean
   canvas?: boolean
+  backgroundOnly?: boolean
   onInvalid: (message: string) => void
 }) {
   const { t } = useOperatorLanguage()
@@ -53,7 +56,7 @@ function StyleControls<T extends HomeStyle>({ value, inherited, onChange, advanc
     ...(canvas ? [{ key: 'backgroundColor' as const, label: t('Color de fondo del lienzo', 'Canvas background color') }] : []),
     { key: 'accentColor' as const, label: canvas ? t('Color de acento del lienzo', 'Canvas accent color') : t('Color de acento', 'Accent color') },
     { key: 'color' as const, label: canvas ? t('Color de texto normal del lienzo', 'Canvas normal text color') : t('Color', 'Color') },
-  ]
+  ].filter(({ key }) => backgroundOnly ? key === 'backgroundColor' : key !== 'backgroundColor')
   const sizeLabel = canvas ? t('Tamaño general del texto', 'General text size') : t('Tamaño del texto', 'Text size')
   const shortLabels = { backgroundColor: t('Fondo', 'Background'), accentColor: t('Acento', 'Accent'), color: t('Texto', 'Text') }
   return <div className="contents">
@@ -66,7 +69,7 @@ function StyleControls<T extends HomeStyle>({ value, inherited, onChange, advanc
         title={t('Heredar', 'Inherit')}
         onClick={() => onChange({ ...value, [key]: undefined })}>↺</button>
     </fieldset>)}
-    <div className="flex items-center gap-1">
+    {!backgroundOnly && <><div className="flex items-center gap-1">
       <label className="flex items-center gap-2 text-xs">{t('Tamaño', 'Size')}
         <input type="number" aria-label={sizeLabel} min={16} max={160} step={1} value={sizeInput}
           className="w-16 rounded border border-current/20 bg-transparent p-1"
@@ -95,11 +98,11 @@ function StyleControls<T extends HomeStyle>({ value, inherited, onChange, advanc
       <button type="button" disabled={value.bold === undefined} className="min-h-11 min-w-8 text-sm disabled:opacity-30"
         aria-label={t('Restablecer negrita', 'Reset bold')} title={t('Heredar', 'Inherit')}
         onClick={() => onChange({ ...value, bold: undefined })}>↺</button>
-    </div>
+    </div></>}
   </div>
 }
 
-export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc, readOnly = false, advanced, onDirtyChange, onBusyChange, onPreviewChange, onReadyChange }: Props) {
+export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc, readOnly = false, advanced, actionsActive = true, onDirtyChange, onBusyChange, onPreviewChange, onReadyChange }: Props) {
   const { t } = useOperatorLanguage()
   const samples = useHomeSamples()
   const [confirmed, setConfirmed] = useState<HomeCanvasResponse | null>(null)
@@ -142,8 +145,11 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
     setError('')
     setConfirmed(null)
     setDraft(null)
-    void getHomeCanvas(gameId).then(result => {
+    void getHomeCanvas(gameId).then(async result => {
       if (!active) return
+      const library = await fetchUserMedia()
+      if (!active) return
+      setMedia(library['home-background']?.items ?? [])
       setConfirmed(result)
       setDraft(result.homeCanvas)
       setUncertain(false)
@@ -288,17 +294,14 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
     ?? (background?.key === confirmed?.homeCanvas[orientation].background?.key ? confirmed?.homeBackgroundUrls[orientation] : null)
   const reloadCanvas = () => { setConfirmReload(false); setNotice(''); setReload(value => value + 1) }
   return <section className="min-w-0 w-full max-w-full space-y-4 rounded-xl border border-current/20 p-3 sm:p-4" aria-label={t('Editor del Home', 'Home editor')}>
-    <header className="flex flex-wrap items-center justify-between gap-3">
-      <div><h3 className="text-xl font-semibold">{t('Lienzo del Home', 'Home canvas')}</h3>
-        <p className="text-sm text-textSub">{t('Añade componentes y arrástralos. Las flechas mueven o redimensionan el elemento enfocado.', 'Add and drag components. Arrow keys move or resize the focused element.')}</p></div>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-2" role="group" aria-label={t('Orientación del lienzo', 'Canvas orientation')}>
-          {(['landscape', 'portrait'] as const).map(value => <button key={value} type="button" disabled={busy} aria-pressed={orientation === value}
-            className={`min-h-11 rounded-lg border px-3 py-2 ${value === orientation ? 'border-primary bg-primary/10 font-semibold' : 'border-current/20'}`}
-            onClick={() => { drag.current = null; setOrientation(value); setSelectedId(null); setNotice('') }}>
-            {value === 'landscape' ? t('Horizontal', 'Landscape') : t('Vertical', 'Portrait')}
-          </button>)}
-        </div>
+    <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="order-2 min-w-0 space-y-3">
+      <header className="flex flex-wrap items-center gap-2">
+        <button type="button" disabled={busy} aria-label={t('Cambiar orientación del lienzo', 'Toggle canvas orientation')}
+          className="min-h-11 rounded-lg border border-current/20 px-3 py-2"
+          onClick={() => { drag.current = null; setOrientation(orientation === 'landscape' ? 'portrait' : 'landscape'); setSelectedId(null); setNotice('') }}>
+          {orientation === 'landscape' ? t('Horizontal', 'Landscape') : t('Vertical', 'Portrait')}
+        </button>
         {composition && <div className="relative inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/20 px-3 py-2 text-sm font-medium text-textMain transition-colors hover:bg-primary/30 focus-within:outline focus-within:outline-2 focus-within:outline-primary [&:has(select:disabled)]:opacity-50">
           <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d={iconPaths.add} />
@@ -322,17 +325,17 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
             </option>)}
           </select>
         </div>}
-      </div>
-    </header>
-    {draft && composition && <fieldset disabled={disabled} className="min-w-0 w-full max-w-full space-y-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-current/15 px-3 py-2" role="region" aria-label={t('Editar selección', 'Edit selection')}>
+      </header>
+    {draft && composition && <fieldset disabled={disabled} className="flex min-w-0 flex-col items-start gap-3 rounded-lg border border-current/15 p-3" role="region" aria-label={t('Editar selección', 'Edit selection')}>
         <h4 className="text-sm font-semibold">{selected ? labels[selected.type] : t('Fondo del lienzo', 'Canvas background')}</h4>
+        <fieldset className="flex w-full min-w-0 flex-col gap-2 border-t border-current/15 pt-2">
+        <legend className="text-sm font-semibold">{t('Fondo', 'Background')}</legend>
         {!selected && <fieldset disabled={!advanced} className="w-72 max-w-full"
           title={advanced ? t('Imagen ≤ 5 MB · MP4/WebM ≤ 100 MB (bucle con sonido).', 'Image ≤ 5 MB · MP4/WebM ≤ 100 MB (looped with sound).')
             : t('Imagen / vídeo de fondo disponible en el plan Event.', 'Background image / video available on the Event plan.')}>
           <legend className="sr-only">{t('Imagen / vídeo de fondo', 'Background image / video')}</legend>
           <MediaPicker selectLabel={t('Fondo guardado', 'Saved background')} uploadLabel={t('Subir imagen o vídeo', 'Upload image or video')}
-            libraryLabel={t('Abrir biblioteca de fondos', 'Open background library')} emptyLabel={t('Sin fondo', 'No background')}
+            emptyLabel={t('Sin fondo', 'No background')}
             value={background?.key ?? ''} accept="image/png,image/jpeg,image/webp,image/svg+xml,video/mp4,video/webm"
             options={[
               ...(background && !media.some(item => item.key === background.key)
@@ -343,24 +346,14 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
               const item = media.find(item => item.key === value)
               change({ background: item ? { key: item.key, type: item.contentType.startsWith('video/') ? 'video' : 'image' } : null })
             }}
-            onOpenLibrary={() => void run(refreshMedia)}
             onUpload={file => void run(async () => {
               const item = await uploadHomeBackground(file)
               change({ background: { key: item.key, type: file.type.startsWith('video/') ? 'video' : 'image' } })
               await refreshMedia()
             })} />
         </fieldset>}
-        {selected?.type === 'text' && <>
-          <label className="flex items-center gap-2 text-xs">{t('Texto', 'Text')}
-            <textarea maxLength={1000} rows={1} value={selected.text ?? ''}
-              className="w-48 resize-x rounded border border-current/20 bg-transparent p-1 text-sm" onChange={event => updateItem({ ...selected, text: event.target.value })} /></label>
-          <label className="flex items-center gap-2 text-xs">{t('Alineación', 'Alignment')}
-            <select value={selected.align ?? 'center'} className="rounded border border-current/20 bg-transparent p-1"
-              onChange={event => updateItem({ ...selected, align: event.target.value as HomeItem['align'] })}>
-              <option value="left">{t('Izquierda', 'Left')}</option><option value="center">{t('Centro', 'Center')}</option><option value="right">{t('Derecha', 'Right')}</option>
-            </select></label>
-        </>}
-        {selected && <div className="flex items-center gap-2">
+        {!selected && <StyleControls value={composition} inherited={inheritedStyle} onChange={change} advanced={advanced} canvas backgroundOnly onInvalid={setNotice} />}
+        {selected && <div className="flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-xs">{t('Fondo', 'Background')}
             <select aria-label={t('Fondo del componente', 'Component background')} className="rounded border border-current/20 bg-transparent p-1"
               value={selected.backgroundColor === undefined ? 'default' : selected.backgroundColor === 'transparent' ? 'transparent' : 'color'}
@@ -378,19 +371,33 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
           </label>
           {selected.backgroundColor !== undefined && selected.backgroundColor !== 'transparent' && <input
             type="color" aria-label={t('Color de fondo del componente', 'Component background color')} className="h-8 w-9 cursor-pointer" value={selected.backgroundColor}
-              onChange={event => updateItem({ ...selected, backgroundColor: event.target.value })} />
-          }
+              onChange={event => updateItem({ ...selected, backgroundColor: event.target.value })} />}
         </div>}
+        </fieldset>
+        <fieldset className="flex w-full min-w-0 flex-col gap-2 border-t border-current/15 pt-2">
+        <legend className="text-sm font-semibold">{t('Fuente', 'Font')}</legend>
+        {selected?.type === 'text' && <>
+          <label className="flex items-center gap-2 text-xs">{t('Texto', 'Text')}
+            <textarea maxLength={1000} rows={1} value={selected.text ?? ''}
+              className="w-48 max-w-full resize-y rounded border border-current/20 bg-transparent p-1 text-sm" onChange={event => updateItem({ ...selected, text: event.target.value })} /></label>
+          <label className="flex items-center gap-2 text-xs">{t('Alineación', 'Alignment')}
+            <select value={selected.align ?? 'center'} className="rounded border border-current/20 bg-transparent p-1"
+              onChange={event => updateItem({ ...selected, align: event.target.value as HomeItem['align'] })}>
+              <option value="left">{t('Izquierda', 'Left')}</option><option value="center">{t('Centro', 'Center')}</option><option value="right">{t('Derecha', 'Right')}</option>
+            </select></label>
+        </>}
         {!selected ? <StyleControls key={`${orientation}-canvas`} value={composition} inherited={inheritedStyle} onChange={change} advanced={advanced} canvas onInvalid={setNotice} />
           : selected.type !== 'qr' && <StyleControls key={`${orientation}-${selected.id}`} value={selected}
           inherited={{ color: composition.color ?? inheritedStyle.color, accentColor: composition.accentColor ?? inheritedStyle.accentColor,
             fontSize: composition.fontSize ?? 48, bold: composition.bold }} onChange={updateItem} advanced={advanced} onInvalid={setNotice} />}
         {selected?.type === 'qr' && <p className="text-xs" title={t('El propio código QR conserva su contraste para poder escanearlo.', 'The QR code itself retains its contrast so it remains scannable.')}>
           {t('El QR conserva su contraste.', 'The QR keeps its contrast.')}</p>}
+        </fieldset>
         {selected && <IconButton icon="delete" className="ml-auto" label={t('Eliminar componente', 'Remove component')}
           onClick={() => { change({ items: composition.items.filter(item => item.id !== selected.id) }); setSelectedId(null) }} />}
+    </fieldset>}
       </div>
-      <div className={`mx-auto min-w-0 w-full rounded-xl border border-current/20 overflow-hidden ${orientation === 'portrait' ? 'max-w-[420px]' : 'max-w-full'}`}
+      {draft && composition && <div className={`order-1 mx-auto min-w-0 w-full rounded-xl border border-current/20 overflow-hidden ${orientation === 'portrait' ? 'max-w-[420px]' : 'max-w-full'}`}
         onClick={event => {
           if (!disabled && event.target instanceof Element && !event.target.closest('[data-home-item]')) setSelectedId(null)
         }}>
@@ -410,13 +417,14 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
                 onKeyDown={event => keyboard(event, item, true)}>↘</button>}
             </>} />
         </div>
-      </div>
-    </fieldset>}
+      </div>}
+    </div>
     {notice && <p role="status" className="text-sm">{notice}</p>}
     {error && <p role="alert" className="text-sm">{error}</p>}
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-current/15 pt-3">
       <p className="text-xs">{dirty ? t('Lienzo con cambios sin guardar', 'Canvas has unsaved changes') : t('Lienzo sin cambios pendientes', 'Canvas has no pending changes')}</p>
       <div className="ml-auto flex gap-2">
+        <ConfigurationActions visible={actionsActive}>
         <IconButton icon="reload" className="!h-11 !w-11" label={t('Recargar lienzo', 'Reload canvas')} disabled={busy}
           onClick={() => dirty ? setConfirmReload(true) : reloadCanvas()} />
         <IconButton icon="download" className="!h-11 !w-11"
@@ -438,6 +446,7 @@ export default function HomeCanvasEditor({ gameId, gameName, appearance, logoSrc
               }
             })
           }}>{t('Guardar lienzo', 'Save canvas')}</SaveButton>
+        </ConfigurationActions>
       </div>
     </div>
     {confirmReload && <div role="alertdialog" aria-label={t('Descartar cambios del lienzo', 'Discard canvas changes')} className="space-y-2 border rounded p-3">

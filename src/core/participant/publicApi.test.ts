@@ -36,6 +36,27 @@ describe('participant credential transport', () => {
     })
   })
 
+  it('sends BASKET start and fixed shot evidence through the shared public score endpoint', async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) })
+    vi.stubGlobal('fetch', fetch)
+    const shot = { atMs: 0, vx: 1600, vy: 7800, vz: -7700 }
+    await publicApi.startBasketAttempt({ gameId: 'GAME1234', playerToken: 'private-session', attemptId: 'attempt-1' })
+    await publicApi.finishBasketAttempt({
+      gameId: 'GAME1234', playerToken: 'private-session', attemptId: 'attempt-1', shots: [shot],
+    })
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      expect.stringMatching(/\/v1\/public\/score$/),
+      expect.stringMatching(/\/v1\/public\/score$/),
+    ])
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+      gameId: 'GAME1234', playerToken: 'private-session', attemptId: 'attempt-1', action: 'start',
+    })
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({
+      gameId: 'GAME1234', playerToken: 'private-session', attemptId: 'attempt-1', shots: [shot], action: 'finish',
+    })
+  })
+
   it('uploads a validated photo through the player-token-protected presigned form', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce({

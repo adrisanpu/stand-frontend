@@ -48,11 +48,17 @@ Normal sign-in and the authenticated root now open `/admin/games`.
 The protected administration has **Juegos / Games** and **Integraciones /
 Integrations**, with desktop navigation and a compact mobile menu.
 
-Games lists the authenticated owner's events from `GET /v1/game`. Each card
-shows the game logo, event name, creation date and player count.
-The search above the list matches names, game type, creation date (ISO or
-displayed date) and player count, without additional API calls. Missing legacy
-metadata is displayed as unavailable, not a fictional date or zero.
+Games lists the authenticated owner's events from `GET /v1/game` in a table
+showing name, status, creation date and player count beneath the game showcase.
+The search at the left above the table matches event names only, ignoring
+case and accents, without additional API calls. Archived events and creation
+buttons sit at the upper right. Name, Status, Created and Players headers
+toggle ascending/descending sorting; the default is newest creation date first.
+Missing metadata sorts last in either direction and is displayed as unavailable,
+not a fictional date or zero. Sorting preserves explicit event selection.
+Only the selected row shows actions in its last column: Open, Configure and
+Pause/Resume, plus Archive when paused or closing. Archived rows instead show
+Restore and Delete permanently, retaining deletion safeguards.
 **Crear partida / Create event** opens the existing catalog and creation flow
 in a scrollable modal above the list, retaining the current search. It supports
 Escape, focus containment and return focus; the old `/admin/games/catalog`

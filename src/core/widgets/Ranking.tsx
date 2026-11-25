@@ -60,7 +60,7 @@ export default function Ranking({
   const topX = prize ? prize.topX : legacyTopX
   const maxPrizeRanking = prize ? prize.limit ?? undefined : legacyMax
   const isT1mer = normalizeGameType(gameType) === 'T1MER'
-  const isStack = normalizeGameType(gameType) === 'STACK'
+  const isScoreGame = ['STACK', 'BASKET'].includes(normalizeGameType(gameType))
   const [ranking, setRanking] = useState<RankingEntry[] | null>(null)
 
   const limit = rankingFetchLimit(topX, maxPrizeRanking)
@@ -131,7 +131,7 @@ export default function Ranking({
                   </span>
                   <span className="home-ranking-score flex items-center flex-shrink-0 whitespace-nowrap" data-testid="ranking-score">
                     <span className="home-ranking-value text-textMain font-bold tabular-nums text-base leading-none">
-                      {isStack
+                      {isScoreGame
                         ? (typeof entry.score === 'number' ? entry.score : '–')
                         : (typeof entry.timer === 'number' ? entry.timer.toFixed(3) : '–')}
                     </span>

@@ -4,12 +4,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { getHomeCanvas, saveHomeCanvas, type HomeCanvasResponse } from '../../api/homeCanvas'
 import HomeCanvasEditor from './HomeCanvasEditor'
 import { toBlob } from 'html-to-image'
+import { fetchUserMedia } from '../../api/userMedia'
 
 vi.mock('../../api/homeCanvas', () => ({ getHomeCanvas: vi.fn(), saveHomeCanvas: vi.fn() }))
+vi.mock('../../api/userMedia', () => ({ fetchUserMedia: vi.fn(), uploadHomeBackground: vi.fn() }))
 vi.mock('html-to-image', () => ({ toBlob: vi.fn() }))
 let saved: HomeCanvasResponse
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(fetchUserMedia).mockResolvedValue({ ok: true, logo: { items: [], selectedId: null, selected: null }, 'home-background': { items: [] } })
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   saved = {
     ok: true, gameId: 'EVENT', gameType: 'T1MER', readOnly: false, homeRevision: 'one',
@@ -27,10 +30,44 @@ async function mount(advanced = true) {
   return dirty
 }
 
+it('loads the background library automatically and groups the sidebar into background and font sections', async () => {
+  vi.mocked(fetchUserMedia).mockResolvedValue({
+    ok: true, logo: { items: [], selectedId: null, selected: null },
+    'home-background': { items: [{
+      id: 'image', kind: 'home-background', name: 'Saved image', fileName: 'image.png',
+      contentType: 'image/png', sizeBytes: 100, key: 'background/image.png', url: 'https://example.com/image.png',
+    }] },
+  })
+  await mount()
+  expect(fetchUserMedia).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('button', { name: 'Abrir biblioteca de fondos' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Lienzo del Home')).not.toBeInTheDocument()
+  const sidebar = screen.getByRole('region', { name: 'Editar selección' })
+  expect(screen.getByRole('group', { name: 'Fondo' })).toContainElement(screen.getByLabelText('Color de fondo del lienzo'))
+  expect(screen.getByRole('group', { name: 'Fuente' })).toContainElement(screen.getByLabelText('Tamaño general del texto'))
+  expect(sidebar.parentElement).toContainElement(screen.getByRole('combobox', { name: 'Añadir componente' }))
+  const orientation = screen.getByRole('button', { name: 'Cambiar orientación del lienzo' })
+  expect(orientation).toHaveTextContent('Horizontal')
+  fireEvent.click(orientation)
+  expect(orientation).toHaveTextContent('Vertical')
+  fireEvent.change(screen.getByRole('combobox', { name: 'Fondo guardado' }), { target: { value: 'background/image.png' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar lienzo' }))
+  await waitFor(() => expect(saveHomeCanvas).toHaveBeenCalled())
+  expect(vi.mocked(saveHomeCanvas).mock.calls[0][1].portrait.background).toEqual({ key: 'background/image.png', type: 'image' })
+})
+
+it('reports automatic library failures and allows reloading', async () => {
+  vi.mocked(fetchUserMedia).mockRejectedValueOnce(new Error('Library unavailable'))
+  render(<HomeCanvasEditor gameId="EVENT" gameName="Event" appearance={null} advanced />)
+  expect(await screen.findByRole('alert')).toHaveTextContent('Library unavailable')
+  fireEvent.click(screen.getByRole('button', { name: 'Recargar lienzo' }))
+  expect(await screen.findByRole('combobox', { name: 'Fondo guardado' })).toBeInTheDocument()
+})
+
 it.each([
   ['Horizontal', 'landscape', 1920, 1080],
   ['Vertical', 'portrait', 1080, 1920],
-] as const)('downloads the current %s draft as a full-size PNG without editing controls', async (label, orientation, width, height) => {
+] as const)('downloads the current %s draft as a full-size PNG without editing controls', async (_label, orientation, width, height) => {
   const blob = new Blob(['snapshot'], { type: 'image/png' })
   const createObjectURL = vi.fn(() => 'blob:snapshot')
   const revokeObjectURL = vi.fn()
@@ -44,7 +81,7 @@ it.each([
     return blob
   })
   const dirty = await mount()
-  fireEvent.click(screen.getByRole('button', { name: label }))
+  if (orientation === 'portrait') fireEvent.click(screen.getByRole('button', { name: 'Cambiar orientación del lienzo' }))
   fireEvent.change(screen.getByRole('combobox', { name: 'Añadir componente' }), { target: { value: 'text' } })
   fireEvent.change(screen.getByLabelText('Texto', { selector: 'textarea' }), { target: { value: 'Draft snapshot' } })
   const download = screen.getByRole('button', { name: 'Descargar snapshot del lienzo' })
@@ -102,11 +139,11 @@ it('starts empty and keeps two independent drafts when changing orientation', as
   fireEvent.change(screen.getByRole('combobox', { name: 'Añadir componente' }), { target: { value: 'qr' } })
   expect(screen.getByRole('button', { name: 'Mover QR' })).toBeInTheDocument()
   expect(screen.getByRole('option', { name: 'QR' })).toBeDisabled()
-  fireEvent.click(screen.getByRole('button', { name: 'Vertical' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cambiar orientación del lienzo' }))
   expect(screen.queryByRole('button', { name: 'Mover QR' })).not.toBeInTheDocument()
   fireEvent.change(screen.getByRole('combobox', { name: 'Añadir componente' }), { target: { value: 'text' } })
   fireEvent.change(screen.getByLabelText('Texto', { selector: 'textarea' }), { target: { value: 'Hola evento' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Horizontal' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cambiar orientación del lienzo' }))
   expect(screen.getByRole('button', { name: 'Mover QR' })).toBeInTheDocument()
   expect(screen.queryByText('Hola evento')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Guardar lienzo' }))
@@ -122,7 +159,7 @@ it('puts the components menu next to orientation and the selection options in on
   await mount()
   const toolbar = screen.getByRole('region', { name: 'Editar selección' })
   const add = screen.getByRole('combobox', { name: 'Añadir componente' })
-  expect(add.closest('header')).toContainElement(screen.getByRole('button', { name: 'Horizontal' }))
+  expect(add.closest('header')).toContainElement(screen.getByRole('button', { name: 'Cambiar orientación del lienzo' }))
   expect(add.parentElement).toHaveTextContent('Componentes')
   expect(toolbar).toContainElement(screen.getByLabelText('Color de fondo del lienzo'))
   expect(toolbar).toContainElement(screen.getByLabelText('Tamaño general del texto'))
@@ -153,7 +190,7 @@ it('edits independent canvas styles, inherits them in new text and saves individ
   fireEvent.click(screen.getByRole('button', { name: 'Restablecer Color de acento' }))
   expect(screen.getByLabelText('Color de acento')).toHaveValue('#abcdef')
   fireEvent.change(screen.getByLabelText('Color'), { target: { value: '#fedcba' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Vertical' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cambiar orientación del lienzo' }))
   expect(screen.getByLabelText('Tamaño general del texto')).toHaveValue(48)
   fireEvent.change(screen.getByLabelText('Tamaño general del texto'), { target: { value: '32' } })
   fireEvent.blur(screen.getByLabelText('Tamaño general del texto'))
@@ -210,7 +247,7 @@ it('toggles bold per selection, inherits canvas bold and resets individual overr
     })
     fireEvent.click(screen.getByRole('button', { name: 'Restablecer negrita' }))
     expect(screen.getByRole('button', { name: 'Negrita' })).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(screen.getByRole('button', { name: 'Vertical' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar orientación del lienzo' }))
     expect(screen.getByRole('button', { name: 'Negrita' })).toHaveAttribute('aria-pressed', 'false')
 })
 it('gates canvas colors on Event but allows size changes and reports invalid sizes', async () => {
@@ -273,7 +310,7 @@ it('rejects empty, fractional and out-of-range sizes only on blur and allows cor
   expect(size).toHaveValue(16)
   fireEvent.click(screen.getByRole('button', { name: 'Restablecer Tamaño general del texto' }))
   expect(size).toHaveValue(48)
-  fireEvent.click(screen.getByRole('button', { name: 'Vertical' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cambiar orientación del lienzo' }))
   expect(screen.getByLabelText('Tamaño general del texto')).toHaveValue(48)
 })
 it('rejects overlaps and invalid sizes while allowing keyboard movement and removal', async () => {
@@ -316,7 +353,7 @@ it('allows transparent and colored component backgrounds on Free and saves both 
   expect(screen.getByLabelText('Color de fondo del componente')).toBeEnabled()
   fireEvent.change(screen.getByLabelText('Color de fondo del componente'), { target: { value: '#123456' } })
   expect(document.querySelector('.home-widget-background')).toHaveStyle({ backgroundColor: '#123456' })
-  fireEvent.click(screen.getByRole('button', { name: 'Vertical' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cambiar orientación del lienzo' }))
   fireEvent.change(screen.getByRole('combobox', { name: 'Añadir componente' }), { target: { value: 'text' } })
   fireEvent.change(screen.getByLabelText('Fondo del componente'), { target: { value: 'transparent' } })
   expect(document.querySelector<HTMLElement>('.home-widget-background')?.style.backgroundColor).toBe('transparent')

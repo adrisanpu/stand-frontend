@@ -21,6 +21,7 @@ import GamePlayPreview from './GamePlayPreview'
 import type { ParticipantPhoneFrame } from '../participant/ParticipantPhonePreview'
 import QRCode from '../widgets/QRCode'
 import { getRedeemUrl } from '../lib/joinUrl'
+import { ConfigurationActionsContext } from '../ui/ConfigurationActions'
 
 export default function GameConfigurationDialog({ gameId: existingId, gameType, onClose, onCreated, requireSetup = false, initialSection = 'appearance' }: {
   gameId?: string; gameType?: string; onClose: (created?: boolean) => void
@@ -53,6 +54,7 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
   const [conditionsDirty, setConditionsDirty] = useState(false)
   const [formDirty, setFormDirty] = useState(false)
   const [section, setSection] = useState<SetupReviewSection>(initialSection)
+  const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(null)
   const [formSection, setFormSection] = useState<'appearance' | 'registration' | 'questionnaire'>(
     initialSection === 'questionnaire' ? 'questionnaire' : initialSection === 'form' ? 'registration' : 'appearance')
   const [discard, setDiscard] = useState(false)
@@ -286,13 +288,13 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
           event.preventDefault(); first?.focus()
         }
       }}>
-      <header className="flex items-center justify-between gap-3 border-b border-current/15 px-5 py-3">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-current/15 px-5 py-3">
         <h2 id="event-config-title" className="text-xl font-semibold">{!gameId
           ? `${t('Crear partida', 'Create event')}${gameType ? ` · ${getGameById(gameType)?.name ?? gameType}` : ''}`
           : data ? data.game.gameName : t('Cargando configuración…', 'Loading settings…')}</h2>
         <IconButton icon="remove" label={t('Cerrar configuración', 'Close settings')} type="button" disabled={busy || discard} onClick={close} />
       </header>
-      <div className="space-y-3 overflow-y-auto p-4 sm:p-5">
+      <div className="min-h-0 space-y-3 overflow-y-auto p-4 sm:p-5">
         {!gameId && <GameGate showHeaderLogo={false} initialGame={gameType ? getGameById(gameType) : undefined}
           createOnly onBusyChange={changeBusy} onGameCreated={(_name, id) => {
             setCreatedId(id)
@@ -305,8 +307,10 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
         </div>}
         {gameId && data && <>
           {readOnly && <p role="status">{t('Solo lectura: esta partida está inactiva o en proceso de cierre.', 'Read only: this event is inactive or closing.')}</p>}
+          <div className="sticky -top-4 z-20 -mx-4 flex flex-wrap items-center justify-between gap-2 border-b border-current/15 px-4 py-2 sm:-top-5 sm:-mx-5 sm:px-5"
+            style={{ background: 'var(--color-background)' }}>
           <nav role="tablist" aria-label={t('Secciones de configuración', 'Settings sections')}
-            className="flex gap-1 overflow-x-auto border-b border-current/15">
+            className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
             {([
               ['appearance', 'Home'],
               ['form', t('Registro', 'Registration')],
@@ -334,6 +338,14 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
               </button>
             ))}
           </nav>
+          <div ref={setActionsTarget} role="group" aria-label={t('Acciones de configuración', 'Settings actions')}
+            className="ml-auto flex shrink-0 items-center gap-2">
+            {section === 'configuration' && Component && !readOnly && <SaveButton iconOnly
+              disabled={busy || saveUncertain || !mechanicsDirty || discard} onClick={() => void save()}>
+              {t('Guardar configuración', 'Save configuration')}
+            </SaveButton>}
+          </div>
+          </div>
           <section role="tabpanel" id="event-panel-configuration" aria-labelledby="event-tab-configuration"
             hidden={section !== 'configuration'} tabIndex={0} className="space-y-3 py-2">
             <div className="grid items-stretch gap-6 lg:h-[calc(92dvh-14rem)] lg:min-h-80 lg:grid-cols-2">
@@ -348,12 +360,6 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
               </fieldset>
             </> : <p>{t('Este juego no tiene ajustes de mecánica editables.', 'This game has no editable mechanic settings.')}</p>}
             {message && <p role={saveError ? 'alert' : 'status'}>{message}</p>}
-            {Component && !readOnly && <div className="flex justify-end">
-              <SaveButton iconOnly disabled={busy || saveUncertain || !mechanicsDirty || discard}
-                onClick={() => void save()}>
-                {t('Guardar configuración', 'Save configuration')}
-              </SaveButton>
-            </div>}
             </div>
             {section === 'configuration' && <aside aria-label={t('Prueba del juego', 'Game trial')}
               className="flex min-h-0 min-w-0 w-full flex-col overflow-hidden rounded-xl border border-current/20 p-5">
@@ -372,13 +378,17 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
             aria-labelledby={`event-tab-${formSection === 'registration' ? 'form' : formSection}`}
             hidden={section !== 'appearance' && section !== 'form' && section !== 'questionnaire'}
             tabIndex={0} className="space-y-3 py-2">
+            <ConfigurationActionsContext.Provider value={{ target: actionsTarget,
+              active: section === 'appearance' || section === 'form' || section === 'questionnaire', disabled: busy || discard }}>
             <fieldset disabled={busy || discard} className="min-w-0 w-full max-w-full">
               <GameFormSettings gameId={gameId} gameName={data.game.gameName} readOnly={readOnly} section={formSection} prizeCatalog={data.prizeCatalog} onFrameChange={setPhoneFrame}
                 onBusyChange={formBusy} onDirtyChange={setFormDirty} onReadyChange={formReady} onSectionDirtyChange={formSectionDirty} />
             </fieldset>
+            </ConfigurationActionsContext.Provider>
           </section>
           <section role="tabpanel" id="event-panel-conditions" aria-labelledby="event-tab-conditions"
             hidden={section !== 'conditions'} tabIndex={0} className="space-y-3 py-2">
+            <ConfigurationActionsContext.Provider value={{ target: actionsTarget, active: section === 'conditions', disabled: busy || discard }}>
             <fieldset disabled={busy || discard} className="space-y-3">
               <PrizeNotificationSettings gameId={gameId} readOnly={readOnly} />
               <RewardConditions data={data} readOnly={readOnly}
@@ -391,10 +401,12 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
                 </div>}
                 onBusyChange={conditionsBusy} onDirtyChange={markConditionsDirty} onReadyChange={conditionsReady} />
             </fieldset>
+            </ConfigurationActionsContext.Provider>
           </section>
           <section role="tabpanel" id="event-panel-prizes" aria-labelledby="event-tab-prizes"
             hidden={section !== 'prizes'} tabIndex={0} className="space-y-3 py-2"
             onChangeCapture={() => invalidateReview('prizes')}>
+            <ConfigurationActionsContext.Provider value={{ target: actionsTarget, active: section === 'prizes', disabled: busy || discard }}>
             <fieldset disabled={busy || discard}>
             {readOnly
               ? <p>{t('Los sorteos solo están disponibles en partidas activas.', 'Raffles are only available for active events.')}</p>
@@ -403,6 +415,7 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
                   onBusyChange={raffleBusy} onReadyChange={raffleReady} onVisibilitySaved={() => invalidateReview('prizes')} gameId={gameId} gameType={definition?.id} />
                 : <p>{t('Disponible en el plan Event 24h.', 'Available on the Event 24h plan.')}</p>}
             </fieldset>
+            </ConfigurationActionsContext.Provider>
           </section>
         </>}
         {(reviewRequired || missingSetup) && <div className="space-y-3 border-t border-current/20 pt-4">

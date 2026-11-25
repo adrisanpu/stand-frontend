@@ -53,9 +53,10 @@ function isUncertainRewardUpdate(error: unknown) {
   return 'isNetworkError' in error && error.isNetworkError === true
 }
 
-export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, onDirtyChange }: {
+export default function StackPrizeSettings({ gameId, basket = false, onPersist, onSavingChange, onDirtyChange }: {
   gameId: string
   raffles: boolean
+  basket?: boolean
   onPersist: (patch: Record<string, unknown>) => void
   onSavingChange?: (saving: boolean) => void
   onDirtyChange?: (dirty: boolean) => void
@@ -138,6 +139,7 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
     setLocationId(null)
     setKivlyConnected(false)
     setCatalogError('')
+    if (basket) return () => { cancelled = true }
     void kivlyApi.getAccountConnection().then(async (connection) => {
       if (cancelled) return
       setKivlyConnected(connection.connected)
@@ -171,7 +173,7 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
         'Could not load Kivly. Check the connection before saving its rewards.'))
     })
     return () => { cancelled = true }
-  }, [gameId, catalogRevision])
+  }, [gameId, catalogRevision, basket])
 
   useEffect(() => {
     setRewards([])
@@ -233,6 +235,11 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
   }
   const save = () => run(async () => {
     if (!program) return
+    if (basket && (program.catalog.some(prize => prize.source !== 'stand')
+      || program.rules.some(rule => !['score', 'top_finish', 'top_final'].includes(rule.condition)))) {
+      throw new Error(t('BASKET solo admite premios STAND y condiciones de puntuación o posición.',
+        'BASKET only supports STAND prizes and score or ranking conditions.'))
+    }
     const saved = await stackPrizeApi.save(gameId, { ...program, deliveryChannel: 'wallet' })
     setProgram(saved)
     setDirty(false)
@@ -414,23 +421,25 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
     {error && <button className={action} onClick={() => setRevision((value) => value + 1)}>{t('Reintentar', 'Retry')}</button>}
   </div>
   const editable = data.state === 'open'
-  const available = [...program.catalog, ...sharedCatalog.filter((prize) =>
+  const available = [...program.catalog.filter(prize => !basket || prize.source === 'stand'), ...sharedCatalog.filter((prize) =>
     !program.catalog.some((item) => item.source === 'stand' && item.sharedPrizeId === prize.id))
     .map((prize): StackPrizeItem => ({
       id: `shared_${prize.id}`, source: 'stand', sharedPrizeId: prize.id, name: prize.name,
       imageKey: prize.imageKey, imageUrl: prize.imageUrl ?? null, stockTotal: null,
-    })), ...rewards.filter((reward) => !program.catalog.some((prize) =>
+    })), ...(basket ? [] : rewards.filter((reward) => !program.catalog.some((prize) =>
     prize.source === 'kivly' && prize.rewardId === reward.id && prize.locationId === locationId)).map((reward): StackPrizeItem => ({
       id: `kivly_${reward.id}`, source: 'kivly', rewardId: reward.id, name: reward.name,
       locationId: locationId ?? '', stockTotal: null, imageUrl: reward.imageUrl,
-    }))]
+    })))]
   const parsedRewardValue = Number(rewardForm.value)
   const parsedPointsRequired = Number(rewardForm.pointsRequired)
   const canCreateReward = rewardForm.title.trim().length > 0
     && rewardForm.description.trim().length > 0 && rewardForm.value.trim().length > 0
     && Number.isFinite(parsedRewardValue)
     && Number.isInteger(parsedPointsRequired) && parsedPointsRequired >= 0
-  const invalidProgram = program.catalog.some((prize) => {
+  const invalidProgram = (basket && (program.catalog.some(prize => prize.source !== 'stand')
+    || program.rules.some(rule => !['score', 'top_finish', 'top_final'].includes(rule.condition))))
+    || program.catalog.some((prize) => {
     return !validCap(prize.stockTotal)
   }) || program.rules.some((rule) => rule.groups.length === 0 || rule.groups.some((group) =>
     group.allocations.length === 0 || group.allocations.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 10))
@@ -585,7 +594,7 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
             ? t('Editar premio', 'Edit prize') : t('Crear premio', 'Create prize')}</h4>
           {rewardError && <p role="alert" className="text-xs text-red-300">{rewardError}</p>}
           <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-4">
-            <label className="space-y-1 text-xs text-textSub">
+            {!basket && <label className="space-y-1 text-xs text-textSub">
               <span>{t('Origen del premio', 'Prize source')}</span>
               <select className={`${selectField} w-full`} value={createSource}
                 disabled={!!editingPrize}
@@ -593,7 +602,7 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
                 <option value="stand">STAND</option>
                 <option value="kivly" disabled={!kivlyConnected || !locationId}>Kivly</option>
               </select>
-            </label>
+            </label>}
               {createSource === 'stand'
                 ? <label className="space-y-1 text-xs text-textSub">
                   <span>{t('Premio del catálogo general', 'Shared catalog prize')}</span>
@@ -868,9 +877,12 @@ export default function StackPrizeSettings({ gameId, onPersist, onSavingChange, 
       )}</p>
       <section className="rounded-xl border border-white/10 p-3 space-y-2">
         <h3 className="text-sm font-semibold">{t('Entrega de premios', 'Reward delivery')}</h3>
-        <p className="text-xs text-textSub">{t(
-          'Los premios STAND se envían al correo verificado con un QR para canjearlos. Si Kivly está conectado, sus premios usan automáticamente el enlace Wallet de Kivly.',
-          'STAND prizes are emailed to the verified address with a QR code for redemption. When Kivly is connected, Kivly rewards automatically use their Kivly Wallet link.',
+        <p className="text-xs text-textSub">{basket ? t(
+          'Los premios se entregan desde el inventario de Stand. BASKET no usa Kivly.',
+          'Rewards are delivered from Stand inventory. BASKET does not use Kivly.',
+        ) : t(
+        'Los premios STAND se envían al correo verificado con un QR para canjearlos. Si Kivly está conectado, sus premios usan automáticamente el enlace Wallet de Kivly.',
+        'STAND prizes are emailed to the verified address with a QR code for redemption. When Kivly is connected, Kivly rewards automatically use their Kivly Wallet link.',
         )}</p>
         {!data.emailAvailable && <p className="text-xs text-amber-300">{t(
           'El envío de premios por correo aún no está habilitado en este entorno.',

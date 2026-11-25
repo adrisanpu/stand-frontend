@@ -69,6 +69,13 @@ function StaticGamePlayPreview({ gameType }: { gameType: string }) {
   const { t } = useOperatorLanguage()
   const actionClass = 'w-full rounded-xl border border-primary/40 bg-primary/20 py-3 font-bold text-primary disabled:opacity-100'
   switch (gameType.toUpperCase()) {
+    case 'BASKET':
+      return <div className="space-y-5 text-center">
+        <h2 className="text-xl font-bold">BASKET</h2>
+        <img src="/images/basket-logo.png" alt="" className="mx-auto h-48 w-48 object-contain" />
+        <p className="text-sm text-textSub">{t('Desliza desde el balón y consigue canastas en 30 segundos.', 'Swipe from the ball and score baskets in 30 seconds.')}</p>
+        <button type="button" disabled className={actionClass}>{t('EMPEZAR', 'START')}</button>
+      </div>
     case 'L3TRAS':
       return <div className="space-y-5 text-center">
         <h2 className="text-xl font-bold">L3TRAS</h2>

@@ -87,6 +87,7 @@ export type StackPrizeSettingsResponse = {
     inventoryReasons?: Record<string, string> | { prizeId: string; reason: string }[]
   }[]
 }
+/** Legacy route and DTO names remain shared by STACK and BASKET; gameId selects the actual game type. */
 export const stackPrizeApi = {
   get: (gameId: string) => api.get<StackPrizeSettingsResponse>(`/v1/game/stack/prizes?gameId=${encodeURIComponent(gameId)}`),
   async saveRules(gameId: string, rules: StackPrizeRule[], expectedRevision: string, autoClose?: StackAutoCloseDuration | null) {

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { ThemeProvider } from '../theme'
 import { getGameById } from '../../games'
 import { normalizeGameType } from '../gameTypeMap'
-import { PublicApiError, publicApi, isStackAssignment, isMobileAssignment, type MobileAssignment, type PublicGameResponse, type PlayerAssignment, type T1merAssignment, type StackAssignment, type ImpostorAssignment, type NativePrizeAward, type PlayerResponse } from '../../api/publicApi'
+import { PublicApiError, publicApi, isStackAssignment, isBasketAssignment, isMobileAssignment, type MobileAssignment, type PublicGameResponse, type PlayerAssignment, type T1merAssignment, type StackAssignment, type BasketAssignment, type ImpostorAssignment, type NativePrizeAward, type PlayerResponse } from '../../api/publicApi'
 import { clearPlayerSession, loadAssignment, loadPlayerToken, savePlayerSession } from './playerSession'
 import { GAME_ACCESS_CAPABILITIES, resolveGameAccess } from '../settings/gameAccess'
 import JoinForm from './JoinForm'
@@ -16,6 +16,7 @@ import NativePrizeClaims from './NativePrizeClaims'
 import T1merParticipantPlay from '../../games/t1mer/ParticipantPlay'
 import T1merParticipantResult from '../../games/t1mer/ParticipantResult'
 import StackParticipantPlay from '../../games/stack/ParticipantPlay'
+import BasketParticipantPlay from '../../games/basket/ParticipantPlay'
 import StackPrizePromo from '../../games/stack/StackPrizePromo'
 import ImpostorParticipantPlay from '../../games/impostor/ParticipantPlay'
 import Rulet4ParticipantPlay from '../../games/rulet4/ParticipantPlay'
@@ -112,6 +113,7 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
   const activeGameId = useRef(gameId)
   activeGameId.current = gameId
   const [stackAssignment, setStackAssignment] = useState<StackAssignment | null>(null)
+  const [basketAssignment, setBasketAssignment] = useState<BasketAssignment | null>(null)
   const [impostorAssignment, setImpostorAssignment] = useState<ImpostorAssignment | null>(null)
   const [rulet4Assignment, setRulet4Assignment] = useState<Rulet4Assignment | null>(null)
   const [mobileAssignment, setMobileAssignment] = useState<MobileAssignment | null>(null)
@@ -123,6 +125,7 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
   const [nativeAwards, setNativeAwards] = useState<NativePrizeAward[]>([])
   const [prizeUnavailable, setPrizeUnavailable] = useState<NonNullable<PlayerResponse['prizeUnavailable']>>([])
   const [prizeEmailOnly, setPrizeEmailOnly] = useState(false)
+  const [recoveryLatencyMs, setRecoveryLatencyMs] = useState(0)
 
   const currentGameMeta = gameMeta?.gameId === gameId ? gameMeta : null
   const gameType = currentGameMeta ? normalizeGameType(currentGameMeta.gameType) : ''
@@ -159,18 +162,18 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
 
   useEffect(() => {
     if (!hasPrizeCatalog) return
-    const isStack = gameType === 'STACK'
-    const refreshEvery = isStack ? (stackPrizeState === 'closing' ? 10000 : 30000) : 30 * 60 * 1000
+    const usesSharedPrizeRules = gameType === 'STACK' || gameType === 'BASKET'
+    const refreshEvery = usesSharedPrizeRules ? (stackPrizeState === 'closing' ? 10000 : 30000) : 30 * 60 * 1000
     let lastRefresh = Date.now()
     const refresh = () => {
       lastRefresh = Date.now()
       void refreshPrizes()
     }
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && (isStack || Date.now() - lastRefresh >= refreshEvery)) refresh()
+      if (document.visibilityState === 'visible' && (usesSharedPrizeRules || Date.now() - lastRefresh >= refreshEvery)) refresh()
     }
     const interval = window.setInterval(() => {
-      if (!isStack || document.visibilityState === 'visible') refresh()
+      if (!usesSharedPrizeRules || document.visibilityState === 'visible') refresh()
     }, refreshEvery)
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => {
@@ -215,24 +218,28 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
     }
     if (isRulet4Assignment(assignment)) throw new Error('No se pudo recuperar tu participante.')
     if (gt === 'STACK' && !isStackAssignment(assignment)) throw new Error('No se pudo recuperar tu participante.')
+    if (gt === 'BASKET' && !isBasketAssignment(assignment)) throw new Error('No se pudo recuperar tu participante.')
     if (gt === 'EMPAREJA2' && !('characterName' in assignment)) throw new Error('No se pudo recuperar tu participante.')
-    if (gt === 'T1MER' && (!('displayName' in assignment) || isStackAssignment(assignment))) {
+    if (gt === 'T1MER' && (!('displayName' in assignment) || isStackAssignment(assignment) || isBasketAssignment(assignment))) {
       throw new Error('No se pudo recuperar tu participante.')
     }
-    if (gt === 'IMPOSTOR' && (!('displayName' in assignment) || isStackAssignment(assignment))) {
+    if (gt === 'IMPOSTOR' && (!('displayName' in assignment) || isStackAssignment(assignment) || isBasketAssignment(assignment))) {
       throw new Error('No se pudo recuperar tu participante.')
     }
     savePlayerSession(gameId, token, assignment)
     setPlayerToken(token)
-    if (gt === 'IMPOSTOR' && 'displayName' in assignment && !isStackAssignment(assignment)) {
+    if (gt === 'IMPOSTOR' && 'displayName' in assignment && !isStackAssignment(assignment) && !isBasketAssignment(assignment)) {
       setImpostorAssignment(assignment)
       setStep('play')
-    } else if (gt !== 'EMPAREJA2' && gt !== 'T1MER' && gt !== 'STACK') {
+    } else if (isBasketAssignment(assignment)) {
+      setBasketAssignment(assignment)
+      setStep('play')
+    } else if (gt !== 'EMPAREJA2' && gt !== 'T1MER' && gt !== 'STACK' && gt !== 'BASKET') {
       setStep('registered')
     } else if (isStackAssignment(assignment)) {
       setStackAssignment(assignment)
       setStep('play')
-    } else if (gt === 'T1MER' && 'displayName' in assignment) {
+    } else if (gt === 'T1MER' && 'displayName' in assignment && !isStackAssignment(assignment) && !isBasketAssignment(assignment)) {
       const result = t1merResultFromAssignment(assignment)
       setT1merResult(result)
       setStep(result ? 'result' : 'play')
@@ -250,6 +257,7 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
     setPrizeUnavailable([])
     setPrizeEmailOnly(false)
     setStackAssignment(null)
+    setBasketAssignment(null)
     setImpostorAssignment(null)
     setRulet4Assignment(null)
     setMobileAssignment(null)
@@ -261,7 +269,8 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
       try {
         const meta = await publicApi.getGame(gameId)
         if (cancelled) return
-        const closedStack = normalizeGameType(meta.gameType) === 'STACK'
+        const sharedPrizeGame = ['STACK', 'BASKET'].includes(normalizeGameType(meta.gameType))
+        const closedStack = sharedPrizeGame
           && (meta.stackPrizeState === 'closing' || meta.stackPrizeState === 'closed')
         if (!meta.ok || meta.gameId !== gameId || (!meta.isActive && !closedStack && !meta.lifecycleState)) {
           setStep('unsupported')
@@ -279,7 +288,9 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
         if (token) {
           let player
           try {
+            const playerRequestStartedAt = performance.now()
             player = await publicApi.getPlayer(token, gameId)
+            setRecoveryLatencyMs(Math.max(0, performance.now() - playerRequestStartedAt))
           } catch (sessionError) {
             if (cancelled) return
             if (sessionError instanceof PublicApiError
@@ -300,7 +311,7 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
           setNativeAwards(player.nativePrizes ?? [])
           setPrizeUnavailable(player.prizeUnavailable ?? [])
           setPrizeEmailOnly(player.prizeNotification?.play === false)
-          if (!meta.isActive && gt !== 'STACK') {
+          if (!meta.isActive && !['STACK', 'BASKET'].includes(gt)) {
             setPlayerToken(player.playerToken)
             setStep('registered')
           } else applyAssignment(meta, player.playerToken, player.assignment)
@@ -330,7 +341,7 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
         data-quiz-active={quizActive ? 'true' : undefined}
       >
         <div className="relative mx-auto max-w-md w-full flex flex-col">
-          {gameType === 'STACK' && gameMeta?.stackPrizeRules
+          {['STACK', 'BASKET'].includes(gameType) && gameMeta?.stackPrizeRules
             ? <StackPrizePromo rules={gameMeta.stackPrizeRules} closesAt={stackClosesAt} state={stackPrizeState} />
             : <ParticipantPrizePromo catalog={currentGameMeta?.prizeCatalog} stickers />}
           <div className="relative w-full">
@@ -381,10 +392,10 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
               </button>
             </div>
           )}
-          {step === 'join' && gameType === 'STACK' && stackPrizeState !== 'open' && (
+          {step === 'join' && ['STACK', 'BASKET'].includes(gameType) && stackPrizeState !== 'open' && (
             <p role="status" className="text-center text-textSub">{t('El juego se está cerrando o ya ha cerrado. No se admiten nuevos intentos.')}</p>
           )}
-          {step === 'join' && gameMeta && (gameType !== 'STACK' || stackPrizeState === 'open') && (
+          {step === 'join' && gameMeta && (!['STACK', 'BASKET'].includes(gameType) || stackPrizeState === 'open') && (
             <JoinForm
               gameId={gameId}
               gameMeta={gameMeta}
@@ -418,6 +429,15 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
 
           {gameType === 'STACK' && step === 'play' && stackAssignment && playerToken && (
             <StackParticipantPlay key={`${gameId}:${stackAssignment.playerId}`} gameId={gameId} playerToken={playerToken} config={gameMeta?.stackConfig} assignment={stackAssignment} startSupported={gameMeta?.stackStartSnapshot === true} finishSupported={gameMeta?.stackFinishSupported === true} prizeCatalog={currentGameMeta?.prizeCatalog} showPrizePromo={false} kivlyRewardEnabled={Boolean(gameMeta?.kivlyReward)} prizeState={stackPrizeState} />
+          )}
+
+          {gameType === 'BASKET' && step === 'play' && basketAssignment && playerToken && (
+            <BasketParticipantPlay key={`${gameId}:${basketAssignment.playerId}`} gameId={gameId} playerToken={playerToken}
+              config={gameMeta?.basketConfig} assignment={basketAssignment}
+              startSupported={gameMeta?.basketStartSnapshot === true} finishSupported={gameMeta?.basketFinishSupported === true}
+              prizeCatalog={currentGameMeta?.prizeCatalog} prizeState={stackPrizeState}
+              recoveryLatencyMs={recoveryLatencyMs}
+              canStart={gameMeta?.isActive === true && stackPrizeState === 'open'} />
           )}
 
           {gameType === 'IMPOSTOR' && step === 'play' && impostorAssignment && playerToken && (
@@ -470,7 +490,7 @@ function ParticipantContent({ gameId, onDefaultLanguage }: {
               showPrizePromo={false}
             />
           )}
-          {(gameType !== 'STACK' || !currentGameMeta?.lifecycleState || nativeAwards.length > 0) && playerToken
+          {(!['STACK', 'BASKET'].includes(gameType) || !currentGameMeta?.lifecycleState || nativeAwards.length > 0) && playerToken
             && <NativePrizeClaims key={`${gameId}:${playerToken}`} gameId={gameId} playerToken={playerToken} initialAwards={nativeAwards} initialUnavailable={prizeUnavailable} initialEmailOnly={prizeEmailOnly} />}
           </ParticipantQuiz>}
         </div>

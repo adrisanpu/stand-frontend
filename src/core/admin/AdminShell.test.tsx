@@ -220,7 +220,7 @@ it('shows the game logo, event identity, creation date and real player count', a
 it('uses icon-only actions with accessible names and hover titles', async () => {
   mount()
   await screen.findByText('NEW_EVENT')
-  for (const name of ['Crear partida', 'Desactivar', 'Archivar']) {
+  for (const name of ['Crear partida', 'Pausar']) {
     const button = screen.getByRole('button', { name })
     expect(button).toHaveAttribute('title', name)
     expect(button).toHaveTextContent('')
@@ -235,6 +235,7 @@ it('uses icon-only actions with accessible names and hover titles', async () => 
   expect(configure).toHaveAttribute('title', 'Configurar partida')
   expect(configure.textContent).toBe('')
   expect(configure.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  expect(screen.queryByRole('button', { name: 'Archivar' })).not.toBeInTheDocument()
 })
 
 it('opens configuration over the existing filtered list, without navigating to the home', async () => {
@@ -275,11 +276,13 @@ it('switches the event table when another game reaches the centre of the showcas
   expect(stack).toHaveAttribute('aria-selected', 'true')
   expect(listbox).toHaveAttribute('aria-activedescendant', 'showcase-STACK')
   fireEvent.keyDown(listbox, { key: 'ArrowRight' })
+  expect(listbox).toHaveAttribute('aria-activedescendant', 'showcase-BASKET')
+  fireEvent.keyDown(listbox, { key: 'ArrowRight' })
   expect(listbox).toHaveAttribute('aria-activedescendant', 'showcase-EMPAREJA2')
   expect(screen.getByText('Este juego no tiene partidas.')).toBeInTheDocument()
 })
 
-it.each(['new_event', '2026-11-04', '4 nov', '17', 'new 17'])('filters the displayed fields using %s', async query => {
+it.each(['new_event', 'NEW', 'new event'])('filters event names using %s', async query => {
   vi.mocked(api.get).mockResolvedValue({
     ok: true, games: [game, { gameId: 'OTHER', gameName: 'Otra', gameType: 'STACK', playerCount: 8, createdAt: '2025-01-01T10:00:00Z' }],
   })
@@ -289,6 +292,14 @@ it.each(['new_event', '2026-11-04', '4 nov', '17', 'new 17'])('filters the displ
   expect(screen.getByText('NEW_EVENT')).toBeInTheDocument()
   expect(screen.queryByText('Otra')).not.toBeInTheDocument()
   expect(api.get).toHaveBeenCalledOnce()
+})
+
+it.each(['2026-11-04', '4 nov', '17', 'stack'])('does not filter other metadata using %s', async query => {
+  mount()
+  await screen.findByText('NEW_EVENT')
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: query } })
+  expect(screen.getByRole('status')).toHaveTextContent('No hay partidas que coincidan')
+  expect(screen.queryByRole('group', { name: 'Acciones de la partida seleccionada' })).not.toBeInTheDocument()
 })
 
 it('distinguishes no matches from no events and restores results on clearing', async () => {
@@ -301,10 +312,112 @@ it('distinguishes no matches from no events and restores results on clearing', a
   expect(screen.getByText('NEW_EVENT')).toBeInTheDocument()
 })
 
+const sortableGames = [
+  { ...game, gameId: 'B', gameName: 'Beta', isActive: false, lifecycleState: 'inactive', createdAt: '2026-11-01T08:00:00Z', playerCount: 2 },
+  { ...game, gameId: 'A', gameName: 'Alpha', lifecycleState: 'active', createdAt: '2026-11-04T08:00:00Z', playerCount: 17 },
+  { gameId: 'L', gameName: 'Legacy', gameType: 'STACK' },
+]
+const eventNames = () => screen.getAllByRole('rowheader').map(header => header.textContent)
+
+it('places global actions above the table and selected event actions in its last cell', async () => {
+  vi.mocked(api.get).mockResolvedValue({ ok: true, games: sortableGames })
+  mount('/admin/games?game=STACK')
+  await screen.findByText('Alpha')
+  expect(eventNames()).toEqual(['Alpha', 'Beta', 'Legacy'])
+  const globalActions = screen.getByRole('group', { name: 'Acciones de partidas' })
+  expect(within(globalActions).getByRole('button', { name: 'Crear partida' })).toBeInTheDocument()
+  expect(within(globalActions).getByRole('button', { name: 'Ver partidas archivadas' })).toBeInTheDocument()
+  expect(globalActions.closest('table')).toBeNull()
+  expect(globalActions.parentElement).toContainElement(screen.getByRole('searchbox'))
+  const selectedActions = screen.getByRole('group', { name: 'Acciones de la partida seleccionada' })
+  const alpha = screen.getByRole('rowheader', { name: 'Alpha' }).closest('tr')!
+  const beta = screen.getByRole('rowheader', { name: 'Beta' }).closest('tr')!
+  expect(alpha.lastElementChild).toContainElement(selectedActions)
+  expect(beta.lastElementChild).toBeEmptyDOMElement()
+  expect(within(alpha).getByRole('button', { name: 'Pausar' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Archivar' })).not.toBeInTheDocument()
+  fireEvent.click(beta)
+  expect(alpha.lastElementChild).toBeEmptyDOMElement()
+  expect(within(beta).getByRole('button', { name: 'Reanudar' })).toBeInTheDocument()
+  expect(within(beta).getByRole('button', { name: 'Archivar' })).toBeEnabled()
+  expect(screen.getAllByRole('group', { name: 'Acciones de la partida seleccionada' })).toHaveLength(1)
+})
+
+it.each([
+  ['Nombre', ['Alpha', 'Beta', 'Legacy'], ['Legacy', 'Beta', 'Alpha']],
+  ['Estado', ['Alpha', 'Beta', 'Legacy'], ['Beta', 'Alpha', 'Legacy']],
+  ['Creada', ['Beta', 'Alpha', 'Legacy'], ['Alpha', 'Beta', 'Legacy']],
+  ['Jugadores', ['Beta', 'Alpha', 'Legacy'], ['Alpha', 'Beta', 'Legacy']],
+])('sorts %s in both directions with missing metadata last', async (column, ascending, descending) => {
+  vi.mocked(api.get).mockResolvedValue({ ok: true, games: sortableGames })
+  mount('/admin/games?game=STACK')
+  await screen.findByText('Alpha')
+  expect(eventNames()).toEqual(['Alpha', 'Beta', 'Legacy'])
+  expect(screen.getByRole('columnheader', { name: 'Creada' })).toHaveAttribute('aria-sort', 'descending')
+  const button = screen.getByRole('button', { name: column })
+  fireEvent.click(button)
+  expect(eventNames()).toEqual(ascending)
+  expect(button.closest('th')).toHaveAttribute('aria-sort', 'ascending')
+  expect(document.querySelectorAll('[aria-sort]')).toHaveLength(1)
+  fireEvent.click(button)
+  expect(eventNames()).toEqual(descending)
+  expect(button.closest('th')).toHaveAttribute('aria-sort', 'descending')
+  expect(api.get).toHaveBeenCalledOnce()
+})
+
+it('keeps explicit selection while sorting and retains sorting while filtering names', async () => {
+  vi.mocked(api.get).mockResolvedValue({ ok: true, games: sortableGames })
+  mount('/admin/games?game=STACK')
+  await screen.findByText('Alpha')
+  fireEvent.click(screen.getByRole('radio', { name: 'Seleccionar Beta' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Nombre' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Nombre' }))
+  expect(screen.getByRole('radio', { name: 'Seleccionar Beta' })).toBeChecked()
+  expect(screen.getByRole('group', { name: 'Acciones de la partida seleccionada' }).closest('tr'))
+    .toContainElement(screen.getByRole('rowheader', { name: 'Beta' }))
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'a' } })
+  expect(eventNames()).toEqual(['Legacy', 'Beta', 'Alpha'])
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'ALPHÁ' } })
+  expect(eventNames()).toEqual(['Alpha'])
+  expect(screen.getByRole('radio', { name: 'Seleccionar Alpha' })).toBeChecked()
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
+  expect(eventNames()).toEqual(['Legacy', 'Beta', 'Alpha'])
+  expect(screen.getByRole('radio', { name: 'Seleccionar Beta' })).toBeChecked()
+})
+
+it('keeps tied sort values stable without mutating the API result', async () => {
+  const tied = sortableGames.slice(0, 2).map(item => ({ ...item, createdAt: game.createdAt, playerCount: 17 }))
+  vi.mocked(api.get).mockResolvedValue({ ok: true, games: tied })
+  mount('/admin/games?game=STACK')
+  await screen.findByText('Beta')
+  expect(eventNames()).toEqual(['Beta', 'Alpha'])
+  fireEvent.click(screen.getByRole('button', { name: 'Jugadores' }))
+  expect(eventNames()).toEqual(['Beta', 'Alpha'])
+  fireEvent.click(screen.getByRole('button', { name: 'Jugadores' }))
+  expect(eventNames()).toEqual(['Beta', 'Alpha'])
+  expect(tied.map(item => item.gameName)).toEqual(['Beta', 'Alpha'])
+})
+
+it('orders archived events with restore and delete actions only in the selected row', async () => {
+  const archived = sortableGames.slice(0, 2).map(item => ({ ...item, isActive: false, lifecycleState: 'inactive', archivedAt: '2026-11-20T08:00:00Z' }))
+  vi.mocked(api.get).mockResolvedValue({ ok: true, games: archived })
+  mount('/admin/games?archived=1&game=STACK')
+  await screen.findByText('Alpha')
+  expect(eventNames()).toEqual(['Alpha', 'Beta'])
+  const beta = screen.getByRole('rowheader', { name: 'Beta' }).closest('tr')!
+  expect(beta.lastElementChild).toBeEmptyDOMElement()
+  fireEvent.click(beta)
+  expect(within(beta).getByRole('button', { name: 'Desarchivar' })).toBeEnabled()
+  expect(within(beta).getByRole('button', { name: 'Borrar definitivamente' })).toBeEnabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Creada' }))
+  expect(eventNames()).toEqual(['Beta', 'Alpha'])
+  expect(screen.getByRole('radio', { name: 'Seleccionar Beta' })).toBeChecked()
+})
+
 it('opens the catalog over the list and closes with Escape, restoring focus and search', async () => {
   mount()
   await screen.findByText('NEW_EVENT')
-  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'stack' } })
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'new' } })
   const trigger = screen.getByRole('button', { name: 'Crear partida' })
   trigger.focus()
   fireEvent.click(trigger)
@@ -316,7 +429,7 @@ it('opens the catalog over the list and closes with Escape, restoring focus and 
   fireEvent.keyDown(dialog, { key: 'Escape' })
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(trigger).toHaveFocus()
-  expect(screen.getByRole('searchbox')).toHaveValue('stack')
+  expect(screen.getByRole('searchbox')).toHaveValue('new')
   expect(document.body.style.overflow).not.toBe('hidden')
 })
 
@@ -340,11 +453,11 @@ it('confirms deactivation, then reactivates without resetting the event', async 
   vi.mocked(api.put).mockResolvedValueOnce({ game: { gameId: 'NEW', isActive: false, lifecycleState: 'inactive' } })
     .mockResolvedValueOnce({ game: { gameId: 'NEW', isActive: true, lifecycleState: 'active' } })
   mount()
-  fireEvent.click(await screen.findByRole('button', { name: 'Desactivar' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Pausar' }))
   expect(api.put).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar desactivación' }))
-  fireEvent.click(await screen.findByRole('button', { name: 'Activar' }))
-  await screen.findByRole('button', { name: 'Desactivar' })
+  fireEvent.click(await screen.findByRole('button', { name: 'Reanudar' }))
+  await screen.findByRole('button', { name: 'Pausar' })
   expect(api.put).toHaveBeenNthCalledWith(1, '/v1/game', { gameId: 'NEW', isActive: false })
   expect(api.put).toHaveBeenNthCalledWith(2, '/v1/game', { gameId: 'NEW', isActive: true })
 })
@@ -380,9 +493,9 @@ it('allows archiving a closing STACK game to stop it immediately', async () => {
   vi.mocked(api.put).mockResolvedValue({ game: { gameId: 'NEW', isActive: false, lifecycleState: 'closing' } })
   vi.mocked(api.delete).mockResolvedValue({ gameId: 'NEW', message: 'Game archived successfully' })
   mount()
-  fireEvent.click(await screen.findByRole('button', { name: 'Desactivar' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Pausar' }))
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar desactivación' }))
-  expect(await screen.findByRole('button', { name: 'Desactivando…' })).toBeDisabled()
+  expect(await screen.findByRole('button', { name: 'Cerrando…' })).toBeDisabled()
   fireEvent.click(screen.getByRole('button', { name: 'Archivar' }))
   expect(screen.getByRole('dialog')).toHaveTextContent('Detiene el cierre y los trabajos pendientes.')
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar archivo' }))
@@ -406,7 +519,7 @@ it('updates closing events in the background without unmounting their cards', as
     await act(async () => {
       resolveRefresh({ ok: true, games: [{ ...game, isActive: false, lifecycleState: 'inactive' }] })
     })
-    expect(screen.getByRole('button', { name: 'Activar' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Reanudar' })).toBeEnabled()
     expect(screen.getByText('NEW_EVENT').closest('tr')).toBe(card)
   } finally {
     vi.useRealTimers()
@@ -443,11 +556,11 @@ it('switches lists using an accessible archive icon and retains search', async (
   fireEvent.click(screen.getByRole('button', { name: 'Ver partidas archivadas' }))
   expect(await screen.findByRole('button', { name: 'Desarchivar' })).toBeEnabled()
   expect(screen.getByRole('button', { name: 'Volver a partidas' })).toHaveAttribute('aria-pressed', 'true')
-  expect(screen.queryByRole('button', { name: 'Activar' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Reanudar' })).not.toBeInTheDocument()
   expect(screen.queryByRole('link', { name: /Entrar en/ })).not.toBeInTheDocument()
   expect(screen.getByRole('searchbox')).toHaveValue('new')
   fireEvent.click(screen.getByRole('button', { name: 'Volver a partidas' }))
-  expect(await screen.findByRole('button', { name: 'Desactivar' })).toBeEnabled()
+  expect(await screen.findByRole('button', { name: 'Pausar' })).toBeEnabled()
   expect(api.get).toHaveBeenNthCalledWith(2, '/v1/game?archived=true')
 })
 
@@ -506,7 +619,7 @@ it.each([
   })
   mount()
   const actionButton = await screen.findByRole('button', {
-    name: action === 'Pausar' ? 'Desactivar' : 'Archivar',
+    name: action,
   })
   const card = screen.getByRole('rowheader', { name: 'NEW_EVENT' }).closest('tr')
   expect(card).not.toBeNull()

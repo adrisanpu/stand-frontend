@@ -182,10 +182,19 @@ available panel dimension, with no border or padding. Extra panel space stays
 transparent, including when a component background was previously configured.
 Position and panel size use dragging, corner resizing or
 arrow keys only; the editor has no coordinate or dimension textboxes.
-Only the selected component shows its resize handle. A single compact toolbar
-above the canvas groups the **Add component** dropdown with contextual
-background (default, transparent or custom color), accent, normal text color,
-text size and bold controls. Its controls wrap on narrower screens. It edits
+The configuration navigation stays pinned at the top while panels scroll.
+Its right-hand action area shows the active panel's existing reload, export/
+download and save controls, retaining permissions, busy states and discard
+confirmations. Other panels' actions remain hidden; panels without these actions
+do not show placeholder buttons. Outside this dialog, editors keep local actions.
+
+Only the selected component shows its resize handle. A single orientation toggle
+and the **Add component** dropdown sit above the editing menu in the right column,
+aligned with the top of the canvas. The contextual menu has **Background** and
+**Font** sections for background media/colors and text color, accent, size and bold.
+The background dropdown loads its library automatically, without a library button.
+On narrower screens this column
+stacks below the canvas. It edits
 the canvas background by default;
 clicking empty canvas space or **Select background** returns to those settings.
 Canvas and component controls are never displayed as separate simultaneous

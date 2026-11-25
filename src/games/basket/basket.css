@@ -1,0 +1,89 @@
+.basket-play {
+  color: var(--color-text-main, #f5f7f8);
+}
+
+.basket-court-frame {
+  box-shadow: 0 16px 42px rgb(0 0 0 / 28%);
+  touch-action: pan-y;
+}
+
+.basket-canvas {
+  touch-action: pan-y;
+}
+
+.basket-shot-area {
+  cursor: grab;
+  touch-action: none;
+}
+
+.basket-shot-area:active {
+  cursor: grabbing;
+}
+
+.basket-hud-value {
+  display: flex;
+  min-width: 4.7rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 0.85rem;
+  background: rgb(255 255 255 / 6%);
+  padding: 0.4rem 0.65rem;
+  color: var(--color-text-sub, #b8c2c9);
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.basket-hud-value strong {
+  color: var(--color-text-main, #f5f7f8);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.basket-hud-value.is-urgent strong {
+  color: #ff9a68;
+}
+
+.basket-primary-button {
+  min-height: 3.2rem;
+  border-radius: 1rem;
+  background: var(--color-primary, #e85d32);
+  padding: 0.8rem 1rem;
+  color: #fff;
+  font-weight: 750;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.basket-primary-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.basket-primary-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.basket-primary-button:focus-visible {
+  outline: 3px solid var(--color-accent, #f4cf72);
+  outline-offset: 3px;
+}
+
+.basket-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.basket-result-card {
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 1.25rem;
+  background: rgb(255 255 255 / 5%);
+  padding: 1.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .basket-primary-button {
+    transition: none;
+  }
+}

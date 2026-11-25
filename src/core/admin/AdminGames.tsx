@@ -13,6 +13,9 @@ export default function AdminGames() {
   const [params, setParams] = useSearchParams()
   const archived = params.get('archived') === '1'
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<{ column: 'name' | 'status' | 'created' | 'players'; direction: 'ascending' | 'descending' }>({
+    column: 'created', direction: 'descending',
+  })
   const [games, setGames] = useState<OperatorGame[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [version, setVersion] = useState(0)
@@ -119,13 +122,37 @@ export default function AdminGames() {
     setParams(next, { replace: true })
   }
   const typeGames = games.filter(game => typeOf(game) === selectedType)
-  const filtered = typeGames.filter(game => {
-    const fields = normalize([
-      game.gameName, game.gameType, getGameById(game.gameType)?.name ?? '',
-      game.createdAt ?? '', dateLabel(game), game.playerCount?.toString() ?? '',
-    ].join(' '))
-    return terms.every(term => fields.includes(term))
+  const statusLabel = (game: OperatorGame) => {
+    if (archived) return t('Archivada', 'Archived')
+    if (game.lifecycleState === 'closing' || (!game.lifecycleState && game.stackPrizeState === 'closing')) return t('Cerrando', 'Closing')
+    if (game.isActive === true) return t('Activa', 'Active')
+    if (game.isActive === false) return t('Pausada', 'Paused')
+    return t('No disponible', 'Unavailable')
+  }
+  const sortValue = (game: OperatorGame) => {
+    switch (sort.column) {
+      case 'name': return game.gameName
+      case 'status': return archived || game.isActive !== undefined || game.lifecycleState === 'closing' || game.stackPrizeState === 'closing'
+        ? statusLabel(game) : undefined
+      case 'created': return game.createdAt ? Date.parse(game.createdAt) : undefined
+      case 'players': return game.playerCount
+    }
+  }
+  const filtered = typeGames.filter(game => terms.every(term => normalize(game.gameName).includes(term))).sort((left, right) => {
+    const a = sortValue(left)
+    const b = sortValue(right)
+    if (a === undefined) return b === undefined ? 0 : 1
+    if (b === undefined) return -1
+    const comparison = typeof a === 'number' && typeof b === 'number'
+      ? a - b : String(a).localeCompare(String(b), language, { sensitivity: 'base' })
+    return sort.direction === 'ascending' ? comparison : -comparison
   })
+  const columns = [
+    { id: 'name', label: t('Nombre', 'Name') },
+    { id: 'status', label: t('Estado', 'Status') },
+    { id: 'created', label: t('Creada', 'Created') },
+    { id: 'players', label: t('Jugadores', 'Players') },
+  ] as const
   const setCatalogOpen = (open: boolean) => {
     const next = new URLSearchParams(params)
     if (open) next.set('create', '1')
@@ -159,7 +186,7 @@ export default function AdminGames() {
     const isClosing = !!game && (game.lifecycleState === 'closing' || (!game.lifecycleState && game.stackPrizeState === 'closing'))
     const canEnter = !!game && (game.isActive === true || !!game.lifecycleState || (stack && (game.stackPrizeState === 'closing' || game.stackPrizeState === 'closed')))
     const blocked = !game || busyId !== null || !!actionError
-    const activityLabel = isClosing ? t('Desactivando…', 'Deactivating…') : game?.isActive ? t('Desactivar', 'Deactivate') : t('Activar', 'Activate')
+    const activityLabel = isClosing ? t('Cerrando…', 'Closing…') : game?.isActive ? t('Pausar', 'Pause') : t('Reanudar', 'Resume')
     return <>
       <div className="flex flex-wrap gap-2">
         {archived ? <>
@@ -190,9 +217,9 @@ export default function AdminGames() {
             onClick={() => { if (game) { if (game.isActive) setConfirm({ gameId: game.gameId, action: 'deactivate' }); else void runAction(game, 'toggle') } }}>
             <ActionIcon name={isClosing ? 'closing' : game?.isActive ? 'deactivate' : 'activate'} />
           </button>
-          <button type="button" disabled={blocked || game?.isActive !== false} className="rounded-xl border border-red-400/40 p-3 disabled:opacity-50"
+          {game?.isActive === false && <button type="button" disabled={blocked} className="rounded-xl border border-red-400/40 p-3 disabled:opacity-50"
             aria-label={t('Archivar', 'Archive')} title={t('Archivar', 'Archive')}
-            onClick={() => game && setConfirm({ gameId: game.gameId, action: 'archive' })}><ActionIcon name="archive" /></button>
+            onClick={() => setConfirm({ gameId: game.gameId, action: 'archive' })}><ActionIcon name="archive" /></button>}
         </>}
       </div>
       {game?.deletionStartedAt && <p role="status" className="text-xs text-textSub">{t(
@@ -207,13 +234,6 @@ export default function AdminGames() {
       {game?.isActive === false && !archived && !canEnter && <p className="text-xs text-textSub">{t('Activa la partida para entrar.', 'Activate the event to open it.')}</p>}
       {game && busyId === game.gameId && <p role="status" className="text-sm">{t('Guardando…', 'Saving…')}</p>}
     </>
-  }
-  const statusLabel = (game: OperatorGame) => {
-    if (archived) return t('Archivada', 'Archived')
-    if (game.lifecycleState === 'closing' || (!game.lifecycleState && game.stackPrizeState === 'closing')) return t('Cerrando', 'Closing')
-    if (game.isActive === true) return t('Activa', 'Active')
-    if (game.isActive === false) return t('Pausada', 'Paused')
-    return t('No disponible', 'Unavailable')
   }
   return (
     <div className="mt-6 space-y-5">
@@ -238,15 +258,14 @@ export default function AdminGames() {
       {ready && <GameShowcase games={catalog} counts={counts} selectedId={selectedType} onSelect={selectGameType}
         onOpen={archived ? undefined : () => setCatalogOpen(true)} />}
       <div className="card space-y-3 p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="w-full sm:min-w-72 sm:max-w-xl sm:flex-1">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1 sm:max-w-xl">
             <label htmlFor="event-search" className="sr-only">{t('Buscar partidas', 'Search events')}</label>
             <input id="event-search" type="search" value={search} onChange={event => setSearch(event.target.value)}
-              placeholder={t('Buscar por partida, fecha o jugadores…', 'Search by event, date or players…')}
+              placeholder={t('Buscar por nombre de partida…', 'Search by event name…')}
               className="w-full rounded-xl border border-current/20 bg-surface px-4 py-3 text-base text-textMain" />
           </div>
-          <div className="flex shrink-0 items-center gap-2 sm:order-first">
+          <div role="group" aria-label={t('Acciones de partidas', 'Event list actions')} className="ml-auto flex shrink-0 items-center gap-2">
             <button type="button" disabled={busyId !== null} aria-pressed={archived}
               aria-label={archived ? t('Volver a partidas', 'Back to events') : t('Ver partidas archivadas', 'View archived events')}
               title={archived ? t('Volver a partidas', 'Back to events') : t('Ver partidas archivadas', 'View archived events')}
@@ -267,17 +286,25 @@ export default function AdminGames() {
               <ActionIcon name="create" />
             </button>
           </div>
-        </div>
-        <div role="group" aria-label={t('Acciones de la partida seleccionada', 'Selected event actions')}
-          className="space-y-2 lg:max-w-sm">{renderActions(chosenGame)}</div>
       </div>
       {ready && filtered.length > 0 && <div className="overflow-x-auto">
           <table className="admin-table w-full text-left text-sm" aria-label={archived ? t('Partidas archivadas', 'Archived events') : t('Mis partidas', 'My events')}>
             <caption className="sr-only">{archived ? t('Partidas archivadas', 'Archived events') : t('Mis partidas', 'My events')}</caption>
             <thead><tr>
               <th scope="col" className="p-2"><span className="sr-only">{t('Selección', 'Selection')}</span></th>
-              {[t('Nombre', 'Name'), t('Estado', 'Status'), t('Creada', 'Created'), t('Jugadores', 'Players')]
-              .map(label => <th key={label} scope="col" className="p-2 whitespace-nowrap">{label}</th>)}</tr></thead>
+              {columns.map(column => <th key={column.id} scope="col" className="p-2 whitespace-nowrap"
+                aria-sort={sort.column === column.id ? sort.direction : undefined}>
+                <button type="button" className="inline-flex items-center gap-2 rounded px-1 py-2"
+                  onClick={() => setSort(current => ({
+                    column: column.id,
+                    direction: current.column === column.id && current.direction === 'ascending' ? 'descending' : 'ascending',
+                  }))}>
+                  {column.label}
+                  {sort.column === column.id && <span aria-hidden="true">{sort.direction === 'ascending' ? '↑' : '↓'}</span>}
+                </button>
+              </th>)}
+              <th scope="col" className="p-2">{t('Acciones', 'Actions')}</th>
+            </tr></thead>
             <tbody>{filtered.map(game => {
               const selected = chosenGame?.gameId === game.gameId
               return <tr key={game.gameId} onClick={() => { if (busyId === null) setChosenId(game.gameId) }}
@@ -291,6 +318,10 @@ export default function AdminGames() {
                 <td className="p-2 whitespace-nowrap">{statusLabel(game)}</td>
                 <td className="p-2 whitespace-nowrap">{game.createdAt ? <time dateTime={game.createdAt}>{dateLabel(game)}</time> : dateLabel(game)}</td>
                 <td className="p-2 tabular-nums">{game.playerCount ?? t('No disponible', 'Unavailable')}</td>
+                <td className="w-64 p-2 align-middle" onClick={event => event.stopPropagation()}>
+                  {selected && <div role="group" aria-label={t('Acciones de la partida seleccionada', 'Selected event actions')}
+                    className="space-y-2">{renderActions(game)}</div>}
+                </td>
               </tr>
             })}</tbody>
           </table>

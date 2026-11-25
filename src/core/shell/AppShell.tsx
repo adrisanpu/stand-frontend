@@ -140,7 +140,8 @@ function AppContent({ initialGame, onReturnToAdmin }: AppShellProps) {
   }, [gameId, definitionId, version])
 
   const catalog = current?.prizeCatalog
-  const rules = gameDefinition?.id === 'STACK' ? current?.stackPrizeRules : undefined
+  const isBasket = gameDefinition?.id === 'BASKET'
+  const rules = ['STACK', 'BASKET'].includes(gameDefinition?.id ?? '') ? current?.stackPrizeRules : undefined
   const showRaffle = features.raffles && current?.game?.showRaffleOnHome !== false
   const showRanking = !!gameDefinition?.showRanking
   const label = (key: string) => typeof gameSettings?.[key] === 'string' ? gameSettings[key] as string : undefined
@@ -148,7 +149,9 @@ function AppContent({ initialGame, onReturnToAdmin }: AppShellProps) {
     : catalog !== undefined ? catalog.ranking?.topX
     : typeof gameSettings?.topX === 'number' ? gameSettings.topX : undefined
   const homePrizes: HomePrize[] = rules
-    ? stackPrizePromotions(rules, t, ['completed', 'score', 'top_finish', 'top_final', ...(showRaffle ? ['raffle' as const] : [])])
+    ? stackPrizePromotions(rules, t, isBasket
+      ? ['score', 'top_finish', 'top_final']
+      : ['completed', 'score', 'top_finish', 'top_final', ...(showRaffle ? ['raffle' as const] : [])])
       .map(prize => ({ ...prize, heading: prize.heading || (prize.id.startsWith('raffle:') ? t('Sorteo', 'Raffle') : t('Premio', 'Prize')) }))
     : [
         { slot: 'validation' as const, heading: t('Premio', 'Prize'), prize: catalog !== undefined ? catalog.validation

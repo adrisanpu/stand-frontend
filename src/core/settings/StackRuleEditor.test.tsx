@@ -85,3 +85,22 @@ it('does not offer manual raffles on a plan without raffles', () => {
   render(<Harness raffles={false} />)
   expect(screen.queryByRole('option', { name: 'gane un sorteo' })).not.toBeInTheDocument()
 })
+
+it('limits BASKET rules to score and final ranking conditions', () => {
+  const allowedConditions = ['score', 'top_finish', 'top_final'] as const
+  function BasketHarness() {
+    const [rules, setRules] = useState<StackPrizeRule[]>([])
+    return <>
+      <StackRuleEditor rules={rules} catalog={catalog} raffles={false} allowedConditions={allowedConditions} onChange={setRules} />
+      <output data-testid="basket-rules">{JSON.stringify(rules)}</output>
+    </>
+  }
+  render(<BasketHarness />)
+  fireEvent.click(screen.getByRole('button', { name: 'Añadir regla' }))
+  expect(JSON.parse(screen.getByTestId('basket-rules').textContent!)[0].condition).toBe('score')
+  expect(screen.queryByRole('option', { name: 'complete una partida' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('option', { name: 'gane un sorteo' })).not.toBeInTheDocument()
+  expect(invalidStackRules([
+    { id: 'legacy', condition: 'completed', groups: [{ allocations: [{ prizeId: 'pizza', quantity: 1 }] }] },
+  ], allowedConditions)).toBe(true)
+})

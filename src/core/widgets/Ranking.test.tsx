@@ -73,6 +73,13 @@ describe('Ranking game score formatting', () => {
     expect(screen.queryByText(/ms$/)).not.toBeInTheDocument()
   })
 
+  it('shows BASKET score as a plain number, including zero, without units', async () => {
+    vi.mocked(api.get).mockResolvedValue({ ok: true, results: [{ rank: 1, username: 'Rosa', score: 0 }] })
+    render(<Ranking gameId="GAME1234" gameType="BASKET" />)
+    expect(await screen.findByTestId('ranking-score')).toHaveTextContent(/^0$/)
+    expect(screen.queryByText(/bloques|canastas|puntos$/i)).not.toBeInTheDocument()
+  })
+
   it('shows T1MER time without units', async () => {
     vi.mocked(api.get).mockResolvedValue({ ok: true, results: [{ rank: 1, username: 'Rosa', timer: 10.1, score: 100 }] })
     render(<Ranking gameId="GAME1234" gameType="T1MER" />)
