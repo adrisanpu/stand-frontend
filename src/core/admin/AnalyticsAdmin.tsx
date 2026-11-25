@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type PointerEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { getFormResponses, type FormResponsePlayer, type FormResponseQuestion, type FormResponses } from '../../api/formResponses'
 import { listOperatorGames, type OperatorGame } from '../../api/operatorGames'
@@ -122,38 +122,101 @@ function RegistrationChart({ points, prizeEvents, language, t }: {
   const maxCount = allPoints.reduce((max, point) => Math.max(max, point.count), 1)
   const firstTimestamp = allPoints.reduce((min, point) => Math.min(min, point.timestamp), Infinity)
   const lastTimestamp = allPoints.reduce((max, point) => Math.max(max, point.timestamp), -Infinity)
-  const x = (timestamp: number) => firstTimestamp === lastTimestamp
+  const [timeRange, setTimeRange] = useState<{ start: number; end: number } | null>(null)
+  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null)
+  const [dragStart, setDragStart] = useState<number | null>(null)
+  useEffect(() => {
+    setTimeRange(null)
+    setSelection(null)
+    setDragStart(null)
+  }, [firstTimestamp, lastTimestamp])
+  const visibleStart = timeRange?.start ?? firstTimestamp
+  const visibleEnd = timeRange?.end ?? lastTimestamp
+  const x = (timestamp: number) => visibleStart === visibleEnd
     ? (left + right) / 2
-    : left + (timestamp - firstTimestamp) / (lastTimestamp - firstTimestamp) * (right - left)
+    : left + (timestamp - visibleStart) / (visibleEnd - visibleStart) * (right - left)
   const y = (count: number) => bottom - count / maxCount * (bottom - top)
-  const path = (values: RegistrationPoint[]) => `M ${left} ${bottom} ` + values.map(point =>
-    `H ${x(point.timestamp)} V ${y(point.count)}`,
-  ).join(' ') + ` H ${right}`
+  const visiblePoints = (values: RegistrationPoint[]) =>
+    values.filter(point => point.timestamp >= visibleStart && point.timestamp <= visibleEnd)
+  const path = (values: RegistrationPoint[]) => {
+    const preceding = [...values].reverse().find(point => point.timestamp < visibleStart)
+    const points = [
+      ...(preceding ? [{ timestamp: visibleStart, count: preceding.count }] : []),
+      ...visiblePoints(values),
+    ]
+    return `M ${left} ${bottom} ` + points.map(point =>
+      `H ${x(point.timestamp)} V ${y(point.count)}`,
+    ).join(' ') + ` H ${right}`
+  }
+  const pointerX = (event: PointerEvent<SVGSVGElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    if (!bounds.width) return null
+    return Math.max(left, Math.min(right, (event.clientX - bounds.left) / bounds.width * 720))
+  }
+  const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
+    if (visibleStart >= visibleEnd || event.button !== 0) return
+    const position = pointerX(event)
+    if (position === null) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    setDragStart(position)
+    setSelection({ start: position, end: position })
+  }
+  const onPointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    if (dragStart === null) return
+    const position = pointerX(event)
+    if (position !== null) setSelection({ start: dragStart, end: position })
+  }
+  const onPointerUp = (event: PointerEvent<SVGSVGElement>) => {
+    if (dragStart === null) return
+    const position = pointerX(event)
+    if (position !== null && Math.abs(position - dragStart) >= 8) {
+      const start = visibleStart + (Math.min(position, dragStart) - left) / (right - left) * (visibleEnd - visibleStart)
+      const end = visibleStart + (Math.max(position, dragStart) - left) / (right - left) * (visibleEnd - visibleStart)
+      if (start < end) setTimeRange({ start, end })
+    }
+    setDragStart(null)
+    setSelection(null)
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
+  const chartSeries = series.map(item => ({ ...item, visiblePoints: visiblePoints(item.points) }))
   const dateFormat = new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'es-ES', {
     dateStyle: 'medium', timeStyle: 'short',
   })
 
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-center">
+      {firstTimestamp !== lastTimestamp && <div className="flex items-center justify-between gap-2 text-xs text-textSub">
+        <p>{t('Arrastra sobre el gráfico para ampliar un intervalo.', 'Drag across the chart to zoom into a range.')}</p>
+        {timeRange && <button type="button" className="shrink-0 underline"
+          onClick={() => setTimeRange(null)}>{t('Restablecer zoom', 'Reset zoom')}</button>}
+      </div>}
       {allPoints.length === 0 ? <p className="mb-4 text-sm text-textSub">
         {t('No hay fechas de registro o premios disponibles.', 'No registration or prize timestamps are available.')}
       </p> : <svg role="img" aria-label={t('Evolución de registros y premios en el tiempo', 'Registrations and prizes over time')}
-        viewBox="0 0 720 220" className="h-56 min-h-0 w-full">
+        viewBox="0 0 720 220" className="h-56 min-h-0 w-full cursor-crosshair touch-none select-none"
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+        onPointerCancel={() => { setDragStart(null); setSelection(null) }}>
         <line x1={left} y1={bottom} x2={right} y2={bottom} stroke="currentColor" opacity=".2" />
         <line x1={left} y1={top} x2={left} y2={bottom} stroke="currentColor" opacity=".2" />
         {[0, maxCount].map(count => <text key={count} x={left - 8} y={y(count) + 4}
           textAnchor="end" className="fill-current text-[11px]">{count}</text>)}
-        {series.map(item => <g key={item.label} aria-label={item.label}>
+        {selection && <rect x={Math.min(selection.start, selection.end)} y={top}
+          width={Math.abs(selection.end - selection.start)} height={bottom - top}
+          fill="var(--color-primary, #FF931F)" opacity=".15" pointerEvents="none" />}
+        {chartSeries.map(item => <g key={item.label} aria-label={item.label}>
           <path d={path(item.points)} fill="none" stroke={item.color} strokeWidth="3"
             strokeDasharray={item.dash} vectorEffect="non-scaling-stroke" />
-          {item.points.map(point => <circle key={point.timestamp} cx={x(point.timestamp)} cy={y(point.count)} r="4"
+          {item.visiblePoints.map(point => <circle key={point.timestamp} cx={x(point.timestamp)} cy={y(point.count)} r="4"
             fill={item.color}><title>{`${item.label}: ${dateFormat.format(point.timestamp)} · ${point.count}`}</title></circle>)}
         </g>)}
         <text x={left} y="210" textAnchor="start" className="fill-current text-[11px]">
-          {dateFormat.format(firstTimestamp)}
+          {dateFormat.format(visibleStart)}
         </text>
         <text x={right} y="210" textAnchor="end" className="fill-current text-[11px]">
-          {dateFormat.format(lastTimestamp)}
+          {dateFormat.format(visibleEnd)}
         </text>
       </svg>}
       <ul aria-label={t('Leyenda de evolución', 'Timeline legend')} className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-textSub">

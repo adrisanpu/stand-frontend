@@ -114,6 +114,34 @@ it('shows cumulative award and redemption series on the registration time axis',
   expect(screen.getByRole('list', { name: 'Timeline legend' })).toHaveTextContent('Prizes redeemed: 1')
 })
 
+it('zooms to a dragged time range across all series and can reset the full range', async () => {
+  vi.mocked(getFormResponses).mockResolvedValue({
+    ...responses,
+    prizeEvents: [
+      { kind: 'awarded', timestamp: '2026-01-01T15:04:05Z' },
+      { kind: 'redeemed', timestamp: '2026-01-02T00:00:00Z' },
+    ],
+  })
+  mount()
+  const chart = await screen.findByRole('img', { name: 'Evolución de registros y premios en el tiempo' })
+  vi.spyOn(chart, 'getBoundingClientRect').mockReturnValue({
+    x: 0, y: 0, left: 0, top: 0, right: 720, bottom: 220, width: 720, height: 220,
+    toJSON: () => ({}),
+  })
+
+  fireEvent(chart, new MouseEvent('pointerdown', { bubbles: true, clientX: 44, button: 0 }))
+  fireEvent(chart, new MouseEvent('pointermove', { bubbles: true, clientX: 360 }))
+  fireEvent(chart, new MouseEvent('pointerup', { bubbles: true, clientX: 360 }))
+
+  expect(chart.querySelector('text[x="676"]')).not.toHaveTextContent('2 ene')
+  expect(screen.getByRole('button', { name: 'Restablecer zoom' })).toBeInTheDocument()
+  expect(chart.querySelector('g[aria-label="Registros acumulados"] circle')).toHaveAttribute('cx', '44')
+  expect(chart.querySelector('g[aria-label="Premios repartidos"] circle')).toHaveAttribute('cx', '676')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Restablecer zoom' }))
+  expect(chart.querySelector('text[x="676"]')).toHaveTextContent('2 ene')
+})
+
 it('shows prize events even without registration timestamps and handles a single timestamp', async () => {
   vi.mocked(getFormResponses).mockResolvedValue({
     ...responses, players: [], prizeEvents: [
