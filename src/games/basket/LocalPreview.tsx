@@ -165,8 +165,8 @@ export default function BasketLocalPreview() {
     {feedback && <p role="status" className="min-h-5 text-center text-sm text-accent">{feedback}</p>}
     {error && <p role="alert" className="text-center text-sm text-red-200">{error}</p>}
     {phase === 'ready' && <div className="space-y-3">
-      <p className="text-sm leading-relaxed">{t('Tienes 30 segundos. Desliza hacia arriba desde el balón; la dirección y la velocidad cambian el lanzamiento. Cada canasta vale un punto.',
-        'You have 30 seconds. Swipe upward from the ball; direction and speed shape each shot. Every basket earns one point.')}</p>
+      <p className="text-sm leading-relaxed">{t('Tienes 30 segundos. Desliza desde el balón para apuntar. La fuerza es automática: solo importan la dirección y el momento del tiro. Cada canasta vale un punto.',
+        'You have 30 seconds. Swipe from the ball to aim. Power is automatic: only direction and timing matter. Every basket earns one point.')}</p>
       <button type="button" className="basket-primary-button w-full" disabled={!!error} onClick={start}>
         {t('Empezar prueba local', 'Start local preview')}
       </button>

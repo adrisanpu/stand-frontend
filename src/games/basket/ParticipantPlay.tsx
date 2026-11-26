@@ -454,8 +454,8 @@ export default function BasketParticipantPlay({
     {phase === 'loading' && <p role="status" className="text-center text-textSub">{t('Recuperando tu intento…', 'Recovering your attempt…')}</p>}
     {(phase === 'ready' || phase === 'start-retry') && <div className="space-y-3">
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-relaxed">
-        <p>{t('Tienes 30 segundos. Desliza hacia arriba desde el balón; la dirección y la velocidad cambian el lanzamiento.',
-          'You have 30 seconds. Swipe upward from the ball; direction and speed shape the shot.')}</p>
+        <p>{t('Tienes 30 segundos. Desliza desde el balón para apuntar. La fuerza es automática: solo importan la dirección y el momento del tiro.',
+          'You have 30 seconds. Swipe from the ball to aim. Power is automatic: only direction and timing matter.')}</p>
         <p className="mt-1 text-textSub">{t('El aro se mueve. Cada canasta vale un punto y solo puedes tener un balón en vuelo.',
           'The hoop moves. Each basket is one point, and only one ball can be in flight.')}</p>
       </div>

@@ -478,6 +478,22 @@ Before event/production sign-off, use a fresh **test event** on physical iOS and
 
 ---
 
+## BASKET swipe controls
+
+Official play and `/preview/BASKET` share `basketShotFromGesture`. Swipe direction
+controls lateral aim, independently of swipe speed or length after the minimum
+gesture threshold. Vertical and forward velocities are fixed at 7.8 and -7.413
+world units/s, calibrated to descend through the hoop's height at its depth.
+Lateral velocity is the horizontal/upward direction ratio multiplied by 3,
+bounded to +/-3. There is no automatic aiming at the moving hoop: direction,
+release timing and existing collisions determine the result.
+
+Physics, hoop movement, collision rules and the server's v1 replay remain
+unchanged. Existing attempts and results need no migration; the client only
+generates a narrower subset of valid v1 shots. This does not cap every later
+velocity during gravity or a rebound. Final touch sensitivity still needs
+physical-device feedback.
+
 ## Authentication
 
 - **Flow:** In-app login UI (`/login`) → Cognito `USER_PASSWORD_AUTH` → tokens in `sessionStorage` (`stand_tokens`) → bootstrap `POST /v1/user` → `/home`.

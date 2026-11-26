@@ -83,20 +83,16 @@ export function basketShotFromGesture(gesture: BasketGestureSample): BasketShot 
   const { deltaX, upwardPixels, width, height, durationMs, atMs } = gesture
   if (![deltaX, upwardPixels, width, height, durationMs, atMs].every(Number.isFinite)
     || width <= 0 || height <= 0 || !Number.isInteger(atMs) || atMs < 0 || atMs >= 30_000
-    || durationMs < 80 || durationMs > 1_500 || upwardPixels <= 0) return null
+    || durationMs <= 0 || upwardPixels <= 0) return null
   const normalizedX = deltaX / width
   const normalizedUp = upwardPixels / height
   const distance = Math.hypot(normalizedX, normalizedUp)
   if (normalizedUp < 0.07 || distance < 0.08) return null
-  const seconds = durationMs / 1_000
-  const horizontalSpeed = normalizedX / seconds
-  const upwardSpeed = normalizedUp / seconds
-  const force = clamp((upwardSpeed - 0.2) / 1.05, 0, 1)
   const shot = {
     atMs,
-    vx: Math.round(clamp(horizontalSpeed * 2.5, -5, 5) * 1_000),
-    vy: Math.round((6 + force * 4) * 1_000),
-    vz: -Math.round((5 + force * 6) * 1_000),
+    vx: Math.round(clamp(deltaX / upwardPixels * 3, -3, 3) * 1_000),
+    vy: 7_800,
+    vz: -7_413,
   }
   return isBasketShot(shot) ? shot : null
 }
