@@ -488,6 +488,9 @@ Lateral velocity is the horizontal/upward direction ratio multiplied by 3,
 bounded to +/-3. There is no automatic aiming at the moving hoop: direction,
 release timing and existing collisions determine the result.
 
+The configuration dialog's Game tab also runs the local BASKET demo without
+editable mechanic settings; its preview keeps a minimum height on narrow screens.
+
 Physics, hoop movement, collision rules and the server's v1 replay remain
 unchanged. Existing attempts and results need no migration; the client only
 generates a narrower subset of valid v1 shots. This does not cap every later

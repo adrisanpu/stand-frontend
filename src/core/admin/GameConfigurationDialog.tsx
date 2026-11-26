@@ -362,9 +362,9 @@ export default function GameConfigurationDialog({ gameId: existingId, gameType, 
             {message && <p role={saveError ? 'alert' : 'status'}>{message}</p>}
             </div>
             {section === 'configuration' && <aside aria-label={t('Prueba del juego', 'Game trial')}
-              className="flex min-h-0 min-w-0 w-full flex-col overflow-hidden rounded-xl border border-current/20 p-5">
+              className="flex min-h-80 min-w-0 w-full flex-col overflow-hidden rounded-xl border border-current/20 p-5">
               <h3 className="mb-3 shrink-0 font-semibold">{t('Vista previa', 'Preview')}</h3>
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="min-h-0 flex-auto overflow-y-auto">
                 {!Component || mechanicsDraft
                   ? <GamePlayPreview gameType={data.game.gameType} settings={Component ? mechanicsDraft! : settings} gameId={gameId}
                     frame={{ ...phoneFrame, prizeCatalog: data.prizeCatalog }} />

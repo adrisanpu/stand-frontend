@@ -129,9 +129,9 @@ describe('isolated playable previews', () => {
     expect(scenes.dispose).toHaveBeenCalledTimes(2)
   })
 
-  it('runs the local BASKET preview without official APIs and disposes its scene', () => {
+  it.each([{}, undefined])('runs the local BASKET preview with settings %j and disposes its scene', settings => {
     vi.spyOn(performance, 'now').mockImplementation(() => Date.now())
-    const view = render(<GamePlayPreview gameType="BASKET" settings={{}} />)
+    const view = render(<GamePlayPreview gameType="BASKET" settings={settings} />)
     expect(previewConfigurationError('BASKET', {})).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Empezar prueba local' }))
     act(() => vi.advanceTimersByTime(32_100))

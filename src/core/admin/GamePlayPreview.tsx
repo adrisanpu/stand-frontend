@@ -45,9 +45,9 @@ export default function GamePlayPreview({ gameType, settings, gameId, content, f
       window.removeEventListener('pageshow', visibility)
     }
   }, [])
-  if (settings === undefined) return <StaticGamePlayPreview gameType={gameType} />
   const type = normalizeGameType(gameType)
-  const error = previewConfigurationError(type, settings, t)
+  if (settings === undefined && type !== 'BASKET') return <StaticGamePlayPreview gameType={gameType} />
+  const error = previewConfigurationError(type, settings ?? {}, t)
   return <section className="flex min-h-full flex-col gap-3" aria-label={t('Prueba jugable aislada', 'Isolated playable preview')}>
     {changed && <p role="status">{t('La configuración ha cambiado. La prueba se ha reiniciado con el borrador.', 'Settings changed. The preview restarted with the draft.')}</p>}
     {showReset && <div className="flex justify-end">
@@ -59,7 +59,7 @@ export default function GamePlayPreview({ gameType, settings, gameId, content, f
     {error ? <p role="alert">{error}</p> : hidden ? <p role="status">{t('Prueba detenida al salir de esta pestaña. Se reiniciará al volver.', 'Preview stopped when leaving this tab. It will restart on return.')}</p>
       : <ParticipantPhonePreview gameType={type} screen="play" language={language} {...frame}
         label={t('Vista en el móvil del participante', 'Participant phone view')}>
-        <PlayableGamePreview key={`${type}:${gameId ?? ''}:${signature}:${reset}`} gameType={type} settings={mechanics.current.settings!}
+        <PlayableGamePreview key={`${type}:${gameId ?? ''}:${signature}:${reset}`} gameType={type} settings={mechanics.current.settings ?? {}}
           gameId={gameId} content={content} />
       </ParticipantPhonePreview>}
   </section>

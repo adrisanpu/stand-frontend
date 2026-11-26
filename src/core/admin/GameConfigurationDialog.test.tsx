@@ -100,7 +100,7 @@ it('keeps the settings navigation sticky and shows only the current panel action
   expect(screen.queryByRole('button', { name: 'Guardar condiciones' })).not.toBeInTheDocument()
 })
 
-it.each(['STACK', 'T1MER', 'EMPAREJA2', 'RULET4', 'L3TRAS', 'IMPOSTOR', 'SEMAFORO', 'INFOCARDS'])(
+it.each(['STACK', 'BASKET', 'T1MER', 'EMPAREJA2', 'RULET4', 'L3TRAS', 'IMPOSTOR', 'SEMAFORO', 'INFOCARDS'])(
   'uses shared responsive configuration and preview columns for %s', async gameType => {
     snapshot.game.gameType = gameType
     snapshot.game.type = {}
@@ -111,6 +111,8 @@ it.each(['STACK', 'T1MER', 'EMPAREJA2', 'RULET4', 'L3TRAS', 'IMPOSTOR', 'SEMAFOR
     mount()
     const preview = await screen.findByRole('complementary', { name: 'Prueba del juego' })
     const grid = preview.parentElement!
+    expect(preview).toHaveClass('min-h-80')
+    expect(preview.lastElementChild).toHaveClass('flex-auto')
     expect(grid).toHaveClass('grid', 'lg:grid-cols-2')
     expect(grid.children).toHaveLength(2)
     expect(grid.lastElementChild).toBe(preview)
